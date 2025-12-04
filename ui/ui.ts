@@ -1,4 +1,4 @@
-// version: 1.2.0
+// version: 1.3.0
 
 class UI {
 
@@ -94,7 +94,7 @@ class UI {
 
             const child =
                 childParams.type === 'container' ? UI.createContainer(childParams) :
-                childParams.type === 'text' ? UI.createText(childParams) :
+                childParams.type === 'text' ? UI.createText(childParams as UI.TextParams) :
                 childParams.type === 'button' ? UI.createButton(childParams as UI.ButtonParams) :
                 undefined;
 
@@ -138,7 +138,7 @@ class UI {
             params.bgColor ?? UI.COLORS.WHITE,
             params.bgAlpha ?? 0,
             params.bgFill ?? mod.UIBgFill.None,
-            params.message ?? mod.Message(""),
+            params.message,
             params.textSize ?? 36,
             params.textColor ?? UI.COLORS.BLACK,
             params.textAlpha ?? 1,
@@ -307,11 +307,11 @@ class UI {
 namespace UI {
 
     export enum Type {
-        Root = "root",
-        Container = "container",
-        Text = "text",
-        Button = "button",
-        Unknown = "unknown",
+        Root = 'root',
+        Container = 'container',
+        Text = 'text',
+        Button = 'button',
+        Unknown = 'unknown',
     }
 
     export type Node = {
@@ -373,7 +373,7 @@ namespace UI {
     }
 
     export interface TextParams extends Params {
-        message?: mod.Message,
+        message: mod.Message,
         textSize?: number,
         textColor?: mod.Vector,
         textAlpha?: number,
@@ -381,7 +381,7 @@ namespace UI {
     }
 
     export interface LabelParams {
-        message?: mod.Message,
+        message: mod.Message,
         textSize?: number,
         textColor?: mod.Vector,
         textAlpha?: number,

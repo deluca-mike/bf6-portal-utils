@@ -20140,6 +20140,9 @@ declare namespace mod {
     export function SetVariableAtIndex(arrayVariable: Variable, arrayIndex: number, value: Any): void;
 
     // Plays a sound using runtime spawner tech.
+    // Scaling the spatial object keeps the centre point the same loudness, but increases how far you need to go for it to go down to silence. So it can be heard further away.
+    // Amplitude increases the centre point volume.
+    // Also every sound has its own default attenuation range. The attenuation scale parameter in portal just increases or decreases that range.
     export function PlaySound(objectId: number, amplitude: number, team: Team): void;
 
     // Plays a sound using runtime spawner tech.

@@ -167,7 +167,7 @@ Creates a text widget via `mod.AddUIText`.
 | --- | --- | --- |
 | `name` | `string` | Text widget id. |
 | `x`, `y`, `width`, `height`, `anchor`, `parent`, `visible`, `padding`, `bgColor`, `bgAlpha`, `bgFill`, `depth` | Same defaults as `ContainerParams` but `bgColor` defaults to `UI.COLORS.WHITE`, `bgAlpha` defaults to `0`, and `bgFill` defaults to `mod.UIBgFill.None`. |
-| `message` | `mod.Message = mod.Message("")` | Text label content (see `mod/index.d.ts` for message helpers). |
+| `message` | `mod.Message` | Text label content (see `mod/index.d.ts` for message helpers). |
 | `textSize` | `number = 36` | Font size. |
 | `textColor` | `mod.Vector = UI.COLORS.BLACK` |
 | `textAlpha` | `number = 1` |

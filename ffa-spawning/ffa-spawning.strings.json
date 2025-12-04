@@ -1,0 +1,9 @@
+{
+    "ffaAutoSpawningSoldier": {
+        "countdown": "Spawn prompt in {} seconds...",
+        "buttons": {
+            "spawn": "Spawn now",
+            "delay": "Ask again in {} seconds"
+        }
+    }
+}
