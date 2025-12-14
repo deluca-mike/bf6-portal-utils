@@ -1,4 +1,4 @@
-// version: 1.3.1
+// version: 1.4.1
 
 class UI {
 
@@ -71,9 +71,9 @@ class UI {
             parent.uiWidget(),
             params.visible ?? true,
             params.padding ?? 0,
-            params.bgColor ?? UI.COLORS.BF_GREY_4,
-            params.bgAlpha ?? 1,
-            params.bgFill ?? mod.UIBgFill.Solid,
+            params.bgColor ?? UI.COLORS.WHITE,
+            params.bgAlpha ?? 0,
+            params.bgFill ?? mod.UIBgFill.None,
             params.depth ?? mod.UIDepth.AboveGameUI,
         ];
     
@@ -99,6 +99,8 @@ class UI {
             setPosition: (x: number, y: number) => mod.SetUIWidgetPosition(uiWidget(), mod.CreateVector(x, y, 0)),
             getSize: () => UI.getSize(uiWidget()),
             setSize: (width: number, height: number) => mod.SetUIWidgetSize(uiWidget(), mod.CreateVector(width, height, 0)),
+            getBgColor: () => mod.GetUIWidgetBgColor(uiWidget()),
+            setBgColor: (color: mod.Vector) => mod.SetUIWidgetBgColor(uiWidget(), color),
         };
 
         for (const childParams of params.childrenParams ?? []) {
@@ -180,6 +182,8 @@ class UI {
             getSize: () => UI.getSize(uiWidget()),
             setSize: (width: number, height: number) => mod.SetUIWidgetSize(uiWidget(), mod.CreateVector(width, height, 0)),
             setMessage: (message: mod.Message) => mod.SetUITextLabel(uiWidget(), message),
+            getBgColor: () => mod.GetUIWidgetBgColor(uiWidget()),
+            setBgColor: (color: mod.Vector) => mod.SetUIWidgetBgColor(uiWidget(), color),
         };
     }
 
@@ -268,6 +272,8 @@ class UI {
             setPosition: (x: number, y: number) => mod.SetUIWidgetPosition(containerUiWidget, mod.CreateVector(x, y, 0)),
             getSize: () => UI.getSize(containerUiWidget),
             setSize: setSize,
+            getBgColor: () => mod.GetUIWidgetBgColor(containerUiWidget),
+            setBgColor: (color: mod.Vector) => mod.SetUIWidgetBgColor(containerUiWidget, color),
             isEnabled: () => mod.GetUIButtonEnabled(buttonUiWidget()),
             enable: () => mod.SetUIButtonEnabled(buttonUiWidget(), true),
             disable: () => mod.SetUIButtonEnabled(buttonUiWidget(), false),
@@ -344,6 +350,8 @@ namespace UI {
         setPosition: (x: number, y: number) => void,
         getSize: () => { width: number, height: number },
         setSize: (width: number, height: number) => void,
+        getBgColor: () => mod.Vector,
+        setBgColor: (color: mod.Vector) => void,
     }
 
     export type Container = Element & {
