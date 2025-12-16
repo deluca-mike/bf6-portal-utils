@@ -1,19 +1,17 @@
-// version 1.1.0
-
-class PerformanceStats {
-
+// version 1.2.0
+export class PerformanceStats {
     private stressThreshold: number = 25;
 
     private deprioritizedThreshold: number = 65;
-    
+
     private sampleRateSeconds: number = 0.5; // 0.5 is ideal as it aligns perfectly with both 30Hz and 60Hz
-    
+
     private tickBucket: number = 0;
 
     private isStarted: boolean = false;
 
-    private cachedTickRate: number = 30; 
-    
+    private cachedTickRate: number = 30;
+
     private log?: (text: string) => void;
 
     constructor(options?: PerformanceStats.Options) {
@@ -26,7 +24,7 @@ class PerformanceStats {
     public get tickRate(): number {
         return this.cachedTickRate;
     }
-    
+
     // This should be called once every tick, so it is best to be called in the `OngoingGlobal()` event handler.
     public trackTick(): void {
         this.tickBucket++;
@@ -44,7 +42,7 @@ class PerformanceStats {
 
     private heartbeat(): void {
         // The raw "Ticks Per Requested Second" (the composite metric).
-        this.analyzeHealth(this.cachedTickRate = this.tickBucket / this.sampleRateSeconds);
+        this.analyzeHealth((this.cachedTickRate = this.tickBucket / this.sampleRateSeconds));
 
         this.tickBucket = 0;
 
@@ -59,7 +57,7 @@ class PerformanceStats {
             this.log(`<PS> Script Callbacks Deprioritized (Virtual Rate: ${tickRate.toFixed(1)}Hz).`);
             return;
         }
-        
+
         // We didn't even get 30 ticks in the time window, which means the server is under stress.
         if (tickRate <= this.stressThreshold) {
             this.log(`<PS> Server Stress (Virtual Rate: ${tickRate.toFixed(1)}Hz).`);
@@ -68,13 +66,11 @@ class PerformanceStats {
     }
 }
 
-namespace PerformanceStats {
-
+export namespace PerformanceStats {
     export type Options = {
         log?: (text: string) => void;
         stressThreshold?: number;
         deprioritizedThreshold?: number;
         sampleRateSeconds?: number;
-    }
-
+    };
 }

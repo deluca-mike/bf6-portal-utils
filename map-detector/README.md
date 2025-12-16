@@ -4,41 +4,49 @@ This TypeScript `MapDetector` class enables Battlefield Portal experience develo
 
 The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and uses these coordinates to identify which map is currently active.
 
-> **Note**  
+> **Note**
 > All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.Maps`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
-1. **No dependencies** – The `MapDetector` class is self-contained and requires no additional modules or setup.
-2. **Spatial data assumption** – This utility assumes that the spatial data loaded with the map has not changed the location of Team 1's HQ. If custom spatial modifications have moved the HQ, detection may fail.
+1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **Spatial data assumption** – This utility assumes that the spatial data loaded with the map has not changed the location of Team 1's HQ. If custom spatial modifications have moved the HQ, detection may fail.
 
 ---
 
 ## Quick Start
 
-1. Copy the entire `MapDetector` class and namespace from [`map-detector/map-detector.ts`](map-detector.ts) and paste it into your mod file.
-2. Access the current map using any of the provided getters or methods.
+1. Install the package: `npm install -D bf6-portal-utils`
+2. Import the module in your code:
+    ```ts
+    import { MapDetector } from 'bf6-portal-utils/map-detector';
+    ```
+3. Access the current map using any of the provided getters or methods.
+4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 ### Example
 
 ```ts
+import { MapDetector } from 'bf6-portal-utils/map-detector';
+
 export async function OnGameModeStarted(): Promise<void> {
     // Get the current map as a MapDetector.Map enum
-    const map = MapDetector.currenMap;
+    const map = MapDetector.currentMap();
     if (map == MapDetector.Map.Downtown) {
         // Handle Downtown-specific logic
     }
 
     // Get the current map as a mod.Maps enum (native API)
-    const nativeMap = MapDetector.currentNativeMap;
+    const nativeMap = MapDetector.currentNativeMap();
     if (nativeMap == mod.Maps.Granite_MainStreet) {
         // Handle using native enum
     }
 
     // Get the current map as a string
-    const mapName = MapDetector.currentMapName;
+    const mapName = MapDetector.currentMapName();
     console.log(`Current map: ${mapName}`);
 
     // Check if current map matches a specific map
@@ -58,13 +66,13 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ### `class MapDetector`
 
-#### Static Properties
+#### Static Methods
 
-| Property | Type | Description |
-| --- | --- | --- |
-| `currenMap` | `MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined. |
-| `currentNativeMap` | `mod.Maps \| undefined` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
-| `currentMapName` | `string \| undefined` | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined. |
+| Method | Description |
+| --- | --- |
+| `currentMap(): MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined. |
+| `currentNativeMap(): mod.Maps \| undefined` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
+| `currentMapName(): string \| undefined` | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined. |
 
 #### Static Methods
 
@@ -132,7 +140,8 @@ The detection is fast and requires no additional setup, making it suitable for u
 
 ## Further Reference
 
-- [`battlefield-portal-utils/mod/index.d.ts`](../mod/index.d.ts) – Official Battlefield Portal type declarations, including the `mod.Maps` enum.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about spatial data and HQ positioning.
 
 ---
@@ -142,4 +151,3 @@ The detection is fast and requires no additional setup, making it suitable for u
 This module is under **active development**. If you discover new maps that need to be added, or encounter issues with detection accuracy, please open an issue or reach out through the project channels. Contributions to expand map support are welcome.
 
 ---
-

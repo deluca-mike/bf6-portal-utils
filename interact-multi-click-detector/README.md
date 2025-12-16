@@ -4,34 +4,42 @@ This TypeScript `InteractMultiClickDetector` class enables Battlefield Portal ex
 
 The detector tracks interact state transitions for each player independently, counting clicks within a configurable time window to determine when a multi-click sequence has been completed.
 
-> **Note**  
+> **Note**
 > All Battlefield Portal types referenced below (`mod.Player`, `mod.SoldierStateBool`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
-1. **No dependencies** – The `InteractMultiClickDetector` class is self-contained and requires no additional modules or setup.
-2. **OngoingPlayer event** – The `checkMultiClick()` method should be called in your `OngoingPlayer()` event handler to accurately track interact state transitions.
+1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **OngoingPlayer event** – The `checkMultiClick()` method should be called in your `OngoingPlayer()` event handler to accurately track interact state transitions.
 
 ---
 
 ## Quick Start
 
-1. Copy the entire `InteractMultiClickDetector` class from [`interact-multi-click-detector/interact-multi-click-detector.ts`](interact-multi-click-detector.ts) and paste it into your mod file.
-2. Call `checkMultiClick(player)` in your `OngoingPlayer()` event handler for each player.
-3. Handle the multi-click event when the method returns `true`.
+1. Install the package: `npm install -D bf6-portal-utils`
+2. Import the module in your code:
+    ```ts
+    import { InteractMultiClickDetector } from 'bf6-portal-utils/interact-multi-click-detector';
+    ```
+3. Call `checkMultiClick(player)` in your `OngoingPlayer()` event handler for each player.
+4. Handle the multi-click event when the method returns `true`.
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 ### Example
 
 ```ts
+import { InteractMultiClickDetector } from 'bf6-portal-utils/interact-multi-click-detector';
+
 export function OngoingPlayer(player: mod.Player): void {
     // Check if the player has performed a multi-click sequence
     if (InteractMultiClickDetector.checkMultiClick(player)) {
         // Player has successfully multi-clicked the interact key
         // Open custom UI, trigger special action, etc.
         console.log(`Player ${mod.GetObjId(player)} performed multi-click!`);
-        
+
         // Example: Open a custom menu or trigger a special ability
         // openCustomMenu(player);
     }
@@ -82,7 +90,7 @@ The following static readonly properties control multi-click detection behavior.
 
 ### Lifecycle Flow
 
-1. Copy the `InteractMultiClickDetector` class into your mod file.
+1. Import the `InteractMultiClickDetector` class in your mod file.
 2. Each tick, call `checkMultiClick(player)` in `OngoingPlayer()` for each player.
 3. The detector automatically:
    - Initializes player state on first call
@@ -142,7 +150,8 @@ In no particular order, planned upcoming work and improvements include:
 
 ## Further Reference
 
-- [`battlefield-portal-utils/mod/index.d.ts`](../mod/index.d.ts) – Official Battlefield Portal type declarations, including `mod.Player`, `mod.SoldierStateBool`, and related types.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about player states and interaction mechanics.
 
 ---
@@ -152,4 +161,3 @@ In no particular order, planned upcoming work and improvements include:
 This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (additional detection modes, performance optimizations, alternative input sources, etc.), so please share your experiences.
 
 ---
-

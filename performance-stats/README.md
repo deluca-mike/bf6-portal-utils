@@ -4,29 +4,37 @@ This TypeScript `PerformanceStats` class enables Battlefield Portal experience d
 
 The system uses a sampling approach to calculate tick rate by counting ticks over a configurable time window, providing a "virtual rate" metric that reflects the actual performance of your script's execution environment.
 
-> **Note**  
+> **Note**
 > All Battlefield Portal types referenced below (`mod.Player`, `mod.Wait`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
-1. **No dependencies** – The `PerformanceStats` class is self-contained and requires no additional modules or setup.
-2. **OngoingGlobal event** – The `trackTick()` method should be called in your `OngoingGlobal()` event handler to accurately track tick rate.
+1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **OngoingGlobal event** – The `trackTick()` method should be called in your `OngoingGlobal()` event handler to accurately track tick rate.
 
 ---
 
 ## Quick Start
 
-1. Copy the entire `PerformanceStats` class and namespace from [`performance-stats/performance-stats.ts`](performance-stats.ts) and paste it into your mod file.
-2. Create an instance of `PerformanceStats` (optionally with configuration options).
-3. Call `trackTick()` in your `OngoingGlobal()` event handler.
-4. Call `startHeartbeat()` to begin monitoring (typically in `OnGameModeStarted()`).
-5. Access the current tick rate via the `tickRate` getter.
+1. Install the package: `npm install -D bf6-portal-utils`
+2. Import the module in your code:
+    ```ts
+    import { PerformanceStats } from 'bf6-portal-utils/performance-stats';
+    ```
+3. Create an instance of `PerformanceStats` (optionally with configuration options).
+4. Call `trackTick()` in your `OngoingGlobal()` event handler.
+5. Call `startHeartbeat()` to begin monitoring (typically in `OnGameModeStarted()`).
+6. Access the current tick rate via the `tickRate` getter.
+7. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 ### Example
 
 ```ts
+import { PerformanceStats } from 'bf6-portal-utils/performance-stats';
+
 // Create a PerformanceStats instance with custom logging
 const perfStats = new PerformanceStats({
     log: (text) => console.log(text),
@@ -197,7 +205,8 @@ This alignment ensures accurate measurements without fractional tick counts.
 
 ## Further Reference
 
-- [`battlefield-portal-utils/mod/index.d.ts`](../mod/index.d.ts) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about server tick rates and performance characteristics.
 
 ---
@@ -207,4 +216,3 @@ This alignment ensures accurate measurements without fractional tick counts.
 This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (additional metrics, configurable health analysis, performance history tracking, etc.), so please share your experiences.
 
 ---
-

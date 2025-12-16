@@ -1,11 +1,28 @@
-// version 1.1.0
-
-class MapDetector {
-
-    private static hqCoordinates: mod.Vector;
+// version 2.0.0
+export namespace MapDetector {
+    export enum Map {
+        Area22B = 'Area 22B',
+        BlackwellFields = 'Blackwell Fields',
+        DefenseNexus = 'Defense Nexus',
+        Downtown = 'Downtown',
+        Eastwood = 'Eastwood',
+        EmpireState = 'Empire State',
+        GolfCourse = 'Golf Course',
+        IberianOffensive = 'Iberian Offensive',
+        LiberationPeak = 'Liberation Peak',
+        ManhattanBridge = 'Manhattan Bridge',
+        Marina = 'Marina',
+        MirakValley = 'Mirak Valley',
+        NewSobekCity = 'New Sobek City',
+        OperationFirestorm = 'Operation Firestorm',
+        PortalSandboxMarina = 'Portal Sandbox Marina',
+        RedlineStorage = 'Redline Storage',
+        SaintsQuarter = 'Saints Quarter',
+        SiegeOfCairo = 'Siege of Cairo',
+    }
 
     // Returns the current map as a `MapDetector.Map` enum value, if possible.
-    public static get currenMap(): MapDetector.Map | undefined {
+    export function currentMap(): MapDetector.Map | undefined {
         const { x, y, z } = MapDetector.getHQCoordinates(0);
 
         if (x == -1044) return MapDetector.Map.Downtown; // Downtown <-1044.5, 122.02, 220.17>
@@ -31,8 +48,8 @@ class MapDetector {
     }
 
     // Returns the current map as a `mod.Maps` enum value, if possible.
-    public static get currentNativeMap(): mod.Maps | undefined {
-        const map = this.currenMap;
+    export function currentNativeMap(): mod.Maps | undefined {
+        const map = MapDetector.currentMap();
 
         if (map == MapDetector.Map.BlackwellFields) return mod.Maps.Badlands;
         if (map == MapDetector.Map.DefenseNexus) return mod.Maps.Granite_TechCampus;
@@ -57,55 +74,33 @@ class MapDetector {
 
         return;
     }
-    
+
     // Returns the current map as a string, if possible.
-    public static get currentMapName(): string | undefined {
-        return this.currenMap?.toString();
+    export function currentMapName(): string | undefined {
+        return MapDetector.currentMap()?.toString();
     }
 
     // Returns true if the current map is the given `MapDetector.Map` enum value.
-    public static isCurrentMap(map: MapDetector.Map): boolean {
-        return this.currenMap == map;
+    export function isCurrentMap(map: MapDetector.Map): boolean {
+        return MapDetector.currentMap() === map;
     }
 
     // Returns true if the current map is the given `mod.Maps` enum value.
-    public static isCurrentNativeMap(map: mod.Maps): boolean {
-        return this.currentNativeMap == map;
+    export function isCurrentNativeMap(map: mod.Maps): boolean {
+        return MapDetector.currentNativeMap() === map;
     }
 
     // Returns the HQ coordinates of the current map (used for finding the HQ coordinates of the current map).
-    public static getHQCoordinates(decimalPlaces: number = 2): { x: number, y: number, z: number } {
+    export function getHQCoordinates(decimalPlaces: number = 2): {
+        x: number;
+        y: number;
+        z: number;
+    } {
         const hqCoordinates = mod.GetObjectPosition(mod.GetHQ(1));
         const scale = 10 ** decimalPlaces;
-        const x = (~~(mod.XComponentOf(hqCoordinates) * scale)) / scale;
-        const y = (~~(mod.YComponentOf(hqCoordinates) * scale)) / scale;
-        const z = (~~(mod.ZComponentOf(hqCoordinates) * scale)) / scale;
+        const x = ~~(mod.XComponentOf(hqCoordinates) * scale) / scale;
+        const y = ~~(mod.YComponentOf(hqCoordinates) * scale) / scale;
+        const z = ~~(mod.ZComponentOf(hqCoordinates) * scale) / scale;
         return { x, y, z };
     }
-
-}
-
-namespace MapDetector {
-    
-    export enum Map {
-        Area22B = 'Area 22B',
-        BlackwellFields = 'Blackwell Fields',
-        DefenseNexus = 'Defense Nexus',
-        Downtown = 'Downtown',
-        Eastwood = 'Eastwood',
-        EmpireState = 'Empire State',
-        GolfCourse = 'Golf Course',
-        IberianOffensive = 'Iberian Offensive',
-        LiberationPeak = 'Liberation Peak',
-        ManhattanBridge = 'Manhattan Bridge',
-        Marina = 'Marina',
-        MirakValley = 'Mirak Valley',
-        NewSobekCity = 'New Sobek City',
-        OperationFirestorm = 'Operation Firestorm',
-        PortalSandboxMarina = 'Portal Sandbox Marina',
-        RedlineStorage = 'Redline Storage',
-        SaintsQuarter = 'Saints Quarter',
-        SiegeOfCairo = 'Siege of Cairo',
-    }
-
 }

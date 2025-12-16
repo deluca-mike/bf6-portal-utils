@@ -5,25 +5,31 @@ This TypeScript `Logger` class removes the biggest Battlefield Portal debugging 
 - **Dynamic mode** behaves like a scrolling console, always appending at the bottom and pushing older rows upward.
 - **Static mode** lets you target a specific row index (e.g., keep player position on row 10 while other diagnostics fill lines 0‑9).
 
-> **Note**  
+> **Note**
 > The `Logger` depends on the shared `UI` helper (containers, text widgets, etc.) which is also maintained in this repository. Keep that namespace/class above the logger in your mod file. All Battlefield Portal types referenced below (`mod.Player`, `mod.UIWidget`, vectors, anchors, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
-1. **UI helpers** – Copy the `UI` namespace/class into your mod before the logger (see `ui/ui.ts` for the canonical version).
-2. **Strings file** – Import `logger/logger.strings.json` into your Battlefield Portal experience so the `mod.stringkeys.logger` lookup is available at runtime.
-3. **One-time setup per player** – Instantiate the logger in your deployment hooks (e.g., `OnPlayerDeployed`) and keep a reference for future logs.
+1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining and strings.json merging.
+3. **UI dependency** – The `Logger` depends on the `UI` namespace (which is also maintained in this repository).
+4. **One-time setup per player** – Instantiate the logger in your deployment hooks (e.g., `OnPlayerDeployed`) and keep a reference for future logs.
 
 ---
 
-## Getting Started
+## Quick Start
 
-1. Copy the entire `Logger` class and namespace from [`logger/logger.ts`](logger.ts) and paste it into your mod after the required `UI` helper.
-2. Copy the `logger` key (and all its children) from `logger/logger.strings.json` into your Battlefield Portal experience's `strings.json` file, ensuring the `logger` key is top-level.
+1. Install the package: `npm install -D bf6-portal-utils`
+2. Import the modules you need in your code:
+    ```ts
+    import { Logger } from 'bf6-portal-utils/logger';
+    import { UI } from 'bf6-portal-utils/ui';
+    ```
 3. Instantiate a logger for a player (or team) as needed.
 4. Call `log(text)` anywhere in your scripts. Static loggers accept an optional `rowIndex`; dynamic loggers ignore it and auto-scroll.
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code and merge all `strings.json` files).
 
 ---
 
@@ -36,6 +42,9 @@ This TypeScript `Logger` class removes the biggest Battlefield Portal debugging 
 ### Example
 
 ```ts
+import { Logger } from 'bf6-portal-utils/logger';
+import { UI } from 'bf6-portal-utils/ui';
+
 let staticLogger: Logger | undefined;
 let dynamicLogger: Logger | undefined;
 
@@ -44,7 +53,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
         staticLogger = new Logger(eventPlayer, { staticRows: true, visible: true, anchor: mod.UIAnchor.TopLeft, width: 600 });
         dynamicLogger = new Logger(eventPlayer, { staticRows: false, visible: true, anchor: mod.UIAnchor.TopRight });
     }
-    
+
     dynamicLogger?.log(`Player: ${mod.GetObjId(player)}`);
     dynamicLogger?.log(`Team: ${mod.GetObjId(mod.GetTeam(player))}`);
     dynamicLogger?.log(`Hellow @ world $${(12345.6789).toFixed(2)}!!`);
@@ -57,7 +66,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
         const z = mod.ZComponentOf(position).toFixed(2);
 
         staticLogger?.log(`Position: <${x},${y},${z}>`, 13);
-    
+
         await mod.Wait(0.5);
 
         if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsReloading)) continue;
@@ -108,13 +117,15 @@ Optional bag passed to the constructor. See [`mod/index.d.ts`](../mod/index.d.ts
 
 ---
 
-## Strings File (`logger.strings.json`)
+## Strings File
+
+This module includes a `strings.json` file that will be automatically merged by `bf6-portal-bundler` when you bundle your mod. The strings are automatically available under the `logger` key:
 
 The logger renders arbitrary strings by mapping each character to a localized token. At runtime, `mod.stringkeys.logger` contains:
 
 - `format` templates for one-, two-, and three-character chunks plus a `badFormat` fallback.
 - `chars` dictionary that maps every supported character (letters, digits, punctuation) to the same character.
-- unsupported charcters display as `*`
+- unsupported characters display as `*`
 
 If you need additional glyphs, extend the JSON first, then update `Logger.getCharacterWidth` so layout calculations stay accurate.
 
@@ -142,8 +153,16 @@ In no particular order, planned upcomming work and improvements include:
 
 ---
 
-## Community & Maintenance
+## Further Reference
 
-This logger is under **active development**. Feature requests, bug reports, or even “how do I…?” questions are welcome—open an issue or reach out through the project channels and you’ll get a timely response. Real-world debugging stories help shape the roadmap (better text scaling, formatting helpers, persistent logs, etc.), so please share your use cases.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
+- [`ui/README.md`](../ui/README.md) – Documentation for the UI helper module required by this system.
+
+---
+
+## Feedback & Support
+
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (better text scaling, formatting helpers, persistent logs, etc.), so please share your experiences.
 
 ---

@@ -4,27 +4,35 @@ This TypeScript `Sounds` class abstracts away and handles the nuance, oddities, 
 
 Key features include automatic sound object reuse to minimize spawn overhead, intelligent availability tracking to prevent sound conflicts, automatic stopping after specified durations, and support for infinite-duration sounds (e.g., looping assets).
 
-> **Note**  
+> **Note**
 > The `Sounds` class is self-contained and requires no additional modules or setup. All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.RuntimeSpawn_Common`, `mod.SFX`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
-1. **No dependencies** – The `Sounds` class is self-contained and requires no additional modules or setup.
-2. **SFX Assets** – You'll need `mod.RuntimeSpawn_Common` references to your sound effect assets (typically obtained from the Battlefield Portal asset browser or via `mod.GetRuntimeSpawnCommon`).
+1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **SFX Assets** – You'll need `mod.RuntimeSpawn_Common` references to your sound effect assets (typically obtained from the Battlefield Portal asset browser or via `mod.GetRuntimeSpawnCommon`).
 
 ---
 
 ## Quick Start
 
-1. Copy the entire `Sounds` class and namespace from [`sounds/sounds.ts`](sounds.ts) and paste it into your mod file.
-2. Optionally set up logging for debugging (recommended during development).
-3. Call `Sounds.play2D()` or `Sounds.play3D()` to play sounds as needed.
+1. Install the package: `npm install -D bf6-portal-utils`
+2. Import the module in your code:
+    ```ts
+    import { Sounds } from 'bf6-portal-utils/sounds';
+    ```
+3. Optionally set up logging for debugging (recommended during development).
+4. Call `Sounds.play2D()` or `Sounds.play3D()` to play sounds as needed.
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 ### Example
 
 ```ts
+import { Sounds } from 'bf6-portal-utils/sounds';
+
 // Define your sound assets (obtain these from your Battlefield Portal experience's asset browser)
 const SOUND_ALPHA_2D = mod.RuntimeSpawn_Common.SFX_UI_EOR_RankUp_Extra_OneShot2D;
 const SOUND_BULLET_3D = mod.RuntimeSpawn_Common.SFX_Projectiles_Flybys_Bullet_Crack_Sniper_Close_OneShot3D;
@@ -36,7 +44,7 @@ const playerUndeployedLoops: Map<number, Sounds.PlayedSound> = new Map();
 export async function OnGameModeStarted(): Promise<void> {
     // Optional: Set up logging for debugging
     Sounds.setLogging((text) => console.log(text), Sounds.LogLevel.Info);
-    
+
     // Optional: Preload some sounds to reduce first-play latency (minimal, if any)
     Sounds.preload(SOUND_ALPHA_2D);
     Sounds.preload(SOUND_BULLET_3D);
@@ -66,10 +74,10 @@ export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
 
 export function OnPlayerUndeploy(eventPlayer: mod.Player): void {
     // Play a 2D sound loop for a specific player
-    const playedSound = Sounds.play2D(SOUND_LOOP_2D, { 
-        player: eventPlayer, 
-        amplitude: 1, 
-        duration: 0 
+    const playedSound = Sounds.play2D(SOUND_LOOP_2D, {
+        player: eventPlayer,
+        amplitude: 1,
+        duration: 0
     });
 
     // Save the looping PlayedSound so it can be stopped once the player leaves the deploy screen.
@@ -83,7 +91,7 @@ export function OnPlayerDeployed(eventPlayer: mod.Player): void {
 
 export async function OnPlayerDied(victim: mod.Player, killer: mod.Player, deathType: mod.DeathType, weapon: mod.WeaponUnlock): Promise<void> {
     const victimPosition = mod.GetSoldierState(victim, mod.SoldierStateVector.GetPosition);
-    
+
     // Play a 3D positional sound at the victim's location
     Sounds.play3D(SOUND_BULLET_3D, victimPosition, {
         amplitude: 1.5,
@@ -276,7 +284,8 @@ The following improvements are planned for future versions:
 
 ## Further Reference
 
-- [`battlefield-portal-utils/mod/index.d.ts`](../mod/index.d.ts) – Official Battlefield Portal type declarations, including `mod.RuntimeSpawn_Common`, `mod.SFX`, `mod.PlaySound`, etc.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about sound assets, runtime spawn commons, and audio limitations.
 
 ---
@@ -286,4 +295,3 @@ The following improvements are planned for future versions:
 This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (performance optimizations, additional playback modes, better resource management, etc.), so please share your experiences.
 
 ---
-

@@ -1,5 +1,5 @@
 {
-    "ffaAutoSpawningSoldier": {
+    "ffaSpawning": {
         "countdown": "Spawning available in {} seconds...",
         "buttons": {
             "spawn": "Spawn now",
