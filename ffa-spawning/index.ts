@@ -1,4 +1,4 @@
-import { UI } from '../ui';
+import { UI } from '../ui/index.ts';
 
 // version: 2.0.0
 export namespace FFASpawning {

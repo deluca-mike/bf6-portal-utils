@@ -8,5 +8,14 @@
     "arrowParens": "always",
     "endOfLine": "lf",
     "bracketSpacing": true,
-    "bracketSameLine": false
+    "bracketSameLine": false,
+    "overrides": [
+        {
+            "files": "*.json",
+            "options": {
+                "tabWidth": 4,
+                "useTabs": false
+            }
+        }
+    ]
 }

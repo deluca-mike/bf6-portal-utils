@@ -1,6 +1,6 @@
-import { UI } from '../ui';
+import { UI } from '../ui/index.ts';
 
-// version: 2.0.0
+// version: 2.0.1
 export class Logger {
     private static readonly _PADDING: number = 10;
 
@@ -146,7 +146,12 @@ export class Logger {
     }
 
     public log(text: string, rowIndex?: number): Logger {
-        this._staticRows ? this._logInRow(text, rowIndex ?? 0) : this._logNext(text);
+        if (this._staticRows) {
+            this._logInRow(text, rowIndex ?? 0);
+        } else {
+            this._logNext(text);
+        }
+
         return this;
     }
 

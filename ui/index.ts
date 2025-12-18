@@ -1,4 +1,4 @@
-// version: 2.0.0
+// version: 2.0.1
 export namespace UI {
     export const COLORS = {
         BLACK: mod.CreateVector(0, 0, 0),
@@ -682,7 +682,7 @@ export namespace UI {
         if (!clickHandler) return;
 
         clickHandler(player).catch((error) => {
-            console.error(`Error in click handler for widget ${mod.GetUIWidgetName(widget)}:`, error);
+            console.log(`<UI> Error in click handler for widget ${mod.GetUIWidgetName(widget)}:`, error);
         });
     }
 }
