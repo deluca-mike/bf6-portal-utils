@@ -1,6 +1,6 @@
 {
     "name": "bf6-portal-utils",
-    "version": "2.0.1",
+    "version": "3.0.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
     "scripts": {
@@ -13,6 +13,7 @@
         "url": "git+https://github.com/deluca-mike/bf6-portal-utils.git"
     },
     "author": "Michael De Luca",
+    "license": "MIT",
     "bugs": {
         "url": "https://github.com/deluca-mike/bf6-portal-utils/issues"
     },

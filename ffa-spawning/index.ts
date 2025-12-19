@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -8,10 +8,7 @@ export namespace FFASpawning {
         Error = 2,
     }
 
-    export type SpawnData = {
-        location: mod.Vector;
-        orientation: number;
-    };
+    export type SpawnData = [x: number, y: number, z: number, orientation: number];
 
     export type Spawn = {
         index: number;
@@ -204,14 +201,16 @@ export namespace FFASpawning {
             mod.EnableHQ(mod.GetHQ(2), false);
 
             this._spawns = spawns.map((spawn, index) => {
+                const location = mod.CreateVector(spawn[0], spawn[1], spawn[2]);
+
                 return {
                     index: index,
                     spawnPoint: mod.SpawnObject(
                         mod.RuntimeSpawn_Common.PlayerSpawner,
-                        spawn.location,
-                        this._getRotationVector(spawn.orientation)
+                        location,
+                        this._getRotationVector(spawn[3])
                     ),
-                    location: spawn.location,
+                    location: location,
                 };
             });
 

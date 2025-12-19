@@ -40,9 +40,10 @@ import { UI } from 'bf6-portal-utils/ui';
 
 // Define your spawn points
 const SPAWN_POINTS: FFASpawning.SpawnData[] = [
-    { location: mod.CreateVector(100, 0, 200), orientation: 0 },
-    { location: mod.CreateVector(-100, 0, 200), orientation: 90 },
-    { location: mod.CreateVector(0, 0, -200), orientation: 180 },
+    [100, 0, 200, 0], // x = 100, y = 0, z = 200, orientation = 0 (North)
+    [-100, 0, 200, 90], // x = -100, y = 0, z = 200, orientation = 90 (East)
+    [0, 0, -200, 180], // x = 0, y = 0, z = -200, orientation = 180 (South)
+    [-200, 100, 300, 270], // x = -200, y = 100, z = 300, orientation = 270 (West)
     // ... more spawn points
 ];
 
@@ -129,15 +130,15 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 
 #### Static Methods
 
-| Method                                                                                 | Description                                                                                                                                                                                                                                     |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. `orientation` in `SpawnData` is the compass angle integer (0-360). Optional `options` let you override spawn distance defaults. |
-| `setLogging(log: (text: string) => void, logLevel?: FFASpawning.LogLevel)`             | Attaches a logger function and defines a minimum log level. Useful for debugging spawn behavior. Default log level is `Info` if not specified.                                                                                                  |
-| `startDelayForPrompt(player: mod.Player)`                                              | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately.                                    |
-| `forceIntoQueue(player: mod.Player)`                                                   | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning.                                                                                                                            |
-| `enableSpawnQueueProcessing()`                                                         | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`).                                                                                           |
-| `disableSpawnQueueProcessing()`                                                        | Disables the processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions.                                                                                                                              |
-| `getVectorString(vector: mod.Vector): string`                                          | Utility method that formats a vector as a string for logging purposes. Returns a string in the format `<x, y, z>` with 2 decimal places.                                                                                                        |
+| Method                                                                                 | Description                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. Optional `options` let you override spawn distance defaults.                                 |
+| `setLogging(log: (text: string) => void, logLevel?: FFASpawning.LogLevel)`             | Attaches a logger function and defines a minimum log level. Useful for debugging spawn behavior. Default log level is `Info` if not specified.                                                               |
+| `startDelayForPrompt(player: mod.Player)`                                              | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately. |
+| `forceIntoQueue(player: mod.Player)`                                                   | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning.                                                                                         |
+| `enableSpawnQueueProcessing()`                                                         | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`).                                                        |
+| `disableSpawnQueueProcessing()`                                                        | Disables the processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions.                                                                                           |
+| `getVectorString(vector: mod.Vector): string`                                          | Utility method that formats a vector as a string for logging purposes. Returns a string in the format `<x, y, z>` with 2 decimal places.                                                                     |
 
 #### Constructor
 
@@ -196,10 +197,9 @@ enum LogLevel {
 Type for defining spawn point data when initializing the system:
 
 ```ts
-type SpawnData = {
-    location: mod.Vector; // World position where the player should spawn
-    orientation: number; // Compass angle (0-360) for spawn direction
-};
+// <x, y, z> world position where the player should spawn.
+// Orientation is the compass angle (0-360) for spawn direction.
+type SpawnData = [x: number, y: number, z: number, orientation: number];
 ```
 
 ### `FFASpawning.Spawn`
