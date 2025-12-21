@@ -16,6 +16,15 @@
                 "tabWidth": 4,
                 "useTabs": false
             }
+        },
+        {
+            "files": "*.md",
+            "options": {
+                "proseWrap": "always",
+                "tabWidth": 4,
+                "useTabs": false,
+                "printWidth": 120
+            }
         }
     ]
 }

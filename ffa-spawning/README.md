@@ -1,18 +1,23 @@
 # FFA Spawning Module
 
-This TypeScript `FFASpawning.Soldier` class enables Free For All (FFA) spawning for custom Battlefield Portal experiences by short-circuiting the normal deploy process in favor of a custom UI prompt. The system asks players if they would like to spawn now or be asked again after a delay, allowing players to adjust their loadout and settings at the deploy screen without being locked out.
+This TypeScript `FFASpawning.Soldier` class enables Free For All (FFA) spawning for custom Battlefield Portal
+experiences by short-circuiting the normal deploy process in favor of a custom UI prompt. The system asks players if
+they would like to spawn now or be asked again after a delay, allowing players to adjust their loadout and settings at
+the deploy screen without being locked out.
 
-The spawning system uses an intelligent algorithm to find safe spawn points that are appropriately distanced from other players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times.
+The spawning system uses an intelligent algorithm to find safe spawn points that are appropriately distanced from other
+players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times.
 
-> **Note**
-> The `FFASpawning` namespace depends on the `UI` namespace (which is also maintained in this repository) and the `mod` namespace (available in the `bf6-portal-mod-types` package).
+> **Note** The `FFASpawning` namespace depends on the `UI` namespace (which is also maintained in this repository) and
+> the `mod` namespace (available in the `bf6-portal-mod-types` package).
 
 ---
 
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining and strings.json merging.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
+   mod. The bundler automatically handles code inlining and strings.json merging.
 3. **Button handler** – Register `UI.handleButtonClick` in your `OnPlayerUIButtonEvent` event handler.
 
 ---
@@ -26,11 +31,14 @@ The spawning system uses an intelligent algorithm to find safe spawn points that
     import { UI } from 'bf6-portal-utils/ui';
     ```
 3. Register the button handler in your `OnPlayerUIButtonEvent` event.
-4. Call `FFASpawning.Soldier.initialize()` in `OnGameModeStarted()` with your spawn point data (optional `InitializeOptions` to override spawn distance defaults).
+4. Call `FFASpawning.Soldier.initialize()` in `OnGameModeStarted()` with your spawn point data (optional
+   `InitializeOptions` to override spawn distance defaults).
 5. Enable spawn queue processing when ready (typically in `OnGameModeStarted()`).
 6. Create `FFASpawning.Soldier` instances for each player in `OnPlayerJoinGame()`.
-7. Call `FFASpawning.Soldier.startDelayForPrompt()` in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` to start the spawn prompt flow.
-8. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code and merge all `strings.json` files).
+7. Call `FFASpawning.Soldier.startDelayForPrompt()` in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` to start the spawn
+   prompt flow.
+8. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
+   automatically inline the code and merge all `strings.json` files).
 
 ### Example
 
@@ -91,11 +99,16 @@ Then build your mod using the bundler (see [bf6-portal-bundler](https://www.npmj
 
 ## Core Concepts
 
-- **Spawn Queue** – Players are added to a queue when they choose to spawn. The queue is processed asynchronously, with a definable delay.
-- **Delay System** – Players see a non-blocking countdown timer before being prompted to spawn or delay again. This gives them time to adjust loadouts.
-- **AI Handling** – AI soldiers automatically skip the countdown and prompt, spawning immediately when added to the queue.
-- **Smart Spawning** – The system uses a prime walking algorithm to find spawn points that are safely distanced from other players.
-- **HQ Disabling** – The system automatically disables both team HQs during initialization to prevent default team-based spawning.
+- **Spawn Queue** – Players are added to a queue when they choose to spawn. The queue is processed asynchronously, with
+  a definable delay.
+- **Delay System** – Players see a non-blocking countdown timer before being prompted to spawn or delay again. This
+  gives them time to adjust loadouts.
+- **AI Handling** – AI soldiers automatically skip the countdown and prompt, spawning immediately when added to the
+  queue.
+- **Smart Spawning** – The system uses a prime walking algorithm to find spawn points that are safely distanced from
+  other players.
+- **HQ Disabling** – The system automatically disables both team HQs during initialization to prevent default team-based
+  spawning.
 
 ---
 
@@ -104,19 +117,27 @@ Then build your mod using the bundler (see [bf6-portal-bundler](https://www.npmj
 The `_getBestSpawnPoint()` method uses a **Prime Walking Algorithm** to efficiently search for suitable spawn locations:
 
 1. **Random Start** – Selects a random starting index in the spawn points array.
-2. **Prime Step Size** – Uses a randomly selected prime number (from `PRIME_STEPS`) as the step size to walk through the array. This ensures good distribution and avoids clustering.
+2. **Prime Step Size** – Uses a randomly selected prime number (from `PRIME_STEPS`) as the step size to walk through the
+   array. This ensures good distribution and avoids clustering.
 3. **Distance Checking** – For each candidate spawn point, calculates the distance to the closest player.
-4. **Ideal Range** – A spawn point is considered ideal if the distance to the closest player is between `minimumSafeDistance` and `maximumInterestingDistance`.
-5. **Fallback Selection** – If no ideal spawn point is found within `MAX_SPAWN_CHECKS` iterations, two fallbacks are tracked: the most interesting "safe" spawn (>= safe distance, closest to players) and the safest "interesting" spawn (<= interesting distance, farthest from players). A scaled midpoint (`safeOverInterestingFallbackFactor` × average of the safe/interesting thresholds) decides which fallback to use, biasing toward safer options as the factor grows.
+4. **Ideal Range** – A spawn point is considered ideal if the distance to the closest player is between
+   `minimumSafeDistance` and `maximumInterestingDistance`.
+5. **Fallback Selection** – If no ideal spawn point is found within `MAX_SPAWN_CHECKS` iterations, two fallbacks are
+   tracked: the most interesting "safe" spawn (>= safe distance, closest to players) and the safest "interesting" spawn
+   (<= interesting distance, farthest from players). A scaled midpoint (`safeOverInterestingFallbackFactor` × average of
+   the safe/interesting thresholds) decides which fallback to use, biasing toward safer options as the factor grows.
 
 ### Performance vs. Quality Tradeoff
 
 The `_MAX_SPAWN_CHECKS` constant (default: 12) represents a tradeoff between:
 
 - **Performance** – Lower values reduce computation time but may miss suitable spawn points.
-- **Spawn Quality** – Higher values increase the chance of finding an ideal spawn point but require more distance calculations.
+- **Spawn Quality** – Higher values increase the chance of finding an ideal spawn point but require more distance
+  calculations.
 
-In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe spawn point is found within the check limit. Consider adjusting `_MAX_SPAWN_CHECKS` based on your map size, player count, and spawn point density, and make sure there are more spawn points than max players.
+In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe
+spawn point is found within the check limit. Consider adjusting `_MAX_SPAWN_CHECKS` based on your map size, player
+count, and spawn point density, and make sure there are more spawn points than max players.
 
 ---
 
@@ -163,7 +184,8 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 
 ## Configuration & Defaults
 
-The following values control spawning behavior. Most can be overridden via the optional `options` argument on `initialize()`.
+The following values control spawning behavior. Most can be overridden via the optional `options` argument on
+`initialize()`.
 
 | Setting                             | Type     | Default | How to change                                            | Description                                                                                                      |
 | ----------------------------------- | -------- | ------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -232,10 +254,12 @@ type InitializeOptions = {
 
 ### Required Event Handlers
 
-1. **`OnGameModeStarted()`** – Call `FFASpawning.Soldier.initialize()` with your spawn points and `FFASpawning.Soldier.enableSpawnQueueProcessing()` to start the system.
+1. **`OnGameModeStarted()`** – Call `FFASpawning.Soldier.initialize()` with your spawn points and
+   `FFASpawning.Soldier.enableSpawnQueueProcessing()` to start the system.
 2. **`OnPlayerJoinGame()`** – Create a new `FFASpawning.Soldier` instance for each player.
 3. **`OnPlayerJoinGame()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to begin the spawn flow for new players.
-4. **`OnPlayerUndeploy()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to restart the spawn flow when players die or undeploy.
+4. **`OnPlayerUndeploy()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to restart the spawn flow when players
+   die or undeploy.
 5. **`OnPlayerUIButtonEvent()`** – Register `UI.handleButtonClick()` to handle button presses from the spawn UI.
 
 ### Lifecycle Flow
@@ -252,7 +276,8 @@ type InitializeOptions = {
 
 ## Strings File
 
-This module includes a `strings.json` file that will be automatically merged by `bf6-portal-bundler` when you bundle your mod. The strings are automatically available under the `ffaSpawning` key:
+This module includes a `strings.json` file that will be automatically merged by `bf6-portal-bundler` when you bundle
+your mod. The strings are automatically available under the `ffaSpawning` key:
 
 ```json
 {
@@ -270,23 +295,34 @@ This module includes a `strings.json` file that will be automatically merged by 
 
 ## Known Limitations & Caveats
 
-- **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe spawn point is found within `_MAX_SPAWN_CHECKS` iterations. Consider adjusting `_MAX_SPAWN_CHECKS` or adding more spawn points to mitigate this.
-- **UI Input Mode** – The system manages `mod.EnableUIInputMode()` automatically. Be careful not to conflict with other UI systems that also control input mode.
-- **HQ Disabling** – The system automatically disables both team HQs during initialization. If you need team-based spawning elsewhere, you'll need to re-enable HQs manually (but you really should not be mixing this with other systems unless you know what you are doing).
-- **Spawn Point Cleanup** – Spawn points created during initialization are not automatically cleaned up. This is typically fine as they persist for the duration of the match.
+- **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top
+  of each other if no safe spawn point is found within `_MAX_SPAWN_CHECKS` iterations. Consider adjusting
+  `_MAX_SPAWN_CHECKS` or adding more spawn points to mitigate this.
+- **UI Input Mode** – The system manages `mod.EnableUIInputMode()` automatically. Be careful not to conflict with other
+  UI systems that also control input mode.
+- **HQ Disabling** – The system automatically disables both team HQs during initialization. If you need team-based
+  spawning elsewhere, you'll need to re-enable HQs manually (but you really should not be mixing this with other systems
+  unless you know what you are doing).
+- **Spawn Point Cleanup** – Spawn points created during initialization are not automatically cleaned up. This is
+  typically fine as they persist for the duration of the match.
 
 ---
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
+  declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
+  Portal.
 - [`ui/README.md`](../ui/README.md) – Documentation for the UI helper module required by this system.
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (additional spawn algorithms, configurable UI positioning, team-based spawning support, etc.), so please share your experiences.
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are
+welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases
+help shape the roadmap (additional spawn algorithms, configurable UI positioning, team-based spawning support, etc.), so
+please share your experiences.
 
 ---

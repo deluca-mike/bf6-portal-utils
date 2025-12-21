@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 3.0.0
+// version: 3.0.1
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -60,7 +60,7 @@ export namespace FFASpawning {
         private static _log(logLevel: FFASpawning.LogLevel, text: string): void {
             if (logLevel < this._logLevel) return;
 
-            this._logger?.(`<FFASS> ${text}`);
+            this._logger?.(`<FFAS> ${text}`);
         }
 
         private static _getRotationVector(orientation: number): mod.Vector {

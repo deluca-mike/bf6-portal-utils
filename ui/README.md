@@ -1,16 +1,19 @@
 # UI Module
 
-This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing strongly typed helpers, convenient defaults, and ergonomic getters/setters for building complex HUDs, panels, and interactive buttons.
+This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing
+strongly typed helpers, convenient defaults, and ergonomic getters/setters for building complex HUDs, panels, and
+interactive buttons.
 
-> **Note**
-> The `UI` namespace depends on the `mod` namespace (available in the `bf6-portal-mod-types` package). All types referenced below (`mod.UIWidget`, `mod.Vector`, `mod.UIAnchor`, etc.) are documented in that package.
+> **Note** The `UI` namespace depends on the `mod` namespace (available in the `bf6-portal-mod-types` package). All
+> types referenced below (`mod.UIWidget`, `mod.Vector`, `mod.UIAnchor`, etc.) are documented in that package.
 
 ---
 
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
+   mod. The bundler automatically handles code inlining.
 3. **Button handler** – Register `UI.handleButtonClick` in your `OnPlayerUIButtonEvent` event handler.
 
 ---
@@ -25,7 +28,8 @@ This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an 
 3. Register the shared button handler once in your `OnPlayerUIButtonEvent` event.
 4. Build UI elements using the `UI` namespace.
 5. Use the returned objects to show/hide, reposition, mutate text/buttons, define onClick behavior, etc.
-6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
+6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
+   automatically inline the code).
 
 ### Example
 
@@ -167,12 +171,19 @@ text.setMessage(mod.Message('Updated'))
 ## Core Concepts
 
 - **`UI` namespace** – A namespace that wraps `mod.*` UI functions and keeps track of active buttons/handlers.
-- **`UI.Node` base class** – All UI nodes (root, containers, text, buttons) extend this class and have a `type`, `name`, and `uiWidget` getter.
-- **`UI.Element` base class** – All created elements extend `Node` and provide getters/setters for common properties (position, size, visibility, colors, etc.) with method chaining support.
-- **`UI.Container`, `UI.Text`, `UI.Button` classes** – Concrete classes that extend `Element` and provide type-specific functionality. All setters return the instance for method chaining (fluent interface).
-- **Default colors** – `UI.COLORS` wraps common `mod.CreateVector(r, g, b)` presets so you rarely need to build vectors yourself. It includes BF palette colors.
-- **Receiver routing** – `Container`, `Text`, and `Button` constructors optionally accept `mod.Player | mod.Team` as a second parameter to display UI to a specific audience. When omitted, the widgets are global.
-- **Method chaining** – All setter methods (e.g., `setPosition()`, `setSize()`, `show()`, `hide()`) return the instance, allowing you to chain multiple operations: `container.setPosition({ x: 10, y: 20 }).setSize({ width: 100, height: 50 }).show()`.
+- **`UI.Node` base class** – All UI nodes (root, containers, text, buttons) extend this class and have a `type`, `name`,
+  and `uiWidget` getter.
+- **`UI.Element` base class** – All created elements extend `Node` and provide getters/setters for common properties
+  (position, size, visibility, colors, etc.) with method chaining support.
+- **`UI.Container`, `UI.Text`, `UI.Button` classes** – Concrete classes that extend `Element` and provide type-specific
+  functionality. All setters return the instance for method chaining (fluent interface).
+- **Default colors** – `UI.COLORS` wraps common `mod.CreateVector(r, g, b)` presets so you rarely need to build vectors
+  yourself. It includes BF palette colors.
+- **Receiver routing** – `Container`, `Text`, and `Button` constructors optionally accept `mod.Player | mod.Team` as a
+  second parameter to display UI to a specific audience. When omitted, the widgets are global.
+- **Method chaining** – All setter methods (e.g., `setPosition()`, `setSize()`, `show()`, `hide()`) return the instance,
+  allowing you to chain multiple operations:
+  `container.setPosition({ x: 10, y: 20 }).setSize({ width: 100, height: 50 }).show()`.
 
 ---
 
@@ -188,7 +199,8 @@ The root node wrapping `mod.GetUIRoot()`. All elements default to this parent un
 
 ### `class UI.Element extends UI.Node`
 
-Base class for all UI elements (containers, text, buttons). Provides common properties and methods with getter/setter pairs and method chaining support.
+Base class for all UI elements (containers, text, buttons). Provides common properties and methods with getter/setter
+pairs and method chaining support.
 
 #### Properties & Methods (Inherited by `Container`, `Text`, and `Button`)
 
@@ -358,7 +370,8 @@ Builds a button by first creating a container, then calling `mod.AddUIButton`. O
 | `label`           | `UI.LabelParams \| undefined`                        | Adds centered text label. Label inherits `width/height/depth` from button and forces `visible = true`.                                                                                                                                                                |
 | `receiver`        | `mod.Player \| mod.Team \| undefined`                | Optional second parameter. Target audience; defaults to global.                                                                                                                                                                                                       |
 
-**Note:** The button's container (which `name` refers to) uses `bgColor = UI.COLORS.BF_GREY_4`, `bgAlpha = 0`, and `bgFill = mod.UIBgFill.None` by default.
+**Note:** The button's container (which `name` refers to) uses `bgColor = UI.COLORS.BF_GREY_4`, `bgAlpha = 0`, and
+`bgFill = mod.UIBgFill.None` by default.
 
 #### Properties & Methods
 
@@ -374,9 +387,11 @@ Inherits all properties and methods from `UI.Element` (see below), plus:
 **Color & Alpha Getters/Setters** (all support method chaining):
 
 - **`colorBase`, `colorDisabled`, `colorFocused`, `colorHover`, `colorPressed: mod.Vector`** (getter/setter)
-- **`setColorBase(color)`, `setColorDisabled(color)`, `setColorFocused(color)`, `setColorHover(color)`, `setColorPressed(color): Button`**
+- **`setColorBase(color)`, `setColorDisabled(color)`, `setColorFocused(color)`, `setColorHover(color)`,
+  `setColorPressed(color): Button`**
 - **`alphaBase`, `alphaDisabled`, `alphaFocused`, `alphaHover`, `alphaPressed: number`** (getter/setter)
-- **`setAlphaBase(alpha)`, `setAlphaDisabled(alpha)`, `setAlphaFocused(alpha)`, `setAlphaHover(alpha)`, `setAlphaPressed(alpha): Button`**
+- **`setAlphaBase(alpha)`, `setAlphaDisabled(alpha)`, `setAlphaFocused(alpha)`, `setAlphaHover(alpha)`,
+  `setAlphaPressed(alpha): Button`**
 
 **Overrides:**
 
@@ -385,7 +400,10 @@ Inherits all properties and methods from `UI.Element` (see below), plus:
 
 ### `UI.handleButtonClick(player, widget, event)`
 
-Utility callback meant to be used in `mod.OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent)` for global subscriptions. Ignores `event` (the Battlefield Portal `mod.UIButtonEvent` is currently unreliable) and resolves the registered `onClick` for the pressed widget.
+Utility callback meant to be used in
+`mod.OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent)` for global
+subscriptions. Ignores `event` (the Battlefield Portal `mod.UIButtonEvent` is currently unreliable) and resolves the
+registered `onClick` for the pressed widget.
 
 ---
 
@@ -407,7 +425,8 @@ Base class for all UI nodes. Provides:
 
 ### `UI.Element extends UI.Node`
 
-Base class for all created widgets. Extends `Node` and provides all the properties and methods documented in the `UI.Element` API section above.
+Base class for all created widgets. Extends `Node` and provides all the properties and methods documented in the
+`UI.Element` API section above.
 
 ### `UI.Container extends UI.Element`
 
@@ -433,9 +452,11 @@ Class for button widgets. Extends `Element` and adds:
 - `labelMessage: mod.Message` (setter)
 - `setLabelMessage(message: mod.Message): Button` (method chaining)
 - Color getters/setters: `colorBase`, `colorDisabled`, `colorFocused`, `colorHover`, `colorPressed`
-- Color setter methods: `setColorBase()`, `setColorDisabled()`, `setColorFocused()`, `setColorHover()`, `setColorPressed()` (all return `Button`)
+- Color setter methods: `setColorBase()`, `setColorDisabled()`, `setColorFocused()`, `setColorHover()`,
+  `setColorPressed()` (all return `Button`)
 - Alpha getters/setters: `alphaBase`, `alphaDisabled`, `alphaFocused`, `alphaHover`, `alphaPressed`
-- Alpha setter methods: `setAlphaBase()`, `setAlphaDisabled()`, `setAlphaFocused()`, `setAlphaHover()`, `setAlphaPressed()` (all return `Button`)
+- Alpha setter methods: `setAlphaBase()`, `setAlphaDisabled()`, `setAlphaFocused()`, `setAlphaHover()`,
+  `setAlphaPressed()` (all return `Button`)
 - Overrides `size` setter and `setSize()` to also update button widget and label
 
 ### `UI.Params`
@@ -520,9 +541,11 @@ interface ButtonParams extends Params {
 
 - Register `UI.handleButtonClick` once per mod to dispatch button presses.
 - Use the returned `Element` helpers to hide/show instead of calling `mod.SetUIWidgetVisible` manually.
-- All properties support both normal setter syntax (e.g., `element.bgAlpha = 0.8;`) and method chaining (e.g., `element.setBgAlpha(0.8).show()`). Method chaining is useful when you want to apply multiple changes in sequence.
+- All properties support both normal setter syntax (e.g., `element.bgAlpha = 0.8;`) and method chaining (e.g.,
+  `element.setBgAlpha(0.8).show()`). Method chaining is useful when you want to apply multiple changes in sequence.
 - Always call `delete()` when removing widgets to prevent stale references inside Battlefield Portal.
-- The `parent` property in `Params` interfaces accepts either `mod.UIWidget` or `UI.Node`, allowing you to pass a previously created native `UIWidget` as a parent.
+- The `parent` property in `Params` interfaces accepts either `mod.UIWidget` or `UI.Node`, allowing you to pass a
+  previously created native `UIWidget` as a parent.
 
 ---
 
@@ -532,34 +555,46 @@ The following features are planned for upcoming releases:
 
 ### Auto-Creating Button Labels
 
-When setting a button's text via `setLabelMessage()` or the `labelMessage` setter, if no label currently exists, a text label will be automatically created with sensible defaults. This eliminates the need to always provide a `label` parameter in the button constructor when you want to set text dynamically later.
+When setting a button's text via `setLabelMessage()` or the `labelMessage` setter, if no label currently exists, a text
+label will be automatically created with sensible defaults. This eliminates the need to always provide a `label`
+parameter in the button constructor when you want to set text dynamically later.
 
 ### Image Widget Support
 
-Support for `UIImage` and `UIWeaponImage` widget types will be added, providing classes similar to `Container`, `Text`, and `Button` for displaying images and weapon icons in the UI.
+Support for `UIImage` and `UIWeaponImage` widget types will be added, providing classes similar to `Container`, `Text`,
+and `Button` for displaying images and weapon icons in the UI.
 
 ### Scoped Receiver Inheritance
 
-Support for parent containers with a different receiver scope than their children. For example, a container created for a team (via `receiver: mod.Team`) can have child elements that are scoped to individual players. This allows for more flexible UI hierarchies where shared containers can contain player-specific elements.
+Support for parent containers with a different receiver scope than their children. For example, a container created for
+a team (via `receiver: mod.Team`) can have child elements that are scoped to individual players. This allows for more
+flexible UI hierarchies where shared containers can contain player-specific elements.
 
 ### Container Child Management
 
-An API for adding children to a container (regardless if they were created by this `UI` module), removing children from a container, and moving children between containers.
+An API for adding children to a container (regardless if they were created by this `UI` module), removing children from
+a container, and moving children between containers.
 
 ### Parent Reference Cleanup
 
-When an element is deleted via `delete()`, the element should be removed from its parent's children list (if the parent is a `Container`). This ensures that parent containers maintain accurate `children` arrays and prevents stale references after deletion.
+When an element is deleted via `delete()`, the element should be removed from its parent's children list (if the parent
+is a `Container`). This ensures that parent containers maintain accurate `children` arrays and prevents stale references
+after deletion.
 
 ---
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
+  declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
+  Portal.
 - Battlefield Builder docs – For runtime UI limitations (widget limits, anchor behavior, etc.).
 
 ---
 
 ## Feedback & Support
 
-This helper library is under active development. Feature requests, bug reports, usage questions, or general ideas are always welcome—open an issue or reach out and they’ll be triaged quickly so you can keep shipping Portal experiences without waiting on tooling updates.
+This helper library is under active development. Feature requests, bug reports, usage questions, or general ideas are
+always welcome—open an issue or reach out and they’ll be triaged quickly so you can keep shipping Portal experiences
+without waiting on tooling updates.

@@ -68,7 +68,7 @@ export namespace MapDetector {
         if (map == MapDetector.Map.SaintsQuarter) return mod.Maps.Limestone;
         if (map == MapDetector.Map.SiegeOfCairo) return mod.Maps.Abbasid;
 
-        // An oversight in the `mod.Maps` enum has ommitted the following maps:
+        // An oversight in the `mod.Maps` enum has omitted the following maps:
         if (map == MapDetector.Map.Area22B) return;
         if (map == MapDetector.Map.RedlineStorage) return;
 

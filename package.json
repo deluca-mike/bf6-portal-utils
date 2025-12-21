@@ -1,10 +1,13 @@
 {
     "name": "bf6-portal-utils",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
+    "engines": {
+        "node": ">=23.0.0"
+    },
     "scripts": {
-        "prettier": "prettier --write ./**/*.ts",
+        "prettier": "prettier --write ./**/*.ts ./*.mjs ./*.md ./*.json ./**/*.md ./**/*.json",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix"
     },
