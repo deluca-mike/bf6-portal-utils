@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 2.1.0
+// version: 2.1.1
 export class Logger {
     private static readonly _PADDING: number = 10;
 
@@ -146,8 +146,14 @@ export class Logger {
     }
 
     public async logAsync(text: string, rowIndex?: number): Promise<void> {
-        await Promise.resolve();
-        this.log(text, rowIndex);
+        return new Promise((resolve) => {
+            try {
+                this.log(text, rowIndex);
+            } catch (error) {
+                // Swallow errors to prevent unhandled promise rejections when the promise is not awaited.
+            }
+            resolve();
+        });
     }
 
     public log(text: string, rowIndex?: number): Logger {

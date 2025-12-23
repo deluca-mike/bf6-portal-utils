@@ -108,7 +108,7 @@ The `MapDetector` class supports detection of the following maps via the `MapDet
 - Mirak Valley
 - New Sobek City
 - Operation Firestorm
-- Portal Sandbox Marina
+- Portal Sandbox
 - Redline Storage
 - Saints Quarter
 - Siege of Cairo
@@ -125,7 +125,7 @@ the Battlefield Portal API. As a result:
 - `MapDetector.currentNativeMap` will return `undefined` for these maps (they are not present in `mod.Maps`).
 - `MapDetector.isCurrentNativeMap()` will always return `false` for these maps when checking against any `mod.Maps`
   value.
-- `MapDetector.currenMap` and `MapDetector.isCurrentMap` will behave correctly for these maps.
+- `MapDetector.currenMap` and `MapDetector.isCurrentMap` **will behave correctly for these maps**.
 
 Therefore, use `MapDetector.Map` enum values and the `isCurrentMap()` method when working with these maps (or
 preferably, for all maps).

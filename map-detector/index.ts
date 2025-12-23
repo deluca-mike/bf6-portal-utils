@@ -1,4 +1,4 @@
-// version 2.0.0
+// version 3.0.0
 export namespace MapDetector {
     export enum Map {
         Area22B = 'Area 22B',
@@ -15,7 +15,7 @@ export namespace MapDetector {
         MirakValley = 'Mirak Valley',
         NewSobekCity = 'New Sobek City',
         OperationFirestorm = 'Operation Firestorm',
-        PortalSandboxMarina = 'Portal Sandbox Marina',
+        PortalSandbox = 'Portal Sandbox',
         RedlineStorage = 'Redline Storage',
         SaintsQuarter = 'Saints Quarter',
         SiegeOfCairo = 'Siege of Cairo',
@@ -31,7 +31,7 @@ export namespace MapDetector {
         if (x == -195) return MapDetector.Map.Eastwood; // Eastwood <-195.29, 231.54, -41.5>
         if (x == -274) return MapDetector.Map.DefenseNexus; // Defense Nexus <-274.12, 138.65, 309.02>
         if (x == -299) return MapDetector.Map.GolfCourse; // Golf Course <-299.32, 191.91, -644.38>
-        if (x == -30) return MapDetector.Map.PortalSandboxMarina; // Portal Sandbox Marina <-30.02, 32.4, -0.01>
+        if (x == -30) return MapDetector.Map.PortalSandbox; // Portal Sandbox <-30.02, 32.4, -0.01>
         if (x == -323) return MapDetector.Map.ManhattanBridge; // Manhattan Bridge <-323.32, 52.3, -440.95>
         if (x == -39) return MapDetector.Map.OperationFirestorm; // Operation Firestorm <-39.67, 124.69, -116.68>
         if (x == -672) return MapDetector.Map.EmpireState; // Empire State <-672.19, 53.79, -115.11>
@@ -64,7 +64,7 @@ export namespace MapDetector {
         if (map == MapDetector.Map.MirakValley) return mod.Maps.Tungsten;
         if (map == MapDetector.Map.NewSobekCity) return mod.Maps.Outskirts;
         if (map == MapDetector.Map.OperationFirestorm) return mod.Maps.Firestorm;
-        if (map == MapDetector.Map.PortalSandboxMarina) return mod.Maps.Sand;
+        if (map == MapDetector.Map.PortalSandbox) return mod.Maps.Sand;
         if (map == MapDetector.Map.SaintsQuarter) return mod.Maps.Limestone;
         if (map == MapDetector.Map.SiegeOfCairo) return mod.Maps.Abbasid;
 

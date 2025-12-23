@@ -1,4 +1,4 @@
-// version: 2.0.1
+// version: 3.0.0
 export namespace UI {
     export const COLORS = {
         BLACK: mod.CreateVector(0, 0, 0),
@@ -27,6 +27,13 @@ export namespace UI {
         BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // 716000
     };
 
+    export enum Type {
+        Root = 'root',
+        Container = 'container',
+        Text = 'text',
+        Button = 'button',
+    }
+
     type Params = {
         type?: Type;
         name?: string;
@@ -35,7 +42,7 @@ export namespace UI {
         width?: number;
         height?: number;
         anchor?: mod.UIAnchor;
-        parent?: mod.UIWidget | Node;
+        parent?: mod.UIWidget | Parent;
         visible?: boolean;
         padding?: number;
         bgColor?: mod.Vector;
@@ -79,24 +86,13 @@ export namespace UI {
         label?: LabelParams;
     };
 
-    export enum Type {
-        Root = 'root',
-        Container = 'container',
-        Text = 'text',
-        Button = 'button',
-        Unknown = 'unknown',
-    }
-
     export class Node {
         protected _uiWidget: mod.UIWidget;
 
-        protected _type: Type;
-
         protected _name: string;
 
-        public constructor(uiWidget: mod.UIWidget, type: Type, name: string) {
+        public constructor(uiWidget: mod.UIWidget, name: string) {
             this._uiWidget = uiWidget;
-            this._type = type;
             this._name = name;
         }
 
@@ -104,12 +100,60 @@ export namespace UI {
             return this._uiWidget;
         }
 
-        public get type(): Type {
-            return this._type;
-        }
-
         public get name(): string {
             return this._name;
+        }
+    }
+
+    interface Parent extends Node {
+        children: Element[];
+        addChild(child: Element): void;
+        syncChildren(): void;
+    }
+
+    class Root extends Node implements Parent {
+        private _children: Element[] = [];
+
+        public get children(): Element[] {
+            return this._children;
+        }
+
+        public constructor() {
+            super(mod.GetUIRoot(), 'ui_root');
+        }
+
+        public addChild(child: Element): this {
+            if (child.parent !== this) return this; // TODO: throw error.
+
+            if (this._children.includes(child)) return this;
+
+            this._children.push(child);
+
+            return this;
+        }
+
+        public syncChildren(): this {
+            this._children = this._children.filter(({ parent }) => parent === this);
+
+            return this;
+        }
+    }
+
+    class UnknownNode extends Node implements Parent {
+        public constructor(uiWidget: mod.UIWidget) {
+            super(uiWidget, 'ui_unknown');
+        }
+
+        public get children(): Element[] {
+            return [];
+        }
+
+        public addChild(child: Element): this {
+            return this;
+        }
+
+        public syncChildren(): this {
+            return this;
         }
     }
 
@@ -125,32 +169,48 @@ export namespace UI {
 
     const CLICK_HANDLERS = new Map<string, (player: mod.Player) => Promise<void>>();
 
-    export const ROOT_NODE = new Node(mod.GetUIRoot(), Type.Root, 'ui_root');
+    export const ROOT_NODE = new Root();
 
     let counter: number = 0;
 
-    function makeName(parent: Node, receiver?: mod.Player | mod.Team): string {
+    function makeName(parent: Parent, receiver?: mod.Player | mod.Team): string {
         return `${parent.name}${receiver ? `_${mod.GetObjId(receiver)}` : ''}_${counter++}`;
     }
 
-    function parseNode(node?: Node | mod.UIWidget): Node {
-        if (!node) return ROOT_NODE;
+    function parseParent(parent?: Parent | mod.UIWidget): Parent {
+        if (!parent) return ROOT_NODE;
 
-        if (node instanceof Node) return node as Node;
+        if (parent instanceof Container) return parent as Container;
 
-        return new Node(node as mod.UIWidget, Type.Unknown, 'ui_unknown');
+        return new UnknownNode(parent as mod.UIWidget);
     }
 
     export class Element extends Node {
-        protected _parent: Node;
+        protected _parent: Parent;
 
-        public constructor(uiWidget: mod.UIWidget, type: Type, name: string, parent: Node) {
-            super(uiWidget, type, name);
+        public constructor(uiWidget: mod.UIWidget, name: string, parent: Parent) {
+            super(uiWidget, name);
+
             this._parent = parent;
+            parent.addChild(this);
         }
 
-        public get parent(): Node {
+        public get parent(): Parent {
             return this._parent;
+        }
+
+        public set parent(parent: Parent) {
+            const oldParent = this._parent;
+
+            this._parent = parent;
+            parent.addChild(this);
+
+            oldParent.syncChildren();
+        }
+
+        public setParent(parent: Parent): this {
+            this.parent = parent;
+            return this;
         }
 
         public get visible(): boolean {
@@ -161,28 +221,29 @@ export namespace UI {
             mod.SetUIWidgetVisible(this._uiWidget, visible);
         }
 
-        public setVisible(visible: boolean): Node {
+        public setVisible(visible: boolean): this {
             this.visible = visible;
             return this;
         }
 
-        public show(): Node {
+        public show(): this {
             this.visible = true;
             return this;
         }
 
-        public hide(): Node {
+        public hide(): this {
             this.visible = false;
             return this;
         }
 
-        public toggle(): Node {
+        public toggle(): this {
             this.visible = !this.visible;
             return this;
         }
 
         public delete(): void {
             mod.DeleteUIWidget(this._uiWidget);
+            this.parent.syncChildren();
         }
 
         public get position(): Position {
@@ -194,7 +255,7 @@ export namespace UI {
             mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
         }
 
-        public setPosition(params: Position): Node {
+        public setPosition(params: Position): this {
             this.position = params;
             return this;
         }
@@ -208,7 +269,7 @@ export namespace UI {
             mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
         }
 
-        public setSize(params: Size): Node {
+        public setSize(params: Size): this {
             this.size = params;
             return this;
         }
@@ -221,7 +282,7 @@ export namespace UI {
             mod.SetUIWidgetBgColor(this._uiWidget, color);
         }
 
-        public setBgColor(color: mod.Vector): Node {
+        public setBgColor(color: mod.Vector): this {
             this.bgColor = color;
             return this;
         }
@@ -234,7 +295,7 @@ export namespace UI {
             mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
         }
 
-        public setBgAlpha(alpha: number): Node {
+        public setBgAlpha(alpha: number): this {
             this.bgAlpha = alpha;
             return this;
         }
@@ -247,7 +308,7 @@ export namespace UI {
             mod.SetUIWidgetBgFill(this._uiWidget, fill);
         }
 
-        public setBgFill(fill: mod.UIBgFill): Node {
+        public setBgFill(fill: mod.UIBgFill): this {
             this.bgFill = fill;
             return this;
         }
@@ -260,7 +321,7 @@ export namespace UI {
             mod.SetUIWidgetDepth(this._uiWidget, depth);
         }
 
-        public setDepth(depth: mod.UIDepth): Node {
+        public setDepth(depth: mod.UIDepth): this {
             this.depth = depth;
             return this;
         }
@@ -273,7 +334,7 @@ export namespace UI {
             mod.SetUIWidgetAnchor(this._uiWidget, anchor);
         }
 
-        public setAnchor(anchor: mod.UIAnchor): Node {
+        public setAnchor(anchor: mod.UIAnchor): this {
             this.anchor = anchor;
             return this;
         }
@@ -286,21 +347,21 @@ export namespace UI {
             mod.SetUIWidgetPadding(this._uiWidget, padding);
         }
 
-        public setPadding(padding: number): Node {
+        public setPadding(padding: number): this {
             this.padding = padding;
             return this;
         }
     }
 
-    export class Container extends Element {
-        private _children: (Container | Text | Button)[];
+    export class Container extends Element implements Parent {
+        private _children: Element[] = [];
 
-        public get children(): (Container | Text | Button)[] {
+        public get children(): Element[] {
             return this._children;
         }
 
         public constructor(params: ContainerParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseNode(params.parent);
+            const parent = parseParent(params.parent);
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -337,32 +398,43 @@ export namespace UI {
 
             const uiWidget = mod.FindUIWidgetWithName(name) as mod.UIWidget;
 
-            super(uiWidget, Type.Container, name, parent);
-
-            this._children = [];
+            super(uiWidget, name, parent);
 
             for (const childParams of params.childrenParams ?? []) {
                 childParams.parent = this;
 
-                const child =
-                    childParams.type === Type.Container
-                        ? new Container(childParams)
-                        : childParams.type === Type.Text
-                          ? new Text(childParams as TextParams)
-                          : childParams.type === Type.Button
-                            ? new Button(childParams as ButtonParams)
-                            : undefined;
-
-                if (!child) continue;
-
-                this._children.push(child);
+                if (childParams.type === Type.Container) {
+                    new Container(childParams);
+                } else if (childParams.type === Type.Text) {
+                    new Text(childParams as TextParams);
+                } else if (childParams.type === Type.Button) {
+                    new Button(childParams as ButtonParams);
+                } else {
+                    continue; // TODO: throw error.
+                }
             }
+        }
+
+        public addChild(child: Element): this {
+            if (child.parent !== this) return this; // TODO: throw error.
+
+            if (this._children.includes(child)) return this;
+
+            this._children.push(child);
+
+            return this;
+        }
+
+        public syncChildren(): this {
+            this._children = this._children.filter(({ parent }) => parent === this);
+
+            return this;
         }
     }
 
     export class Text extends Element {
         public constructor(params: TextParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseNode(params.parent);
+            const parent = parseParent(params.parent);
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -409,20 +481,20 @@ export namespace UI {
 
             const uiWidget = mod.FindUIWidgetWithName(name) as mod.UIWidget;
 
-            super(uiWidget, Type.Text, name, parent);
+            super(uiWidget, name, parent);
         }
 
         public set message(message: mod.Message) {
             mod.SetUITextLabel(this._uiWidget, message);
         }
 
-        public setMessage(message: mod.Message): Text {
+        public setMessage(message: mod.Message): this {
             this.message = message;
             return this;
         }
     }
 
-    export class Button extends Element {
+    export class Button extends Container {
         private _buttonName: string;
 
         private _buttonUiWidget: mod.UIWidget;
@@ -430,7 +502,7 @@ export namespace UI {
         private _label?: Text;
 
         public constructor(params: ButtonParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseNode(params.parent);
+            const parent = parseParent(params.parent);
 
             const containerParams: ContainerParams = {
                 x: params.x,
@@ -438,7 +510,7 @@ export namespace UI {
                 width: params.width,
                 height: params.height,
                 anchor: params.anchor,
-                parent: parent,
+                parent,
                 visible: params.visible,
                 padding: 0,
                 bgColor: COLORS.BF_GREY_4,
@@ -447,19 +519,16 @@ export namespace UI {
                 depth: params.depth ?? mod.UIDepth.AboveGameUI,
             };
 
-            const container = new Container(containerParams, receiver);
-            const containerUiWidget = container.uiWidget;
+            super(containerParams, receiver);
 
-            super(containerUiWidget, Type.Button, container.name, container.parent);
-
-            const buttonName = params.name ?? `${container.name}_button`;
+            const buttonName = params.name ?? `${this._name}_button`;
 
             mod.AddUIButton(
                 buttonName,
                 mod.CreateVector(0, 0, 0),
                 mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
                 params.anchor ?? mod.UIAnchor.Center,
-                containerUiWidget,
+                this.uiWidget,
                 true,
                 params.padding ?? 0,
                 params.bgColor ?? COLORS.WHITE,
@@ -488,8 +557,8 @@ export namespace UI {
             this._label = params.label
                 ? new Text({
                       ...params.label,
-                      name: `${container.name}_label`,
-                      parent: container,
+                      name: `${this._name}_label`,
+                      parent: this.uiWidget,
                       width: params.width,
                       height: params.height,
                       visible: true,
@@ -517,7 +586,7 @@ export namespace UI {
             mod.SetUIButtonAlphaBase(this._buttonUiWidget, alpha);
         }
 
-        public setAlphaBase(alpha: number): Button {
+        public setAlphaBase(alpha: number): this {
             this.alphaBase = alpha;
             return this;
         }
@@ -530,7 +599,7 @@ export namespace UI {
             mod.SetUIButtonAlphaDisabled(this._buttonUiWidget, alpha);
         }
 
-        public setAlphaDisabled(alpha: number): Button {
+        public setAlphaDisabled(alpha: number): this {
             this.alphaDisabled = alpha;
             return this;
         }
@@ -543,7 +612,7 @@ export namespace UI {
             mod.SetUIButtonAlphaFocused(this._buttonUiWidget, alpha);
         }
 
-        public setAlphaFocused(alpha: number): Button {
+        public setAlphaFocused(alpha: number): this {
             this.alphaFocused = alpha;
             return this;
         }
@@ -556,7 +625,7 @@ export namespace UI {
             mod.SetUIButtonAlphaHover(this._buttonUiWidget, alpha);
         }
 
-        public setAlphaHover(alpha: number): Button {
+        public setAlphaHover(alpha: number): this {
             this.alphaHover = alpha;
             return this;
         }
@@ -569,7 +638,7 @@ export namespace UI {
             mod.SetUIButtonAlphaPressed(this._buttonUiWidget, alpha);
         }
 
-        public setAlphaPressed(alpha: number): Button {
+        public setAlphaPressed(alpha: number): this {
             this.alphaPressed = alpha;
             return this;
         }
@@ -582,7 +651,7 @@ export namespace UI {
             mod.SetUIButtonColorBase(this._buttonUiWidget, color);
         }
 
-        public setColorBase(color: mod.Vector): Button {
+        public setColorBase(color: mod.Vector): this {
             this.colorBase = color;
             return this;
         }
@@ -595,7 +664,7 @@ export namespace UI {
             mod.SetUIButtonColorDisabled(this._buttonUiWidget, color);
         }
 
-        public setColorDisabled(color: mod.Vector): Button {
+        public setColorDisabled(color: mod.Vector): this {
             this.colorDisabled = color;
             return this;
         }
@@ -608,7 +677,7 @@ export namespace UI {
             mod.SetUIButtonColorFocused(this._buttonUiWidget, color);
         }
 
-        public setColorFocused(color: mod.Vector): Button {
+        public setColorFocused(color: mod.Vector): this {
             this.colorFocused = color;
             return this;
         }
@@ -621,7 +690,7 @@ export namespace UI {
             mod.SetUIButtonColorHover(this._buttonUiWidget, color);
         }
 
-        public setColorHover(color: mod.Vector): Button {
+        public setColorHover(color: mod.Vector): this {
             this.colorHover = color;
             return this;
         }
@@ -634,7 +703,7 @@ export namespace UI {
             mod.SetUIButtonColorPressed(this._buttonUiWidget, color);
         }
 
-        public setColorPressed(color: mod.Vector): Button {
+        public setColorPressed(color: mod.Vector): this {
             this.colorPressed = color;
             return this;
         }
@@ -647,7 +716,7 @@ export namespace UI {
             mod.SetUIButtonEnabled(this._buttonUiWidget, enabled);
         }
 
-        public setEnabled(enabled: boolean): Button {
+        public setEnabled(enabled: boolean): this {
             this.enabled = enabled;
             return this;
         }
@@ -656,7 +725,7 @@ export namespace UI {
             this._label?.setMessage(message);
         }
 
-        public setLabelMessage(message: mod.Message): Button {
+        public setLabelMessage(message: mod.Message): this {
             this.labelMessage = message;
             return this;
         }
@@ -667,7 +736,7 @@ export namespace UI {
             this._label?.setSize({ width: params.width, height: params.height });
         }
 
-        public override setSize(params: Size): Button {
+        public override setSize(params: Size): this {
             this.size = params;
             return this;
         }

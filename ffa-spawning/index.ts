@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 3.0.1
+// version: 3.1.0
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -17,26 +17,24 @@ export namespace FFASpawning {
     };
 
     export type InitializeOptions = {
+        maxSpawnCandidates?: number;
         minimumSafeDistance?: number;
         maximumInterestingDistance?: number;
         safeOverInterestingFallbackFactor?: number;
+        initialPromptDelay?: number;
+        promptDelay?: number;
+        queueProcessingDelay?: number;
     };
 
     export class Soldier {
         private static readonly _ALL_SOLDIERS: { [playerId: number]: Soldier } = {};
 
-        // Time until the player is asked to spawn to delay the prompt again.
-        private static readonly _PROMPT_DELAY: number = 10;
-
         private static readonly _PRIME_STEPS: number[] = [2039, 2027, 2017];
 
-        // The maximum number of random spawns to consider when trying to find a spawn point for a player.
-        private static readonly _MAX_SPAWN_CHECKS: number = 12;
-
-        // The delay between processing the spawn queue.
-        private static readonly _QUEUE_PROCESSING_DELAY: number = 1;
-
         private static _spawns: FFASpawning.Spawn[] = [];
+
+        // The maximum number of random spawns to consider when trying to find a spawn point for a player.
+        private static _maxSpawnCandidates: number = 12;
 
         // The minimum distance a spawn point must be to another player to be considered safe.
         private static _minimumSafeDistance: number = 20;
@@ -48,6 +46,15 @@ export namespace FFASpawning {
         private static _safeOverInterestingFallbackFactor: number = 1.5;
 
         private static _spawnQueue: Soldier[] = [];
+
+        // Time subsequent delays between prompts.
+        private static _promptDelay: number = 10;
+
+        // Time intiial time until the player is asked to spawn.
+        private static _initialPromptDelay: number = this._promptDelay;
+
+        // The delay between processing the spawn queue.
+        private static _queueProcessingDelay: number = 1;
 
         private static _queueProcessingEnabled: boolean = false;
 
@@ -79,7 +86,7 @@ export namespace FFASpawning {
             let interestingFallbackSpawn: FFASpawning.Spawn | undefined = undefined;
             let interestingFallbackDistance: number = -1;
 
-            for (let i = 0; i < this._MAX_SPAWN_CHECKS; ++i) {
+            for (let i = 0; i < this._maxSpawnCandidates; ++i) {
                 const index = (startIndex + i * stepSize) % spawns.length;
                 const candidate = spawns[index];
                 const distance = this._getDistanceToClosestPlayer(candidate.location);
@@ -180,7 +187,7 @@ export namespace FFASpawning {
                 mod.SpawnPlayerFromSpawnPoint(soldier.player, spawn.spawnPoint);
             }
 
-            mod.Wait(this._QUEUE_PROCESSING_DELAY).then(() => this._processSpawnQueue());
+            mod.Wait(this._queueProcessingDelay).then(() => this._processSpawnQueue());
         }
 
         public static getVectorString(vector: mod.Vector): string {
@@ -214,16 +221,18 @@ export namespace FFASpawning {
                 };
             });
 
+            this._maxSpawnCandidates = options?.maxSpawnCandidates ?? this._maxSpawnCandidates;
             this._minimumSafeDistance = options?.minimumSafeDistance ?? this._minimumSafeDistance;
             this._maximumInterestingDistance = options?.maximumInterestingDistance ?? this._maximumInterestingDistance;
 
             this._safeOverInterestingFallbackFactor =
                 options?.safeOverInterestingFallbackFactor ?? this._safeOverInterestingFallbackFactor;
 
-            this._log(
-                FFASpawning.LogLevel.Info,
-                `Set ${this._spawns.length} spawn points (S: ${this._minimumSafeDistance}m, I: ${this._maximumInterestingDistance}m, F: ${this._safeOverInterestingFallbackFactor}).`
-            );
+            this._initialPromptDelay = options?.initialPromptDelay ?? this._initialPromptDelay;
+            this._promptDelay = options?.promptDelay ?? this._promptDelay;
+            this._queueProcessingDelay = options?.queueProcessingDelay ?? this._queueProcessingDelay;
+
+            this._log(FFASpawning.LogLevel.Info, `Initialized with ${this._spawns.length} spawn points.`);
         }
 
         // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
@@ -251,8 +260,6 @@ export namespace FFASpawning {
 
         // Enables the processing of the spawn queue.
         public static enableSpawnQueueProcessing(): void {
-            this._log(FFASpawning.LogLevel.Info, `Enabling processing spawn queue.`);
-
             if (this._queueProcessingEnabled) return;
 
             this._queueProcessingEnabled = true;
@@ -261,8 +268,6 @@ export namespace FFASpawning {
 
         // Disables the processing of the spawn queue.
         public static disableSpawnQueueProcessing(): void {
-            this._log(FFASpawning.LogLevel.Info, `Disabling processing spawn queue.`);
-
             this._queueProcessingEnabled = false;
         }
 
@@ -329,12 +334,12 @@ export namespace FFASpawning {
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
                             label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._PROMPT_DELAY),
+                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
                                 textSize: 30,
                                 textColor: UI.COLORS.BF_YELLOW_BRIGHT,
                             },
                             onClick: async (player: mod.Player): Promise<void> => {
-                                this.startDelayForPrompt();
+                                this.startDelayForPrompt(Soldier._promptDelay);
                             },
                         },
                     ],
@@ -365,7 +370,7 @@ export namespace FFASpawning {
 
         private _playerId: number;
 
-        private _delayCountdown: number = Soldier._PROMPT_DELAY;
+        private _delayCountdown: number = 0;
 
         private _promptUI?: UI.Container;
 
@@ -381,8 +386,10 @@ export namespace FFASpawning {
 
         // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
         // AI soldiers will skip the countdown and spawn immediately.
-        public startDelayForPrompt(): void {
-            Soldier._log(FFASpawning.LogLevel.Debug, `Starting delay for P_${this._playerId}.`);
+        public startDelayForPrompt(delay: number = Soldier._initialPromptDelay): void {
+            if (this._delayCountdown > 0) return;
+
+            Soldier._log(FFASpawning.LogLevel.Debug, `Starting ${delay}s delay for P_${this._playerId}.`);
 
             if (mod.GetSoldierState(this._player, mod.SoldierStateBool.IsAISoldier)) return this.addToQueue();
 
@@ -390,7 +397,7 @@ export namespace FFASpawning {
             this._promptUI?.hide();
             mod.EnableUIInputMode(false, this._player);
 
-            this._delayCountdown = Soldier._PROMPT_DELAY;
+            this._delayCountdown = delay;
             this.handleDelayCountdown();
         }
 
@@ -431,7 +438,7 @@ export namespace FFASpawning {
         private deleteIfNotValid(): boolean {
             if (mod.IsPlayerValid(this._player)) return false;
 
-            Soldier._log(FFASpawning.LogLevel.Info, `P_${this._playerId} is no longer in the game.`);
+            Soldier._log(FFASpawning.LogLevel.Info, `P_${this._playerId} is no longer valid.`);
 
             this._promptUI?.delete();
             this._countdownUI?.delete();

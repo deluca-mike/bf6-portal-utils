@@ -32,7 +32,7 @@ players, reducing the chance of spawning directly into combat while maintaining 
     ```
 3. Register the button handler in your `OnPlayerUIButtonEvent` event.
 4. Call `FFASpawning.Soldier.initialize()` in `OnGameModeStarted()` with your spawn point data (optional
-   `InitializeOptions` to override spawn distance defaults).
+   `InitializeOptions` to override defaults for spawn distances, delays, and candidate limits).
 5. Enable spawn queue processing when ready (typically in `OnGameModeStarted()`).
 6. Create `FFASpawning.Soldier` instances for each player in `OnPlayerJoinGame()`.
 7. Call `FFASpawning.Soldier.startDelayForPrompt()` in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` to start the spawn
@@ -61,6 +61,10 @@ export async function OnGameModeStarted(): Promise<void> {
         minimumSafeDistance: 20, // Optional override (default 20)
         maximumInterestingDistance: 40, // Optional override (default 40)
         safeOverInterestingFallbackFactor: 1.5, // Optional override (default 1.5)
+        maxSpawnCandidates: 12, // Optional override (default 12)
+        initialPromptDelay: 10, // Optional override (default 10)
+        promptDelay: 10, // Optional override (default 10)
+        queueProcessingDelay: 1, // Optional override (default 1)
     });
 
     // Enable spawn queue processing
@@ -122,22 +126,23 @@ The `_getBestSpawnPoint()` method uses a **Prime Walking Algorithm** to efficien
 3. **Distance Checking** – For each candidate spawn point, calculates the distance to the closest player.
 4. **Ideal Range** – A spawn point is considered ideal if the distance to the closest player is between
    `minimumSafeDistance` and `maximumInterestingDistance`.
-5. **Fallback Selection** – If no ideal spawn point is found within `MAX_SPAWN_CHECKS` iterations, two fallbacks are
+5. **Fallback Selection** – If no ideal spawn point is found within `maxSpawnCandidates` iterations, two fallbacks are
    tracked: the most interesting "safe" spawn (>= safe distance, closest to players) and the safest "interesting" spawn
    (<= interesting distance, farthest from players). A scaled midpoint (`safeOverInterestingFallbackFactor` × average of
    the safe/interesting thresholds) decides which fallback to use, biasing toward safer options as the factor grows.
 
 ### Performance vs. Quality Tradeoff
 
-The `_MAX_SPAWN_CHECKS` constant (default: 12) represents a tradeoff between:
+The `maxSpawnCandidates` option (default: 12) represents a tradeoff between:
 
 - **Performance** – Lower values reduce computation time but may miss suitable spawn points.
 - **Spawn Quality** – Higher values increase the chance of finding an ideal spawn point but require more distance
   calculations.
 
 In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe
-spawn point is found within the check limit. Consider adjusting `_MAX_SPAWN_CHECKS` based on your map size, player
-count, and spawn point density, and make sure there are more spawn points than max players.
+spawn point is found within the check limit. Consider adjusting `maxSpawnCandidates` via the `initialize()` options
+based on your map size, player count, and spawn point density, and make sure there are more spawn points than max
+players.
 
 ---
 
@@ -151,15 +156,15 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 
 #### Static Methods
 
-| Method                                                                                 | Description                                                                                                                                                                                                  |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. Optional `options` let you override spawn distance defaults.                                 |
-| `setLogging(log: (text: string) => void, logLevel?: FFASpawning.LogLevel)`             | Attaches a logger function and defines a minimum log level. Useful for debugging spawn behavior. Default log level is `Info` if not specified.                                                               |
-| `startDelayForPrompt(player: mod.Player)`                                              | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately. |
-| `forceIntoQueue(player: mod.Player)`                                                   | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning.                                                                                         |
-| `enableSpawnQueueProcessing()`                                                         | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`).                                                        |
-| `disableSpawnQueueProcessing()`                                                        | Disables the processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions.                                                                                           |
-| `getVectorString(vector: mod.Vector): string`                                          | Utility method that formats a vector as a string for logging purposes. Returns a string in the format `<x, y, z>` with 2 decimal places.                                                                     |
+| Method                                                                                 | Description                                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. Optional `options` let you override defaults for spawn distances, delays, and candidate limits. |
+| `setLogging(log: (text: string) => void, logLevel?: FFASpawning.LogLevel)`             | Attaches a logger function and defines a minimum log level. Useful for debugging spawn behavior. Default log level is `Info` if not specified.                                                                  |
+| `startDelayForPrompt(player: mod.Player)`                                              | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately.    |
+| `forceIntoQueue(player: mod.Player)`                                                   | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning.                                                                                            |
+| `enableSpawnQueueProcessing()`                                                         | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`).                                                           |
+| `disableSpawnQueueProcessing()`                                                        | Disables the processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions.                                                                                              |
+| `getVectorString(vector: mod.Vector): string`                                          | Utility method that formats a vector as a string for logging purposes. Returns a string in the format `<x, y, z>` with 2 decimal places.                                                                        |
 
 #### Constructor
 
@@ -189,12 +194,13 @@ The following values control spawning behavior. Most can be overridden via the o
 
 | Setting                             | Type     | Default | How to change                                            | Description                                                                                                      |
 | ----------------------------------- | -------- | ------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `_PROMPT_DELAY`                     | `number` | `10`    | Edit constant                                            | Time (in seconds) until the player is asked to spawn or delay the prompt again.                                  |
 | `minimumSafeDistance`               | `number` | `20`    | `initialize` `options.minimumSafeDistance`               | Minimum distance (m) for a spawn to be considered safe.                                                          |
 | `maximumInterestingDistance`        | `number` | `40`    | `initialize` `options.maximumInterestingDistance`        | Maximum distance (m) for a spawn to still be considered interesting (not too far).                               |
 | `safeOverInterestingFallbackFactor` | `number` | `1.5`   | `initialize` `options.safeOverInterestingFallbackFactor` | Scales the midpoint between safe/interesting distances when picking a fallback spawn. Higher favors safer picks. |
-| `_MAX_SPAWN_CHECKS`                 | `number` | `12`    | Edit constant                                            | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
-| `_QUEUE_PROCESSING_DELAY`           | `number` | `1`     | Edit constant                                            | Delay (seconds) between processing spawn queue batches.                                                          |
+| `maxSpawnCandidates`                | `number` | `12`    | `initialize` `options.maxSpawnCandidates`                | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
+| `initialPromptDelay`                | `number` | `10`    | `initialize` `options.initialPromptDelay`                | Time (in seconds) until the player is first asked to spawn or delay the prompt again.                            |
+| `promptDelay`                       | `number` | `10`    | `initialize` `options.promptDelay`                       | Time (in seconds) until the player is asked to spawn or delay the prompt again (after clicking delay).           |
+| `queueProcessingDelay`              | `number` | `1`     | `initialize` `options.queueProcessingDelay`              | Delay (seconds) between processing spawn queue batches.                                                          |
 
 ---
 
@@ -238,13 +244,17 @@ type Spawn = {
 
 ### `FFASpawning.InitializeOptions`
 
-Optional overrides for spawn selection thresholds when calling `initialize()`:
+Optional overrides for spawn selection thresholds, delays, and candidate limits when calling `initialize()`:
 
 ```ts
 type InitializeOptions = {
+    maxSpawnCandidates?: number; // Default 12
     minimumSafeDistance?: number; // Default 20
     maximumInterestingDistance?: number; // Default 40
     safeOverInterestingFallbackFactor?: number; // Default 1.5
+    initialPromptDelay?: number; // Default 10
+    promptDelay?: number; // Default 10
+    queueProcessingDelay?: number; // Default 1
 };
 ```
 
@@ -265,10 +275,11 @@ type InitializeOptions = {
 ### Lifecycle Flow
 
 1. Player joins or undeploys → `startDelayForPrompt()` is called
-2. Countdown timer displays for `_PROMPT_DELAY` seconds (default: 10)
+2. Countdown timer displays for `initialPromptDelay` seconds (default: 10) on first prompt, or `promptDelay` seconds
+   (default: 10) on subsequent delays
 3. UI prompt appears with "Spawn" and "Delay" buttons
 4. Player clicks "Spawn" → Player is added to spawn queue
-5. Player clicks "Delay" → Countdown restarts
+5. Player clicks "Delay" → Countdown restarts with `promptDelay` duration
 6. Spawn queue processor finds best spawn point and spawns the player
 7. Process repeats when player dies or undeploys
 
@@ -296,8 +307,8 @@ your mod. The strings are automatically available under the `ffaSpawning` key:
 ## Known Limitations & Caveats
 
 - **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top
-  of each other if no safe spawn point is found within `_MAX_SPAWN_CHECKS` iterations. Consider adjusting
-  `_MAX_SPAWN_CHECKS` or adding more spawn points to mitigate this.
+  of each other if no safe spawn point is found within `maxSpawnCandidates` iterations. Consider adjusting
+  `maxSpawnCandidates` via the `initialize()` options or adding more spawn points to mitigate this.
 - **UI Input Mode** – The system manages `mod.EnableUIInputMode()` automatically. Be careful not to conflict with other
   UI systems that also control input mode.
 - **HQ Disabling** – The system automatically disables both team HQs during initialization. If you need team-based

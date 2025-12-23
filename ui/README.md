@@ -166,15 +166,52 @@ text.setMessage(mod.Message('Updated'))
     .show();
 ```
 
+### Parent-Child Management Example
+
+Elements automatically manage parent-child relationships. When you create an element with a parent, move it between
+parents, or delete it, the parent's `children` array is automatically updated:
+
+```ts
+// Create containers
+const container1 = new UI.Container({ x: 0, y: 0, width: 200, height: 200 });
+const container2 = new UI.Container({ x: 200, y: 0, width: 200, height: 200 });
+
+// Create a text element as a child of container1
+const text = new UI.Text({
+    message: mod.Message('Hello'),
+    parent: container1,
+});
+
+console.log(container1.children.length); // 1
+console.log(container2.children.length); // 0
+
+// Move the text element to container2
+text.setParent(container2);
+// Or: text.parent = container2;
+
+console.log(container1.children.length); // 0 (automatically removed)
+console.log(container2.children.length); // 1 (automatically added)
+
+// Delete the text element
+text.delete();
+
+console.log(container2.children.length); // 0 (automatically removed)
+```
+
 ---
 
 ## Core Concepts
 
 - **`UI` namespace** – A namespace that wraps `mod.*` UI functions and keeps track of active buttons/handlers.
-- **`UI.Node` base class** – All UI nodes (root, containers, text, buttons) extend this class and have a `type`, `name`,
-  and `uiWidget` getter.
+- **`UI.Node` base class** – All UI nodes (root, containers, text, buttons) extend this class and have `name` and
+  `uiWidget` getters. Use `instanceof` to check node types (e.g., `element instanceof UI.Container`).
+- **`UI.Parent` interface** – Interface implemented by nodes that can have children (`Root` and `Container`). Provides
+  `children`, `addChild()`, and `syncChildren()` methods for managing parent-child relationships.
+- **`UI.Root` class** – The root node wrapping `mod.GetUIRoot()`. Available as `UI.ROOT_NODE`. All elements default to
+  this parent unless you supply `parent` in params.
 - **`UI.Element` base class** – All created elements extend `Node` and provide getters/setters for common properties
-  (position, size, visibility, colors, etc.) with method chaining support.
+  (position, size, visibility, colors, etc.) with method chaining support. Elements automatically manage parent-child
+  relationships when created, moved, or deleted.
 - **`UI.Container`, `UI.Text`, `UI.Button` classes** – Concrete classes that extend `Element` and provide type-specific
   functionality. All setters return the instance for method chaining (fluent interface).
 - **Default colors** – `UI.COLORS` wraps common `mod.CreateVector(r, g, b)` presets so you rarely need to build vectors
@@ -184,6 +221,9 @@ text.setMessage(mod.Message('Updated'))
 - **Method chaining** – All setter methods (e.g., `setPosition()`, `setSize()`, `show()`, `hide()`) return the instance,
   allowing you to chain multiple operations:
   `container.setPosition({ x: 10, y: 20 }).setSize({ width: 100, height: 50 }).show()`.
+- **Parent-child management** – When elements are created with a parent, moved between parents, or deleted, the parent's
+  `children` array is automatically maintained. Containers track their children, and calling `delete()` on an element
+  automatically removes it from its parent's children list.
 
 ---
 
@@ -206,13 +246,14 @@ pairs and method chaining support.
 
 **From `UI.Node`:**
 
-- **`type: UI.Type`** (getter) – The node type (`Container`, `Text`, `Button`, etc.).
 - **`name: string`** (getter) – The widget name.
 - **`uiWidget: mod.UIWidget`** (getter) – The underlying UI widget.
 
 **Element-specific:**
 
-- **`parent: UI.Node`** (getter) – The parent node.
+- **`parent: UI.Parent`** (getter/setter) – The parent node (either `UI.Root` or `UI.Container`). Setting the parent
+  automatically adds this element to the new parent's children and removes it from the old parent's children.
+- **`setParent(parent: UI.Parent): Element`** – Sets the parent and returns `this` for method chaining.
 
 **Visibility:**
 
@@ -249,7 +290,8 @@ pairs and method chaining support.
 
 **Lifecycle:**
 
-- **`delete(): void`** – Deletes the widget from Battlefield Portal. Does not return `this` (element is destroyed).
+- **`delete(): void`** – Deletes the widget from Battlefield Portal and automatically removes it from its parent's
+  children list. Does not return `this` (element is destroyed).
 
 **Method Chaining Example:**
 
@@ -281,27 +323,29 @@ Creates a container (`mod.AddUIContainer`) and any nested children defined via `
 
 #### Constructor Parameters
 
-| Param             | Type / Default                                              | Notes                                                                                                                                                                               |
-| ----------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | `string \| undefined`                                       | Auto-generated names follow `<PARENT_NAME>_<RECEIVER_ID_IF_PROVIDED>_<INCREMENTING_NUMBER>` when omitted.                                                                           |
-| `x`, `y`          | `number = 0`                                                | Position relative to `anchor`.                                                                                                                                                      |
-| `width`, `height` | `number = 0`                                                | Size in screen units.                                                                                                                                                               |
-| `anchor`          | `mod.UIAnchor = mod.UIAnchor.Center`                        | See `mod/index.d.ts` for enum values.                                                                                                                                               |
-| `parent`          | `mod.UIWidget \| UI.Node \| undefined`                      | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted.                                                                                                                     |
-| `visible`         | `boolean = true`                                            | Initial visibility.                                                                                                                                                                 |
-| `padding`         | `number = 0`                                                | Container padding.                                                                                                                                                                  |
-| `bgColor`         | `mod.Vector = UI.COLORS.WHITE`                              | Background color.                                                                                                                                                                   |
-| `bgAlpha`         | `number = 0`                                                | Background opacity.                                                                                                                                                                 |
-| `bgFill`          | `mod.UIBgFill = mod.UIBgFill.None`                          | Fill mode.                                                                                                                                                                          |
-| `depth`           | `mod.UIDepth = mod.UIDepth.AboveGameUI`                     | Z-order.                                                                                                                                                                            |
-| `childrenParams`  | `Array<ContainerParams \| TextParams \| ButtonParams> = []` | Nested elements automatically receive this container as `parent`. Note that a `type` of `UI.Type.Container`, `UI.Type.Text`, or `UI.Type.Button` is required for each child params. |
-| `receiver`        | `mod.Player \| mod.Team \| undefined`                       | Optional second parameter. Target audience; defaults to global.                                                                                                                     |
+| Param             | Type / Default                                              | Notes                                                                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `string \| undefined`                                       | Auto-generated names follow `<PARENT_NAME>_<RECEIVER_ID_IF_PROVIDED>_<INCREMENTING_NUMBER>` when omitted.                                                                                 |
+| `x`, `y`          | `number = 0`                                                | Position relative to `anchor`.                                                                                                                                                            |
+| `width`, `height` | `number = 0`                                                | Size in screen units.                                                                                                                                                                     |
+| `anchor`          | `mod.UIAnchor = mod.UIAnchor.Center`                        | See `mod/index.d.ts` for enum values.                                                                                                                                                     |
+| `parent`          | `mod.UIWidget \| UI.Parent \| undefined`                    | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted. When a `UI.Parent` (i.e., `UI.Root` or `UI.Container`) is provided, parent-child relationships are automatically managed. |
+| `visible`         | `boolean = true`                                            | Initial visibility.                                                                                                                                                                       |
+| `padding`         | `number = 0`                                                | Container padding.                                                                                                                                                                        |
+| `bgColor`         | `mod.Vector = UI.COLORS.WHITE`                              | Background color.                                                                                                                                                                         |
+| `bgAlpha`         | `number = 0`                                                | Background opacity.                                                                                                                                                                       |
+| `bgFill`          | `mod.UIBgFill = mod.UIBgFill.None`                          | Fill mode.                                                                                                                                                                                |
+| `depth`           | `mod.UIDepth = mod.UIDepth.AboveGameUI`                     | Z-order.                                                                                                                                                                                  |
+| `childrenParams`  | `Array<ContainerParams \| TextParams \| ButtonParams> = []` | Nested elements automatically receive this container as `parent`. Note that a `type` of `UI.Type.Container`, `UI.Type.Text`, or `UI.Type.Button` is required for each child params.       |
+| `receiver`        | `mod.Player \| mod.Team \| undefined`                       | Optional second parameter. Target audience; defaults to global.                                                                                                                           |
 
 #### Properties & Methods
 
 Inherits all properties and methods from `UI.Element` (see below), plus:
 
-- **`children: (Container \| Text \| Button)[]`** – Read-only array of child elements created from `childrenParams`.
+- **`children: Element[]`** – Array of child elements. Automatically maintained when children are created, moved, or
+  deleted. Elements are automatically added when created with this container as their parent, and automatically removed
+  when deleted or moved to another parent.
 
 ### `class UI.Text extends UI.Element`
 
@@ -309,25 +353,25 @@ Creates a text widget via `mod.AddUIText`.
 
 #### Constructor Parameters
 
-| Param             | Type / Default                          | Notes                                                                        |
-| ----------------- | --------------------------------------- | ---------------------------------------------------------------------------- |
-| `name`            | `string \| undefined`                   | Auto-generated when omitted (see `Container` for naming pattern).            |
-| `x`, `y`          | `number = 0`                            | Position relative to `anchor`.                                               |
-| `width`, `height` | `number = 0`                            | Size in screen units.                                                        |
-| `anchor`          | `mod.UIAnchor = mod.UIAnchor.Center`    | See `mod/index.d.ts` for enum values.                                        |
-| `parent`          | `mod.UIWidget \| UI.Node \| undefined`  | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted.              |
-| `visible`         | `boolean = true`                        | Initial visibility.                                                          |
-| `padding`         | `number = 0`                            | Container padding.                                                           |
-| `bgColor`         | `mod.Vector = UI.COLORS.WHITE`          | Background color.                                                            |
-| `bgAlpha`         | `number = 0`                            | Background opacity.                                                          |
-| `bgFill`          | `mod.UIBgFill = mod.UIBgFill.None`      | Fill mode.                                                                   |
-| `depth`           | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order.                                                                     |
-| `message`         | `mod.Message`                           | **Required.** Text label content (see `mod/index.d.ts` for message helpers). |
-| `textSize`        | `number = 36`                           | Font size.                                                                   |
-| `textColor`       | `mod.Vector = UI.COLORS.BLACK`          | Text color.                                                                  |
-| `textAlpha`       | `number = 1`                            | Text opacity.                                                                |
-| `textAnchor`      | `mod.UIAnchor = mod.UIAnchor.Center`    | Alignment inside the text widget.                                            |
-| `receiver`        | `mod.Player \| mod.Team \| undefined`   | Optional second parameter. Target audience; defaults to global.              |
+| Param             | Type / Default                           | Notes                                                                                                                                                 |
+| ----------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | `string \| undefined`                    | Auto-generated when omitted (see `Container` for naming pattern).                                                                                     |
+| `x`, `y`          | `number = 0`                             | Position relative to `anchor`.                                                                                                                        |
+| `width`, `height` | `number = 0`                             | Size in screen units.                                                                                                                                 |
+| `anchor`          | `mod.UIAnchor = mod.UIAnchor.Center`     | See `mod/index.d.ts` for enum values.                                                                                                                 |
+| `parent`          | `mod.UIWidget \| UI.Parent \| undefined` | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted. When a `UI.Parent` is provided, parent-child relationships are automatically managed. |
+| `visible`         | `boolean = true`                         | Initial visibility.                                                                                                                                   |
+| `padding`         | `number = 0`                             | Container padding.                                                                                                                                    |
+| `bgColor`         | `mod.Vector = UI.COLORS.WHITE`           | Background color.                                                                                                                                     |
+| `bgAlpha`         | `number = 0`                             | Background opacity.                                                                                                                                   |
+| `bgFill`          | `mod.UIBgFill = mod.UIBgFill.None`       | Fill mode.                                                                                                                                            |
+| `depth`           | `mod.UIDepth = mod.UIDepth.AboveGameUI`  | Z-order.                                                                                                                                              |
+| `message`         | `mod.Message`                            | **Required.** Text label content (see `mod/index.d.ts` for message helpers).                                                                          |
+| `textSize`        | `number = 36`                            | Font size.                                                                                                                                            |
+| `textColor`       | `mod.Vector = UI.COLORS.BLACK`           | Text color.                                                                                                                                           |
+| `textAlpha`       | `number = 1`                             | Text opacity.                                                                                                                                         |
+| `textAnchor`      | `mod.UIAnchor = mod.UIAnchor.Center`     | Alignment inside the text widget.                                                                                                                     |
+| `receiver`        | `mod.Player \| mod.Team \| undefined`    | Optional second parameter. Target audience; defaults to global.                                                                                       |
 
 #### Properties & Methods
 
@@ -348,7 +392,7 @@ Builds a button by first creating a container, then calling `mod.AddUIButton`. O
 | `x`, `y`          | `number = 0`                                         | Position relative to `anchor`.                                                                                                                                                                                                                                        |
 | `width`, `height` | `number = 0`                                         | Size in screen units.                                                                                                                                                                                                                                                 |
 | `anchor`          | `mod.UIAnchor = mod.UIAnchor.Center`                 | See `mod/index.d.ts` for enum values.                                                                                                                                                                                                                                 |
-| `parent`          | `mod.UIWidget \| UI.Node \| undefined`               | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted.                                                                                                                                                                                                       |
+| `parent`          | `mod.UIWidget \| UI.Parent \| undefined`             | Parent widget or node. Defaults to `UI.ROOT_NODE` when omitted. When a `UI.Parent` is provided, parent-child relationships are automatically managed.                                                                                                                 |
 | `visible`         | `boolean = true`                                     | Initial visibility.                                                                                                                                                                                                                                                   |
 | `padding`         | `number = 0`                                         | Container padding.                                                                                                                                                                                                                                                    |
 | `bgColor`         | `mod.Vector = UI.COLORS.WHITE`                       | Button background color (applied to the button widget, not the container).                                                                                                                                                                                            |
@@ -413,26 +457,46 @@ All types and classes are defined inside the `UI` namespace in [`ui/index.ts`](.
 
 ### `UI.Type`
 
-Enumeration of node types: `Root`, `Container`, `Text`, `Button`, `Unknown`.
+Enumeration of node types: `Root`, `Container`, `Text`, `Button`. Used primarily for specifying the `type` field in
+`childrenParams` when creating nested elements. For runtime type checking, use `instanceof` (e.g.,
+`element instanceof UI.Container`).
 
 ### `UI.Node`
 
 Base class for all UI nodes. Provides:
 
-- `type: UI.Type` (getter)
-- `name: string` (getter)
-- `uiWidget: mod.UIWidget` (getter)
+- `name: string` (getter) – The widget name
+- `uiWidget: mod.UIWidget` (getter) – The underlying UI widget
+
+Use `instanceof` to check node types at runtime (e.g., `node instanceof UI.Container`).
+
+### `UI.Parent` (interface)
+
+Interface implemented by nodes that can have children. Implemented by `Root` and `Container`.
+
+- `children: Element[]` (getter) – Array of child elements
+- `addChild(child: Element): void` – Adds a child to this parent (called automatically when elements are created or
+  moved).
+- `syncChildren(): void` – Removes any children whose parent is no longer this node (called automatically when elements
+  are moved or deleted)
+
+### `UI.Root extends UI.Node implements UI.Parent`
+
+The root node wrapping `mod.GetUIRoot()`. Available as `UI.ROOT_NODE`. All elements default to this parent unless you
+supply `parent` in params. Implements `Parent` interface to manage top-level children.
 
 ### `UI.Element extends UI.Node`
 
 Base class for all created widgets. Extends `Node` and provides all the properties and methods documented in the
-`UI.Element` API section above.
+`UI.Element` API section above. Automatically manages parent-child relationships: when created, it's added to its
+parent's children; when the parent is changed, it's moved between parents' children lists; when deleted, it's removed
+from its parent's children.
 
-### `UI.Container extends UI.Element`
+### `UI.Container extends UI.Element implements UI.Parent`
 
-Class for container widgets. Extends `Element` and adds:
+Class for container widgets. Extends `Element` and implements `Parent`. Adds:
 
-- `children: (Container | Text | Button)[]` (getter)
+- `children: Element[]` (getter) – Array of child elements, automatically maintained
 
 ### `UI.Text extends UI.Element`
 
@@ -441,9 +505,9 @@ Class for text widgets. Extends `Element` and adds:
 - `message: mod.Message` (getter/setter)
 - `setMessage(message: mod.Message): Text` (method chaining)
 
-### `UI.Button extends UI.Element`
+### `UI.Button extends UI.Container`
 
-Class for button widgets. Extends `Element` and adds:
+Class for button widgets. Extends `Container` (and thus `Element`) and adds:
 
 - `buttonName: string` (getter)
 - `buttonUiWidget: mod.UIWidget` (getter)
@@ -472,7 +536,7 @@ interface Params {
     width?: number; // Default: 0
     height?: number; // Default: 0
     anchor?: mod.UIAnchor; // Default: mod.UIAnchor.Center
-    parent?: mod.UIWidget | Node; // Default: UI.ROOT_NODE
+    parent?: mod.UIWidget | Parent; // Default: UI.ROOT_NODE
     visible?: boolean; // Default: true
     padding?: number; // Default: 0
     bgColor?: mod.Vector; // Default varies by class (see below)
@@ -543,9 +607,18 @@ interface ButtonParams extends Params {
 - Use the returned `Element` helpers to hide/show instead of calling `mod.SetUIWidgetVisible` manually.
 - All properties support both normal setter syntax (e.g., `element.bgAlpha = 0.8;`) and method chaining (e.g.,
   `element.setBgAlpha(0.8).show()`). Method chaining is useful when you want to apply multiple changes in sequence.
-- Always call `delete()` when removing widgets to prevent stale references inside Battlefield Portal.
-- The `parent` property in `Params` interfaces accepts either `mod.UIWidget` or `UI.Node`, allowing you to pass a
-  previously created native `UIWidget` as a parent.
+- Always call `delete()` when removing widgets to prevent stale references inside Battlefield Portal. The element will
+  automatically be removed from its parent's `children` array.
+- The `parent` property in `Params` interfaces accepts either `mod.UIWidget` or `UI.Parent` (i.e., `UI.Root` or
+  `UI.Container`). When you pass a `UI.Parent`, parent-child relationships are automatically managed. When you pass a
+  `mod.UIWidget`, it's wrapped in an `UnknownNode` internally (which doesn't track children).
+- **Parent-child relationships** are automatically maintained:
+    - When an element is created with a parent, it's automatically added to the parent's `children` array.
+    - When an element's `parent` is changed (via setter or `setParent()`), it's removed from the old parent's children
+      and added to the new parent's children.
+    - When an element is deleted, it's automatically removed from its parent's `children` array.
+    - Containers can call `syncChildren()` to clean up any stale references (though this is usually handled
+      automatically).
 
 ---
 
@@ -572,14 +645,10 @@ flexible UI hierarchies where shared containers can contain player-specific elem
 
 ### Container Child Management
 
-An API for adding children to a container (regardless if they were created by this `UI` module), removing children from
-a container, and moving children between containers.
-
-### Parent Reference Cleanup
-
-When an element is deleted via `delete()`, the element should be removed from its parent's children list (if the parent
-is a `Container`). This ensures that parent containers maintain accurate `children` arrays and prevents stale references
-after deletion.
+An API for programmatically adding children to a container (regardless if they were created by this `UI` module),
+removing children from a container, and moving children between containers. Currently, children are automatically
+managed when created with a parent or when moved via the `parent` setter, but there's no public API for manually adding
+or removing children that were created outside the module.
 
 ---
 
