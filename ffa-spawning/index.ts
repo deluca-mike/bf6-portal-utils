@@ -1,6 +1,8 @@
+import { SolidUI } from '../solid-ui/index.ts';
 import { UI } from '../ui/index.ts';
+import { Timers } from '../timers/index.ts';
 
-// version: 3.1.0
+// version: 3.2.0
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -50,7 +52,7 @@ export namespace FFASpawning {
         // Time subsequent delays between prompts.
         private static _promptDelay: number = 10;
 
-        // Time intiial time until the player is asked to spawn.
+        // Time initial delay until the player is asked to spawn.
         private static _initialPromptDelay: number = this._promptDelay;
 
         // The delay between processing the spawn queue.
@@ -175,16 +177,17 @@ export namespace FFASpawning {
             while (this._spawnQueue.length > 0) {
                 const soldier = this._spawnQueue.shift();
 
-                if (!soldier || soldier.deleteIfNotValid()) continue;
+                if (!soldier || soldier._deleteIfNotValid()) continue;
 
                 const spawn = this._getBestSpawnPoint();
 
                 this._log(
                     FFASpawning.LogLevel.Debug,
-                    `Spawning P_${soldier.playerId} at ${this.getVectorString(spawn.location)}.`
+                    `Spawning P_${soldier._playerId} at ${this.getVectorString(spawn.location)}.`
                 );
 
-                mod.SpawnPlayerFromSpawnPoint(soldier.player, spawn.spawnPoint);
+                mod.EnableUIInputMode(false, soldier._player);
+                mod.SpawnPlayerFromSpawnPoint(soldier._player, spawn.spawnPoint);
             }
 
             mod.Wait(this._queueProcessingDelay).then(() => this._processSpawnQueue());
@@ -242,7 +245,7 @@ export namespace FFASpawning {
 
             const soldier = this._ALL_SOLDIERS[mod.GetObjId(player)];
 
-            if (!soldier || soldier.deleteIfNotValid()) return;
+            if (!soldier || soldier._deleteIfNotValid()) return;
 
             soldier.startDelayForPrompt();
         }
@@ -253,9 +256,9 @@ export namespace FFASpawning {
 
             const soldier = this._ALL_SOLDIERS[mod.GetObjId(player)];
 
-            if (!soldier || soldier.deleteIfNotValid()) return;
+            if (!soldier || soldier._deleteIfNotValid()) return;
 
-            soldier.addToQueue();
+            soldier._addToQueue();
         }
 
         // Enables the processing of the spawn queue.
@@ -278,89 +281,97 @@ export namespace FFASpawning {
 
             Soldier._ALL_SOLDIERS[this._playerId] = this;
 
-            if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier)) return;
+            this._isAISoldier = mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier);
 
-            this._promptUI = new UI.Container(
+            if (this._isAISoldier) return;
+
+            const [delayCountdown, setDelayCountdown] = SolidUI.createSignal(-1);
+
+            this._delayCountdown = { get: delayCountdown, set: setDelayCountdown };
+
+            this._promptUI = SolidUI.h(
+                UI.Container,
                 {
                     x: 0,
                     y: 0,
                     width: 440,
                     height: 140,
                     anchor: mod.UIAnchor.Center,
-                    visible: false,
+                    visible: () => {
+                        const visible = delayCountdown() == 0;
+
+                        if (!visible) return false;
+
+                        mod.EnableUIInputMode(true, this._player); // Allow payer to click prompt buttons.
+
+                        return true;
+                    },
                     bgColor: UI.COLORS.BF_GREY_4,
                     bgAlpha: 0.5,
                     bgFill: mod.UIBgFill.Blur,
-                    childrenParams: [
-                        {
-                            type: UI.Type.Button,
-                            x: 0,
-                            y: 20,
-                            width: 400,
-                            height: 40,
-                            anchor: mod.UIAnchor.TopCenter,
-                            bgColor: UI.COLORS.BF_GREY_2,
-                            baseColor: UI.COLORS.BF_GREY_2,
-                            baseAlpha: 1,
-                            pressedColor: UI.COLORS.BF_GREEN_DARK,
-                            pressedAlpha: 1,
-                            hoverColor: UI.COLORS.BF_GREY_1,
-                            hoverAlpha: 1,
-                            focusedColor: UI.COLORS.BF_GREY_1,
-                            focusedAlpha: 1,
-                            label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.spawn),
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                            },
-                            onClick: async (player: mod.Player): Promise<void> => {
-                                this.addToQueue();
-                            },
-                        },
-                        {
-                            type: UI.Type.Button,
-                            x: 0,
-                            y: 80,
-                            width: 400,
-                            height: 40,
-                            anchor: mod.UIAnchor.TopCenter,
-                            bgColor: UI.COLORS.BF_GREY_2,
-                            baseColor: UI.COLORS.BF_GREY_2,
-                            baseAlpha: 1,
-                            pressedColor: UI.COLORS.BF_YELLOW_DARK,
-                            pressedAlpha: 1,
-                            hoverColor: UI.COLORS.BF_GREY_1,
-                            hoverAlpha: 1,
-                            focusedColor: UI.COLORS.BF_GREY_1,
-                            focusedAlpha: 1,
-                            label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                            },
-                            onClick: async (player: mod.Player): Promise<void> => {
-                                this.startDelayForPrompt(Soldier._promptDelay);
-                            },
-                        },
-                    ],
                 },
                 player
             );
 
-            this._countdownUI = new UI.Text(
+            SolidUI.h(UI.TextButton, {
+                parent: this._promptUI,
+                x: 0,
+                y: 20,
+                width: 400,
+                height: 40,
+                anchor: mod.UIAnchor.TopCenter,
+                bgColor: UI.COLORS.BF_GREY_2,
+                baseColor: UI.COLORS.BF_GREY_2,
+                baseAlpha: 1,
+                pressedColor: UI.COLORS.BF_GREEN_DARK,
+                pressedAlpha: 1,
+                hoverColor: UI.COLORS.BF_GREY_1,
+                hoverAlpha: 1,
+                focusedColor: UI.COLORS.BF_GREY_1,
+                focusedAlpha: 1,
+                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.spawn),
+                textSize: 30,
+                textColor: UI.COLORS.BF_GREEN_BRIGHT,
+                onClick: async (player: mod.Player): Promise<void> => this._addToQueue(),
+            });
+
+            SolidUI.h(UI.TextButton, {
+                parent: this._promptUI,
+                x: 0,
+                y: 80,
+                width: 400,
+                height: 40,
+                anchor: mod.UIAnchor.TopCenter,
+                bgColor: UI.COLORS.BF_GREY_2,
+                baseColor: UI.COLORS.BF_GREY_2,
+                baseAlpha: 1,
+                pressedColor: UI.COLORS.BF_YELLOW_DARK,
+                pressedAlpha: 1,
+                hoverColor: UI.COLORS.BF_GREY_1,
+                hoverAlpha: 1,
+                focusedColor: UI.COLORS.BF_GREY_1,
+                focusedAlpha: 1,
+                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
+                textSize: 30,
+                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
+                onClick: async (player: mod.Player): Promise<void> => this.startDelayForPrompt(Soldier._promptDelay),
+            });
+
+            this._countdownUI = SolidUI.h(
+                UI.Text,
                 {
                     x: 0,
                     y: 60,
                     width: 400,
                     height: 50,
                     anchor: mod.UIAnchor.TopCenter,
-                    message: mod.Message(mod.stringkeys.ffaSpawning.countdown, this._delayCountdown),
+                    message: () => mod.Message(mod.stringkeys.ffaSpawning.countdown, delayCountdown()),
                     textSize: 30,
                     textColor: UI.COLORS.BF_GREEN_BRIGHT,
                     bgColor: UI.COLORS.BF_GREY_4,
                     bgAlpha: 0.5,
                     bgFill: mod.UIBgFill.Solid,
-                    visible: false,
+                    visible: () => delayCountdown() > 0,
                 },
                 player
             );
@@ -370,7 +381,11 @@ export namespace FFASpawning {
 
         private _playerId: number;
 
-        private _delayCountdown: number = 0;
+        private _isAISoldier: boolean;
+
+        private _delayCountdown: { get: () => number; set: (value: number) => void } = { get: () => -1, set: () => {} };
+
+        private _delayCountdownInterval?: number;
 
         private _promptUI?: UI.Container;
 
@@ -387,37 +402,35 @@ export namespace FFASpawning {
         // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
         // AI soldiers will skip the countdown and spawn immediately.
         public startDelayForPrompt(delay: number = Soldier._initialPromptDelay): void {
-            if (this._delayCountdown > 0) return;
+            if (this._isAISoldier) return this._addToQueue();
 
             Soldier._log(FFASpawning.LogLevel.Debug, `Starting ${delay}s delay for P_${this._playerId}.`);
 
-            if (mod.GetSoldierState(this._player, mod.SoldierStateBool.IsAISoldier)) return this.addToQueue();
-
-            this._countdownUI?.show();
-            this._promptUI?.hide();
             mod.EnableUIInputMode(false, this._player);
 
-            this._delayCountdown = delay;
-            this.handleDelayCountdown();
+            if (delay <= 0) return this._addToQueue();
+
+            this._delayCountdown.set(delay);
+
+            Timers.clearInterval(this._delayCountdownInterval);
+            this._delayCountdownInterval = Timers.setInterval(() => this._handleDelayCountdown(), 1);
         }
 
-        private handleDelayCountdown(): void {
-            if (this.deleteIfNotValid()) return;
+        private _handleDelayCountdown(): void {
+            if (this._deleteIfNotValid()) return;
 
-            this._countdownUI?.setMessage(mod.Message(mod.stringkeys.ffaSpawning.countdown, this._delayCountdown--));
+            const timeLeft = this._delayCountdown.get();
 
-            if (this._delayCountdown < 0) return this.showPrompt();
+            if (timeLeft > 0) return this._delayCountdown.set(timeLeft - 1);
 
-            mod.Wait(1).then(() => this.handleDelayCountdown());
+            Timers.clearInterval(this._delayCountdownInterval);
         }
 
-        private showPrompt(): void {
-            this._countdownUI?.hide();
-            mod.EnableUIInputMode(true, this._player);
-            this._promptUI?.show();
-        }
+        private _addToQueue(): void {
+            if (!this._isAISoldier) {
+                this._delayCountdown.set(-1);
+            }
 
-        private addToQueue(): void {
             Soldier._spawnQueue.push(this);
 
             Soldier._log(
@@ -425,24 +438,24 @@ export namespace FFASpawning {
                 `P_${this._playerId} added to queue (${Soldier._spawnQueue.length} total).`
             );
 
-            this._countdownUI?.hide();
-            this._promptUI?.hide();
-            mod.EnableUIInputMode(false, this._player);
-
             if (!Soldier._queueProcessingEnabled || Soldier._queueProcessingActive) return;
 
             Soldier._log(FFASpawning.LogLevel.Debug, `Restarting spawn queue processing.`);
             Soldier._processSpawnQueue();
         }
 
-        private deleteIfNotValid(): boolean {
+        private _deleteIfNotValid(): boolean {
             if (mod.IsPlayerValid(this._player)) return false;
 
             Soldier._log(FFASpawning.LogLevel.Info, `P_${this._playerId} is no longer valid.`);
 
+            Timers.clearInterval(this._delayCountdownInterval);
+
             this._promptUI?.delete();
             this._countdownUI?.delete();
+
             delete Soldier._ALL_SOLDIERS[this._playerId];
+
             return true;
         }
     }
