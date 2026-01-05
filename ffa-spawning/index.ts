@@ -50,7 +50,7 @@ export namespace FFASpawning {
         // Time subsequent delays between prompts.
         private static _promptDelay: number = 10;
 
-        // Time intiial time until the player is asked to spawn.
+        // Time initial delay until the player is asked to spawn.
         private static _initialPromptDelay: number = this._promptDelay;
 
         // The delay between processing the spawn queue.
@@ -308,11 +308,9 @@ export namespace FFASpawning {
                             hoverAlpha: 1,
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
-                            label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.spawn),
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                            },
+                            message: mod.Message(mod.stringkeys.ffaSpawning.buttons.spawn),
+                            textSize: 30,
+                            textColor: UI.COLORS.BF_GREEN_BRIGHT,
                             onClick: async (player: mod.Player): Promise<void> => {
                                 this.addToQueue();
                             },
@@ -333,11 +331,9 @@ export namespace FFASpawning {
                             hoverAlpha: 1,
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
-                            label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                            },
+                            message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
+                            textSize: 30,
+                            textColor: UI.COLORS.BF_YELLOW_BRIGHT,
                             onClick: async (player: mod.Player): Promise<void> => {
                                 this.startDelayForPrompt(Soldier._promptDelay);
                             },

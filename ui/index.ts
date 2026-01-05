@@ -1,4 +1,4 @@
-// version: 3.0.0
+// version: 4.0.0
 export namespace UI {
     export const COLORS = {
         BLACK: mod.CreateVector(0, 0, 0),
@@ -13,18 +13,18 @@ export namespace UI {
         PURPLE: mod.CreateVector(1, 0, 1),
         CYAN: mod.CreateVector(0, 1, 1),
         MAGENTA: mod.CreateVector(1, 0, 1),
-        BF_GREY_1: mod.CreateVector(0.8353, 0.9216, 0.9765), // D5EBF9
-        BF_GREY_2: mod.CreateVector(0.3294, 0.3686, 0.3882), // 545E63
-        BF_GREY_3: mod.CreateVector(0.2118, 0.2235, 0.2353), // 36393C
-        BF_GREY_4: mod.CreateVector(0.0314, 0.0431, 0.0431), // 080B0B,
-        BF_BLUE_BRIGHT: mod.CreateVector(0.4392, 0.9216, 1.0), // 70EBFF
-        BF_BLUE_DARK: mod.CreateVector(0.0745, 0.1843, 0.2471), // 132F3F
-        BF_RED_BRIGHT: mod.CreateVector(1.0, 0.5137, 0.3804), // FF8361
-        BF_RED_DARK: mod.CreateVector(0.251, 0.0941, 0.0667), // 401811
-        BF_GREEN_BRIGHT: mod.CreateVector(0.6784, 0.9922, 0.5255), // ADFD86
-        BF_GREEN_DARK: mod.CreateVector(0.2784, 0.4471, 0.2118), // 477236
-        BF_YELLOW_BRIGHT: mod.CreateVector(1.0, 0.9882, 0.6118), // FFFC9C
-        BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // 716000
+        BF_GREY_1: mod.CreateVector(0.8353, 0.9216, 0.9765), // #D5EBF9
+        BF_GREY_2: mod.CreateVector(0.3294, 0.3686, 0.3882), // #545E63
+        BF_GREY_3: mod.CreateVector(0.2118, 0.2235, 0.2353), // #36393C
+        BF_GREY_4: mod.CreateVector(0.0314, 0.0431, 0.0431), // #080B0B,
+        BF_BLUE_BRIGHT: mod.CreateVector(0.4392, 0.9216, 1.0), // #70EBFF
+        BF_BLUE_DARK: mod.CreateVector(0.0745, 0.1843, 0.2471), // #132F3F
+        BF_RED_BRIGHT: mod.CreateVector(1.0, 0.5137, 0.3804), // #FF8361
+        BF_RED_DARK: mod.CreateVector(0.251, 0.0941, 0.0667), // #401811
+        BF_GREEN_BRIGHT: mod.CreateVector(0.6784, 0.9922, 0.5255), // #ADFD86
+        BF_GREEN_DARK: mod.CreateVector(0.2784, 0.4471, 0.2118), // #477236
+        BF_YELLOW_BRIGHT: mod.CreateVector(1.0, 0.9882, 0.6118), // #FFFC9C
+        BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // #716000
     };
 
     export enum Type {
@@ -34,15 +34,11 @@ export namespace UI {
         Button = 'button',
     }
 
-    type Params = {
+    type BaseParams = {
         type?: Type;
         name?: string;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
         anchor?: mod.UIAnchor;
-        parent?: mod.UIWidget | Parent;
+        parent?: Root | Container;
         visible?: boolean;
         padding?: number;
         bgColor?: mod.Vector;
@@ -50,6 +46,13 @@ export namespace UI {
         bgFill?: mod.UIBgFill;
         depth?: mod.UIDepth;
     };
+
+    type Params = BaseParams &
+        (({ position?: Position } & { x?: never; y?: never }) | ({ x?: number; y?: number } & { position?: never })) &
+        (
+            | ({ size?: Size } & { width?: never; height?: never })
+            | ({ width?: number; height?: number } & { size?: never })
+        );
 
     export type ContainerParams = Params & {
         childrenParams?: (ContainerParams | TextParams | ButtonParams)[];
@@ -61,13 +64,6 @@ export namespace UI {
         textColor?: mod.Vector;
         textAlpha?: number;
         textAnchor?: mod.UIAnchor;
-    };
-
-    export type LabelParams = {
-        message: mod.Message;
-        textSize?: number;
-        textColor?: mod.Vector;
-        textAlpha?: number;
     };
 
     export type ButtonParams = Params & {
@@ -83,7 +79,11 @@ export namespace UI {
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
         onClick?: (player: mod.Player) => Promise<void>;
-        label?: LabelParams;
+        message?: mod.Message;
+        textSize?: number;
+        textColor?: mod.Vector;
+        textAlpha?: number;
+        textAnchor?: mod.UIAnchor;
     };
 
     export class Node {
@@ -111,14 +111,16 @@ export namespace UI {
         syncChildren(): void;
     }
 
-    class Root extends Node implements Parent {
+    export class Root extends Node implements Parent {
         private _children: Element[] = [];
+
+        public static readonly instance = new Root();
 
         public get children(): Element[] {
             return this._children;
         }
 
-        public constructor() {
+        private constructor() {
             super(mod.GetUIRoot(), 'ui_root');
         }
 
@@ -139,24 +141,6 @@ export namespace UI {
         }
     }
 
-    class UnknownNode extends Node implements Parent {
-        public constructor(uiWidget: mod.UIWidget) {
-            super(uiWidget, 'ui_unknown');
-        }
-
-        public get children(): Element[] {
-            return [];
-        }
-
-        public addChild(child: Element): this {
-            return this;
-        }
-
-        public syncChildren(): this {
-            return this;
-        }
-    }
-
     export type Size = {
         width: number;
         height: number;
@@ -169,7 +153,7 @@ export namespace UI {
 
     const CLICK_HANDLERS = new Map<string, (player: mod.Player) => Promise<void>>();
 
-    export const ROOT_NODE = new Root();
+    export const ROOT_NODE = Root.instance;
 
     let counter: number = 0;
 
@@ -177,29 +161,21 @@ export namespace UI {
         return `${parent.name}${receiver ? `_${mod.GetObjId(receiver)}` : ''}_${counter++}`;
     }
 
-    function parseParent(parent?: Parent | mod.UIWidget): Parent {
-        if (!parent) return ROOT_NODE;
-
-        if (parent instanceof Container) return parent as Container;
-
-        return new UnknownNode(parent as mod.UIWidget);
-    }
-
     export class Element extends Node {
-        protected _parent: Parent;
+        protected _parent: Root | Container;
 
-        public constructor(uiWidget: mod.UIWidget, name: string, parent: Parent) {
+        public constructor(uiWidget: mod.UIWidget, name: string, parent: Root | Container) {
             super(uiWidget, name);
 
             this._parent = parent;
             parent.addChild(this);
         }
 
-        public get parent(): Parent {
+        public get parent(): Root | Container {
             return this._parent;
         }
 
-        public set parent(parent: Parent) {
+        public set parent(parent: Root | Container) {
             const oldParent = this._parent;
 
             this._parent = parent;
@@ -208,7 +184,7 @@ export namespace UI {
             oldParent.syncChildren();
         }
 
-        public setParent(parent: Parent): this {
+        public setParent(parent: Root | Container): this {
             this.parent = parent;
             return this;
         }
@@ -246,6 +222,32 @@ export namespace UI {
             this.parent.syncChildren();
         }
 
+        public get x(): number {
+            return mod.XComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+        }
+
+        public set x(x: number) {
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, this.y, 0));
+        }
+
+        public setX(x: number): this {
+            this.x = x;
+            return this;
+        }
+
+        public get y(): number {
+            return mod.YComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+        }
+
+        public set y(y: number) {
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(this.x, y, 0));
+        }
+
+        public setY(y: number): this {
+            this.y = y;
+            return this;
+        }
+
         public get position(): Position {
             const position = mod.GetUIWidgetPosition(this._uiWidget);
             return { x: mod.XComponentOf(position), y: mod.YComponentOf(position) };
@@ -257,6 +259,32 @@ export namespace UI {
 
         public setPosition(params: Position): this {
             this.position = params;
+            return this;
+        }
+
+        public get width(): number {
+            return mod.XComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+        }
+
+        public set width(width: number) {
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, this.height, 0));
+        }
+
+        public setWidth(width: number): this {
+            this.width = width;
+            return this;
+        }
+
+        public get height(): number {
+            return mod.YComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+        }
+
+        public set height(height: number) {
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, height, 0));
+        }
+
+        public setHeight(height: number): this {
+            this.height = height;
             return this;
         }
 
@@ -353,6 +381,14 @@ export namespace UI {
         }
     }
 
+    function getPositionVector(params: Params): mod.Vector {
+        return mod.CreateVector(params.x ?? params.position?.x ?? 0, params.y ?? params.position?.y ?? 0, 0);
+    }
+
+    function getSizeVector(params: Params): mod.Vector {
+        return mod.CreateVector(params.width ?? params.size?.width ?? 0, params.height ?? params.size?.height ?? 0, 0);
+    }
+
     export class Container extends Element implements Parent {
         private _children: Element[] = [];
 
@@ -361,7 +397,7 @@ export namespace UI {
         }
 
         public constructor(params: ContainerParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -378,8 +414,8 @@ export namespace UI {
                 mod.UIDepth,
             ] = [
                 name,
-                mod.CreateVector(params.x ?? 0, params.y ?? 0, 0),
-                mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
+                getPositionVector(params),
+                getSizeVector(params),
                 params.anchor ?? mod.UIAnchor.Center,
                 parent.uiWidget,
                 params.visible ?? true,
@@ -433,8 +469,10 @@ export namespace UI {
     }
 
     export class Text extends Element {
+        private _message: mod.Message;
+
         public constructor(params: TextParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -456,8 +494,8 @@ export namespace UI {
                 mod.UIDepth,
             ] = [
                 name,
-                mod.CreateVector(params.x ?? 0, params.y ?? 0, 0),
-                mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
+                getPositionVector(params),
+                getSizeVector(params),
                 params.anchor ?? mod.UIAnchor.Center,
                 parent.uiWidget,
                 params.visible ?? true,
@@ -482,14 +520,73 @@ export namespace UI {
             const uiWidget = mod.FindUIWidgetWithName(name) as mod.UIWidget;
 
             super(uiWidget, name, parent);
+
+            this._message = params.message;
+        }
+
+        public get message(): mod.Message {
+            return this._message;
         }
 
         public set message(message: mod.Message) {
+            this._message = message;
             mod.SetUITextLabel(this._uiWidget, message);
         }
 
         public setMessage(message: mod.Message): this {
             this.message = message;
+            return this;
+        }
+
+        public get textAlpha(): number {
+            return mod.GetUITextAlpha(this._uiWidget);
+        }
+
+        public set textAlpha(alpha: number) {
+            mod.SetUITextAlpha(this._uiWidget, alpha);
+        }
+
+        public setTextAlpha(alpha: number): this {
+            this.textAlpha = alpha;
+            return this;
+        }
+
+        public get textAnchor(): mod.UIAnchor {
+            return mod.GetUITextAnchor(this._uiWidget);
+        }
+
+        public set textAnchor(anchor: mod.UIAnchor) {
+            mod.SetUITextAnchor(this._uiWidget, anchor);
+        }
+
+        public setTextAnchor(anchor: mod.UIAnchor): this {
+            this.textAnchor = anchor;
+            return this;
+        }
+
+        public get textColor(): mod.Vector {
+            return mod.GetUITextColor(this._uiWidget);
+        }
+
+        public set textColor(color: mod.Vector) {
+            mod.SetUITextColor(this._uiWidget, color);
+        }
+
+        public setTextColor(color: mod.Vector): this {
+            this.textColor = color;
+            return this;
+        }
+
+        public get textSize(): number {
+            return mod.GetUITextSize(this._uiWidget);
+        }
+
+        public set textSize(size: number) {
+            mod.SetUITextSize(this._uiWidget, size);
+        }
+
+        public setTextSize(size: number): this {
+            this.textSize = size;
             return this;
         }
     }
@@ -502,22 +599,15 @@ export namespace UI {
         private _label?: Text;
 
         public constructor(params: ButtonParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
 
-            const containerParams: ContainerParams = {
-                x: params.x,
-                y: params.y,
-                width: params.width,
-                height: params.height,
-                anchor: params.anchor,
+            const containerParams: ContainerParams = Object.assign({}, params, {
                 parent,
-                visible: params.visible,
                 padding: 0,
-                bgColor: COLORS.BF_GREY_4,
+                bgColor: COLORS.WHITE,
                 bgAlpha: 0,
                 bgFill: mod.UIBgFill.None,
-                depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            };
+            });
 
             super(containerParams, receiver);
 
@@ -528,7 +618,7 @@ export namespace UI {
                 mod.CreateVector(0, 0, 0),
                 mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
                 params.anchor ?? mod.UIAnchor.Center,
-                this.uiWidget,
+                this._uiWidget,
                 true,
                 params.padding ?? 0,
                 params.bgColor ?? COLORS.WHITE,
@@ -554,11 +644,16 @@ export namespace UI {
 
             const buttonUiWidget = mod.FindUIWidgetWithName(buttonName) as mod.UIWidget;
 
-            this._label = params.label
+            // TODO: If params.message is undefined, label will never be created, and setting text properties afterward will silently fail.
+            this._label = params.message
                 ? new Text({
-                      ...params.label,
+                      message: params.message,
+                      textSize: params.textSize,
+                      textColor: params.textColor,
+                      textAlpha: params.textAlpha,
+                      textAnchor: params.textAnchor,
                       name: `${this._name}_label`,
-                      parent: this.uiWidget,
+                      parent: this,
                       width: params.width,
                       height: params.height,
                       visible: true,
@@ -576,6 +671,17 @@ export namespace UI {
 
         public get buttonUiWidget(): mod.UIWidget {
             return this._buttonUiWidget;
+        }
+
+        public override delete(): void {
+            if (CLICK_HANDLERS.has(this.buttonName)) {
+                CLICK_HANDLERS.delete(this.buttonName);
+            }
+
+            mod.DeleteUIWidget(this._buttonUiWidget);
+            this._label?.delete();
+
+            super.delete();
         }
 
         public get alphaBase(): number {
@@ -721,15 +827,6 @@ export namespace UI {
             return this;
         }
 
-        public set labelMessage(message: mod.Message) {
-            this._label?.setMessage(message);
-        }
-
-        public setLabelMessage(message: mod.Message): this {
-            this.labelMessage = message;
-            return this;
-        }
-
         public override set size(params: Size) {
             mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
             mod.SetUIWidgetSize(this._buttonUiWidget, mod.CreateVector(params.width, params.height, 0));
@@ -738,6 +835,58 @@ export namespace UI {
 
         public override setSize(params: Size): this {
             this.size = params;
+            return this;
+        }
+
+        public get message(): mod.Message | undefined {
+            return this._label?.message;
+        }
+
+        public set message(message: mod.Message) {
+            this._label?.setMessage(message);
+        }
+
+        public setMessage(message: mod.Message): this {
+            this.message = message;
+            return this;
+        }
+
+        public get textAlpha(): number | undefined {
+            return this._label?.textAlpha;
+        }
+
+        public set textAlpha(alpha: number) {
+            this._label?.setTextAlpha(alpha);
+        }
+
+        public setTextAlpha(alpha: number): this {
+            this.textAlpha = alpha;
+            return this;
+        }
+
+        public get textAnchor(): mod.UIAnchor | undefined {
+            return this._label?.textAnchor;
+        }
+
+        public set textAnchor(anchor: mod.UIAnchor) {
+            this._label?.setTextAnchor(anchor);
+        }
+
+        public setTextAnchor(anchor: mod.UIAnchor): this {
+            this.textAnchor = anchor;
+            return this;
+        }
+
+        public get textSize(): number | undefined {
+            return this._label?.textSize;
+        }
+
+        public set textSize(size: number) {
+            this._label?.setTextSize(size);
+        }
+
+        public setTextSize(size: number): this {
+            this.textSize = size;
             return this;
         }
     }

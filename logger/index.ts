@@ -35,18 +35,22 @@ export class Logger {
     }
 
     private static _buildMessage(part: string): mod.Message {
-        if (part.length === 3)
+        if (part.length === 3) {
             return mod.Message(
                 mod.stringkeys.logger.format[3],
                 Logger._getChar(part[0]),
                 Logger._getChar(part[1]),
                 Logger._getChar(part[2])
             );
+        }
 
-        if (part.length === 2)
+        if (part.length === 2) {
             return mod.Message(mod.stringkeys.logger.format[2], Logger._getChar(part[0]), Logger._getChar(part[1]));
+        }
 
-        if (part.length === 1) return mod.Message(mod.stringkeys.logger.format[1], Logger._getChar(part[0]));
+        if (part.length === 1) {
+            return mod.Message(mod.stringkeys.logger.format[1], Logger._getChar(part[0]));
+        }
 
         return mod.Message(mod.stringkeys.logger.format.badFormat);
     }
@@ -149,9 +153,10 @@ export class Logger {
         return new Promise((resolve) => {
             try {
                 this.log(text, rowIndex);
-            } catch (error) {
+            } catch {
                 // Swallow errors to prevent unhandled promise rejections when the promise is not awaited.
             }
+
             resolve();
         });
     }
@@ -252,7 +257,7 @@ export class Logger {
             width: this._width - Logger._PADDING * 2,
             height: this._rowHeight,
             anchor: mod.UIAnchor.TopLeft,
-            parent: this._window.uiWidget,
+            parent: this._window,
             bgFill: mod.UIBgFill.None,
         });
 
@@ -277,7 +282,7 @@ export class Logger {
             width: partWidth,
             height: this._rowHeight,
             anchor: mod.UIAnchor.CenterLeft,
-            parent: row.uiWidget,
+            parent: row,
             message: Logger._buildMessage(part),
             textSize: this._rowHeight,
             textColor: this._textColor,
@@ -299,7 +304,7 @@ export namespace Logger {
     export interface Options {
         staticRows?: boolean;
         truncate?: boolean;
-        parent?: mod.UIWidget | UI.Node;
+        parent?: UI.Root | UI.Container;
         anchor?: mod.UIAnchor;
         x?: number;
         y?: number;
