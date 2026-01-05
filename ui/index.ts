@@ -1,4 +1,4 @@
-// version: 3.0.0
+// version: 4.0.0
 export namespace UI {
     export const COLORS = {
         BLACK: mod.CreateVector(0, 0, 0),
@@ -13,18 +13,18 @@ export namespace UI {
         PURPLE: mod.CreateVector(1, 0, 1),
         CYAN: mod.CreateVector(0, 1, 1),
         MAGENTA: mod.CreateVector(1, 0, 1),
-        BF_GREY_1: mod.CreateVector(0.8353, 0.9216, 0.9765), // D5EBF9
-        BF_GREY_2: mod.CreateVector(0.3294, 0.3686, 0.3882), // 545E63
-        BF_GREY_3: mod.CreateVector(0.2118, 0.2235, 0.2353), // 36393C
-        BF_GREY_4: mod.CreateVector(0.0314, 0.0431, 0.0431), // 080B0B,
-        BF_BLUE_BRIGHT: mod.CreateVector(0.4392, 0.9216, 1.0), // 70EBFF
-        BF_BLUE_DARK: mod.CreateVector(0.0745, 0.1843, 0.2471), // 132F3F
-        BF_RED_BRIGHT: mod.CreateVector(1.0, 0.5137, 0.3804), // FF8361
-        BF_RED_DARK: mod.CreateVector(0.251, 0.0941, 0.0667), // 401811
-        BF_GREEN_BRIGHT: mod.CreateVector(0.6784, 0.9922, 0.5255), // ADFD86
-        BF_GREEN_DARK: mod.CreateVector(0.2784, 0.4471, 0.2118), // 477236
-        BF_YELLOW_BRIGHT: mod.CreateVector(1.0, 0.9882, 0.6118), // FFFC9C
-        BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // 716000
+        BF_GREY_1: mod.CreateVector(0.8353, 0.9216, 0.9765), // #D5EBF9
+        BF_GREY_2: mod.CreateVector(0.3294, 0.3686, 0.3882), // #545E63
+        BF_GREY_3: mod.CreateVector(0.2118, 0.2235, 0.2353), // #36393C
+        BF_GREY_4: mod.CreateVector(0.0314, 0.0431, 0.0431), // #080B0B,
+        BF_BLUE_BRIGHT: mod.CreateVector(0.4392, 0.9216, 1.0), // #70EBFF
+        BF_BLUE_DARK: mod.CreateVector(0.0745, 0.1843, 0.2471), // #132F3F
+        BF_RED_BRIGHT: mod.CreateVector(1.0, 0.5137, 0.3804), // #FF8361
+        BF_RED_DARK: mod.CreateVector(0.251, 0.0941, 0.0667), // #401811
+        BF_GREEN_BRIGHT: mod.CreateVector(0.6784, 0.9922, 0.5255), // #ADFD86
+        BF_GREEN_DARK: mod.CreateVector(0.2784, 0.4471, 0.2118), // #477236
+        BF_YELLOW_BRIGHT: mod.CreateVector(1.0, 0.9882, 0.6118), // #FFFC9C
+        BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), //rgb(59, 55, 31)
     };
 
     export enum Type {
@@ -32,6 +32,39 @@ export namespace UI {
         Container = 'container',
         Text = 'text',
         Button = 'button',
+    }
+
+    export type MessageDescriptor = {
+        arg0: string | number | mod.Player;
+        arg1?: string | number | mod.Player;
+        arg2?: string | number | mod.Player;
+        arg3?: string | number | mod.Player;
+    };
+
+    export function isMessageDescriptorEqual(a: MessageDescriptor, b: MessageDescriptor): boolean {
+        if (!isMessageDescriptorArgEqual(a.arg0, b.arg0)) return false;
+        if (!isMessageDescriptorArgEqual(a.arg1, b.arg1)) return false;
+        if (!isMessageDescriptorArgEqual(a.arg2, b.arg2)) return false;
+        if (!isMessageDescriptorArgEqual(a.arg3, b.arg3)) return false;
+        return true;
+    }
+
+    function isMessageDescriptorArgEqual(a?: string | number | mod.Player, b?: string | number | mod.Player): boolean {
+        if (a === b) return true;
+
+        if (typeof a === 'object' && typeof b === 'object') return mod.GetObjId(a) === mod.GetObjId(b);
+
+        return false;
+    }
+
+    function createMessage(descriptor: MessageDescriptor): mod.Message {
+        const { arg0, arg1, arg2, arg3 } = descriptor;
+
+        if (arg1 === undefined) return mod.Message(arg0);
+        if (arg2 === undefined) return mod.Message(arg0, arg1);
+        if (arg3 === undefined) return mod.Message(arg0, arg1, arg2);
+
+        return mod.Message(arg0, arg1, arg2, arg3);
     }
 
     type Params = {
@@ -42,7 +75,7 @@ export namespace UI {
         width?: number;
         height?: number;
         anchor?: mod.UIAnchor;
-        parent?: mod.UIWidget | Parent;
+        parent?: Root | Container;
         visible?: boolean;
         padding?: number;
         bgColor?: mod.Vector;
@@ -56,7 +89,7 @@ export namespace UI {
     };
 
     export type TextParams = Params & {
-        message: mod.Message;
+        message: MessageDescriptor;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;
@@ -64,7 +97,7 @@ export namespace UI {
     };
 
     export type LabelParams = {
-        message: mod.Message;
+        message: MessageDescriptor;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;
@@ -111,7 +144,7 @@ export namespace UI {
         syncChildren(): void;
     }
 
-    class Root extends Node implements Parent {
+    export class Root extends Node implements Parent {
         private _children: Element[] = [];
 
         public get children(): Element[] {
@@ -139,24 +172,6 @@ export namespace UI {
         }
     }
 
-    class UnknownNode extends Node implements Parent {
-        public constructor(uiWidget: mod.UIWidget) {
-            super(uiWidget, 'ui_unknown');
-        }
-
-        public get children(): Element[] {
-            return [];
-        }
-
-        public addChild(child: Element): this {
-            return this;
-        }
-
-        public syncChildren(): this {
-            return this;
-        }
-    }
-
     export type Size = {
         width: number;
         height: number;
@@ -177,29 +192,21 @@ export namespace UI {
         return `${parent.name}${receiver ? `_${mod.GetObjId(receiver)}` : ''}_${counter++}`;
     }
 
-    function parseParent(parent?: Parent | mod.UIWidget): Parent {
-        if (!parent) return ROOT_NODE;
-
-        if (parent instanceof Container) return parent as Container;
-
-        return new UnknownNode(parent as mod.UIWidget);
-    }
-
     export class Element extends Node {
-        protected _parent: Parent;
+        protected _parent: Root | Container;
 
-        public constructor(uiWidget: mod.UIWidget, name: string, parent: Parent) {
+        public constructor(uiWidget: mod.UIWidget, name: string, parent: Root | Container) {
             super(uiWidget, name);
 
             this._parent = parent;
             parent.addChild(this);
         }
 
-        public get parent(): Parent {
+        public get parent(): Root | Container {
             return this._parent;
         }
 
-        public set parent(parent: Parent) {
+        public set parent(parent: Root | Container) {
             const oldParent = this._parent;
 
             this._parent = parent;
@@ -208,7 +215,7 @@ export namespace UI {
             oldParent.syncChildren();
         }
 
-        public setParent(parent: Parent): this {
+        public setParent(parent: Root | Container): this {
             this.parent = parent;
             return this;
         }
@@ -361,7 +368,7 @@ export namespace UI {
         }
 
         public constructor(params: ContainerParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -433,8 +440,10 @@ export namespace UI {
     }
 
     export class Text extends Element {
+        private _messageDescriptor: MessageDescriptor;
+
         public constructor(params: TextParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
             const name = params.name ?? makeName(parent, receiver);
 
             const args: [
@@ -465,7 +474,7 @@ export namespace UI {
                 params.bgColor ?? COLORS.WHITE,
                 params.bgAlpha ?? 0,
                 params.bgFill ?? mod.UIBgFill.None,
-                params.message,
+                createMessage(params.message),
                 params.textSize ?? 36,
                 params.textColor ?? COLORS.BLACK,
                 params.textAlpha ?? 1,
@@ -482,13 +491,20 @@ export namespace UI {
             const uiWidget = mod.FindUIWidgetWithName(name) as mod.UIWidget;
 
             super(uiWidget, name, parent);
+
+            this._messageDescriptor = params.message;
         }
 
-        public set message(message: mod.Message) {
-            mod.SetUITextLabel(this._uiWidget, message);
+        public get messageDescriptor(): MessageDescriptor {
+            return this._messageDescriptor;
         }
 
-        public setMessage(message: mod.Message): this {
+        public set message(message: MessageDescriptor) {
+            this._messageDescriptor = message;
+            mod.SetUITextLabel(this._uiWidget, createMessage(message));
+        }
+
+        public setMessage(message: MessageDescriptor): this {
             this.message = message;
             return this;
         }
@@ -502,7 +518,7 @@ export namespace UI {
         private _label?: Text;
 
         public constructor(params: ButtonParams, receiver?: mod.Player | mod.Team) {
-            const parent = parseParent(params.parent);
+            const parent = params.parent ?? ROOT_NODE;
 
             const containerParams: ContainerParams = {
                 x: params.x,
@@ -528,7 +544,7 @@ export namespace UI {
                 mod.CreateVector(0, 0, 0),
                 mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
                 params.anchor ?? mod.UIAnchor.Center,
-                this.uiWidget,
+                this._uiWidget,
                 true,
                 params.padding ?? 0,
                 params.bgColor ?? COLORS.WHITE,
@@ -558,7 +574,7 @@ export namespace UI {
                 ? new Text({
                       ...params.label,
                       name: `${this._name}_label`,
-                      parent: this.uiWidget,
+                      parent: this,
                       width: params.width,
                       height: params.height,
                       visible: true,
@@ -576,6 +592,17 @@ export namespace UI {
 
         public get buttonUiWidget(): mod.UIWidget {
             return this._buttonUiWidget;
+        }
+
+        public override delete(): void {
+            if (CLICK_HANDLERS.has(this.buttonName)) {
+                CLICK_HANDLERS.delete(this.buttonName);
+            }
+
+            mod.DeleteUIWidget(this._buttonUiWidget);
+            this._label?.delete();
+
+            super.delete();
         }
 
         public get alphaBase(): number {
@@ -721,11 +748,15 @@ export namespace UI {
             return this;
         }
 
-        public set labelMessage(message: mod.Message) {
+        public get labelMessageDescriptor(): MessageDescriptor | undefined {
+            return this._label?.messageDescriptor;
+        }
+
+        public set labelMessage(message: MessageDescriptor) {
             this._label?.setMessage(message);
         }
 
-        public setLabelMessage(message: mod.Message): this {
+        public setLabelMessage(message: MessageDescriptor): this {
             this.labelMessage = message;
             return this;
         }

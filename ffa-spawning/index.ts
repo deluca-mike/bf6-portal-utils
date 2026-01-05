@@ -50,7 +50,7 @@ export namespace FFASpawning {
         // Time subsequent delays between prompts.
         private static _promptDelay: number = 10;
 
-        // Time intiial time until the player is asked to spawn.
+        // Time initial delay until the player is asked to spawn.
         private static _initialPromptDelay: number = this._promptDelay;
 
         // The delay between processing the spawn queue.
@@ -309,7 +309,7 @@ export namespace FFASpawning {
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
                             label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.spawn),
+                                message: { arg0: mod.stringkeys.ffaSpawning.buttons.spawn },
                                 textSize: 30,
                                 textColor: UI.COLORS.BF_GREEN_BRIGHT,
                             },
@@ -334,7 +334,7 @@ export namespace FFASpawning {
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
                             label: {
-                                message: mod.Message(mod.stringkeys.ffaSpawning.buttons.delay, Soldier._promptDelay),
+                                message: { arg0: mod.stringkeys.ffaSpawning.buttons.delay, arg1: Soldier._promptDelay },
                                 textSize: 30,
                                 textColor: UI.COLORS.BF_YELLOW_BRIGHT,
                             },
@@ -354,7 +354,7 @@ export namespace FFASpawning {
                     width: 400,
                     height: 50,
                     anchor: mod.UIAnchor.TopCenter,
-                    message: mod.Message(mod.stringkeys.ffaSpawning.countdown, this._delayCountdown),
+                    message: { arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown },
                     textSize: 30,
                     textColor: UI.COLORS.BF_GREEN_BRIGHT,
                     bgColor: UI.COLORS.BF_GREY_4,
@@ -404,7 +404,7 @@ export namespace FFASpawning {
         private handleDelayCountdown(): void {
             if (this.deleteIfNotValid()) return;
 
-            this._countdownUI?.setMessage(mod.Message(mod.stringkeys.ffaSpawning.countdown, this._delayCountdown--));
+            this._countdownUI?.setMessage({ arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown-- });
 
             if (this._delayCountdown < 0) return this.showPrompt();
 
