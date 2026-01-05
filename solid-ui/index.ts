@@ -2,10 +2,9 @@ import { UI } from '../ui/index.ts';
 
 export namespace SolidUI {
     // ==================================================================================
-    // 1. REACTIVITY CORE (Signals & Effects)
+    // 1. REACTIVITY CORE
     // ==================================================================================
 
-    // A subscriber is essentially an Effect
     type Subscriber = {
         execute: () => void;
         dependencies: Set<Set<Subscriber>>;
@@ -13,11 +12,11 @@ export namespace SolidUI {
 
     const context: Subscriber[] = [];
 
-    // Clean up dependencies before re-executing an effect
-    function cleanup(subscriber: Subscriber) {
+    function cleanup(subscriber: Subscriber): void {
         for (const dep of subscriber.dependencies) {
             dep.delete(subscriber);
         }
+
         subscriber.dependencies.clear();
     }
 
@@ -30,18 +29,22 @@ export namespace SolidUI {
 
         const read = () => {
             const observer = context[context.length - 1];
+
             if (observer) {
                 subscriptions.add(observer);
                 observer.dependencies.add(subscriptions);
             }
+
             return value;
         };
 
         const write = (newValue: T | ((prev: T) => T)) => {
             const nextValue = newValue instanceof Function ? (newValue as (prev: T) => T)(value) : newValue;
+
             if (value !== nextValue) {
                 value = nextValue;
-                // Clone to avoid infinite loops if effects modify signals
+
+                // Clone to avoid infinite loops
                 [...subscriptions].forEach((sub) => sub.execute());
             }
         };
@@ -53,6 +56,7 @@ export namespace SolidUI {
         const execute = () => {
             cleanup(subscriber);
             context.push(subscriber);
+
             try {
                 fn();
             } finally {
@@ -75,146 +79,226 @@ export namespace SolidUI {
     }
 
     // ==================================================================================
-    // 2. HYPERSCRIPT (The Render Logic)
+    // 2. VNODE & REGISTRY
     // ==================================================================================
 
-    type PropValue<T> = T | Accessor<T>;
+    // A Blueprint for a UI Element
+    export interface VNode<P = any> {
+        type: UI.Type;
+        props: P;
+        children: VNode[];
+        // A reference to the real instance, populated after render
+        instance?: UI.Element;
+    }
 
-    // Map generic props to specific UI types if needed, or keep generic
-    type Props = Record<string, any>;
-
-    // Helper to detect if a prop is a signal
+    // Helper to detect signals
     function isAccessor(val: any): val is Accessor<any> {
         return typeof val === 'function';
     }
 
-    /**
-     * Maps UI.Type enums to the actual Classes
-     */
+    // Transform a Params interface so every property can optionally be a Signal
+    type Reactive<T> = {
+        [K in keyof T]?: T[K] | Accessor<T[K]>;
+    };
+
+    // Augment Button params to allow the convenience "text" prop
+    type SmartButtonProps = UI.ButtonParams & {
+        text?: string | UI.MessageDescriptor | Accessor<string | UI.MessageDescriptor>;
+    };
+
+    // The Master Registry: Maps Enum -> Class Instance & Props
+    interface ComponentRegistry {
+        [UI.Type.Container]: {
+            instance: UI.Container;
+            props: UI.ContainerParams;
+        };
+        [UI.Type.Text]: {
+            instance: UI.Text;
+            props: UI.TextParams;
+        };
+        [UI.Type.Button]: {
+            instance: UI.Button;
+            props: SmartButtonProps; // Uses our augmented type
+        };
+        [UI.Type.Root]: {
+            instance: UI.Root;
+            props: object;
+        };
+    }
+
+    // Map for runtime instantiation
     const ComponentMap = {
         [UI.Type.Container]: UI.Container,
         [UI.Type.Text]: UI.Text,
         [UI.Type.Button]: UI.Button,
-        [UI.Type.Root]: UI.Root, // Usually not instantiated manually
+        [UI.Type.Root]: UI.Root,
     };
 
-    /**
-     * Standardizes property setting for the imperative UI library.
-     * It handles the mapping of "prop name" -> "setter method".
-     */
-    function setProperty(instance: any, key: string, value: any) {
-        // 1. Handle explicit setters (e.g., setVisible, setSize)
-        // We look for the setter by capitalizing the key: visible -> setVisible
-        const setterName = `set${key.charAt(0).toUpperCase() + key.slice(1)}`;
+    // ==================================================================================
+    // 3. THE RENDERER (Mounts Blueprints to Reality)
+    // ==================================================================================
 
-        // 2. Handle Special Mappings (Aliases)
-        // e.g., if user types 'text' for a Button, we might map it to 'setLabelMessage'
+    function setProperty(instance: any, key: string, value: any) {
+        // 1. Handle "text" convenience prop on Button
         if (instance instanceof UI.Button && key === 'text') {
-            // If user passes a raw string, we convert to descriptor
-            // If user passes a descriptor, we use it directly
             const desc = typeof value === 'string' ? ({ arg0: value } as UI.MessageDescriptor) : value;
             instance.setLabelMessage(desc);
             return;
         }
 
+        // 2. Handle "message" convenience prop on Text (allow raw string)
         if (instance instanceof UI.Text && key === 'message') {
             const desc = typeof value === 'string' ? ({ arg0: value } as UI.MessageDescriptor) : value;
             instance.setMessage(desc);
             return;
         }
 
-        // 3. Generic Setter Call
+        // 3. Standard Setter Lookup (e.g. visible -> setVisible)
+        const setterName = `set${key.charAt(0).toUpperCase() + key.slice(1)}`;
+
         if (typeof instance[setterName] === 'function') {
             instance[setterName](value);
         } else {
-            // Fallback: direct property assignment (calls the setter via JS getter/setter)
-            // e.g. instance.visible = true;
+            // Fallback to direct assignment
             try {
                 instance[key] = value;
             } catch (e) {
-                // Property likely doesn't exist or is read-only
+                /* ignore read-only */
             }
         }
     }
 
     /**
-     * The Hyperscript function.
-     * @param type The UI Component Type (UI.Type.Button, etc.)
-     * @param props Object of properties. Can be static values OR signals.
-     * @param children Array of child elements.
+     * Creates the real UI Widget from a VNode, then recursively creates children.
+     * Guaranteed Top-Down execution.
      */
-    export function h(
-        type: UI.Type,
-        props: Props = {},
-        children: (UI.Element | Accessor<UI.Element>)[] = []
-    ): UI.Element {
-        // 1. Separation Phase:
-        // We must extract the *initial* values for the constructor,
-        // and separate the dynamic signals for post-creation binding.
+    function mount(vnode: VNode, parent: UI.Root | UI.Container): UI.Element {
+        const ClassConstructor = ComponentMap[vnode.type];
+
+        if (!ClassConstructor) throw new Error(`Unknown component type: ${vnode.type}`);
+
+        // 1. Separation Phase (Props vs Signals)
         const constructorParams: any = {};
         const dynamicBindings: { key: string; signal: Accessor<any> }[] = [];
 
-        // Special handling: 'onClick' is usually an event, not a signal
-        // We pass it directly to constructor params.
+        // Inject the PARENT automatically.
+        // This solves the dependency issue. The child now definitely has the parent
+        // before the underlying mod.AddUI... is called.
+        constructorParams.parent = parent;
 
-        for (const [key, value] of Object.entries(props)) {
+        for (const [key, value] of Object.entries(vnode.props)) {
             if (key === 'onClick') {
                 constructorParams[key] = value;
                 continue;
             }
 
             if (isAccessor(value)) {
-                // It's a signal! Get current value for initial render...
-                constructorParams[key] = value();
-                // ...and queue it for binding
+                constructorParams[key] = value(); // Initial value
                 dynamicBindings.push({ key, signal: value });
             } else {
-                // Static value
+                constructorParams[key] = value;
+            }
+        }
+
+        // 2. Instantiation Phase (REAL Creation happens here)
+        // We cast to any to bypass strict constructor checks for this generic logic
+        const instance = new (ClassConstructor as any)(constructorParams);
+        vnode.instance = instance; // Store ref in case we need it
+
+        // 3. Reactive Binding Phase
+        dynamicBindings.forEach(({ key, signal }) => {
+            createEffect(() => {
+                setProperty(instance, key, signal());
+            });
+        });
+
+        // 4. Children Phase (Recursive Top-Down)
+        if ('addChild' in instance) {
+            vnode.children.forEach((childVNode) => {
+                // RECURSION: We pass the *just created* instance as the parent
+                mount(childVNode, instance as UI.Container);
+            });
+        }
+
+        return instance;
+    }
+
+    /**
+     * Main entry point to draw the UI.
+     * @param rootVNode The blueprint tree returned by h(...)
+     * @param rootElement The existing root to attach to (usually UI.ROOT_NODE)
+     */
+    export function render(rootVNode: VNode, rootElement: UI.Root = UI.ROOT_NODE) {
+        // We do not "mount" the root itself (it exists), we mount its children
+        // But if rootVNode is a container intended to be a child of ROOT_NODE:
+        mount(rootVNode, rootElement);
+    }
+
+    // ==================================================================================
+    // 4. HYPERSCRIPT (The Builder)
+    // ==================================================================================
+
+    /**
+     * Strictly typed Hyperscript function.
+     * @param type The UI Type Enum (inferred K)
+     * @param props The specific Props for that Type (static or signals)
+     * @param children Child elements or arrays of elements (from Show)
+     */
+    export function h<K extends keyof ComponentRegistry>(
+        type: K,
+        props: Reactive<ComponentRegistry[K]['props']> = {},
+        children: (VNode | VNode[])[] = [] // Accepts VNodes now
+    ): VNode<Reactive<ComponentRegistry[K]['props']>> {
+        const ClassConstructor = ComponentMap[type];
+        if (!ClassConstructor) throw new Error(`Unknown component type: ${type}`);
+
+        // 1. Separation Phase
+        const constructorParams: any = {};
+        const dynamicBindings: { key: string; signal: Accessor<any> }[] = [];
+
+        for (const [key, value] of Object.entries(props)) {
+            // Events are never signals in this framework's convention
+            if (key === 'onClick') {
+                constructorParams[key] = value;
+                continue;
+            }
+
+            if (isAccessor(value)) {
+                constructorParams[key] = value(); // Initial value
+                dynamicBindings.push({ key, signal: value });
+            } else {
                 constructorParams[key] = value;
             }
         }
 
         // 2. Instantiation Phase
-        const ClassConstructor = ComponentMap[type];
-        if (!ClassConstructor) throw new Error(`Unknown component type: ${type}`);
-
-        // The UI library expects explicit params (e.g. TextParams).
-        // We assume constructorParams matches that shape roughly.
-        // Note: We might need default parent handling here or let the UI library handle it.
-        const instance = new ClassConstructor(constructorParams);
+        // We cast to any because TS struggles to verify dynamic constructor signatures against the registry map
+        const instance = new (ClassConstructor as any)(constructorParams);
 
         // 3. Reactive Binding Phase
-        // For every dynamic prop, create an effect that updates the instance
         dynamicBindings.forEach(({ key, signal }) => {
             createEffect(() => {
-                const newValue = signal();
-                setProperty(instance, key, newValue);
+                setProperty(instance, key, signal());
             });
         });
 
         // 4. Children Phase
-        // Append children to the instance (if it's a container)
-        // We allow children to be plain elements or signals (conditional rendering)
-        if ('addChild' in instance) {
-            children.forEach((child) => {
-                if (isAccessor(child)) {
-                    // Dynamic Child (e.g. conditional show/hide)
-                    // NOTE: This is complex in BF Portal because we can't easily reorder.
-                    // For MVP, we assume the child signal returns an already created Element
-                    // that we just toggle visibility on, or we just append it.
-                    // Real dynamic lists require a <For> component implementation.
+        // Flatten children array because <Show> returns UI.Element[]
+        const flatChildren = children.flat();
 
-                    // Simple approach: Run effect, but assume append only for now.
-                    createEffect(() => {
-                        const c = child();
-                        if (c) (instance as any).addChild(c);
-                    });
-                } else {
+        if ('addChild' in instance) {
+            flatChildren.forEach((child) => {
+                // Ensure valid child before adding
+                if (child && child instanceof UI.Node) {
                     (instance as any).addChild(child);
                 }
             });
         }
 
-        return instance as UI.Element;
+        return {
+            type,
+            props,
+            children: children.flat().filter((c) => !!c), // Flatten and clean
+        };
     }
 }
