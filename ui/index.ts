@@ -34,6 +34,23 @@ export namespace UI {
         Button = 'button',
     }
 
+    export type MessageDescriptor = {
+        arg0: string | number | mod.Player;
+        arg1?: string | number | mod.Player;
+        arg2?: string | number | mod.Player;
+        arg3?: string | number | mod.Player;
+    };
+
+    function createMessage(descriptor: MessageDescriptor): mod.Message {
+        const { arg0, arg1, arg2, arg3 } = descriptor;
+
+        if (arg1 === undefined) return mod.Message(arg0);
+        if (arg2 === undefined) return mod.Message(arg0, arg1);
+        if (arg3 === undefined) return mod.Message(arg0, arg1, arg2);
+
+        return mod.Message(arg0, arg1, arg2, arg3);
+    }
+
     type BaseParams = {
         type?: Type;
         name?: string;
@@ -59,7 +76,7 @@ export namespace UI {
     };
 
     export type TextParams = Params & {
-        message: mod.Message;
+        text: MessageDescriptor;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;
@@ -79,7 +96,7 @@ export namespace UI {
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
         onClick?: (player: mod.Player) => Promise<void>;
-        message?: mod.Message;
+        text?: MessageDescriptor;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;
@@ -469,7 +486,7 @@ export namespace UI {
     }
 
     export class Text extends Element {
-        private _message: mod.Message;
+        private _messageDescriptor: MessageDescriptor;
 
         public constructor(params: TextParams, receiver?: mod.Player | mod.Team) {
             const parent = params.parent ?? ROOT_NODE;
@@ -503,7 +520,7 @@ export namespace UI {
                 params.bgColor ?? COLORS.WHITE,
                 params.bgAlpha ?? 0,
                 params.bgFill ?? mod.UIBgFill.None,
-                params.message,
+                createMessage(params.text),
                 params.textSize ?? 36,
                 params.textColor ?? COLORS.BLACK,
                 params.textAlpha ?? 1,
@@ -521,20 +538,20 @@ export namespace UI {
 
             super(uiWidget, name, parent);
 
-            this._message = params.message;
+            this._messageDescriptor = params.text;
         }
 
-        public get message(): mod.Message {
-            return this._message;
+        public get text(): MessageDescriptor {
+            return this._messageDescriptor;
         }
 
-        public set message(message: mod.Message) {
-            this._message = message;
-            mod.SetUITextLabel(this._uiWidget, message);
+        public set text(text: MessageDescriptor) {
+            this._messageDescriptor = text;
+            mod.SetUITextLabel(this._uiWidget, createMessage(text));
         }
 
-        public setMessage(message: mod.Message): this {
-            this.message = message;
+        public setText(text: MessageDescriptor): this {
+            this.text = text;
             return this;
         }
 
@@ -644,10 +661,10 @@ export namespace UI {
 
             const buttonUiWidget = mod.FindUIWidgetWithName(buttonName) as mod.UIWidget;
 
-            // TODO: If params.message is undefined, label will never be created, and setting text properties afterward will silently fail.
-            this._label = params.message
+            // TODO: If params.text is undefined, label will never be created, and setting text properties afterward will silently fail.
+            this._label = params.text
                 ? new Text({
-                      message: params.message,
+                      text: params.text,
                       textSize: params.textSize,
                       textColor: params.textColor,
                       textAlpha: params.textAlpha,
@@ -838,16 +855,16 @@ export namespace UI {
             return this;
         }
 
-        public get message(): mod.Message | undefined {
-            return this._label?.message;
+        public get text(): MessageDescriptor | undefined {
+            return this._label?.text;
         }
 
-        public set message(message: mod.Message) {
-            this._label?.setMessage(message);
+        public set text(text: MessageDescriptor) {
+            this._label?.setText(text);
         }
 
-        public setMessage(message: mod.Message): this {
-            this.message = message;
+        public setText(text: MessageDescriptor): this {
+            this.text = text;
             return this;
         }
 

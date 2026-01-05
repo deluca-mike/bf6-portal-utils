@@ -59,7 +59,7 @@ export namespace SolidUI {
             return true;
         }
 
-        // Plain object deep compare (Size, Position, Vector, etc).
+        // Plain object deep compare (MessageDescriptor, Size, Position, Vector, etc).
         if (isPlainObject(a) && isPlainObject(b)) {
             const objA = a as Record<string, unknown>;
             const objB = b as Record<string, unknown>;

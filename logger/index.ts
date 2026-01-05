@@ -34,25 +34,29 @@ export class Logger {
         return 10;
     }
 
-    private static _buildMessage(part: string): mod.Message {
+    private static _buildMessage(part: string): UI.MessageDescriptor {
         if (part.length === 3) {
-            return mod.Message(
-                mod.stringkeys.logger.format[3],
-                Logger._getChar(part[0]),
-                Logger._getChar(part[1]),
-                Logger._getChar(part[2])
-            );
+            return {
+                arg0: mod.stringkeys.logger.format[3],
+                arg1: Logger._getChar(part[0]),
+                arg2: Logger._getChar(part[1]),
+                arg3: Logger._getChar(part[2]),
+            };
         }
 
         if (part.length === 2) {
-            return mod.Message(mod.stringkeys.logger.format[2], Logger._getChar(part[0]), Logger._getChar(part[1]));
+            return {
+                arg0: mod.stringkeys.logger.format[2],
+                arg1: Logger._getChar(part[0]),
+                arg2: Logger._getChar(part[1]),
+            };
         }
 
         if (part.length === 1) {
-            return mod.Message(mod.stringkeys.logger.format[1], Logger._getChar(part[0]));
+            return { arg0: mod.stringkeys.logger.format[1], arg1: Logger._getChar(part[0]) };
         }
 
-        return mod.Message(mod.stringkeys.logger.format.badFormat);
+        return { arg0: mod.stringkeys.logger.format.badFormat };
     }
 
     private static _getChar(char: string): string {
@@ -283,7 +287,7 @@ export class Logger {
             height: this._rowHeight,
             anchor: mod.UIAnchor.CenterLeft,
             parent: row,
-            message: Logger._buildMessage(part),
+            text: Logger._buildMessage(part),
             textSize: this._rowHeight,
             textColor: this._textColor,
             textAnchor: mod.UIAnchor.CenterLeft,
