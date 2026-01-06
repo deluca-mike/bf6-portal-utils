@@ -1,9 +1,43 @@
 import { UI } from '../ui/index.ts';
 
 export namespace SolidUI {
-    // ==================================================================================
-    // 1. REACTIVITY CORE (Signals & Effects)
-    // ==================================================================================
+    /****** SCHEDULER ******/
+
+    // Queue to hold effects that need to run.
+    const pendingEffects = new Set<Subscriber>();
+    let isFlushPending = false;
+
+    // The function that processes the queue.
+    function flush() {
+        isFlushPending = false;
+
+        // Snapshot the current queue to handle new effects being added during flush.
+        const toRun = [...pendingEffects];
+        pendingEffects.clear();
+
+        // Run all queued effects.
+        toRun.forEach((sub) => sub.execute());
+    }
+
+    // Adds effects to the queue and schedules a flush if one isn't already pending
+    function schedule(subscribers: Set<Subscriber>) {
+        subscribers.forEach((sub) => pendingEffects.add(sub));
+
+        if (isFlushPending) return;
+
+        isFlushPending = true;
+
+        // "Promise.resolve().then" pushes the flush to the microtask queue.
+        // This ensures setting a signal returns execution to the game logic instantly,
+        // and the UI updates happen right after the game logic finishes.
+        Promise.resolve()
+            .then(flush)
+            .catch((e) => {
+                // Swallow errors to prevent one effect from affecting others.
+            });
+    }
+
+    /****** REACTIVITY CORE ******/
 
     type Subscriber = {
         execute: () => void;
@@ -24,6 +58,11 @@ export namespace SolidUI {
 
     export type Setter<T> = (newValue: T | ((prev: T) => T)) => void;
 
+    /**
+     * Creates a signal (source of truth) and returns an accessor and setter.
+     * @param initialValue - The initial value of the signal.
+     * @returns A tuple containing the accessor and setter functions.
+     */
     export function createSignal<T>(initialValue: T): [Accessor<T>, Setter<T>] {
         const subscriptions = new Set<Subscriber>();
         let value = initialValue;
@@ -43,16 +82,19 @@ export namespace SolidUI {
             const nextValue = newValue instanceof Function ? (newValue as (prev: T) => T)(value) : newValue;
 
             if (value !== nextValue) {
-                value = nextValue;
-
-                // Clone to avoid infinite loops
-                [...subscriptions].forEach((sub) => sub.execute());
+                value = nextValue; // Update state immediately
+                schedule(subscriptions); // Triggers updates asynchronously (non-blocking)
             }
         };
 
         return [read, write];
     }
 
+    /**
+     * Creates an effect and runs it immediately.
+     * Runs a function immediately, tracks which signals are read during that run, and re-runs the function whenever those signals change.
+     * @param fn - The function to execute.
+     */
     export function createEffect(fn: () => void): void {
         const execute = () => {
             cleanup(subscriber);
@@ -70,18 +112,24 @@ export namespace SolidUI {
             dependencies: new Set(),
         };
 
+        // Effects run immediately on creation (synchronously) to establish initial dependencies.
         execute();
     }
 
+    /**
+     * Creates a memo (derived signal) and returns an accessor.
+     * It relies on other signals but presents itself as a read-only signal to others.
+     * @param fn - The function to execute.
+     * @returns The memo value.
+     */
     export function createMemo<T>(fn: () => T): Accessor<T> {
         const [s, set] = createSignal<T>(fn());
+        // Memos must update immediately to be consistent, but their downstream effects will still be batched by the signal's scheduler.
         createEffect(() => set(fn()));
         return s;
     }
 
-    // ==================================================================================
-    // 2. TYPE REGISTRY (Intellisense & Validation)
-    // ==================================================================================
+    /****** TYPE REGISTRY ******/
 
     function isAccessor<T>(value: T): value is T & Accessor<T> {
         return typeof value === 'function';
@@ -90,11 +138,6 @@ export namespace SolidUI {
     // Transform Params so every property can optionally be a Signal
     type Reactive<T> = {
         [K in keyof T]?: T[K] | Accessor<T[K]>;
-    };
-
-    // Augment Button params for the convenience "text" prop
-    type SmartButtonProps = UI.ButtonParams & {
-        text?: string | UI.MessageDescriptor | Accessor<string | UI.MessageDescriptor>;
     };
 
     // Maps Enum -> Class Instance & Props
@@ -109,7 +152,7 @@ export namespace SolidUI {
         };
         [UI.Type.Button]: {
             instance: UI.Button;
-            props: SmartButtonProps;
+            props: UI.ButtonParams;
         };
     }
 
@@ -119,17 +162,9 @@ export namespace SolidUI {
         [UI.Type.Button]: UI.Button,
     };
 
-    // ==================================================================================
-    // 3. THE FACTORY (h)
-    // ==================================================================================
+    /****** THE FACTORY ******/
 
     function setProperty<T extends UI.Container | UI.Text | UI.Button>(instance: T, key: keyof T, value: T[keyof T]) {
-        if ((instance instanceof UI.Button || instance instanceof UI.Text) && key === 'text') {
-            const descriptor = typeof value === 'string' ? { arg0: value } : (value as UI.MessageDescriptor);
-            instance.setText(descriptor);
-            return;
-        }
-
         try {
             instance[key] = value;
         } catch (e) {
@@ -139,11 +174,11 @@ export namespace SolidUI {
 
     /**
      * Creates a UI Widget immediately and sets up reactive bindings.
-     * Must be called in order (Parents first).
-     * @param type The UI Type Enum
-     * @param props The properties (static or reactive)
-     * @param receiver The player or team to receive the UI
-     * @returns The created UI Instance
+     * Must be called in order (parents before their children).
+     * @param type The UI Type Enum.
+     * @param props The properties (static or reactive).
+     * @param receiver The player or team to receive the UI, if any.
+     * @returns The created UI Instance.
      */
     export function h<K extends keyof ComponentRegistry>(
         type: K,
@@ -155,13 +190,13 @@ export namespace SolidUI {
         if (!ClassConstructor) throw new Error(`Unknown component type: ${type}`);
 
         // 1. Separation Phase
-        const constructorParams: any = {};
-        const dynamicBindings: { key: keyof K; signal: Accessor<any> }[] = [];
+        const constructorParams: ComponentRegistry[K]['props'] = {};
+        const dynamicBindings: { key: keyof ComponentRegistry[K]['props']; signal: Accessor<any> }[] = []; // `ComponentRegistry[K]['props'][keyof ComponentRegistry[K]['props']]` instead of `any`?
 
         for (const [key, value] of Object.entries(props)) {
             // Events are never signals
             if (key === 'onClick') {
-                constructorParams[key] = value;
+                constructorParams[key as keyof ComponentRegistry[K]['props']] = value;
                 continue;
             }
 
@@ -169,10 +204,10 @@ export namespace SolidUI {
             // but if passed as a signal, we unwrap it for the constructor.
             // (Dynamic re-parenting is handled by setProperty later if supported)
             if (isAccessor(value)) {
-                constructorParams[key] = value(); // Initial value
-                dynamicBindings.push({ key, signal: value });
+                constructorParams[key as keyof ComponentRegistry[K]['props']] = value(); // Initial value
+                dynamicBindings.push({ key: key as keyof ComponentRegistry[K]['props'], signal: value });
             } else {
-                constructorParams[key] = value;
+                constructorParams[key as keyof ComponentRegistry[K]['props']] = value;
             }
         }
 
