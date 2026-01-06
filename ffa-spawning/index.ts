@@ -308,11 +308,9 @@ export namespace FFASpawning {
                             hoverAlpha: 1,
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
-                            label: {
-                                message: { arg0: mod.stringkeys.ffaSpawning.buttons.spawn },
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                            },
+                            text: { arg0: mod.stringkeys.ffaSpawning.buttons.spawn },
+                            textSize: 30,
+                            textColor: UI.COLORS.BF_GREEN_BRIGHT,
                             onClick: async (player: mod.Player): Promise<void> => {
                                 this.addToQueue();
                             },
@@ -333,11 +331,9 @@ export namespace FFASpawning {
                             hoverAlpha: 1,
                             focusedColor: UI.COLORS.BF_GREY_1,
                             focusedAlpha: 1,
-                            label: {
-                                message: { arg0: mod.stringkeys.ffaSpawning.buttons.delay, arg1: Soldier._promptDelay },
-                                textSize: 30,
-                                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                            },
+                            text: { arg0: mod.stringkeys.ffaSpawning.buttons.delay, arg1: Soldier._promptDelay },
+                            textSize: 30,
+                            textColor: UI.COLORS.BF_YELLOW_BRIGHT,
                             onClick: async (player: mod.Player): Promise<void> => {
                                 this.startDelayForPrompt(Soldier._promptDelay);
                             },
@@ -354,7 +350,7 @@ export namespace FFASpawning {
                     width: 400,
                     height: 50,
                     anchor: mod.UIAnchor.TopCenter,
-                    message: { arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown },
+                    text: { arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown },
                     textSize: 30,
                     textColor: UI.COLORS.BF_GREEN_BRIGHT,
                     bgColor: UI.COLORS.BF_GREY_4,
@@ -404,7 +400,7 @@ export namespace FFASpawning {
         private handleDelayCountdown(): void {
             if (this.deleteIfNotValid()) return;
 
-            this._countdownUI?.setMessage({ arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown-- });
+            this._countdownUI?.setText({ arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown-- });
 
             if (this._delayCountdown < 0) return this.showPrompt();
 

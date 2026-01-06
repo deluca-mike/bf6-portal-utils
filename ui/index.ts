@@ -67,13 +67,9 @@ export namespace UI {
         return mod.Message(arg0, arg1, arg2, arg3);
     }
 
-    type Params = {
+    type BaseParams = {
         type?: Type;
         name?: string;
-        x?: number;
-        y?: number;
-        width?: number;
-        height?: number;
         anchor?: mod.UIAnchor;
         parent?: Root | Container;
         visible?: boolean;
@@ -84,23 +80,23 @@ export namespace UI {
         depth?: mod.UIDepth;
     };
 
+    type Params = BaseParams &
+        (({ position?: Position } & { x?: never; y?: never }) | ({ x?: number; y?: number } & { position?: never })) &
+        (
+            | ({ size?: Size } & { width?: never; height?: never })
+            | ({ width?: number; height?: number } & { size?: never })
+        );
+
     export type ContainerParams = Params & {
         childrenParams?: (ContainerParams | TextParams | ButtonParams)[];
     };
 
     export type TextParams = Params & {
-        message: MessageDescriptor;
+        text: MessageDescriptor;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;
         textAnchor?: mod.UIAnchor;
-    };
-
-    export type LabelParams = {
-        message: MessageDescriptor;
-        textSize?: number;
-        textColor?: mod.Vector;
-        textAlpha?: number;
     };
 
     export type ButtonParams = Params & {
@@ -116,7 +112,11 @@ export namespace UI {
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
         onClick?: (player: mod.Player) => Promise<void>;
-        label?: LabelParams;
+        text?: MessageDescriptor;
+        textSize?: number;
+        textColor?: mod.Vector;
+        textAlpha?: number;
+        textAnchor?: mod.UIAnchor;
     };
 
     export class Node {
@@ -253,6 +253,32 @@ export namespace UI {
             this.parent.syncChildren();
         }
 
+        public get x(): number {
+            return mod.XComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+        }
+
+        public set x(x: number) {
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, this.y, 0));
+        }
+
+        public setX(x: number): this {
+            this.x = x;
+            return this;
+        }
+
+        public get y(): number {
+            return mod.YComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+        }
+
+        public set y(y: number) {
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(this.x, y, 0));
+        }
+
+        public setY(y: number): this {
+            this.y = y;
+            return this;
+        }
+
         public get position(): Position {
             const position = mod.GetUIWidgetPosition(this._uiWidget);
             return { x: mod.XComponentOf(position), y: mod.YComponentOf(position) };
@@ -264,6 +290,32 @@ export namespace UI {
 
         public setPosition(params: Position): this {
             this.position = params;
+            return this;
+        }
+
+        public get width(): number {
+            return mod.XComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+        }
+
+        public set width(width: number) {
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, this.height, 0));
+        }
+
+        public setWidth(width: number): this {
+            this.width = width;
+            return this;
+        }
+
+        public get height(): number {
+            return mod.YComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+        }
+
+        public set height(height: number) {
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, height, 0));
+        }
+
+        public setHeight(height: number): this {
+            this.height = height;
             return this;
         }
 
@@ -360,6 +412,14 @@ export namespace UI {
         }
     }
 
+    function getPositionVector(params: Params): mod.Vector {
+        return mod.CreateVector(params.x ?? params.position?.x ?? 0, params.y ?? params.position?.y ?? 0, 0);
+    }
+
+    function getSizeVector(params: Params): mod.Vector {
+        return mod.CreateVector(params.width ?? params.size?.width ?? 0, params.height ?? params.size?.height ?? 0, 0);
+    }
+
     export class Container extends Element implements Parent {
         private _children: Element[] = [];
 
@@ -385,8 +445,8 @@ export namespace UI {
                 mod.UIDepth,
             ] = [
                 name,
-                mod.CreateVector(params.x ?? 0, params.y ?? 0, 0),
-                mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
+                getPositionVector(params),
+                getSizeVector(params),
                 params.anchor ?? mod.UIAnchor.Center,
                 parent.uiWidget,
                 params.visible ?? true,
@@ -465,8 +525,8 @@ export namespace UI {
                 mod.UIDepth,
             ] = [
                 name,
-                mod.CreateVector(params.x ?? 0, params.y ?? 0, 0),
-                mod.CreateVector(params.width ?? 0, params.height ?? 0, 0),
+                getPositionVector(params),
+                getSizeVector(params),
                 params.anchor ?? mod.UIAnchor.Center,
                 parent.uiWidget,
                 params.visible ?? true,
@@ -474,7 +534,7 @@ export namespace UI {
                 params.bgColor ?? COLORS.WHITE,
                 params.bgAlpha ?? 0,
                 params.bgFill ?? mod.UIBgFill.None,
-                createMessage(params.message),
+                createMessage(params.text),
                 params.textSize ?? 36,
                 params.textColor ?? COLORS.BLACK,
                 params.textAlpha ?? 1,
@@ -492,20 +552,59 @@ export namespace UI {
 
             super(uiWidget, name, parent);
 
-            this._messageDescriptor = params.message;
+            this._messageDescriptor = params.text;
         }
 
-        public get messageDescriptor(): MessageDescriptor {
+        public get text(): MessageDescriptor {
             return this._messageDescriptor;
         }
 
-        public set message(message: MessageDescriptor) {
-            this._messageDescriptor = message;
-            mod.SetUITextLabel(this._uiWidget, createMessage(message));
+        public set text(text: MessageDescriptor) {
+            this._messageDescriptor = text;
+            mod.SetUITextLabel(this._uiWidget, createMessage(text));
         }
 
-        public setMessage(message: MessageDescriptor): this {
-            this.message = message;
+        public setText(text: MessageDescriptor): this {
+            this.text = text;
+            return this;
+        }
+
+        public get textAlpha(): number {
+            return mod.GetUITextAlpha(this._uiWidget);
+        }
+
+        public set textAlpha(alpha: number) {
+            mod.SetUITextAlpha(this._uiWidget, alpha);
+        }
+
+        public setTextAlpha(alpha: number): this {
+            this.textAlpha = alpha;
+            return this;
+        }
+
+        public get textAnchor(): mod.UIAnchor {
+            return mod.GetUITextAnchor(this._uiWidget);
+        }
+
+        public set textAnchor(anchor: mod.UIAnchor) {
+            mod.SetUITextAnchor(this._uiWidget, anchor);
+        }
+
+        public setTextAnchor(anchor: mod.UIAnchor): this {
+            this.textAnchor = anchor;
+            return this;
+        }
+
+        public get textSize(): number {
+            return mod.GetUITextSize(this._uiWidget);
+        }
+
+        public set textSize(size: number) {
+            mod.SetUITextSize(this._uiWidget, size);
+        }
+
+        public setTextSize(size: number): this {
+            this.textSize = size;
             return this;
         }
     }
@@ -520,20 +619,13 @@ export namespace UI {
         public constructor(params: ButtonParams, receiver?: mod.Player | mod.Team) {
             const parent = params.parent ?? ROOT_NODE;
 
-            const containerParams: ContainerParams = {
-                x: params.x,
-                y: params.y,
-                width: params.width,
-                height: params.height,
-                anchor: params.anchor,
+            const containerParams: ContainerParams = Object.assign({}, params, {
                 parent,
-                visible: params.visible,
                 padding: 0,
-                bgColor: COLORS.BF_GREY_4,
+                bgColor: COLORS.WHITE,
                 bgAlpha: 0,
                 bgFill: mod.UIBgFill.None,
-                depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            };
+            });
 
             super(containerParams, receiver);
 
@@ -570,9 +662,14 @@ export namespace UI {
 
             const buttonUiWidget = mod.FindUIWidgetWithName(buttonName) as mod.UIWidget;
 
-            this._label = params.label
+            // TODO: If params.text is undefined, label will never be created, and setting text properties afterward will silently fail.
+            this._label = params.text
                 ? new Text({
-                      ...params.label,
+                      text: params.text,
+                      textSize: params.textSize,
+                      textColor: params.textColor,
+                      textAlpha: params.textAlpha,
+                      textAnchor: params.textAnchor,
                       name: `${this._name}_label`,
                       parent: this,
                       width: params.width,
@@ -748,19 +845,6 @@ export namespace UI {
             return this;
         }
 
-        public get labelMessageDescriptor(): MessageDescriptor | undefined {
-            return this._label?.messageDescriptor;
-        }
-
-        public set labelMessage(message: MessageDescriptor) {
-            this._label?.setMessage(message);
-        }
-
-        public setLabelMessage(message: MessageDescriptor): this {
-            this.labelMessage = message;
-            return this;
-        }
-
         public override set size(params: Size) {
             mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
             mod.SetUIWidgetSize(this._buttonUiWidget, mod.CreateVector(params.width, params.height, 0));
@@ -769,6 +853,58 @@ export namespace UI {
 
         public override setSize(params: Size): this {
             this.size = params;
+            return this;
+        }
+
+        public get text(): MessageDescriptor | undefined {
+            return this._label?.text;
+        }
+
+        public set text(text: MessageDescriptor) {
+            this._label?.setText(text);
+        }
+
+        public setText(text: MessageDescriptor): this {
+            this.text = text;
+            return this;
+        }
+
+        public get textAlpha(): number | undefined {
+            return this._label?.textAlpha;
+        }
+
+        public set textAlpha(alpha: number) {
+            this._label?.setTextAlpha(alpha);
+        }
+
+        public setTextAlpha(alpha: number): this {
+            this.textAlpha = alpha;
+            return this;
+        }
+
+        public get textAnchor(): mod.UIAnchor | undefined {
+            return this._label?.textAnchor;
+        }
+
+        public set textAnchor(anchor: mod.UIAnchor) {
+            this._label?.setTextAnchor(anchor);
+        }
+
+        public setTextAnchor(anchor: mod.UIAnchor): this {
+            this.textAnchor = anchor;
+            return this;
+        }
+
+        public get textSize(): number | undefined {
+            return this._label?.textSize;
+        }
+
+        public set textSize(size: number) {
+            this._label?.setTextSize(size);
+        }
+
+        public setTextSize(size: number): this {
+            this.textSize = size;
             return this;
         }
     }

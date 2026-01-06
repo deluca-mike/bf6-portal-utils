@@ -286,7 +286,7 @@ export class Logger {
             height: this._rowHeight,
             anchor: mod.UIAnchor.CenterLeft,
             parent: row,
-            message: Logger._buildMessage(part),
+            text: Logger._buildMessage(part),
             textSize: this._rowHeight,
             textColor: this._textColor,
             textAnchor: mod.UIAnchor.CenterLeft,
