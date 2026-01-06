@@ -1,3 +1,4 @@
+import { SolidUI } from '../solid-ui/index.ts';
 import { UI } from '../ui/index.ts';
 
 // version: 3.1.0
@@ -280,83 +281,90 @@ export namespace FFASpawning {
 
             if (mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier)) return;
 
-            this._promptUI = new UI.Container(
+            const [promptVisible, setPromptVisible] = SolidUI.createSignal(false);
+
+            this._promptUI = SolidUI.h(
+                UI.Container,
                 {
                     x: 0,
                     y: 0,
                     width: 440,
                     height: 140,
                     anchor: mod.UIAnchor.Center,
-                    visible: false,
+                    visible: promptVisible,
                     bgColor: UI.COLORS.BF_GREY_4,
                     bgAlpha: 0.5,
                     bgFill: mod.UIBgFill.Blur,
-                    childrenParams: [
-                        {
-                            type: UI.Type.Button,
-                            x: 0,
-                            y: 20,
-                            width: 400,
-                            height: 40,
-                            anchor: mod.UIAnchor.TopCenter,
-                            bgColor: UI.COLORS.BF_GREY_2,
-                            baseColor: UI.COLORS.BF_GREY_2,
-                            baseAlpha: 1,
-                            pressedColor: UI.COLORS.BF_GREEN_DARK,
-                            pressedAlpha: 1,
-                            hoverColor: UI.COLORS.BF_GREY_1,
-                            hoverAlpha: 1,
-                            focusedColor: UI.COLORS.BF_GREY_1,
-                            focusedAlpha: 1,
-                            text: { arg0: mod.stringkeys.ffaSpawning.buttons.spawn },
-                            textSize: 30,
-                            textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                            onClick: async (player: mod.Player): Promise<void> => {
-                                this.addToQueue();
-                            },
-                        },
-                        {
-                            type: UI.Type.Button,
-                            x: 0,
-                            y: 80,
-                            width: 400,
-                            height: 40,
-                            anchor: mod.UIAnchor.TopCenter,
-                            bgColor: UI.COLORS.BF_GREY_2,
-                            baseColor: UI.COLORS.BF_GREY_2,
-                            baseAlpha: 1,
-                            pressedColor: UI.COLORS.BF_YELLOW_DARK,
-                            pressedAlpha: 1,
-                            hoverColor: UI.COLORS.BF_GREY_1,
-                            hoverAlpha: 1,
-                            focusedColor: UI.COLORS.BF_GREY_1,
-                            focusedAlpha: 1,
-                            text: { arg0: mod.stringkeys.ffaSpawning.buttons.delay, arg1: Soldier._promptDelay },
-                            textSize: 30,
-                            textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                            onClick: async (player: mod.Player): Promise<void> => {
-                                this.startDelayForPrompt(Soldier._promptDelay);
-                            },
-                        },
-                    ],
                 },
                 player
             );
 
-            this._countdownUI = new UI.Text(
-                {
+            SolidUI.h(UI.Button, {
+                parent: this._promptUI,
+                x: 0,
+                y: 20,
+                width: 400,
+                height: 40,
+                anchor: mod.UIAnchor.TopCenter,
+                bgColor: UI.COLORS.BF_GREY_2,
+                baseColor: UI.COLORS.BF_GREY_2,
+                baseAlpha: 1,
+                pressedColor: UI.COLORS.BF_GREEN_DARK,
+                pressedAlpha: 1,
+                hoverColor: UI.COLORS.BF_GREY_1,
+                hoverAlpha: 1,
+                focusedColor: UI.COLORS.BF_GREY_1,
+                focusedAlpha: 1,
+                text: { arg0: mod.stringkeys.ffaSpawning.buttons.spawn },
+                textSize: 30,
+                textColor: UI.COLORS.BF_GREEN_BRIGHT,
+                onClick: async (player: mod.Player): Promise<void> => {
+                    this.addToQueue();
+                },
+            });
+
+            SolidUI.h(UI.Button, {
+                parent: this._promptUI,
+                x: 0,
+                y: 80,
+                width: 400,
+                height: 40,
+                anchor: mod.UIAnchor.TopCenter,
+                bgColor: UI.COLORS.BF_GREY_2,
+                baseColor: UI.COLORS.BF_GREY_2,
+                baseAlpha: 1,
+                pressedColor: UI.COLORS.BF_YELLOW_DARK,
+                pressedAlpha: 1,
+                hoverColor: UI.COLORS.BF_GREY_1,
+                hoverAlpha: 1,
+                focusedColor: UI.COLORS.BF_GREY_1,
+                focusedAlpha: 1,
+                text: { arg0: mod.stringkeys.ffaSpawning.buttons.delay, arg1: Soldier._promptDelay },
+                textSize: 30,
+                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
+                onClick: async (player: mod.Player): Promise<void> => {
+                    this.startDelayForPrompt(Soldier._promptDelay);
+                },
+            });
+
+            const [delayCountdownVisible, setDelayCountdownVisible] = SolidUI.createSignal(false);
+            const [delayCountdown, setDelayCountdown] = SolidUI.createSignal(this._delayCountdown);
+
+            this._countdownUI = SolidUI.h(UI.Text, {
                     x: 0,
                     y: 60,
                     width: 400,
                     height: 50,
                     anchor: mod.UIAnchor.TopCenter,
-                    text: { arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown },
+                    text: () => {
+                        return { arg0: mod.stringkeys.ffaSpawning.countdown, arg1: delayCountdown() }
+                    },
                     textSize: 30,
                     textColor: UI.COLORS.BF_GREEN_BRIGHT,
                     bgColor: UI.COLORS.BF_GREY_4,
                     bgAlpha: 0.5,
                     bgFill: mod.UIBgFill.Solid,
-                    visible: false,
+                    visible: delayCountdownVisible,
                 },
                 player
             );
@@ -389,7 +397,7 @@ export namespace FFASpawning {
 
             if (mod.GetSoldierState(this._player, mod.SoldierStateBool.IsAISoldier)) return this.addToQueue();
 
-            this._countdownUI?.show();
+            // this._countdownUI?.show();
             this._promptUI?.hide();
             mod.EnableUIInputMode(false, this._player);
 
@@ -400,7 +408,7 @@ export namespace FFASpawning {
         private handleDelayCountdown(): void {
             if (this.deleteIfNotValid()) return;
 
-            this._countdownUI?.setText({ arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown-- });
+            // this._countdownUI?.setText({ arg0: mod.stringkeys.ffaSpawning.countdown, arg1: this._delayCountdown-- });
 
             if (this._delayCountdown < 0) return this.showPrompt();
 
@@ -408,7 +416,7 @@ export namespace FFASpawning {
         }
 
         private showPrompt(): void {
-            this._countdownUI?.hide();
+            // this._countdownUI?.hide();
             mod.EnableUIInputMode(true, this._player);
             this._promptUI?.show();
         }
@@ -421,7 +429,7 @@ export namespace FFASpawning {
                 `P_${this._playerId} added to queue (${Soldier._spawnQueue.length} total).`
             );
 
-            this._countdownUI?.hide();
+            // this._countdownUI?.hide();
             this._promptUI?.hide();
             mod.EnableUIInputMode(false, this._player);
 

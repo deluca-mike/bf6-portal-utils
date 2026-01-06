@@ -595,6 +595,19 @@ export namespace UI {
             return this;
         }
 
+        public get textColor(): mod.Vector {
+            return mod.GetUITextColor(this._uiWidget);
+        }
+
+        public set textColor(color: mod.Vector) {
+            mod.SetUITextColor(this._uiWidget, color);
+        }
+
+        public setTextColor(color: mod.Vector): this {
+            this.textColor = color;
+            return this;
+        }
+
         public get textSize(): number {
             return mod.GetUITextSize(this._uiWidget);
         }
