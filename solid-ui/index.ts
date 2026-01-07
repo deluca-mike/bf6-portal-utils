@@ -187,7 +187,7 @@ export namespace SolidUI {
         const subscriptions = new Set<Subscriber>();
         let value = initialValue;
 
-        const read = (): T => {
+        const read: Accessor<T> = (): T => {
             const observer = context[context.length - 1];
 
             if (observer) {
@@ -197,7 +197,7 @@ export namespace SolidUI {
             return value;
         };
 
-        const write = (newValue: T | ((prev: T) => T)): void => {
+        const write: Setter<T> = (newValue: T | ((prev: T) => T)): void => {
             const nextValue = typeof newValue === 'function' ? (newValue as (prev: T) => T)(value) : newValue;
 
             if (isEqual(value, nextValue)) return; // Don't trigger if value didn't change.
@@ -460,7 +460,7 @@ export namespace SolidUI {
         try {
             // We cast instance to a generic record to allow assignment. "Trust me, bro."
             (instance as unknown as Record<keyof T, unknown>)[key] = value;
-        } catch (e) {
+        } catch {
             /* ignore read-only */
         }
     }

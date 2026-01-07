@@ -157,9 +157,10 @@ export class Logger {
         return new Promise((resolve) => {
             try {
                 this.log(text, rowIndex);
-            } catch (error) {
+            } catch {
                 // Swallow errors to prevent unhandled promise rejections when the promise is not awaited.
             }
+
             resolve();
         });
     }
