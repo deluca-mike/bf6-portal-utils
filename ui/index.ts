@@ -41,22 +41,6 @@ export namespace UI {
         arg3?: string | number | mod.Player;
     };
 
-    export function isMessageDescriptorEqual(a: MessageDescriptor, b: MessageDescriptor): boolean {
-        if (!isMessageDescriptorArgEqual(a.arg0, b.arg0)) return false;
-        if (!isMessageDescriptorArgEqual(a.arg1, b.arg1)) return false;
-        if (!isMessageDescriptorArgEqual(a.arg2, b.arg2)) return false;
-        if (!isMessageDescriptorArgEqual(a.arg3, b.arg3)) return false;
-        return true;
-    }
-
-    function isMessageDescriptorArgEqual(a?: string | number | mod.Player, b?: string | number | mod.Player): boolean {
-        if (a === b) return true;
-
-        if (typeof a === 'object' && typeof b === 'object') return mod.GetObjId(a) === mod.GetObjId(b);
-
-        return false;
-    }
-
     function createMessage(descriptor: MessageDescriptor): mod.Message {
         const { arg0, arg1, arg2, arg3 } = descriptor;
 
