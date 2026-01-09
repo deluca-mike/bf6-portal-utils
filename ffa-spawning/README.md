@@ -9,7 +9,8 @@ The spawning system uses an intelligent algorithm to find safe spawn points that
 players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times.
 
 > **Note** The `FFASpawning` namespace depends on the `UI` namespace (which is also maintained in this repository) and
-> the `mod` namespace (available in the `bf6-portal-mod-types` package).
+> the `mod` namespace (available in the `bf6-portal-mod-types` package). Internally, it uses `Timers` for cancellable
+> interval management and `SolidUI` (a SolidJS variant for BF6 Portal) for reactive UI components.
 
 ---
 
