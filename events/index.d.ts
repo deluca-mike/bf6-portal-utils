@@ -61,7 +61,7 @@ export declare namespace Events {
         OnSpawnerSpawned = 58,
         OnTimeLimitReached = 59,
         OnVehicleDestroyed = 60,
-        OnVehicleSpawned = 61
+        OnVehicleSpawned = 61,
     }
     type Signature = {
         OngoingGlobal: () => void;
@@ -99,10 +99,25 @@ export declare namespace Events {
         OnMCOMArmed: (mcom: mod.MCOM) => void;
         OnMCOMDefused: (mcom: mod.MCOM) => void;
         OnMCOMDestroyed: (mcom: mod.MCOM) => void;
-        OnPlayerDamaged: (player: mod.Player, otherPlayer: mod.Player, damageType: mod.DamageType, weaponUnlock: mod.WeaponUnlock) => void;
+        OnPlayerDamaged: (
+            player: mod.Player,
+            otherPlayer: mod.Player,
+            damageType: mod.DamageType,
+            weaponUnlock: mod.WeaponUnlock
+        ) => void;
         OnPlayerDeployed: (player: mod.Player) => void;
-        OnPlayerDied: (player: mod.Player, otherPlayer: mod.Player, deathType: mod.DeathType, weaponUnlock: mod.WeaponUnlock) => void;
-        OnPlayerEarnedKill: (player: mod.Player, otherPlayer: mod.Player, deathType: mod.DeathType, weaponUnlock: mod.WeaponUnlock) => void;
+        OnPlayerDied: (
+            player: mod.Player,
+            otherPlayer: mod.Player,
+            deathType: mod.DeathType,
+            weaponUnlock: mod.WeaponUnlock
+        ) => void;
+        OnPlayerEarnedKill: (
+            player: mod.Player,
+            otherPlayer: mod.Player,
+            deathType: mod.DeathType,
+            weaponUnlock: mod.WeaponUnlock
+        ) => void;
         OnPlayerEarnedKillAssist: (player: mod.Player, otherPlayer: mod.Player) => void;
         OnPlayerEnterAreaTrigger: (player: mod.Player, areaTrigger: mod.AreaTrigger) => void;
         OnPlayerEnterCapturePoint: (player: mod.Player, capturePoint: mod.CapturePoint) => void;
@@ -131,8 +146,14 @@ export declare namespace Events {
         [K in keyof typeof Type]: (typeof Type)[K] extends T ? K : never;
     }[keyof typeof Type];
     type Parameters<T> = T extends (...args: infer P) => void ? P : never;
-    type HandlerForType<T extends Type> = EventTypeName<T> extends keyof Signature ? Signature[EventTypeName<T>] extends (...args: infer P) => void ? (...args: P) => void | Promise<void> : never : never;
-    type EventParameters<T extends Type> = EventTypeName<T> extends keyof Signature ? Parameters<Signature[EventTypeName<T>]> : never;
+    type HandlerForType<T extends Type> =
+        EventTypeName<T> extends keyof Signature
+            ? Signature[EventTypeName<T>] extends (...args: infer P) => void
+                ? (...args: P) => void | Promise<void>
+                : never
+            : never;
+    type EventParameters<T extends Type> =
+        EventTypeName<T> extends keyof Signature ? Parameters<Signature[EventTypeName<T>]> : never;
     export function subscribe<T extends Type>(type: T, handler: HandlerForType<T>): void;
     export function unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void;
     export function trigger<T extends Type>(type: T, ...args: EventParameters<T>): void;
@@ -173,10 +194,25 @@ export declare function OnMandown(player: mod.Player, otherPlayer: mod.Player): 
 export declare function OnMCOMArmed(mcom: mod.MCOM): void;
 export declare function OnMCOMDefused(mcom: mod.MCOM): void;
 export declare function OnMCOMDestroyed(mcom: mod.MCOM): void;
-export declare function OnPlayerDamaged(player: mod.Player, otherPlayer: mod.Player, damageType: mod.DamageType, weaponUnlock: mod.WeaponUnlock): void;
+export declare function OnPlayerDamaged(
+    player: mod.Player,
+    otherPlayer: mod.Player,
+    damageType: mod.DamageType,
+    weaponUnlock: mod.WeaponUnlock
+): void;
 export declare function OnPlayerDeployed(player: mod.Player): void;
-export declare function OnPlayerDied(player: mod.Player, otherPlayer: mod.Player, deathType: mod.DeathType, weaponUnlock: mod.WeaponUnlock): void;
-export declare function OnPlayerEarnedKill(player: mod.Player, otherPlayer: mod.Player, deathType: mod.DeathType, weaponUnlock: mod.WeaponUnlock): void;
+export declare function OnPlayerDied(
+    player: mod.Player,
+    otherPlayer: mod.Player,
+    deathType: mod.DeathType,
+    weaponUnlock: mod.WeaponUnlock
+): void;
+export declare function OnPlayerEarnedKill(
+    player: mod.Player,
+    otherPlayer: mod.Player,
+    deathType: mod.DeathType,
+    weaponUnlock: mod.WeaponUnlock
+): void;
 export declare function OnPlayerEarnedKillAssist(player: mod.Player, otherPlayer: mod.Player): void;
 export declare function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void;
 export declare function OnPlayerEnterCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void;
@@ -190,7 +226,11 @@ export declare function OnPlayerInteract(player: mod.Player, interactPoint: mod.
 export declare function OnPlayerJoinGame(player: mod.Player): void;
 export declare function OnPlayerLeaveGame(number: number): void;
 export declare function OnPlayerSwitchTeam(player: mod.Player, team: mod.Team): void;
-export declare function OnPlayerUIButtonEvent(player: mod.Player, uiWidget: mod.UIWidget, uiButtonEvent: mod.UIButtonEvent): void;
+export declare function OnPlayerUIButtonEvent(
+    player: mod.Player,
+    uiWidget: mod.UIWidget,
+    uiButtonEvent: mod.UIButtonEvent
+): void;
 export declare function OnPlayerUndeploy(player: mod.Player): void;
 export declare function OnRayCastHit(player: mod.Player, point: mod.Vector, normal: mod.Vector): void;
 export declare function OnRayCastMissed(player: mod.Player): void;

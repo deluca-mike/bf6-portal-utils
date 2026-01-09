@@ -1,6 +1,3 @@
-// TODO: auto-rename when changing parents to keep name consistency.
-// TODO: UI Input Mode getter and setter for whole server, team, and player.
-
 // version: 4.0.0
 export namespace UI {
     /****** Types ******/

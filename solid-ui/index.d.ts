@@ -14,7 +14,10 @@ export declare namespace SolidUI {
      */
     export type Setter<T> = (newValue: T | ((prev: T) => T)) => void;
     type Constructable<Params, Instance> = new (params: Params, receiver?: mod.Player | mod.Team) => Instance;
-    type FunctionalComponent<Params, Instance> = (props: Reactive<Params>, receiver?: mod.Player | mod.Team) => Instance;
+    type FunctionalComponent<Params, Instance> = (
+        props: Reactive<Params>,
+        receiver?: mod.Player | mod.Team
+    ) => Instance;
     type Reactive<T> = {
         [K in keyof T]?: T[K] | Accessor<T[K]>;
     };
@@ -151,7 +154,11 @@ export declare namespace SolidUI {
      *
      * @returns The created UI Instance.
      */
-    export function h<P extends object, T>(component: Constructable<P, T> | FunctionalComponent<P, T>, props?: Reactive<P>, receiver?: mod.Player | mod.Team): T;
+    export function h<P extends object, T>(
+        component: Constructable<P, T> | FunctionalComponent<P, T>,
+        props?: Reactive<P>,
+        receiver?: mod.Player | mod.Team
+    ): T;
     /**
      * A generic List Renderer optimized for Game UI.
      * Different from `array.map()` in that `Index` renders components based on their array position, not their value.

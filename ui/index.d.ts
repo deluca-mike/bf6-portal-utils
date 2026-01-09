@@ -18,28 +18,32 @@ export declare namespace UI {
         x: number;
         y: number;
     };
-    type EitherPosition = ({
-        position?: Position;
-    } & {
-        x?: never;
-        y?: never;
-    }) | ({
-        x?: number;
-        y?: number;
-    } & {
-        position?: never;
-    });
-    type EitherSize = ({
-        size?: Size;
-    } & {
-        width?: never;
-        height?: never;
-    }) | ({
-        width?: number;
-        height?: number;
-    } & {
-        size?: never;
-    });
+    type EitherPosition =
+        | ({
+              position?: Position;
+          } & {
+              x?: never;
+              y?: never;
+          })
+        | ({
+              x?: number;
+              y?: number;
+          } & {
+              position?: never;
+          });
+    type EitherSize =
+        | ({
+              size?: Size;
+          } & {
+              width?: never;
+              height?: never;
+          })
+        | ({
+              width?: number;
+              height?: number;
+          } & {
+              size?: never;
+          });
     type ElementParams = BaseParams & EitherPosition & EitherSize;
     export type ChildParams<T> = T & {
         type: new (params: T, receiver?: mod.Player | mod.Team) => Element;
@@ -222,7 +226,10 @@ export declare namespace UI {
      * @template TContent - The type of the content element (Text, Image, etc.)
      * @template TContentProps - Array of property names to delegate from the content element
      */
-    abstract class BaseButtonWithContent<TContent extends Element, TContentProps extends readonly string[]> extends Element {
+    abstract class BaseButtonWithContent<
+        TContent extends Element,
+        TContentProps extends readonly string[],
+    > extends Element {
         protected _button: Button;
         protected _content: TContent;
         alphaBase: number;
@@ -249,12 +256,17 @@ export declare namespace UI {
         setColorPressed: (color: mod.Vector) => this;
         setEnabled: (enabled: boolean) => this;
         setOnClick: (onClick: ((player: mod.Player) => Promise<void>) | undefined) => this;
-        protected constructor(params: ButtonParams, receiver: mod.Player | mod.Team | undefined, createContent: (container: Container, params: ButtonParams) => TContent, contentProperties: TContentProps);
+        protected constructor(
+            params: ButtonParams,
+            receiver: mod.Player | mod.Team | undefined,
+            createContent: (container: Container, params: ButtonParams) => TContent,
+            contentProperties: TContentProps
+        );
         delete(): void;
         set size(params: Size);
         setSize(params: Size): this;
     }
-    const TEXT_BUTTON_CONTENT_PROPERTIES: readonly ["message", "textAlpha", "textAnchor", "textSize"];
+    const TEXT_BUTTON_CONTENT_PROPERTIES: readonly ['message', 'textAlpha', 'textAnchor', 'textSize'];
     export class TextButton extends BaseButtonWithContent<Text, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
         message: mod.Message;
         textAlpha: number;

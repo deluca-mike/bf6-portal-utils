@@ -2,7 +2,7 @@ export declare namespace FFASpawning {
     enum LogLevel {
         Debug = 0,
         Info = 1,
-        Error = 2
+        Error = 2,
     }
     type SpawnData = [x: number, y: number, z: number, orientation: number];
     type Spawn = {

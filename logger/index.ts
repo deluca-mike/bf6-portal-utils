@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 2.1.2
+// version: 3.0.0
 export class Logger {
     private static readonly _PADDING: number = 10;
 

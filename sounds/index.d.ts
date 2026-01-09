@@ -17,7 +17,11 @@ export declare class Sounds {
     private static _play2DSoundForSquad;
     private static _play2DSoundForTeam;
     static play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): Sounds.PlayedSound;
-    static play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): Sounds.PlayedSound;
+    static play3D(
+        sfxAsset: mod.RuntimeSpawn_Common,
+        position: mod.Vector,
+        params?: Sounds.Params3D
+    ): Sounds.PlayedSound;
     static setLogging(log?: (text: string) => void, logLevel?: Sounds.LogLevel): void;
     static preload(sfxAsset: mod.RuntimeSpawn_Common): void;
     static get objectCount(): number;
@@ -46,6 +50,6 @@ export declare namespace Sounds {
     enum LogLevel {
         Debug = 0,
         Info = 1,
-        Error = 2
+        Error = 2,
     }
 }
