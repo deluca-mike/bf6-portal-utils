@@ -9,7 +9,8 @@
     "scripts": {
         "prettier": "prettier --write ./**/*.ts ./*.mjs ./*.md ./*.json ./**/*.md ./**/*.json",
         "lint": "eslint .",
-        "lint:fix": "eslint . --fix"
+        "lint:fix": "eslint . --fix",
+        "build:types": "tsc --project tsconfig.build.json"
     },
     "repository": {
         "type": "git",
