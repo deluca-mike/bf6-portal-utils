@@ -2,13 +2,15 @@ export declare namespace UI {
     /****** Types ******/
     type BaseParams = {
         anchor?: mod.UIAnchor;
-        parent?: Root | Container;
+        parent?: Parent;
         visible?: boolean;
         padding?: number;
         bgColor?: mod.Vector;
         bgAlpha?: number;
         bgFill?: mod.UIBgFill;
         depth?: mod.UIDepth;
+        receiver?: mod.Player | mod.Team;
+        uiInputModeWhenVisible?: boolean;
     };
     export type Size = {
         width: number;
@@ -45,7 +47,24 @@ export declare namespace UI {
               size?: never;
           });
     type ElementParams = BaseParams & EitherPosition & EitherSize;
-    export type ChildParams<T> = T & {
+    type FinalElementParams = {
+        name: string;
+        anchor: mod.UIAnchor;
+        parent: Parent;
+        visible: boolean;
+        padding: number;
+        bgColor: mod.Vector;
+        bgAlpha: number;
+        bgFill: mod.UIBgFill;
+        depth: mod.UIDepth;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        uiInputModeWhenVisible: boolean;
+    };
+    export type ChildParams<T extends ElementParams> = T & {
         type: new (params: T, receiver?: mod.Player | mod.Team) => Element;
     };
     export type ContainerParams = ElementParams & {
@@ -81,17 +100,47 @@ export declare namespace UI {
     };
     /****** Interfaces ******/
     export interface Parent {
+        name: string;
+        uiWidget: mod.UIWidget;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
         children: Element[];
         attachChild(child: Element): void;
         detachChild(child: Element): void;
     }
     /****** Classes ******/
-    export class Node {
+    abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
+        protected _id: string;
+        protected _nativeReceiver: T;
+        protected _inputModeRequesters: Set<Element>;
+        protected constructor(id: string, receiver: T);
+        get id(): string;
+        get nativeReceiver(): T;
+        get isInputModeRequested(): boolean;
+        addInputModeRequester(element: Element): void;
+        removeInputModeRequester(element: Element): void;
+    }
+    class GlobalReceiver extends Receiver<undefined> {
+        static readonly instance: GlobalReceiver;
+        private constructor();
+    }
+    class TeamReceiver extends Receiver<mod.Team> {
+        private static _instances;
+        private constructor();
+        static getInstance(receiver: mod.Team): TeamReceiver;
+    }
+    class PlayerReceiver extends Receiver<mod.Player> {
+        private static _instances;
+        private constructor();
+        static getInstance(receiver: mod.Player): PlayerReceiver;
+    }
+    export abstract class Node {
         protected _name: string;
         protected _uiWidget: mod.UIWidget;
-        constructor(name: string, uiWidget: mod.UIWidget);
-        get uiWidget(): mod.UIWidget;
+        protected _receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        constructor(name: string, uiWidget: mod.UIWidget, receiver: GlobalReceiver | TeamReceiver | PlayerReceiver);
         get name(): string;
+        get uiWidget(): mod.UIWidget;
+        get receiver(): GlobalReceiver | TeamReceiver | PlayerReceiver;
     }
     export class Root extends Node implements Parent {
         static readonly instance: Root;
@@ -101,14 +150,24 @@ export declare namespace UI {
         attachChild(child: Element): this;
         detachChild(child: Element): this;
     }
-    export class Element extends Node {
-        protected _parent: Root | Container;
-        protected _receiver?: mod.Player | mod.Team;
-        constructor(name: string, parent: Root | Container, receiver?: mod.Player | mod.Team);
-        get parent(): Root | Container;
-        set parent(parent: Root | Container);
-        setParent(parent: Root | Container): this;
-        get receiver(): mod.Player | mod.Team | undefined;
+    export abstract class Element extends Node {
+        protected _parent: Parent;
+        protected _visible: boolean;
+        protected _x: number;
+        protected _y: number;
+        protected _width: number;
+        protected _height: number;
+        protected _bgColor: mod.Vector;
+        protected _bgAlpha: number;
+        protected _bgFill: mod.UIBgFill;
+        protected _depth: mod.UIDepth;
+        protected _anchor: mod.UIAnchor;
+        protected _padding: number;
+        protected _uiInputModeWhenVisible: boolean;
+        constructor(params: FinalElementParams);
+        get parent(): Parent;
+        set parent(parent: Parent);
+        setParent(parent: Parent): this;
         get visible(): boolean;
         set visible(visible: boolean);
         setVisible(visible: boolean): this;
@@ -152,10 +211,13 @@ export declare namespace UI {
         get padding(): number;
         set padding(padding: number);
         setPadding(padding: number): this;
+        get uiInputModeWhenVisible(): boolean;
+        set uiInputModeWhenVisible(newValue: boolean);
+        setUiInputModeWhenVisible(newValue: boolean): this;
     }
     export class Container extends Element implements Parent {
         private _children;
-        constructor(params: ContainerParams, receiver?: mod.Player | mod.Team);
+        constructor(params: ContainerParams);
         get children(): Element[];
         delete(): void;
         attachChild(child: Element): this;
@@ -163,7 +225,11 @@ export declare namespace UI {
     }
     export class Text extends Element {
         private _message;
-        constructor(params: TextParams, receiver?: mod.Player | mod.Team);
+        private _textSize;
+        private _textColor;
+        private _textAlpha;
+        private _textAnchor;
+        constructor(params: TextParams);
         get message(): mod.Message;
         set message(message: mod.Message);
         setMessage(message: mod.Message): this;
@@ -181,41 +247,53 @@ export declare namespace UI {
         setTextSize(size: number): this;
     }
     export class Button extends Element {
-        constructor(params: ButtonParams, receiver?: mod.Player | mod.Team);
+        private _buttonEnabled;
+        private _baseColor;
+        private _baseAlpha;
+        private _disabledColor;
+        private _disabledAlpha;
+        private _pressedColor;
+        private _pressedAlpha;
+        private _hoverColor;
+        private _hoverAlpha;
+        private _focusedColor;
+        private _focusedAlpha;
+        private _onClick;
+        constructor(params: ButtonParams);
         delete(): void;
-        get alphaBase(): number;
-        set alphaBase(alpha: number);
-        setAlphaBase(alpha: number): this;
-        get alphaDisabled(): number;
-        set alphaDisabled(alpha: number);
-        setAlphaDisabled(alpha: number): this;
-        get alphaFocused(): number;
-        set alphaFocused(alpha: number);
-        setAlphaFocused(alpha: number): this;
-        get alphaHover(): number;
-        set alphaHover(alpha: number);
-        setAlphaHover(alpha: number): this;
-        get alphaPressed(): number;
-        set alphaPressed(alpha: number);
-        setAlphaPressed(alpha: number): this;
-        get colorBase(): mod.Vector;
-        set colorBase(color: mod.Vector);
-        setColorBase(color: mod.Vector): this;
-        get colorDisabled(): mod.Vector;
-        set colorDisabled(color: mod.Vector);
-        setColorDisabled(color: mod.Vector): this;
-        get colorFocused(): mod.Vector;
-        set colorFocused(color: mod.Vector);
-        setColorFocused(color: mod.Vector): this;
-        get colorHover(): mod.Vector;
-        set colorHover(color: mod.Vector);
-        setColorHover(color: mod.Vector): this;
-        get colorPressed(): mod.Vector;
-        set colorPressed(color: mod.Vector);
-        setColorPressed(color: mod.Vector): this;
         get enabled(): boolean;
         set enabled(enabled: boolean);
         setEnabled(enabled: boolean): this;
+        get baseColor(): mod.Vector;
+        set baseColor(color: mod.Vector);
+        setBaseColor(color: mod.Vector): this;
+        get baseAlpha(): number;
+        set baseAlpha(alpha: number);
+        setBaseAlpha(alpha: number): this;
+        get disabledColor(): mod.Vector;
+        set disabledColor(color: mod.Vector);
+        setDisabledColor(color: mod.Vector): this;
+        get disabledAlpha(): number;
+        set disabledAlpha(alpha: number);
+        setDisabledAlpha(alpha: number): this;
+        get pressedColor(): mod.Vector;
+        set pressedColor(color: mod.Vector);
+        setColorPressed(color: mod.Vector): this;
+        get pressedAlpha(): number;
+        set pressedAlpha(alpha: number);
+        setPressedAlpha(alpha: number): this;
+        get hoverColor(): mod.Vector;
+        set hoverColor(color: mod.Vector);
+        setHoverColor(color: mod.Vector): this;
+        get hoverAlpha(): number;
+        set hoverAlpha(alpha: number);
+        setHoverAlpha(alpha: number): this;
+        get focusedColor(): mod.Vector;
+        set focusedColor(color: mod.Vector);
+        setFocusedColor(color: mod.Vector): this;
+        get focusedAlpha(): number;
+        set focusedAlpha(alpha: number);
+        setFocusedAlpha(alpha: number): this;
         get onClick(): ((player: mod.Player) => Promise<void>) | undefined;
         set onClick(onClick: ((player: mod.Player) => Promise<void>) | undefined);
         setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): this;
@@ -232,39 +310,39 @@ export declare namespace UI {
     > extends Element {
         protected _button: Button;
         protected _content: TContent;
-        alphaBase: number;
-        alphaDisabled: number;
-        alphaFocused: number;
-        alphaHover: number;
-        alphaPressed: number;
-        colorBase: mod.Vector;
-        colorDisabled: mod.Vector;
-        colorFocused: mod.Vector;
-        colorHover: mod.Vector;
-        colorPressed: mod.Vector;
         enabled: boolean;
+        baseColor: mod.Vector;
+        baseAlpha: number;
+        disabledColor: mod.Vector;
+        disabledAlpha: number;
+        pressedColor: mod.Vector;
+        pressedAlpha: number;
+        hoverColor: mod.Vector;
+        hoverAlpha: number;
+        focusedColor: mod.Vector;
+        focusedAlpha: number;
         onClick: ((player: mod.Player) => Promise<void>) | undefined;
-        setAlphaBase: (alpha: number) => this;
-        setAlphaDisabled: (alpha: number) => this;
-        setAlphaFocused: (alpha: number) => this;
-        setAlphaHover: (alpha: number) => this;
-        setAlphaPressed: (alpha: number) => this;
-        setColorBase: (color: mod.Vector) => this;
-        setColorDisabled: (color: mod.Vector) => this;
-        setColorFocused: (color: mod.Vector) => this;
-        setColorHover: (color: mod.Vector) => this;
-        setColorPressed: (color: mod.Vector) => this;
         setEnabled: (enabled: boolean) => this;
+        setBaseColor: (color: mod.Vector) => this;
+        setBaseAlpha: (alpha: number) => this;
+        setDisabledColor: (color: mod.Vector) => this;
+        setDisabledAlpha: (alpha: number) => this;
+        setPressedColor: (color: mod.Vector) => this;
+        setPressedAlpha: (alpha: number) => this;
+        setHoverColor: (color: mod.Vector) => this;
+        setHoverAlpha: (alpha: number) => this;
+        setFocusedColor: (color: mod.Vector) => this;
+        setFocusedAlpha: (alpha: number) => this;
         setOnClick: (onClick: ((player: mod.Player) => Promise<void>) | undefined) => this;
         protected constructor(
             params: ButtonParams,
-            receiver: mod.Player | mod.Team | undefined,
             createContent: (container: Container, params: ButtonParams) => TContent,
             contentProperties: TContentProps
         );
         delete(): void;
+        set width(width: number);
+        set height(height: number);
         set size(params: Size);
-        setSize(params: Size): this;
     }
     const TEXT_BUTTON_CONTENT_PROPERTIES: readonly ['message', 'textAlpha', 'textAnchor', 'textSize'];
     export class TextButton extends BaseButtonWithContent<Text, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
@@ -276,7 +354,7 @@ export declare namespace UI {
         setTextAlpha: (alpha: number) => this;
         setTextAnchor: (anchor: mod.UIAnchor) => this;
         setTextSize: (size: number) => this;
-        constructor(params: TextButtonParams, receiver?: mod.Player | mod.Team);
+        constructor(params: TextButtonParams);
     }
     /****** Constants ******/
     export const COLORS: {
@@ -306,6 +384,6 @@ export declare namespace UI {
         BF_YELLOW_DARK: mod.Vector;
     };
     export const ROOT_NODE: Root;
-    export function handleButtonClick(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void;
+    export function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void;
     export {};
 }

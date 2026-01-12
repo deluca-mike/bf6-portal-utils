@@ -13,11 +13,8 @@ export declare namespace SolidUI {
      *   - An "updater" function that receives the previous value (e.g., `prev => prev + 1`).
      */
     export type Setter<T> = (newValue: T | ((prev: T) => T)) => void;
-    type Constructable<Params, Instance> = new (params: Params, receiver?: mod.Player | mod.Team) => Instance;
-    type FunctionalComponent<Params, Instance> = (
-        props: Reactive<Params>,
-        receiver?: mod.Player | mod.Team
-    ) => Instance;
+    type Constructable<Params, Instance> = new (params: Params) => Instance;
+    type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instance;
     type Reactive<T> = {
         [K in keyof T]?: T[K] | Accessor<T[K]>;
     };
@@ -150,14 +147,12 @@ export declare namespace SolidUI {
      *
      * @param component - Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component.
      * @param props - An object of properties. Values can be static OR reactive (Signals/Accessors).
-     * @param receiver - (Optional) The specific player or team this UI is for.
      *
      * @returns The created UI Instance.
      */
     export function h<P extends object, T>(
         component: Constructable<P, T> | FunctionalComponent<P, T>,
-        props?: Reactive<P>,
-        receiver?: mod.Player | mod.Team
+        props?: Reactive<P>
     ): T;
     /**
      * A generic List Renderer optimized for Game UI.

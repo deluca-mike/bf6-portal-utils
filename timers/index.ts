@@ -1,4 +1,4 @@
-// version: 1.0.0
+// version: 1.0.1
 export class Timers {
     private static readonly _ACTIVE_IDS = new Set<number>();
 
@@ -10,6 +10,59 @@ export class Timers {
         this._logger?.(`<Timers> ${text}`);
     }
 
+    private static async _executeTimeout(id: number, callback: () => void, ms: number): Promise<void> {
+        await Promise.resolve();
+
+        try {
+            await mod.Wait(ms / 1_000);
+
+            if (!this._ACTIVE_IDS.has(id)) return; // Exit if the timer is no longer active.
+
+            this._ACTIVE_IDS.delete(id); // Cleanup one-time timer.
+
+            callback();
+        } catch (error) {
+            this._log(`Error in setTimeout (ID ${id}): ${error?.toString()}`);
+        }
+    }
+
+    private static async _executeInterval(
+        id: number,
+        callback: () => void,
+        ms: number,
+        immediate: boolean
+    ): Promise<void> {
+        await Promise.resolve();
+
+        try {
+            if (immediate && this._ACTIVE_IDS.has(id)) {
+                try {
+                    callback();
+                } catch (error) {
+                    // Swallow the error here so the loop can still start.
+                    this._log(`Error in setInterval immediate callback (ID ${id}): ${error?.toString()}`);
+                }
+            }
+
+            while (this._ACTIVE_IDS.has(id)) {
+                await mod.Wait(ms / 1_000);
+
+                if (this._ACTIVE_IDS.has(id)) {
+                    try {
+                        callback();
+                    } catch (error) {
+                        // Swallow the error here so the loop can continue.
+                        this._log(`Error in setInterval loop callback (ID ${id}): ${error?.toString()}`);
+                    }
+                }
+            }
+        } catch (error) {
+            // This catches system errors (e.g. mod.Wait failing).
+            this._log(`System error in setInterval (ID ${id}): ${error?.toString()}`);
+            this._ACTIVE_IDS.delete(id);
+        }
+    }
+
     public static setLogging(log: (text: string) => void): void {
         this._logger = log;
     }
@@ -17,69 +70,30 @@ export class Timers {
     /**
      * Schedules a one-time execution after the specified delay.
      * @param callback Function to execute
-     * @param seconds Delay in seconds
+     * @param ms Delay in milliseconds
      * @returns Timer ID
      */
-    public static setTimeout(callback: () => void, seconds: number): number {
+    public static setTimeout(callback: () => void, ms: number): number {
         const id = this._nextId++;
         this._ACTIVE_IDS.add(id);
 
         // Run async without awaiting (fire-and-forget).
-        (async () => {
-            try {
-                await mod.Wait(seconds);
-
-                if (!this._ACTIVE_IDS.has(id)) return; // Exit if the timer is no longer active.
-
-                this._ACTIVE_IDS.delete(id); // Cleanup one-time timer.
-
-                callback();
-            } catch (error) {
-                this._log(`Error in setTimeout (ID ${id}): ${error?.toString()}`);
-            }
-        })();
+        this._executeTimeout(id, callback, ms);
 
         return id;
     }
 
     /**
      * @param callback Function to execute
-     * @param seconds Interval in seconds
+     * @param ms Interval in milliseconds
      * @param immediate If true, runs the callback immediately before the first wait period.
      */
-    public static setInterval(callback: () => void, seconds: number, immediate: boolean = false): number {
+    public static setInterval(callback: () => void, ms: number, immediate: boolean = false): number {
         const id = this._nextId++;
         this._ACTIVE_IDS.add(id);
 
-        (async () => {
-            try {
-                if (immediate && this._ACTIVE_IDS.has(id)) {
-                    try {
-                        callback();
-                    } catch (error) {
-                        // Swallow the error here so the loop can still start.
-                        this._log(`Error in setInterval immediate callback (ID ${id}): ${error?.toString()}`);
-                    }
-                }
-
-                while (this._ACTIVE_IDS.has(id)) {
-                    await mod.Wait(seconds);
-
-                    if (this._ACTIVE_IDS.has(id)) {
-                        try {
-                            callback();
-                        } catch (error) {
-                            // Swallow the error here so the loop can continue.
-                            this._log(`Error in setInterval loop callback (ID ${id}): ${error?.toString()}`);
-                        }
-                    }
-                }
-            } catch (error) {
-                // This catches system errors (e.g. mod.Wait failing).
-                this._log(`System error in setInterval (ID ${id}): ${error?.toString()}`);
-                this._ACTIVE_IDS.delete(id);
-            }
-        })();
+        // Run async without awaiting (fire-and-forget).
+        this._executeInterval(id, callback, ms, immediate);
 
         return id;
     }

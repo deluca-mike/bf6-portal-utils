@@ -1,16 +1,18 @@
-// version: 4.0.0
+// version: 5.0.0
 export namespace UI {
     /****** Types ******/
 
     type BaseParams = {
         anchor?: mod.UIAnchor;
-        parent?: Root | Container;
+        parent?: Parent;
         visible?: boolean;
         padding?: number;
         bgColor?: mod.Vector;
         bgAlpha?: number;
         bgFill?: mod.UIBgFill;
         depth?: mod.UIDepth;
+        receiver?: mod.Player | mod.Team;
+        uiInputModeWhenVisible?: boolean;
     };
 
     export type Size = {
@@ -36,8 +38,26 @@ export namespace UI {
     // Base params type
     type ElementParams = BaseParams & EitherPosition & EitherSize;
 
+    type FinalElementParams = {
+        name: string;
+        anchor: mod.UIAnchor;
+        parent: Parent;
+        visible: boolean;
+        padding: number;
+        bgColor: mod.Vector;
+        bgAlpha: number;
+        bgFill: mod.UIBgFill;
+        depth: mod.UIDepth;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        uiInputModeWhenVisible: boolean;
+    };
+
     // Container children parameters with a 'type' property and the properties required by that element's constructor.
-    export type ChildParams<T> = T & {
+    export type ChildParams<T extends ElementParams> = T & {
         type: new (params: T, receiver?: mod.Player | mod.Team) => Element;
     };
 
@@ -80,6 +100,9 @@ export namespace UI {
     /****** Interfaces ******/
 
     export interface Parent {
+        name: string;
+        uiWidget: mod.UIWidget;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
         children: Element[];
         attachChild(child: Element): void;
         detachChild(child: Element): void;
@@ -87,22 +110,122 @@ export namespace UI {
 
     /****** Classes ******/
 
-    export class Node {
+    abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
+        protected _id: string;
+
+        protected _nativeReceiver: T;
+
+        protected _inputModeRequesters: Set<Element> = new Set();
+
+        protected constructor(id: string, receiver: T) {
+            this._id = id;
+            this._nativeReceiver = receiver;
+        }
+
+        public get id(): string {
+            return this._id;
+        }
+
+        public get nativeReceiver(): T {
+            return this._nativeReceiver;
+        }
+
+        public get isInputModeRequested(): boolean {
+            return this._inputModeRequesters.size > 0;
+        }
+
+        public addInputModeRequester(element: Element): void {
+            const wasAlreadyRequested = this.isInputModeRequested;
+            this._inputModeRequesters.add(element);
+
+            // If input mode was already requested, do nothing (there is obviously at least one requester).
+            if (wasAlreadyRequested) return;
+
+            if (this._nativeReceiver) {
+                mod.EnableUIInputMode(true, this._nativeReceiver);
+            } else {
+                mod.EnableUIInputMode(true);
+            }
+        }
+
+        public removeInputModeRequester(element: Element): void {
+            const wasAlreadyRequested = this.isInputModeRequested;
+            this._inputModeRequesters.delete(element);
+
+            // If input mode was not requested, do nothing (there are obviously still no requesters).
+            if (!wasAlreadyRequested) return;
+
+            // If input mode is still requested, do nothing (there is still at least one requester).
+            if (this.isInputModeRequested) return;
+
+            if (this._nativeReceiver) {
+                mod.EnableUIInputMode(false, this._nativeReceiver);
+            } else {
+                mod.EnableUIInputMode(false);
+            }
+        }
+    }
+
+    class GlobalReceiver extends Receiver<undefined> {
+        public static readonly instance = new GlobalReceiver();
+
+        private constructor() {
+            super('g', undefined);
+        }
+    }
+
+    class TeamReceiver extends Receiver<mod.Team> {
+        private static _instances = new Map<number, TeamReceiver>();
+
+        private constructor(receiver: mod.Team) {
+            const id = mod.GetObjId(receiver);
+            super(`t${id}`, receiver);
+            TeamReceiver._instances.set(id, this);
+        }
+
+        public static getInstance(receiver: mod.Team): TeamReceiver {
+            return TeamReceiver._instances.get(mod.GetObjId(receiver)) ?? new TeamReceiver(receiver);
+        }
+    }
+
+    class PlayerReceiver extends Receiver<mod.Player> {
+        private static _instances = new Map<number, PlayerReceiver>();
+
+        private constructor(receiver: mod.Player) {
+            super(`p${mod.GetObjId(receiver)}`, receiver);
+            PlayerReceiver._instances.set(mod.GetObjId(receiver), this);
+        }
+
+        public static getInstance(receiver: mod.Player): PlayerReceiver {
+            return PlayerReceiver._instances.get(mod.GetObjId(receiver)) ?? new PlayerReceiver(receiver);
+        }
+    }
+
+    export abstract class Node {
         protected _name: string;
-
         protected _uiWidget: mod.UIWidget;
+        protected _receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
 
-        public constructor(name: string, uiWidget: mod.UIWidget) {
+        public constructor(
+            name: string,
+            uiWidget: mod.UIWidget,
+            receiver: GlobalReceiver | TeamReceiver | PlayerReceiver
+        ) {
             this._name = name;
             this._uiWidget = uiWidget;
+            this._receiver = receiver;
+        }
+
+        public get name(): string {
+            return this._name;
         }
 
         public get uiWidget(): mod.UIWidget {
             return this._uiWidget;
         }
 
-        public get name(): string {
-            return this._name;
+        public get receiver(): GlobalReceiver | TeamReceiver | PlayerReceiver {
+            return this._receiver;
         }
     }
 
@@ -112,7 +235,7 @@ export namespace UI {
         private _children: Element[] = [];
 
         private constructor() {
-            super('root', mod.GetUIRoot());
+            super('root', mod.GetUIRoot(), GlobalReceiver.instance);
         }
 
         public get children(): Element[] {
@@ -142,22 +265,44 @@ export namespace UI {
         }
     }
 
-    export class Element extends Node {
-        protected _parent: Root | Container;
+    export abstract class Element extends Node {
+        protected _parent: Parent;
+        protected _visible: boolean;
+        protected _x: number;
+        protected _y: number;
+        protected _width: number;
+        protected _height: number;
+        protected _bgColor: mod.Vector;
+        protected _bgAlpha: number;
+        protected _bgFill: mod.UIBgFill;
+        protected _depth: mod.UIDepth;
+        protected _anchor: mod.UIAnchor;
+        protected _padding: number;
+        protected _uiInputModeWhenVisible: boolean;
 
-        protected _receiver?: mod.Player | mod.Team;
+        public constructor(params: FinalElementParams) {
+            super(params.name, mod.FindUIWidgetWithName(params.name) as mod.UIWidget, params.receiver);
 
-        public constructor(name: string, parent: Root | Container, receiver?: mod.Player | mod.Team) {
-            super(name, mod.FindUIWidgetWithName(name) as mod.UIWidget);
-            this._parent = parent;
-            this._receiver = receiver;
+            this._parent = params.parent;
+            this._visible = params.visible;
+            this._x = params.x;
+            this._y = params.y;
+            this._width = params.width;
+            this._height = params.height;
+            this._bgColor = params.bgColor;
+            this._bgAlpha = params.bgAlpha;
+            this._bgFill = params.bgFill;
+            this._depth = params.depth;
+            this._anchor = params.anchor;
+            this._padding = params.padding;
+            this._uiInputModeWhenVisible = params.uiInputModeWhenVisible;
         }
 
-        public get parent(): Root | Container {
+        public get parent(): Parent {
             return this._parent;
         }
 
-        public set parent(parent: Root | Container) {
+        public set parent(parent: Parent) {
             mod.SetUIWidgetParent(this._uiWidget, parent.uiWidget);
 
             const oldParent = this._parent;
@@ -167,21 +312,25 @@ export namespace UI {
             parent.attachChild(this);
         }
 
-        public setParent(parent: Root | Container): this {
+        public setParent(parent: Parent): this {
             this.parent = parent;
             return this;
         }
 
-        public get receiver(): mod.Player | mod.Team | undefined {
-            return this._receiver;
-        }
-
         public get visible(): boolean {
-            return mod.GetUIWidgetVisible(this._uiWidget);
+            return this._visible;
         }
 
         public set visible(visible: boolean) {
-            mod.SetUIWidgetVisible(this._uiWidget, visible);
+            mod.SetUIWidgetVisible(this._uiWidget, (this._visible = visible));
+
+            if (!this._uiInputModeWhenVisible) return;
+
+            if (visible) {
+                this._receiver.addInputModeRequester(this);
+            } else {
+                this._receiver.removeInputModeRequester(this);
+            }
         }
 
         public setVisible(visible: boolean): this {
@@ -205,15 +354,19 @@ export namespace UI {
         }
 
         public delete(): void {
+            if (this._uiInputModeWhenVisible) {
+                this._receiver.removeInputModeRequester(this);
+            }
+
             mod.DeleteUIWidget(this._uiWidget);
         }
 
         public get x(): number {
-            return mod.XComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+            return this._x;
         }
 
         public set x(x: number) {
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, this.y, 0));
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector((this._x = x), this.y, 0));
         }
 
         public setX(x: number): this {
@@ -222,11 +375,11 @@ export namespace UI {
         }
 
         public get y(): number {
-            return mod.YComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+            return this._y;
         }
 
         public set y(y: number) {
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(this.x, y, 0));
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(this.x, (this._y = y), 0));
         }
 
         public setY(y: number): this {
@@ -235,12 +388,11 @@ export namespace UI {
         }
 
         public get position(): Position {
-            const position = mod.GetUIWidgetPosition(this._uiWidget);
-            return { x: mod.XComponentOf(position), y: mod.YComponentOf(position) };
+            return { x: this._x, y: this._y };
         }
 
         public set position(params: Position) {
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector((this._x = params.x), (this._y = params.y), 0));
         }
 
         public setPosition(params: Position): this {
@@ -249,11 +401,11 @@ export namespace UI {
         }
 
         public get width(): number {
-            return mod.XComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+            return this._width;
         }
 
         public set width(width: number) {
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, this.height, 0));
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector((this._width = width), this.height, 0));
         }
 
         public setWidth(width: number): this {
@@ -262,11 +414,11 @@ export namespace UI {
         }
 
         public get height(): number {
-            return mod.YComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+            return this._height;
         }
 
         public set height(height: number) {
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, height, 0));
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, (this._height = height), 0));
         }
 
         public setHeight(height: number): this {
@@ -275,12 +427,14 @@ export namespace UI {
         }
 
         public get size(): Size {
-            const size = mod.GetUIWidgetSize(this._uiWidget);
-            return { width: mod.XComponentOf(size), height: mod.YComponentOf(size) };
+            return { width: this._width, height: this._height };
         }
 
         public set size(params: Size) {
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
+            mod.SetUIWidgetSize(
+                this._uiWidget,
+                mod.CreateVector((this._width = params.width), (this._height = params.height), 0)
+            );
         }
 
         public setSize(params: Size): this {
@@ -289,11 +443,11 @@ export namespace UI {
         }
 
         public get bgColor(): mod.Vector {
-            return mod.GetUIWidgetBgColor(this._uiWidget);
+            return this._bgColor;
         }
 
         public set bgColor(color: mod.Vector) {
-            mod.SetUIWidgetBgColor(this._uiWidget, color);
+            mod.SetUIWidgetBgColor(this._uiWidget, (this._bgColor = color));
         }
 
         public setBgColor(color: mod.Vector): this {
@@ -302,11 +456,11 @@ export namespace UI {
         }
 
         public get bgAlpha(): number {
-            return mod.GetUIWidgetBgAlpha(this._uiWidget);
+            return this._bgAlpha;
         }
 
         public set bgAlpha(alpha: number) {
-            mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
+            mod.SetUIWidgetBgAlpha(this._uiWidget, (this._bgAlpha = alpha));
         }
 
         public setBgAlpha(alpha: number): this {
@@ -315,11 +469,11 @@ export namespace UI {
         }
 
         public get bgFill(): mod.UIBgFill {
-            return mod.GetUIWidgetBgFill(this._uiWidget);
+            return this._bgFill;
         }
 
         public set bgFill(fill: mod.UIBgFill) {
-            mod.SetUIWidgetBgFill(this._uiWidget, fill);
+            mod.SetUIWidgetBgFill(this._uiWidget, (this._bgFill = fill));
         }
 
         public setBgFill(fill: mod.UIBgFill): this {
@@ -328,11 +482,11 @@ export namespace UI {
         }
 
         public get depth(): mod.UIDepth {
-            return mod.GetUIWidgetDepth(this._uiWidget);
+            return this._depth;
         }
 
         public set depth(depth: mod.UIDepth) {
-            mod.SetUIWidgetDepth(this._uiWidget, depth);
+            mod.SetUIWidgetDepth(this._uiWidget, (this._depth = depth));
         }
 
         public setDepth(depth: mod.UIDepth): this {
@@ -341,11 +495,11 @@ export namespace UI {
         }
 
         public get anchor(): mod.UIAnchor {
-            return mod.GetUIWidgetAnchor(this._uiWidget);
+            return this._anchor;
         }
 
         public set anchor(anchor: mod.UIAnchor) {
-            mod.SetUIWidgetAnchor(this._uiWidget, anchor);
+            mod.SetUIWidgetAnchor(this._uiWidget, (this._anchor = anchor));
         }
 
         public setAnchor(anchor: mod.UIAnchor): this {
@@ -354,15 +508,41 @@ export namespace UI {
         }
 
         public get padding(): number {
-            return mod.GetUIWidgetPadding(this._uiWidget);
+            return this._padding;
         }
 
         public set padding(padding: number) {
-            mod.SetUIWidgetPadding(this._uiWidget, padding);
+            mod.SetUIWidgetPadding(this._uiWidget, (this._padding = padding));
         }
 
         public setPadding(padding: number): this {
             this.padding = padding;
+            return this;
+        }
+
+        public get uiInputModeWhenVisible(): boolean {
+            return this._uiInputModeWhenVisible;
+        }
+
+        public set uiInputModeWhenVisible(newValue: boolean) {
+            const previousValue = this._uiInputModeWhenVisible;
+
+            if (previousValue === newValue) return;
+
+            this._uiInputModeWhenVisible = newValue;
+
+            // If `uiInputModeWhenVisible` is being enabled and the element is visible...
+            if (newValue && this.visible) {
+                // ...add the element as an input mode requester.
+                this._receiver.addInputModeRequester(this);
+            } else {
+                // ...remove the element as an input mode requester.
+                this._receiver.removeInputModeRequester(this);
+            }
+        }
+
+        public setUiInputModeWhenVisible(newValue: boolean): this {
+            this.uiInputModeWhenVisible = newValue;
             return this;
         }
     }
@@ -370,9 +550,29 @@ export namespace UI {
     export class Container extends Element implements Parent {
         private _children: Element[] = [];
 
-        public constructor(params: ContainerParams, receiver?: mod.Player | mod.Team) {
+        public constructor(params: ContainerParams) {
             const parent = params.parent ?? ROOT_NODE;
-            const name = makeName(parent, receiver);
+            const receiver = getReceiver(parent, params.receiver);
+            const { x, y } = getPosition(params);
+            const { width, height } = getSize(params);
+
+            const elementParams: FinalElementParams = {
+                name: makeName(parent, receiver),
+                parent,
+                visible: params.visible ?? true,
+                x,
+                y,
+                width,
+                height,
+                anchor: params.anchor ?? mod.UIAnchor.Center,
+                padding: params.padding ?? 0,
+                bgColor: params.bgColor ?? COLORS.WHITE,
+                bgAlpha: params.bgAlpha ?? 0,
+                bgFill: params.bgFill ?? mod.UIBgFill.None,
+                depth: params.depth ?? mod.UIDepth.AboveGameUI,
+                receiver,
+                uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+            };
 
             const args: [
                 string, // name
@@ -387,26 +587,26 @@ export namespace UI {
                 mod.UIBgFill, // bgFill
                 mod.UIDepth, // depth
             ] = [
-                name,
-                getPositionVector(params),
-                getSizeVector(params),
-                params.anchor ?? mod.UIAnchor.Center,
+                elementParams.name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                elementParams.anchor,
                 parent.uiWidget,
-                params.visible ?? true,
-                params.padding ?? 0,
-                params.bgColor ?? COLORS.WHITE,
-                params.bgAlpha ?? 0,
-                params.bgFill ?? mod.UIBgFill.None,
-                params.depth ?? mod.UIDepth.AboveGameUI,
+                elementParams.visible,
+                elementParams.padding,
+                elementParams.bgColor,
+                elementParams.bgAlpha,
+                elementParams.bgFill,
+                elementParams.depth,
             ];
 
-            if (receiver == undefined) {
+            if (receiver instanceof GlobalReceiver) {
                 mod.AddUIContainer(...args);
             } else {
-                mod.AddUIContainer(...args, receiver);
+                mod.AddUIContainer(...args, receiver.nativeReceiver);
             }
 
-            super(name, parent);
+            super(elementParams);
 
             for (const childParams of params.childrenParams ?? []) {
                 childParams.parent = this;
@@ -422,9 +622,11 @@ export namespace UI {
         }
 
         public override delete(): void {
-            this._children.forEach((child) => child.delete());
+            for (const child of this._children) {
+                child.delete();
+            }
 
-            mod.DeleteUIWidget(this._uiWidget);
+            super.delete();
         }
 
         public attachChild(child: Element): this {
@@ -452,10 +654,40 @@ export namespace UI {
 
     export class Text extends Element {
         private _message: mod.Message;
+        private _textSize: number;
+        private _textColor: mod.Vector;
+        private _textAlpha: number;
+        private _textAnchor: mod.UIAnchor;
 
-        public constructor(params: TextParams, receiver?: mod.Player | mod.Team) {
+        public constructor(params: TextParams) {
             const parent = params.parent ?? ROOT_NODE;
-            const name = makeName(parent, receiver);
+            const receiver = getReceiver(parent, params.receiver);
+            const { x, y } = getPosition(params);
+            const { width, height } = getSize(params);
+
+            const elementParams: FinalElementParams = {
+                name: makeName(parent, receiver),
+                parent,
+                visible: params.visible ?? true,
+                x,
+                y,
+                width,
+                height,
+                anchor: params.anchor ?? mod.UIAnchor.Center,
+                padding: params.padding ?? 0,
+                bgColor: params.bgColor ?? COLORS.WHITE,
+                bgAlpha: params.bgAlpha ?? 0,
+                bgFill: params.bgFill ?? mod.UIBgFill.None,
+                depth: params.depth ?? mod.UIDepth.AboveGameUI,
+                receiver,
+                uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+            };
+
+            const message = params.message;
+            const textSize = params.textSize ?? 36;
+            const textColor = params.textColor ?? COLORS.BLACK;
+            const textAlpha = params.textAlpha ?? 1;
+            const textAnchor = params.textAnchor ?? mod.UIAnchor.Center;
 
             const args: [
                 string, // name
@@ -475,33 +707,37 @@ export namespace UI {
                 mod.UIAnchor, // textAnchor
                 mod.UIDepth, // depth
             ] = [
-                name,
-                getPositionVector(params),
-                getSizeVector(params),
-                params.anchor ?? mod.UIAnchor.Center,
+                elementParams.name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                elementParams.anchor,
                 parent.uiWidget,
-                params.visible ?? true,
-                params.padding ?? 0,
-                params.bgColor ?? COLORS.WHITE,
-                params.bgAlpha ?? 0,
-                params.bgFill ?? mod.UIBgFill.None,
-                params.message,
-                params.textSize ?? 36,
-                params.textColor ?? COLORS.BLACK,
-                params.textAlpha ?? 1,
-                params.textAnchor ?? mod.UIAnchor.Center,
-                params.depth ?? mod.UIDepth.AboveGameUI,
+                elementParams.visible,
+                elementParams.padding,
+                elementParams.bgColor,
+                elementParams.bgAlpha,
+                elementParams.bgFill,
+                message,
+                textSize,
+                textColor,
+                textAlpha,
+                textAnchor,
+                elementParams.depth,
             ];
 
-            if (receiver == undefined) {
+            if (receiver instanceof GlobalReceiver) {
                 mod.AddUIText(...args);
             } else {
-                mod.AddUIText(...args, receiver);
+                mod.AddUIText(...args, receiver.nativeReceiver);
             }
 
-            super(name, parent);
+            super(elementParams);
 
             this._message = params.message;
+            this._textSize = textSize;
+            this._textColor = textColor;
+            this._textAlpha = textAlpha;
+            this._textAnchor = textAnchor;
         }
 
         public get message(): mod.Message {
@@ -518,11 +754,11 @@ export namespace UI {
         }
 
         public get textAlpha(): number {
-            return mod.GetUITextAlpha(this._uiWidget);
+            return this._textAlpha;
         }
 
         public set textAlpha(alpha: number) {
-            mod.SetUITextAlpha(this._uiWidget, alpha);
+            mod.SetUITextAlpha(this._uiWidget, (this._textAlpha = alpha));
         }
 
         public setTextAlpha(alpha: number): this {
@@ -531,11 +767,11 @@ export namespace UI {
         }
 
         public get textAnchor(): mod.UIAnchor {
-            return mod.GetUITextAnchor(this._uiWidget);
+            return this._textAnchor;
         }
 
         public set textAnchor(anchor: mod.UIAnchor) {
-            mod.SetUITextAnchor(this._uiWidget, anchor);
+            mod.SetUITextAnchor(this._uiWidget, (this._textAnchor = anchor));
         }
 
         public setTextAnchor(anchor: mod.UIAnchor): this {
@@ -544,11 +780,11 @@ export namespace UI {
         }
 
         public get textColor(): mod.Vector {
-            return mod.GetUITextColor(this._uiWidget);
+            return this._textColor;
         }
 
         public set textColor(color: mod.Vector) {
-            mod.SetUITextColor(this._uiWidget, color);
+            mod.SetUITextColor(this._uiWidget, (this._textColor = color));
         }
 
         public setTextColor(color: mod.Vector): this {
@@ -557,11 +793,11 @@ export namespace UI {
         }
 
         public get textSize(): number {
-            return mod.GetUITextSize(this._uiWidget);
+            return this._textSize;
         }
 
         public set textSize(size: number) {
-            mod.SetUITextSize(this._uiWidget, size);
+            mod.SetUITextSize(this._uiWidget, (this._textSize = size));
         }
 
         public setTextSize(size: number): this {
@@ -571,9 +807,55 @@ export namespace UI {
     }
 
     export class Button extends Element {
-        public constructor(params: ButtonParams, receiver?: mod.Player | mod.Team) {
+        private _buttonEnabled: boolean;
+        private _baseColor: mod.Vector;
+        private _baseAlpha: number;
+        private _disabledColor: mod.Vector;
+        private _disabledAlpha: number;
+        private _pressedColor: mod.Vector;
+        private _pressedAlpha: number;
+        private _hoverColor: mod.Vector;
+        private _hoverAlpha: number;
+        private _focusedColor: mod.Vector;
+        private _focusedAlpha: number;
+        private _onClick: ((player: mod.Player) => Promise<void>) | undefined;
+
+        public constructor(params: ButtonParams) {
             const parent = params.parent ?? ROOT_NODE;
-            const name = makeName(parent, receiver);
+            const receiver = getReceiver(parent, params.receiver);
+            const { x, y } = getPosition(params);
+            const { width, height } = getSize(params);
+
+            const elementParams: FinalElementParams = {
+                name: makeName(parent, receiver),
+                parent,
+                visible: params.visible ?? true,
+                x,
+                y,
+                width,
+                height,
+                anchor: params.anchor ?? mod.UIAnchor.Center,
+                padding: params.padding ?? 0,
+                bgColor: params.bgColor ?? COLORS.WHITE,
+                bgAlpha: params.bgAlpha ?? 0,
+                bgFill: params.bgFill ?? mod.UIBgFill.None,
+                depth: params.depth ?? mod.UIDepth.AboveGameUI,
+                receiver,
+                uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+            };
+
+            const buttonEnabled = params.buttonEnabled ?? true;
+            const baseColor = params.baseColor ?? COLORS.BF_GREY_2;
+            const baseAlpha = params.baseAlpha ?? 1;
+            const disabledColor = params.disabledColor ?? COLORS.BF_GREY_3;
+            const disabledAlpha = params.disabledAlpha ?? 1;
+            const pressedColor = params.pressedColor ?? COLORS.BF_GREEN_BRIGHT;
+            const pressedAlpha = params.pressedAlpha ?? 1;
+            const hoverColor = params.hoverColor ?? COLORS.BF_GREY_1;
+            const hoverAlpha = params.hoverAlpha ?? 1;
+            const focusedColor = params.focusedColor ?? COLORS.BF_GREY_1;
+            const focusedAlpha = params.focusedAlpha ?? 1;
+            const onClick = params.onClick;
 
             const args: [
                 string, // name
@@ -599,16 +881,16 @@ export namespace UI {
                 number, // focusedAlpha
                 mod.UIDepth, // depth
             ] = [
-                name,
-                getPositionVector(params),
-                getSizeVector(params),
-                params.anchor ?? mod.UIAnchor.Center,
+                elementParams.name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                elementParams.anchor,
                 parent.uiWidget,
-                params.visible ?? true,
-                params.padding ?? 0,
-                params.bgColor ?? COLORS.WHITE,
-                params.bgAlpha ?? 0,
-                params.bgFill ?? mod.UIBgFill.None,
+                elementParams.visible,
+                elementParams.padding,
+                elementParams.bgColor,
+                elementParams.bgAlpha,
+                elementParams.bgFill,
                 params.buttonEnabled ?? true,
                 params.baseColor ?? COLORS.BF_GREY_2,
                 params.baseAlpha ?? 1,
@@ -620,166 +902,45 @@ export namespace UI {
                 params.hoverAlpha ?? 1,
                 params.focusedColor ?? COLORS.BF_GREY_1,
                 params.focusedAlpha ?? 1,
-                params.depth ?? mod.UIDepth.AboveGameUI,
+                elementParams.depth,
             ];
 
-            if (receiver == undefined) {
+            if (receiver instanceof GlobalReceiver) {
                 mod.AddUIButton(...args);
             } else {
-                mod.AddUIButton(...args, receiver);
+                mod.AddUIButton(...args, receiver.nativeReceiver);
             }
 
-            super(name, parent);
+            super(elementParams);
 
-            if (params.onClick) {
-                CLICK_HANDLERS.set(this._name, params.onClick);
-            }
+            this._buttonEnabled = buttonEnabled;
+            this._baseColor = baseColor;
+            this._baseAlpha = baseAlpha;
+            this._disabledColor = disabledColor;
+            this._disabledAlpha = disabledAlpha;
+            this._pressedColor = pressedColor;
+            this._pressedAlpha = pressedAlpha;
+            this._hoverColor = hoverColor;
+            this._hoverAlpha = hoverAlpha;
+            this._focusedColor = focusedColor;
+            this._focusedAlpha = focusedAlpha;
+            this._onClick = onClick;
+
+            BUTTONS.set(this._name, this);
         }
 
         public override delete(): void {
-            if (CLICK_HANDLERS.has(this._name)) {
-                CLICK_HANDLERS.delete(this._name);
-            }
+            BUTTONS.delete(this._name);
 
             super.delete();
         }
 
-        public get alphaBase(): number {
-            return mod.GetUIButtonAlphaBase(this._uiWidget);
-        }
-
-        public set alphaBase(alpha: number) {
-            mod.SetUIButtonAlphaBase(this._uiWidget, alpha);
-        }
-
-        public setAlphaBase(alpha: number): this {
-            this.alphaBase = alpha;
-            return this;
-        }
-
-        public get alphaDisabled(): number {
-            return mod.GetUIButtonAlphaDisabled(this._uiWidget);
-        }
-
-        public set alphaDisabled(alpha: number) {
-            mod.SetUIButtonAlphaDisabled(this._uiWidget, alpha);
-        }
-
-        public setAlphaDisabled(alpha: number): this {
-            this.alphaDisabled = alpha;
-            return this;
-        }
-
-        public get alphaFocused(): number {
-            return mod.GetUIButtonAlphaFocused(this._uiWidget);
-        }
-
-        public set alphaFocused(alpha: number) {
-            mod.SetUIButtonAlphaFocused(this._uiWidget, alpha);
-        }
-
-        public setAlphaFocused(alpha: number): this {
-            this.alphaFocused = alpha;
-            return this;
-        }
-
-        public get alphaHover(): number {
-            return mod.GetUIButtonAlphaHover(this._uiWidget);
-        }
-
-        public set alphaHover(alpha: number) {
-            mod.SetUIButtonAlphaHover(this._uiWidget, alpha);
-        }
-
-        public setAlphaHover(alpha: number): this {
-            this.alphaHover = alpha;
-            return this;
-        }
-
-        public get alphaPressed(): number {
-            return mod.GetUIButtonAlphaPressed(this._uiWidget);
-        }
-
-        public set alphaPressed(alpha: number) {
-            mod.SetUIButtonAlphaPressed(this._uiWidget, alpha);
-        }
-
-        public setAlphaPressed(alpha: number): this {
-            this.alphaPressed = alpha;
-            return this;
-        }
-
-        public get colorBase(): mod.Vector {
-            return mod.GetUIButtonColorBase(this._uiWidget);
-        }
-
-        public set colorBase(color: mod.Vector) {
-            mod.SetUIButtonColorBase(this._uiWidget, color);
-        }
-
-        public setColorBase(color: mod.Vector): this {
-            this.colorBase = color;
-            return this;
-        }
-
-        public get colorDisabled(): mod.Vector {
-            return mod.GetUIButtonColorDisabled(this._uiWidget);
-        }
-
-        public set colorDisabled(color: mod.Vector) {
-            mod.SetUIButtonColorDisabled(this._uiWidget, color);
-        }
-
-        public setColorDisabled(color: mod.Vector): this {
-            this.colorDisabled = color;
-            return this;
-        }
-
-        public get colorFocused(): mod.Vector {
-            return mod.GetUIButtonColorFocused(this._uiWidget);
-        }
-
-        public set colorFocused(color: mod.Vector) {
-            mod.SetUIButtonColorFocused(this._uiWidget, color);
-        }
-
-        public setColorFocused(color: mod.Vector): this {
-            this.colorFocused = color;
-            return this;
-        }
-
-        public get colorHover(): mod.Vector {
-            return mod.GetUIButtonColorHover(this._uiWidget);
-        }
-
-        public set colorHover(color: mod.Vector) {
-            mod.SetUIButtonColorHover(this._uiWidget, color);
-        }
-
-        public setColorHover(color: mod.Vector): this {
-            this.colorHover = color;
-            return this;
-        }
-
-        public get colorPressed(): mod.Vector {
-            return mod.GetUIButtonColorPressed(this._uiWidget);
-        }
-
-        public set colorPressed(color: mod.Vector) {
-            mod.SetUIButtonColorPressed(this._uiWidget, color);
-        }
-
-        public setColorPressed(color: mod.Vector): this {
-            this.colorPressed = color;
-            return this;
-        }
-
         public get enabled(): boolean {
-            return mod.GetUIButtonEnabled(this._uiWidget);
+            return this._buttonEnabled;
         }
 
         public set enabled(enabled: boolean) {
-            mod.SetUIButtonEnabled(this._uiWidget, enabled);
+            mod.SetUIButtonEnabled(this._uiWidget, (this._buttonEnabled = enabled));
         }
 
         public setEnabled(enabled: boolean): this {
@@ -787,16 +948,142 @@ export namespace UI {
             return this;
         }
 
+        public get baseColor(): mod.Vector {
+            return this._baseColor;
+        }
+
+        public set baseColor(color: mod.Vector) {
+            mod.SetUIButtonColorBase(this._uiWidget, (this._baseColor = color));
+        }
+
+        public setBaseColor(color: mod.Vector): this {
+            this.baseColor = color;
+            return this;
+        }
+
+        public get baseAlpha(): number {
+            return this._baseAlpha;
+        }
+
+        public set baseAlpha(alpha: number) {
+            mod.SetUIButtonAlphaBase(this._uiWidget, (this._baseAlpha = alpha));
+        }
+
+        public setBaseAlpha(alpha: number): this {
+            this.baseAlpha = alpha;
+            return this;
+        }
+
+        public get disabledColor(): mod.Vector {
+            return this._disabledColor;
+        }
+
+        public set disabledColor(color: mod.Vector) {
+            mod.SetUIButtonColorDisabled(this._uiWidget, (this._disabledColor = color));
+        }
+
+        public setDisabledColor(color: mod.Vector): this {
+            this.disabledColor = color;
+            return this;
+        }
+
+        public get disabledAlpha(): number {
+            return this._disabledAlpha;
+        }
+
+        public set disabledAlpha(alpha: number) {
+            mod.SetUIButtonAlphaDisabled(this._uiWidget, (this._disabledAlpha = alpha));
+        }
+
+        public setDisabledAlpha(alpha: number): this {
+            this.disabledAlpha = alpha;
+            return this;
+        }
+
+        public get pressedColor(): mod.Vector {
+            return this._pressedColor;
+        }
+
+        public set pressedColor(color: mod.Vector) {
+            mod.SetUIButtonColorPressed(this._uiWidget, (this._pressedColor = color));
+        }
+
+        public setColorPressed(color: mod.Vector): this {
+            this.pressedColor = color;
+            return this;
+        }
+
+        public get pressedAlpha(): number {
+            return this._pressedAlpha;
+        }
+
+        public set pressedAlpha(alpha: number) {
+            mod.SetUIButtonAlphaPressed(this._uiWidget, (this._pressedAlpha = alpha));
+        }
+
+        public setPressedAlpha(alpha: number): this {
+            this.pressedAlpha = alpha;
+            return this;
+        }
+
+        public get hoverColor(): mod.Vector {
+            return this._hoverColor;
+        }
+
+        public set hoverColor(color: mod.Vector) {
+            mod.SetUIButtonColorHover(this._uiWidget, (this._hoverColor = color));
+        }
+
+        public setHoverColor(color: mod.Vector): this {
+            this.hoverColor = color;
+            return this;
+        }
+
+        public get hoverAlpha(): number {
+            return this._hoverAlpha;
+        }
+
+        public set hoverAlpha(alpha: number) {
+            mod.SetUIButtonAlphaHover(this._uiWidget, (this._hoverAlpha = alpha));
+        }
+
+        public setHoverAlpha(alpha: number): this {
+            this.hoverAlpha = alpha;
+            return this;
+        }
+
+        public get focusedColor(): mod.Vector {
+            return this._focusedColor;
+        }
+
+        public set focusedColor(color: mod.Vector) {
+            mod.SetUIButtonColorFocused(this._uiWidget, (this._focusedColor = color));
+        }
+
+        public setFocusedColor(color: mod.Vector): this {
+            this.focusedColor = color;
+            return this;
+        }
+
+        public get focusedAlpha(): number {
+            return this._focusedAlpha;
+        }
+
+        public set focusedAlpha(alpha: number) {
+            mod.SetUIButtonAlphaFocused(this._uiWidget, (this._focusedAlpha = alpha));
+        }
+
+        public setFocusedAlpha(alpha: number): this {
+            this.focusedAlpha = alpha;
+            return this;
+        }
+
         public get onClick(): ((player: mod.Player) => Promise<void>) | undefined {
-            return CLICK_HANDLERS.get(this._name);
+            return this._onClick;
         }
 
         public set onClick(onClick: ((player: mod.Player) => Promise<void>) | undefined) {
-            if (onClick) {
-                CLICK_HANDLERS.set(this._name, onClick);
-            } else {
-                CLICK_HANDLERS.delete(this._name);
-            }
+            this._onClick = onClick;
         }
 
         public setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): this {
@@ -819,55 +1106,76 @@ export namespace UI {
 
         protected _content: TContent;
 
-        // Button properties (delegated via delegateProperties)
-        declare public alphaBase: number;
-        declare public alphaDisabled: number;
-        declare public alphaFocused: number;
-        declare public alphaHover: number;
-        declare public alphaPressed: number;
-        declare public colorBase: mod.Vector;
-        declare public colorDisabled: mod.Vector;
-        declare public colorFocused: mod.Vector;
-        declare public colorHover: mod.Vector;
-        declare public colorPressed: mod.Vector;
+        // Button properties (delegated via delegateProperties).
         declare public enabled: boolean;
+        declare public baseColor: mod.Vector;
+        declare public baseAlpha: number;
+        declare public disabledColor: mod.Vector;
+        declare public disabledAlpha: number;
+        declare public pressedColor: mod.Vector;
+        declare public pressedAlpha: number;
+        declare public hoverColor: mod.Vector;
+        declare public hoverAlpha: number;
+        declare public focusedColor: mod.Vector;
+        declare public focusedAlpha: number;
         declare public onClick: ((player: mod.Player) => Promise<void>) | undefined;
 
-        // Button setter methods (delegated via delegateProperties)
-        declare public setAlphaBase: (alpha: number) => this;
-        declare public setAlphaDisabled: (alpha: number) => this;
-        declare public setAlphaFocused: (alpha: number) => this;
-        declare public setAlphaHover: (alpha: number) => this;
-        declare public setAlphaPressed: (alpha: number) => this;
-        declare public setColorBase: (color: mod.Vector) => this;
-        declare public setColorDisabled: (color: mod.Vector) => this;
-        declare public setColorFocused: (color: mod.Vector) => this;
-        declare public setColorHover: (color: mod.Vector) => this;
-        declare public setColorPressed: (color: mod.Vector) => this;
+        // Button setter methods (delegated via delegateProperties).
         declare public setEnabled: (enabled: boolean) => this;
+        declare public setBaseColor: (color: mod.Vector) => this;
+        declare public setBaseAlpha: (alpha: number) => this;
+        declare public setDisabledColor: (color: mod.Vector) => this;
+        declare public setDisabledAlpha: (alpha: number) => this;
+        declare public setPressedColor: (color: mod.Vector) => this;
+        declare public setPressedAlpha: (alpha: number) => this;
+        declare public setHoverColor: (color: mod.Vector) => this;
+        declare public setHoverAlpha: (alpha: number) => this;
+        declare public setFocusedColor: (color: mod.Vector) => this;
+        declare public setFocusedAlpha: (alpha: number) => this;
         declare public setOnClick: (onClick: ((player: mod.Player) => Promise<void>) | undefined) => this;
 
         protected constructor(
             params: ButtonParams,
-            receiver: mod.Player | mod.Team | undefined,
             createContent: (container: Container, params: ButtonParams) => TContent,
             contentProperties: TContentProps
         ) {
+            const parent = params.parent ?? ROOT_NODE;
+            const receiver = getReceiver(parent, params.receiver);
+            const { x, y } = getPosition(params);
+            const { width, height } = getSize(params);
+            const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+
             const containerParams = {
-                ...params,
+                parent,
+                visible: params.visible ?? true,
+                x,
+                y,
+                width,
+                height,
+                anchor: params.anchor ?? mod.UIAnchor.Center,
+                padding: params.padding ?? 0,
                 bgColor: COLORS.WHITE,
                 bgAlpha: 0,
                 bgFill: mod.UIBgFill.None,
-            } as ContainerParams;
+                depth,
+                receiver: params.receiver,
+                uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+            };
 
-            const container = new Container(containerParams, receiver);
+            const container = new Container(containerParams);
 
-            super(container.name, container.parent);
+            const elementParams: FinalElementParams = {
+                ...containerParams,
+                name: makeName(parent, receiver),
+                receiver,
+            };
+
+            super(elementParams);
 
             const buttonParams: ButtonParams = {
                 parent: container,
-                width: params.width ?? params.size?.width ?? 0,
-                height: params.height ?? params.size?.height ?? 0,
+                width,
+                height,
                 bgColor: params.bgColor ?? COLORS.WHITE,
                 bgAlpha: params.bgAlpha ?? 1,
                 bgFill: params.bgFill ?? mod.UIBgFill.Solid,
@@ -882,7 +1190,7 @@ export namespace UI {
                 hoverAlpha: params.hoverAlpha ?? 1,
                 focusedColor: params.focusedColor ?? COLORS.BF_GREY_1,
                 focusedAlpha: params.focusedAlpha ?? 1,
-                depth: params.depth ?? mod.UIDepth.AboveGameUI,
+                depth,
                 onClick: params.onClick,
             };
 
@@ -890,23 +1198,26 @@ export namespace UI {
 
             this._content = createContent(container, params);
 
-            // Delegate Button properties
+            // Delegate Button properties.
             delegateProperties(this, this._button, [
-                'alphaBase',
-                'alphaDisabled',
-                'alphaFocused',
-                'alphaHover',
-                'alphaPressed',
-                'colorBase',
-                'colorDisabled',
-                'colorFocused',
-                'colorHover',
-                'colorPressed',
+                'bgColor',
+                'bgAlpha',
+                'bgFill',
                 'enabled',
+                'baseColor',
+                'baseAlpha',
+                'disabledColor',
+                'disabledAlpha',
+                'pressedColor',
+                'pressedAlpha',
+                'focusedAlpha',
+                'focusedColor',
+                'hoverAlpha',
+                'hoverColor',
                 'onClick',
             ]);
 
-            // Delegate content properties
+            // Delegate content properties.
             delegateProperties(this, this._content, contentProperties);
         }
 
@@ -917,16 +1228,22 @@ export namespace UI {
             super.delete();
         }
 
-        public override set size(params: Size) {
-            super.setSize(params);
-
-            this._button.setSize(params);
-            this._content.setSize(params);
+        public override set width(width: number) {
+            super.setWidth(width); // Updates the container width
+            this._button.setWidth(width);
+            this._content.setWidth(width);
         }
 
-        public override setSize(params: Size): this {
-            this.size = params;
-            return this;
+        public override set height(height: number) {
+            super.setHeight(height); // Updates the container height
+            this._button.setHeight(height);
+            this._content.setHeight(height);
+        }
+
+        public override set size(params: Size) {
+            super.setSize(params); // Updates the container size
+            this._button.setSize(params);
+            this._content.setSize(params);
         }
     }
 
@@ -945,7 +1262,7 @@ export namespace UI {
         declare public setTextAnchor: (anchor: mod.UIAnchor) => this;
         declare public setTextSize: (size: number) => this;
 
-        public constructor(params: TextButtonParams, receiver?: mod.Player | mod.Team) {
+        public constructor(params: TextButtonParams) {
             const createContent = (container: Container, buttonParams: ButtonParams): Text => {
                 const textParams: TextParams = {
                     parent: container,
@@ -956,13 +1273,13 @@ export namespace UI {
                     textColor: params.textColor,
                     textAlpha: params.textAlpha,
                     textAnchor: params.textAnchor,
-                    depth: buttonParams.depth ?? mod.UIDepth.AboveGameUI,
+                    depth: buttonParams.depth,
                 };
 
                 return new Text(textParams);
             };
 
-            super(params, receiver, createContent, TEXT_BUTTON_CONTENT_PROPERTIES);
+            super(params, createContent, TEXT_BUTTON_CONTENT_PROPERTIES);
         }
     }
 
@@ -997,14 +1314,22 @@ export namespace UI {
 
     export const ROOT_NODE = Root.instance;
 
-    const CLICK_HANDLERS = new Map<string, (player: mod.Player) => Promise<void>>();
+    const BUTTONS = new Map<string, Button>();
 
     /****** Utils ******/
 
     let counter: number = 0;
 
-    function makeName(parent: Node, receiver?: mod.Player | mod.Team): string {
-        return `${parent.name}${receiver ? `_${mod.GetObjId(receiver)}` : ''}_${counter++}`;
+    function isTeam(receiver?: mod.Player | mod.Team): receiver is mod.Team {
+        return receiver !== undefined && mod.IsType(receiver, mod.Types.Team);
+    }
+
+    function isPlayer(receiver?: mod.Player | mod.Team): receiver is mod.Player {
+        return receiver !== undefined && mod.IsType(receiver, mod.Types.Player);
+    }
+
+    function makeName(parent: Parent, receiver: GlobalReceiver | TeamReceiver | PlayerReceiver): string {
+        return `${parent.name}${parent.receiver !== receiver ? `_${receiver.id}` : ''}_${counter++}`;
     }
 
     /**
@@ -1020,7 +1345,7 @@ export namespace UI {
         properties: readonly string[]
     ): void {
         for (const prop of properties) {
-            // Create getter and setter
+            // Create getter and setter.
             Object.defineProperty(target, prop, {
                 get() {
                     return (source as Record<string, unknown>)[prop];
@@ -1032,8 +1357,9 @@ export namespace UI {
                 configurable: true,
             });
 
-            // Create setter method (e.g., setAlphaBase)
+            // Create setter method (e.g., setBaseAlpha).
             const setterMethodName = `set${prop.charAt(0).toUpperCase() + prop.slice(1)}`;
+
             (target as Record<string, unknown>)[setterMethodName] = function (value: unknown) {
                 (source as Record<string, unknown>)[prop] = value;
                 return this;
@@ -1041,26 +1367,61 @@ export namespace UI {
         }
     }
 
-    function getPositionVector(params: ElementParams): mod.Vector {
-        return mod.CreateVector(params.x ?? params.position?.x ?? 0, params.y ?? params.position?.y ?? 0, 0);
+    function getPosition(params: ElementParams): Position {
+        return { x: params.x ?? params.position?.x ?? 0, y: params.y ?? params.position?.y ?? 0 };
     }
 
-    function getSizeVector(params: ElementParams): mod.Vector {
-        return mod.CreateVector(params.width ?? params.size?.width ?? 0, params.height ?? params.size?.height ?? 0, 0);
+    function getSize(params: ElementParams): Size {
+        return { width: params.width ?? params.size?.width ?? 0, height: params.height ?? params.size?.height ?? 0 };
     }
 
-    export function handleButtonClick(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
-        // NOTE: mod.UIButtonEvent is currently broken or undefined, so we're not using it for now.
-        // if (event != mod.UIButtonEvent.ButtonUp) return;
+    function getReceiver(
+        parent: Parent,
+        receiverParam?: mod.Player | mod.Team
+    ): GlobalReceiver | TeamReceiver | PlayerReceiver {
+        if (isTeam(receiverParam)) {
+            const receiver = TeamReceiver.getInstance(receiverParam);
+
+            if (parent.receiver instanceof TeamReceiver && parent.receiver !== receiver) {
+                console.log('<UI> Warning: Team receiver mismatch with parent.');
+            }
+
+            if (parent.receiver instanceof PlayerReceiver) {
+                console.log('<UI> Warning: Parent receiver scope is more narrow.');
+            }
+
+            return receiver;
+        }
+
+        if (isPlayer(receiverParam)) {
+            const receiver = PlayerReceiver.getInstance(receiverParam);
+
+            if (parent.receiver instanceof PlayerReceiver && parent.receiver !== receiver) {
+                console.log('<UI> Warning: Player receiver mismatch with parent.');
+            }
+
+            if (
+                parent.receiver instanceof TeamReceiver &&
+                !mod.Equals(parent.receiver.nativeReceiver, mod.GetTeam(receiverParam))
+            ) {
+                console.log('<UI> Warning: Parent receiver is different team.');
+            }
+
+            return receiver;
+        }
+
+        return GlobalReceiver.instance;
+    }
+
+    export function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
+        // NOTE: `event: mod.UIButtonEvent` is currently broken or undefined, so we're not using it for now.
 
         const name = mod.GetUIWidgetName(widget);
 
-        const clickHandler = CLICK_HANDLERS.get(name);
-
-        if (!clickHandler) return;
-
-        clickHandler(player).catch((error) => {
-            console.log(`<UI> Error in click handler for widget ${name}:`, error);
-        });
+        BUTTONS.get(name)
+            ?.onClick?.(player)
+            .catch((error) => {
+                console.log(`<UI> Error in click handler for widget ${name}:`, error);
+            });
     }
 }

@@ -1,6 +1,6 @@
 import { UI } from '../ui/index.ts';
 
-// version: 3.0.0
+// version: 3.0.1
 export class Logger {
     private static readonly _PADDING: number = 10;
 
@@ -64,22 +64,20 @@ export class Logger {
         this._height = options?.height ?? 300;
         this._textColor = options?.textColor ?? UI.COLORS.BF_GREEN_BRIGHT;
 
-        this._window = new UI.Container(
-            {
-                x: options?.x ?? 10,
-                y: options?.y ?? 10,
-                width: this._width,
-                height: this._height,
-                parent: options?.parent,
-                anchor: options?.anchor ?? mod.UIAnchor.TopLeft,
-                bgColor: options?.bgColor ?? UI.COLORS.BF_GREY_4,
-                bgAlpha: options?.bgAlpha ?? 0.5,
-                bgFill: options?.bgFill ?? mod.UIBgFill.Blur,
-                padding: Logger._PADDING,
-                visible: options?.visible ?? false,
-            },
-            player
-        );
+        this._window = new UI.Container({
+            x: options?.x ?? 10,
+            y: options?.y ?? 10,
+            width: this._width,
+            height: this._height,
+            parent: options?.parent,
+            anchor: options?.anchor ?? mod.UIAnchor.TopLeft,
+            bgColor: options?.bgColor ?? UI.COLORS.BF_GREY_4,
+            bgAlpha: options?.bgAlpha ?? 0.5,
+            bgFill: options?.bgFill ?? mod.UIBgFill.Blur,
+            padding: Logger._PADDING,
+            visible: options?.visible ?? false,
+            receiver: player,
+        });
 
         this._staticRows = options?.staticRows ?? false;
         this._truncate = this._staticRows || (options?.truncate ?? false);

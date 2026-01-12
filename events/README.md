@@ -33,8 +33,10 @@ non-blocking, ensuring optimal performance.
     ```ts
     import { Events } from 'bf6-portal-utils/events';
     ```
-3. Subscribe to events using `Events.subscribe()` with the event type and your handler function.
-4. Unsubscribe when needed using `Events.unsubscribe()` with the same event type and handler reference.
+3. Subscribe to events using `Events.subscribe()` with the event type and your handler function. The function returns an
+   unsubscribe function for convenience.
+4. Unsubscribe when needed by calling the returned unsubscribe function, or use `Events.unsubscribe()` with the same
+   event type and handler reference.
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
 
@@ -70,15 +72,15 @@ function handleOngoingPlayer(player: mod.Player): void {
 }
 
 // Set up subscriptions at module load time (top-level code)
-Events.subscribe(Events.Type.OnPlayerDeployed, handlePlayerDeployed);
-Events.subscribe(Events.Type.OnPlayerDied, handlePlayerDied);
-Events.subscribe(Events.Type.OngoingPlayer, handleOngoingPlayer);
+const unsubscribeDeployed = Events.subscribe(Events.Type.OnPlayerDeployed, handlePlayerDeployed);
+const unsubscribeDied = Events.subscribe(Events.Type.OnPlayerDied, handlePlayerDied);
+const unsubscribeOngoing = Events.subscribe(Events.Type.OngoingPlayer, handleOngoingPlayer);
 
 // Optional: Clean up subscriptions when the game mode ends
 Events.subscribe(Events.Type.OnGameModeEnding, () => {
-    Events.unsubscribe(Events.Type.OnPlayerDeployed, handlePlayerDeployed);
-    Events.unsubscribe(Events.Type.OnPlayerDied, handlePlayerDied);
-    Events.unsubscribe(Events.Type.OngoingPlayer, handleOngoingPlayer);
+    unsubscribeDeployed();
+    unsubscribeDied();
+    unsubscribeOngoing();
 });
 ```
 
@@ -138,7 +140,7 @@ Available event types include:
 - `OnTimeLimitReached`
 - `OnVehicleDestroyed`, `OnVehicleSpawned`
 
-#### `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
+#### `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
 
 Subscribes a handler function to an event type. The handler will be called whenever the event fires.
 
@@ -147,12 +149,21 @@ Subscribes a handler function to an event type. The handler will be called whene
 - `type` – The event type from `Events.Type` enum
 - `handler` – A function matching the signature for the event type. Can be synchronous or asynchronous.
 
+**Returns:**
+
+- A function that can be called to unsubscribe the handler. This is a convenience method that avoids needing to store
+  the handler reference separately.
+
 **Example:**
 
 ```ts
-Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
+// Using the returned unsubscribe function
+const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
     console.log(`Player deployed: ${mod.GetObjId(player)}`);
 });
+
+// Later, unsubscribe
+unsubscribe();
 ```
 
 #### `Events.unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
@@ -172,6 +183,12 @@ const handler = (player: mod.Player) => {
     console.log(`Player deployed: ${mod.GetObjId(player)}`);
 };
 
+// Option 1: Use the returned unsubscribe function (recommended)
+const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, handler);
+// Later...
+unsubscribe();
+
+// Option 2: Use Events.unsubscribe with the handler reference
 Events.subscribe(Events.Type.OnPlayerDeployed, handler);
 // Later...
 Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
@@ -230,11 +247,13 @@ class PlayerStats {
     private kills = new Map<number, number>();
     private deaths = new Map<number, number>();
 
+    private unsubscribeFunctions: (() => void)[] = [];
+
     constructor() {
         // Subscribe to player events for stats tracking
-        Events.subscribe(Events.Type.OnPlayerEarnedKill, this.handleKill.bind(this));
-        Events.subscribe(Events.Type.OnPlayerDied, this.handleDeath.bind(this));
-        Events.subscribe(Events.Type.OnPlayerLeaveGame, this.handleLeave.bind(this));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerEarnedKill, this.handleKill.bind(this)));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerDied, this.handleDeath.bind(this)));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerLeaveGame, this.handleLeave.bind(this)));
     }
 
     private handleKill(
@@ -269,12 +288,20 @@ class PlayerStats {
     getDeaths(player: mod.Player): number {
         return this.deaths.get(mod.GetObjId(player)) || 0;
     }
+
+    cleanup(): void {
+        this.unsubscribeFunctions.forEach((unsub) => unsub());
+    }
 }
 
 let stats: PlayerStats;
 
 Events.subscribe(Events.Type.OnGameModeStarted, () => {
     stats = new PlayerStats();
+});
+
+Events.subscribe(Events.Type.OnGameModeEnding, () => {
+    stats?.cleanup();
 });
 ```
 
@@ -285,13 +312,15 @@ import { Events } from 'bf6-portal-utils/events';
 
 // Game event logging module - subscribes to the SAME events as PlayerStats
 class GameLogger {
+    private unsubscribeFunctions: (() => void)[] = [];
+
     constructor() {
         // Multiple modules can subscribe to the same events!
         // This logger also listens to OnPlayerEarnedKill and OnPlayerDied
-        Events.subscribe(Events.Type.OnPlayerEarnedKill, this.logKill.bind(this));
-        Events.subscribe(Events.Type.OnPlayerDied, this.logDeath.bind(this));
-        Events.subscribe(Events.Type.OnPlayerDeployed, this.logDeployment.bind(this));
-        Events.subscribe(Events.Type.OnVehicleSpawned, this.logVehicleSpawn.bind(this));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerEarnedKill, this.logKill.bind(this)));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerDied, this.logDeath.bind(this)));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnPlayerDeployed, this.logDeployment.bind(this)));
+        this.unsubscribeFunctions.push(Events.subscribe(Events.Type.OnVehicleSpawned, this.logVehicleSpawn.bind(this)));
     }
 
     private logKill(
@@ -321,12 +350,20 @@ class GameLogger {
     private logVehicleSpawn(vehicle: mod.Vehicle): void {
         console.log(`[VEHICLE] Vehicle ${mod.GetObjId(vehicle)} spawned`);
     }
+
+    cleanup(): void {
+        this.unsubscribeFunctions.forEach((unsub) => unsub());
+    }
 }
 
 let logger: GameLogger;
 
 Events.subscribe(Events.Type.OnGameModeStarted, () => {
     logger = new GameLogger();
+});
+
+Events.subscribe(Events.Type.OnGameModeEnding, () => {
+    logger?.cleanup();
 });
 ```
 
@@ -396,7 +433,8 @@ The `Events` module uses a centralized subscription system:
   your own code. If you do, they will conflict with this module's implementations and cause undefined behavior.
 
 - **Handler Reference Equality** – When unsubscribing, you must pass the exact same function reference that was used in
-  `subscribe()`. Anonymous functions cannot be unsubscribed unless you store the reference.
+  `subscribe()`. Anonymous functions cannot be unsubscribed unless you store the reference. **Recommended:** Use the
+  unsubscribe function returned by `subscribe()` instead of storing handler references.
 
 - **Execution Order** – Handler execution order is not guaranteed. If you need handlers to execute in a specific order,
   chain them manually or use a single handler that calls other functions in order.

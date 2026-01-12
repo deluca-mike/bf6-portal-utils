@@ -1,10 +1,30 @@
+// version: 2.0.0
 export namespace SolidUI {
-    /****** Types ******/
+    /****** Classes and Types ******/
 
-    type Subscriber = {
-        execute: () => void;
-        dependencies: Set<Set<Subscriber>>;
-    };
+    class Subscriber {
+        public dependencies = new Set<Set<Subscriber>>();
+
+        constructor(public fn: () => void) {
+            // Effects run immediately on creation (synchronously) to establish initial dependencies.
+            this.execute();
+        }
+
+        execute() {
+            cleanup(this);
+            context.push(this);
+
+            try {
+                this.fn();
+            } finally {
+                context.pop();
+            }
+        }
+
+        dispose() {
+            cleanup(this);
+        }
+    }
 
     /**
      * A generic function that retrieves the current value of a reactive signal.
@@ -23,12 +43,9 @@ export namespace SolidUI {
     export type Setter<T> = (newValue: T | ((prev: T) => T)) => void;
 
     // Defines the contract for any UI Class Constructor (Native or Custom).
-    type Constructable<Params, Instance> = new (params: Params, receiver?: mod.Player | mod.Team) => Instance;
+    type Constructable<Params, Instance> = new (params: Params) => Instance;
 
-    type FunctionalComponent<Params, Instance> = (
-        props: Reactive<Params>,
-        receiver?: mod.Player | mod.Team
-    ) => Instance;
+    type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instance;
 
     // Transform Params so every property can optionally be a Signal.
     type Reactive<T> = {
@@ -103,21 +120,39 @@ export namespace SolidUI {
     // Queue to hold effects that need to run.
     const pendingEffects = new Set<Subscriber>();
     let isFlushPending = false;
+    const MAX_FLUSH_CYCLES = 1_000;
+    const noop = () => {};
 
     // The function that processes the queue.
     function flush(): void {
         isFlushPending = false;
+        let cycles = 0;
 
-        // Snapshot the current queue to handle new effects being added during flush.
-        const toRun = [...pendingEffects];
-        pendingEffects.clear();
+        for (const sub of pendingEffects) {
+            if (cycles++ > MAX_FLUSH_CYCLES) {
+                // Important: Clear the queue so the next frame isn't also broken.
+                pendingEffects.clear();
 
-        toRun.forEach((sub) => sub.execute()); // Run all queued effects.
+                console.log(
+                    'SolidUI: Maximum reactive stack depth exceeded. You might have an infinite loop in an effect.'
+                );
+            }
+
+            pendingEffects.delete(sub);
+
+            try {
+                sub.execute();
+            } catch {
+                // Swallow errors so one bad effect doesn't kill the whole UI.
+            }
+        }
     }
 
     // Adds effects to the queue and schedules a flush if one isn't already pending.
     function schedule(subscribers: Set<Subscriber>): void {
-        subscribers.forEach((sub) => pendingEffects.add(sub));
+        for (const sub of subscribers) {
+            pendingEffects.add(sub);
+        }
 
         if (isFlushPending) return;
 
@@ -126,11 +161,7 @@ export namespace SolidUI {
         // "Promise.resolve().then" pushes the flush to the microtask queue.
         // This ensures setting a signal returns execution to the game logic instantly, and the UI updates happen right
         // after the game logic finishes.
-        Promise.resolve()
-            .then(flush)
-            .catch((e) => {
-                // Swallow errors to prevent one effect from affecting others.
-            });
+        Promise.resolve().then(flush).catch(noop); // Swallow errors to prevent one effect from affecting others.
     }
 
     /****** Reactivity Core ******/
@@ -223,26 +254,8 @@ export namespace SolidUI {
      * @returns A "disposer" function that manually stops the effect and frees memory.
      */
     export function createEffect(fn: () => void): () => void {
-        const execute = (): void => {
-            cleanup(subscriber);
-            context.push(subscriber);
-
-            try {
-                fn();
-            } finally {
-                context.pop();
-            }
-        };
-
-        const subscriber: Subscriber = {
-            execute,
-            dependencies: new Set(),
-        };
-
-        // Effects run immediately on creation (synchronously) to establish initial dependencies.
-        execute();
-
-        return () => cleanup(subscriber);
+        const effect = new Subscriber(fn);
+        return () => effect.dispose();
     }
 
     /**
@@ -374,7 +387,7 @@ export namespace SolidUI {
 
         // A simplified setter that accepts a producer function (e.g. state => state.count++).
         // We just run the producer on the proxy. The Proxy 'set' trap handles the rest automatically.
-        const setStore = (producer: (state: T) => void): void => producer(store);
+        const setStore = (producer: (state: T) => void) => producer(store);
 
         return [store, setStore];
     }
@@ -470,19 +483,17 @@ export namespace SolidUI {
      *
      * @param component - Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component.
      * @param props - An object of properties. Values can be static OR reactive (Signals/Accessors).
-     * @param receiver - (Optional) The specific player or team this UI is for.
      *
      * @returns The created UI Instance.
      */
     export function h<P extends object, T>(
         component: Constructable<P, T> | FunctionalComponent<P, T>,
-        props: Reactive<P> = {},
-        receiver?: mod.Player | mod.Team
+        props: Reactive<P> = {}
     ): T {
         // If the component is a function, just call it passing the raw 'props' (Reactive<P>) so the function can access
         // the signals directly.
         // The function is expected to call 'h' internally for a real UI Class, which will handle the bindings.
-        if (!isClassConstructor(component)) return (component as FunctionalComponent<P, T>)(props, receiver);
+        if (!isClassConstructor(component)) return (component as FunctionalComponent<P, T>)(props);
 
         const ClassConstructor = component as Constructable<P, T>;
 
@@ -498,7 +509,7 @@ export namespace SolidUI {
         const dynamicBindings: { key: keyof P; signal: Accessor<unknown> }[] = [];
 
         for (const [key, value] of Object.entries(props)) {
-            if (key === 'onClick') {
+            if (/^on[A-Z]/.test(key)) {
                 constructorParams[key] = value;
                 continue;
             }
@@ -511,7 +522,7 @@ export namespace SolidUI {
             }
         }
 
-        const instance = new ClassConstructor(constructorParams as P, receiver);
+        const instance = new ClassConstructor(constructorParams as P);
 
         // Setup reactive bindings.
         dynamicBindings.forEach(({ key, signal }) => {
@@ -564,6 +575,7 @@ export namespace SolidUI {
         // We use this to update data without re-rendering, or kill rows on shrink.
         const rows: { setItem: Setter<T>; dispose: () => void }[] = [];
 
+        // TODO: Can use cache and dirty checking to optimize this.
         createEffect(() => {
             const list = each();
             const newLength = list.length;
@@ -571,7 +583,9 @@ export namespace SolidUI {
 
             // If new rows are needed, updated the existing rows and create new ones.
             if (newLength > oldLength) {
-                rows.forEach((row, index) => row.setItem(list[index]));
+                for (let i = 0; i < oldLength; ++i) {
+                    rows[i].setItem(list[i]);
+                }
 
                 for (let i = oldLength; i < newLength; ++i) {
                     createRoot((dispose) => {
@@ -597,7 +611,9 @@ export namespace SolidUI {
             }
 
             // Update the remaining rows if the length is the same or after the shrink operation.
-            rows.forEach((row, index) => row.setItem(list[index]));
+            for (let i = 0; i < newLength; ++i) {
+                rows[i].setItem(list[i]);
+            }
         });
     }
 }

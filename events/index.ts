@@ -1,4 +1,4 @@
-// version: 1.0.0
+// version: 1.1.0
 export namespace Events {
     export enum Type {
         OngoingGlobal,
@@ -180,16 +180,41 @@ export namespace Events {
 
     const handlers = new Map<Type, Set<AllHandlers>>();
 
-    export function subscribe<T extends Type>(type: T, handler: HandlerForType<T>): void {
+    /**
+     * Subscribe to an event.
+     * @param type - The event type to subscribe to.
+     * @param handler - The handler function to call when the event is triggered.
+     * @returns A function to unsubscribe from the event.
+     */
+    export function subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void {
         if (!handlers.has(type)) {
             handlers.set(type, new Set());
         }
 
+        const unsubscribe = () => Events.unsubscribe(type, handler);
+
         handlers.get(type)!.add(handler as AllHandlers);
+
+        return unsubscribe;
     }
 
+    /**
+     * Unsubscribe from an event.
+     * @param type - The event type to unsubscribe from.
+     * @param handler - The handler function that was subscribed.
+     */
     export function unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void {
         handlers.get(type)?.delete(handler as AllHandlers);
+    }
+
+    const noop = () => {};
+
+    function executeHandler<T extends Type>(handler: AllHandlers, args: Parameters<AllHandlers>): void {
+        Promise.resolve()
+            .then(() => {
+                return (handler as HandlerForType<T>)(...args);
+            })
+            .catch(noop);
     }
 
     export function trigger<T extends Type>(type: T, ...args: EventParameters<T>): void {
@@ -199,18 +224,9 @@ export namespace Events {
 
         // Execute each handler asynchronously and non-blocking.
         // Errors in one handler won't prevent other handlers from executing.
-        typeHandlers.forEach((handler) => {
-            // Wrap in Promise.resolve to handle both sync and async handlers.
-            // Don't await - fire and forget for non-blocking behavior.
-            Promise.resolve()
-                .then(() => {
-                    // At runtime, we know handler matches the type, so this is safe.
-                    return (handler as HandlerForType<T>)(...args);
-                })
-                .catch((error) => {
-                    // Silently catch errors to prevent one handler from affecting others.
-                });
-        });
+        for (const handler of typeHandlers) {
+            executeHandler(handler as AllHandlers, args as Parameters<AllHandlers>);
+        }
     }
 }
 

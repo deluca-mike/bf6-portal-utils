@@ -5,6 +5,13 @@ which run in a QuickJS runtime, which does not natively include these standard J
 uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs,
 and provides error handling to ensure robust timer execution.
 
+**Why use Timers instead of `mod.Wait()`?** The `Timers` module offers significant advantages: timers can be cancelled
+with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently without blocking, automatic error handling
+prevents timer failures from crashing your mod, and the familiar JavaScript API makes code more readable and
+maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario where you need cancellable or
+recurring delays. See the [Comparing Timers to mod.Wait()](#comparing-timers-to-modwait) section below for a detailed
+comparison.
+
 Key features include automatic timer ID management, graceful error handling that prevents timer failures from crashing
 your mod, support for immediate interval execution, and optional logging for debugging timer behavior.
 
@@ -50,12 +57,12 @@ export async function OnGameModeStarted(): Promise<void> {
     healthCheckInterval = Timers.setInterval(() => {
         const players = mod.GetPlayers();
         console.log(`Active players: ${players.length}`);
-    }, 5);
+    }, 5_000);
 
     // Schedule a one-time event after 30 seconds
     Timers.setTimeout(() => {
         console.log('Game mode has been running for 30 seconds!');
-    }, 30);
+    }, 30_000);
 }
 
 export async function OnPlayerDied(
@@ -67,7 +74,7 @@ export async function OnPlayerDied(
     // Schedule a respawn after 10 seconds
     respawnTimeout = Timers.setTimeout(() => {
         mod.SpawnPlayer(victim, mod.GetRandomSpawnPoint(mod.GetTeam(victim)));
-    }, 10);
+    }, 10_000);
 }
 
 export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
@@ -96,7 +103,7 @@ export async function OnGameModeStarted(): Promise<void> {
             // Update scoreboard, check objectives, etc.
             updateGameState();
         },
-        10,
+        10_000,
         true // true = immediate execution
     );
 }
@@ -119,6 +126,48 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ---
 
+## Comparing Timers to mod.Wait()
+
+While `mod.Wait()` is the underlying API used by this module, the `Timers` class provides significant advantages that
+make it a better choice for most timing scenarios:
+
+### Key Advantages
+
+- **Cancellable Timers** – Unlike `mod.Wait()`, which cannot be cancelled once started, timers can be cancelled at any
+  time using `clearTimeout()` or `clearInterval()`. This is essential for scenarios like respawn timers that should be
+  cancelled if a player spawns early, or debouncing where you need to reset a delay.
+
+- **Concurrent Execution** – Multiple timers can run simultaneously without blocking each other or your main event
+  handlers. With `mod.Wait()`, you'd need to carefully manage async functions and await chains, which becomes unwieldy
+  with multiple concurrent delays.
+
+- **Automatic Error Handling** – Timer callbacks are wrapped in error handling that prevents failures from crashing your
+  mod. If a callback throws an error, it's caught and logged (if logging is enabled), but other timers continue running
+  normally.
+
+- **Familiar JavaScript API** – `setTimeout()` and `setInterval()` are standard JavaScript functions that most
+  developers already know. This makes code more readable and maintainable compared to manually managing `mod.Wait()`
+  calls in async functions.
+
+- **Periodic Tasks Made Easy** – `setInterval()` provides a clean way to run recurring operations without manually
+  implementing loops with `mod.Wait()`. The timer automatically handles the repetition and can be cancelled when no
+  longer needed.
+
+### Ideal Use Cases
+
+The `Timers` module is particularly well-suited for:
+
+- **Periodic tasks** – Scoreboard updates, health checks, periodic spawns, or any recurring operation
+- **Delayed actions** – Respawn timers, delayed announcements, cleanup tasks that should happen after a delay
+- **Debouncing** – Input handlers that should only trigger after a period of inactivity
+- **Cancellable delays** – Any scenario where you might need to cancel a pending action (e.g., cancelling a respawn if
+  the player manually spawns)
+
+While `mod.Wait()` is still useful for simple, linear delays in async functions, the `Timers` module is the recommended
+approach for most timing needs in Battlefield Portal experiences.
+
+---
+
 ## API Reference
 
 ### `class Timers`
@@ -127,13 +176,13 @@ All methods are static. The class does not need to be instantiated.
 
 #### Static Methods
 
-| Method                                                                            | Description                                                                                                                                                                                                                        |
-| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setTimeout(callback: () => void, seconds: number): number`                       | Schedules a one-time execution of `callback` after `seconds` delay. Returns a timer ID that can be used with `clearTimeout()`.                                                                                                     |
-| `setInterval(callback: () => void, seconds: number, immediate?: boolean): number` | Schedules repeated execution of `callback` every `seconds`. Returns a timer ID that can be used with `clearInterval()`. If `immediate` is `true`, the callback runs immediately before the first wait period. Defaults to `false`. |
-| `clearTimeout(id: number \| undefined \| null): void`                             | Cancels a timeout identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs.                                                                                                                                        |
-| `clearInterval(id: number \| undefined \| null): void`                            | Cancels an interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs.                                                                                                                                      |
-| `setLogging(log: (text: string) => void): void`                                   | Attaches a logger function for debugging timer behavior. Log messages are prefixed with `<Timers>`. Set `log` to `undefined` to disable logging.                                                                                   |
+| Method                                                                       | Description                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `setTimeout(callback: () => void, ms: number): number`                       | Schedules a one-time execution of `callback` after `ms` milliseconds delay. Returns a timer ID that can be used with `clearTimeout()`.                                                                                                     |
+| `setInterval(callback: () => void, ms: number, immediate?: boolean): number` | Schedules repeated execution of `callback` every `ms` milliseconds. Returns a timer ID that can be used with `clearInterval()`. If `immediate` is `true`, the callback runs immediately before the first wait period. Defaults to `false`. |
+| `clearTimeout(id: number \| undefined \| null): void`                        | Cancels a timeout identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs.                                                                                                                                                |
+| `clearInterval(id: number \| undefined \| null): void`                       | Cancels an interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs.                                                                                                                                              |
+| `setLogging(log: (text: string) => void): void`                              | Attaches a logger function for debugging timer behavior. Log messages are prefixed with `<Timers>`. Set `log` to `undefined` to disable logging.                                                                                           |
 
 ---
 
@@ -160,7 +209,7 @@ export async function OnGameModeStarted(): Promise<void> {
     vehicleSpawnInterval = Timers.setInterval(() => {
         const spawnPoint = mod.GetRandomSpawnPoint(mod.GetTeam(1));
         mod.SpawnVehicle(mod.RuntimeSpawn_Common.Vehicle_Tank_T90, spawnPoint);
-    }, 60);
+    }, 60_000);
 }
 
 export async function OnGameModeEnded(): Promise<void> {
@@ -192,7 +241,7 @@ export async function OnPlayerUIButtonEvent(
         // This only runs if the player doesn't click again within 0.5 seconds
         handleButtonClick(player, widget);
         debounceTimers.delete(playerId);
-    }, 0.5);
+    }, 500);
 
     debounceTimers.set(playerId, timerId);
 }
@@ -217,7 +266,7 @@ export async function OnGameModeStarted(): Promise<void> {
                 console.log(`Error in async callback: ${error}`);
             }
         })();
-    }, 5);
+    }, 5_000);
 
     // Alternatively, define an async function and call it
     async function performAsyncTask() {
@@ -230,7 +279,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
     Timers.setInterval(() => {
         performAsyncTask(); // Note: not awaited, but errors are handled inside
-    }, 10);
+    }, 10_000);
 }
 ```
 
@@ -244,7 +293,7 @@ The `Timers` class implements timer functionality using Battlefield Portal's `mo
    `_ACTIVE_IDS` set when the timer is created.
 
 2. **setTimeout Implementation** – Creates an async function that:
-    - Waits for the specified delay using `await mod.Wait(seconds)`
+    - Waits for the specified delay using `await mod.Wait(ms / 1_000)` (converts milliseconds to seconds)
     - Checks if the timer is still active (hasn't been cleared)
     - Removes the timer ID from the active set
     - Executes the callback
@@ -253,7 +302,7 @@ The `Timers` class implements timer functionality using Battlefield Portal's `mo
 3. **setInterval Implementation** – Creates an async function that:
     - Optionally executes the callback immediately if `immediate` is `true`
     - Enters a `while` loop that continues while the timer ID is in the active set
-    - Waits for the interval duration using `await mod.Wait(seconds)`
+    - Waits for the interval duration using `await mod.Wait(ms / 1_000)` (converts milliseconds to seconds)
     - Checks if the timer is still active before each callback execution
     - Executes the callback in a try-catch to prevent errors from stopping the loop
     - Catches system errors (e.g., `mod.Wait()` failures) and cleans up the timer

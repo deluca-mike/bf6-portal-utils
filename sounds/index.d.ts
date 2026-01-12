@@ -16,6 +16,8 @@ export declare class Sounds {
     private static _play2DSoundForPlayer;
     private static _play2DSoundForSquad;
     private static _play2DSoundForTeam;
+    private static _stop;
+    static stop(soundObject: Sounds.SoundObject): void;
     static play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): Sounds.PlayedSound;
     static play3D(
         sfxAsset: mod.RuntimeSpawn_Common,
@@ -31,6 +33,7 @@ export declare namespace Sounds {
     type SoundObject = {
         sfx: mod.SFX;
         availableTime: number;
+        stopTimerId?: number;
     };
     type PlayedSound = {
         stop: () => void;

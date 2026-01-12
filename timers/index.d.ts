@@ -3,20 +3,22 @@ export declare class Timers {
     private static _nextId;
     private static _logger?;
     private static _log;
+    private static _executeTimeout;
+    private static _executeInterval;
     static setLogging(log: (text: string) => void): void;
     /**
      * Schedules a one-time execution after the specified delay.
      * @param callback Function to execute
-     * @param seconds Delay in seconds
+     * @param ms Delay in milliseconds
      * @returns Timer ID
      */
-    static setTimeout(callback: () => void, seconds: number): number;
+    static setTimeout(callback: () => void, ms: number): number;
     /**
      * @param callback Function to execute
-     * @param seconds Interval in seconds
+     * @param ms Interval in milliseconds
      * @param immediate If true, runs the callback immediately before the first wait period.
      */
-    static setInterval(callback: () => void, seconds: number, immediate?: boolean): number;
+    static setInterval(callback: () => void, ms: number, immediate?: boolean): number;
     /**
      * Cancels a timeout.
      * Silently ignores null, undefined, or invalid IDs.

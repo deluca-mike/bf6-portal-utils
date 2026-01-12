@@ -154,7 +154,18 @@ export declare namespace Events {
             : never;
     type EventParameters<T extends Type> =
         EventTypeName<T> extends keyof Signature ? Parameters<Signature[EventTypeName<T>]> : never;
-    export function subscribe<T extends Type>(type: T, handler: HandlerForType<T>): void;
+    /**
+     * Subscribe to an event.
+     * @param type - The event type to subscribe to.
+     * @param handler - The handler function to call when the event is triggered.
+     * @returns A function to unsubscribe from the event.
+     */
+    export function subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void;
+    /**
+     * Unsubscribe from an event.
+     * @param type - The event type to unsubscribe from.
+     * @param handler - The handler function that was subscribed.
+     */
     export function unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void;
     export function trigger<T extends Type>(type: T, ...args: EventParameters<T>): void;
     export {};
