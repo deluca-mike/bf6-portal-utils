@@ -78,7 +78,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
     // Play a 2D sound for all players
-    Sounds.play2D(SOUND_ALPHA_2D, { amplitude: 0.8, duration: 2 });
+    Sounds.play2D(SOUND_ALPHA_2D, { amplitude: 0.8, duration: 2000 });
 }
 
 export function OnPlayerUndeploy(eventPlayer: mod.Player): void {
@@ -110,7 +110,7 @@ export async function OnPlayerDied(
     Sounds.play3D(SOUND_BULLET_3D, victimPosition, {
         amplitude: 1.5,
         attenuationRange: 50, // Sound can be heard up to 50 meters away
-        duration: 5,
+        duration: 5000,
     });
 }
 ```
@@ -139,12 +139,12 @@ export async function OnPlayerDied(
 
 #### Static Methods
 
-| Method                                                                                                          | Description                                                                                                                                                                                                                                |
-| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): Sounds.PlayedSound`                       | Plays a 2D sound that can be heard by all players (or a specific player, squad, or team). Returns a `PlayedSound` object that can be used to stop the sound manually. Default duration is `3` seconds.                                     |
-| `play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): Sounds.PlayedSound` | Plays a 3D positional sound at the specified world position. The sound attenuates with distance based on `attenuationRange`. Returns a `PlayedSound` object that can be used to stop the sound manually. Default duration is `10` seconds. |
-| `setLogging(log?: (text: string) => void, logLevel?: Sounds.LogLevel): void`                                    | Attaches a logger function and defines a minimum log level. Useful for debugging sound behavior. Default log level is `Info` if not specified. Set `log` to `undefined` to disable logging.                                                |
-| `preload(sfxAsset: mod.RuntimeSpawn_Common): void`                                                              | Creates a sound object for the given asset if one doesn't already exist. This helps the game client load the sound asset into memory so it can play quicker when needed. Only needed once per asset, if at all.                            |
+| Method                                                                                                          | Description                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): Sounds.PlayedSound`                       | Plays a 2D sound that can be heard by all players (or a specific player, squad, or team). Returns a `PlayedSound` object that can be used to stop the sound manually. Default duration is `3000` milliseconds.                                     |
+| `play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): Sounds.PlayedSound` | Plays a 3D positional sound at the specified world position. The sound attenuates with distance based on `attenuationRange`. Returns a `PlayedSound` object that can be used to stop the sound manually. Default duration is `10000` milliseconds. |
+| `setLogging(log?: (text: string) => void, logLevel?: Sounds.LogLevel): void`                                    | Attaches a logger function and defines a minimum log level. Useful for debugging sound behavior. Default log level is `Info` if not specified. Set `log` to `undefined` to disable logging.                                                        |
+| `preload(sfxAsset: mod.RuntimeSpawn_Common): void`                                                              | Creates a sound object for the given asset if one doesn't already exist. This helps the game client load the sound asset into memory so it can play quicker when needed. Only needed once per asset, if at all.                                    |
 
 #### Static Properties
 
@@ -162,9 +162,9 @@ and `play3D()`.
 
 | Setting               | Type     | Default            | How to change             | Description                                                                                                           |
 | --------------------- | -------- | ------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `DEFAULT_2D_DURATION` | `number` | `3`                | Edit constant             | Default duration (seconds) for 2D sounds when not specified in `params.duration`.                                     |
-| `DEFAULT_3D_DURATION` | `number` | `10`               | Edit constant             | Default duration (seconds) for 3D sounds when not specified in `params.duration`.                                     |
-| `DURATION_BUFFER`     | `number` | `1`                | Edit constant             | Additional time (seconds) added to sound duration to prevent overlap when reusing sound objects.                      |
+| `DEFAULT_2D_DURATION` | `number` | `3000`             | Edit constant             | Default duration (milliseconds) for 2D sounds when not specified in `params.duration`.                                |
+| `DEFAULT_3D_DURATION` | `number` | `10000`            | Edit constant             | Default duration (milliseconds) for 3D sounds when not specified in `params.duration`.                                |
+| `DURATION_BUFFER`     | `number` | `1000`             | Edit constant             | Additional time (milliseconds) added to sound duration to prevent overlap when reusing sound objects.                 |
 | `amplitude` (2D)      | `number` | `1`                | `params.amplitude`        | Volume level for 2D sounds (typically 0.0 to 1.0, but can exceed 1.0 for amplification).                              |
 | `amplitude` (3D)      | `number` | `1`                | `params.amplitude`        | Volume level for 3D sounds (typically 0.0 to 1.0, but can exceed 1.0 for amplification).                              |
 | `attenuationRange`    | `number` | `10`               | `params.attenuationRange` | Maximum distance (meters) at which a 3D sound can be heard. Sounds fade out as distance increases.                    |
@@ -189,7 +189,7 @@ type PlayedSound = {
 **Usage:**
 
 ```ts
-const sound = Sounds.play2D(mySoundAsset, { duration: 10 });
+const sound = Sounds.play2D(mySoundAsset, { duration: 10000 });
 // ... later ...
 sound.stop(); // Stops the sound manually
 ```
@@ -204,7 +204,7 @@ type Params2D = {
     player?: mod.Player; // If specified, only this player hears the sound
     squad?: mod.Squad; // If specified, only players in this squad hear the sound
     team?: mod.Team; // If specified, only players on this team hear the sound
-    duration?: number; // Duration in seconds (default: 3). Use 0 for infinite duration.
+    duration?: number; // Duration in milliseconds (default: 3000). Use 0 for infinite duration.
 };
 ```
 
@@ -219,7 +219,7 @@ Optional parameters for 3D positional sound playback:
 type Params3D = {
     amplitude?: number; // Volume level (default: 1)
     attenuationRange?: number; // Maximum hearing distance in meters (default: 10)
-    duration?: number; // Duration in seconds (default: 10). Use 0 for infinite duration.
+    duration?: number; // Duration in milliseconds (default: 10000). Use 0 for infinite duration.
 };
 ```
 
@@ -264,11 +264,12 @@ The `Sounds` class uses a pooling and reuse system to efficiently manage sound p
    `PlaySound` call determines where/how the sound is heard.
 
 4. **Duration Management** – When a sound is played with a duration > 0, the system schedules an automatic stop using
-   `mod.Wait(duration)`. The `PlayedSound.stop()` method provides manual control and includes safeguards to prevent
-   stopping sounds that have already finished.
+   `Timers.setTimeout(duration)`. The timer can be cancelled if the sound is stopped manually via `PlayedSound.stop()`.
+   The `PlayedSound.stop()` method provides manual control and includes safeguards to prevent stopping sounds that have
+   already finished.
 
-5. **Infinite Duration** – When `duration` is `0`, the sound object's `availableTime` is set to
-   `Number.MAX_SAFE_INTEGER`, effectively reserving it indefinitely until manually stopped.
+5. **Infinite Duration** – When `duration` is `0`, the sound object's `availableTime` is set to `0`, effectively
+   reserving it indefinitely until manually stopped. No automatic stop timer is scheduled for infinite-duration sounds.
 
 6. **2D vs 3D Selection** – The system automatically calls the appropriate `mod.PlaySound` overload based on the
    parameters provided:

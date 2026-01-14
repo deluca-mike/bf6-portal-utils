@@ -2,7 +2,7 @@ import { SolidUI } from '../solid-ui/index.ts';
 import { UI } from '../ui/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 3.2.0
+// version: 4.0.0
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -49,14 +49,14 @@ export namespace FFASpawning {
 
         private static _spawnQueue: Soldier[] = [];
 
-        // Time subsequent delays between prompts.
-        private static _promptDelay: number = 10;
+        // Time subsequent delays between prompts (in milliseconds).
+        private static _promptDelay: number = 10_000;
 
-        // Time initial delay until the player is asked to spawn.
+        // Time initial delay until the player is asked to spawn (in milliseconds).
         private static _initialPromptDelay: number = this._promptDelay;
 
-        // The delay between processing the spawn queue.
-        private static _queueProcessingDelay: number = 1;
+        // The delay between processing the spawn queue (in milliseconds).
+        private static _queueProcessingDelay: number = 1_000;
 
         private static _queueProcessingEnabled: boolean = false;
 
@@ -186,11 +186,10 @@ export namespace FFASpawning {
                     `Spawning P_${soldier._playerId} at ${this.getVectorString(spawn.location)}.`
                 );
 
-                mod.EnableUIInputMode(false, soldier._player);
                 mod.SpawnPlayerFromSpawnPoint(soldier._player, spawn.spawnPoint);
             }
 
-            mod.Wait(this._queueProcessingDelay).then(() => this._processSpawnQueue());
+            Timers.setTimeout(() => this._processSpawnQueue(), this._queueProcessingDelay);
         }
 
         public static getVectorString(vector: mod.Vector): string {
@@ -289,29 +288,19 @@ export namespace FFASpawning {
 
             this._delayCountdown = { get: delayCountdown, set: setDelayCountdown };
 
-            this._promptUI = SolidUI.h(
-                UI.Container,
-                {
-                    x: 0,
-                    y: 0,
-                    width: 440,
-                    height: 140,
-                    anchor: mod.UIAnchor.Center,
-                    visible: () => {
-                        const visible = delayCountdown() == 0;
-
-                        if (!visible) return false;
-
-                        mod.EnableUIInputMode(true, this._player); // Allow payer to click prompt buttons.
-
-                        return true;
-                    },
-                    bgColor: UI.COLORS.BF_GREY_4,
-                    bgAlpha: 0.5,
-                    bgFill: mod.UIBgFill.Blur,
-                },
-                player
-            );
+            this._promptUI = SolidUI.h(UI.Container, {
+                x: 0,
+                y: 0,
+                width: 440,
+                height: 140,
+                anchor: mod.UIAnchor.Center,
+                visible: () => delayCountdown() === 0,
+                bgColor: UI.COLORS.BF_GREY_4,
+                bgAlpha: 0.5,
+                bgFill: mod.UIBgFill.Blur,
+                receiver: player,
+                uiInputModeWhenVisible: true,
+            });
 
             SolidUI.h(UI.TextButton, {
                 parent: this._promptUI,
@@ -357,24 +346,21 @@ export namespace FFASpawning {
                 onClick: async (player: mod.Player): Promise<void> => this.startDelayForPrompt(Soldier._promptDelay),
             });
 
-            this._countdownUI = SolidUI.h(
-                UI.Text,
-                {
-                    x: 0,
-                    y: 60,
-                    width: 400,
-                    height: 50,
-                    anchor: mod.UIAnchor.TopCenter,
-                    message: () => mod.Message(mod.stringkeys.ffaSpawning.countdown, delayCountdown()),
-                    textSize: 30,
-                    textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                    bgColor: UI.COLORS.BF_GREY_4,
-                    bgAlpha: 0.5,
-                    bgFill: mod.UIBgFill.Solid,
-                    visible: () => delayCountdown() > 0,
-                },
-                player
-            );
+            this._countdownUI = SolidUI.h(UI.Text, {
+                x: 0,
+                y: 60,
+                width: 400,
+                height: 50,
+                anchor: mod.UIAnchor.TopCenter,
+                message: () => mod.Message(mod.stringkeys.ffaSpawning.countdown, delayCountdown()),
+                textSize: 30,
+                textColor: UI.COLORS.BF_GREEN_BRIGHT,
+                bgColor: UI.COLORS.BF_GREY_4,
+                bgAlpha: 0.5,
+                bgFill: mod.UIBgFill.Solid,
+                visible: () => delayCountdown() > 0,
+                receiver: player,
+            });
         }
 
         private _player: mod.Player;
@@ -406,14 +392,12 @@ export namespace FFASpawning {
 
             Soldier._log(FFASpawning.LogLevel.Debug, `Starting ${delay}s delay for P_${this._playerId}.`);
 
-            mod.EnableUIInputMode(false, this._player);
-
             if (delay <= 0) return this._addToQueue();
 
             this._delayCountdown.set(delay);
 
             Timers.clearInterval(this._delayCountdownInterval);
-            this._delayCountdownInterval = Timers.setInterval(() => this._handleDelayCountdown(), 1);
+            this._delayCountdownInterval = Timers.setInterval(() => this._handleDelayCountdown(), 1_000);
         }
 
         private _handleDelayCountdown(): void {

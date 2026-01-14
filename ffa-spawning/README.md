@@ -63,9 +63,9 @@ export async function OnGameModeStarted(): Promise<void> {
         maximumInterestingDistance: 40, // Optional override (default 40)
         safeOverInterestingFallbackFactor: 1.5, // Optional override (default 1.5)
         maxSpawnCandidates: 12, // Optional override (default 12)
-        initialPromptDelay: 10, // Optional override (default 10)
-        promptDelay: 10, // Optional override (default 10)
-        queueProcessingDelay: 1, // Optional override (default 1)
+        initialPromptDelay: 10_000, // Optional override (default 10_000 ms)
+        promptDelay: 10_000, // Optional override (default 10_000 ms)
+        queueProcessingDelay: 1_000, // Optional override (default 1_000 ms)
     });
 
     // Enable spawn queue processing
@@ -193,15 +193,15 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 The following values control spawning behavior. Most can be overridden via the optional `options` argument on
 `initialize()`.
 
-| Setting                             | Type     | Default | How to change                                            | Description                                                                                                      |
-| ----------------------------------- | -------- | ------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `minimumSafeDistance`               | `number` | `20`    | `initialize` `options.minimumSafeDistance`               | Minimum distance (m) for a spawn to be considered safe.                                                          |
-| `maximumInterestingDistance`        | `number` | `40`    | `initialize` `options.maximumInterestingDistance`        | Maximum distance (m) for a spawn to still be considered interesting (not too far).                               |
-| `safeOverInterestingFallbackFactor` | `number` | `1.5`   | `initialize` `options.safeOverInterestingFallbackFactor` | Scales the midpoint between safe/interesting distances when picking a fallback spawn. Higher favors safer picks. |
-| `maxSpawnCandidates`                | `number` | `12`    | `initialize` `options.maxSpawnCandidates`                | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
-| `initialPromptDelay`                | `number` | `10`    | `initialize` `options.initialPromptDelay`                | Time (in seconds) until the player is first asked to spawn or delay the prompt again.                            |
-| `promptDelay`                       | `number` | `10`    | `initialize` `options.promptDelay`                       | Time (in seconds) until the player is asked to spawn or delay the prompt again (after clicking delay).           |
-| `queueProcessingDelay`              | `number` | `1`     | `initialize` `options.queueProcessingDelay`              | Delay (seconds) between processing spawn queue batches.                                                          |
+| Setting                             | Type     | Default  | How to change                                            | Description                                                                                                      |
+| ----------------------------------- | -------- | -------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `minimumSafeDistance`               | `number` | `20`     | `initialize` `options.minimumSafeDistance`               | Minimum distance (m) for a spawn to be considered safe.                                                          |
+| `maximumInterestingDistance`        | `number` | `40`     | `initialize` `options.maximumInterestingDistance`        | Maximum distance (m) for a spawn to still be considered interesting (not too far).                               |
+| `safeOverInterestingFallbackFactor` | `number` | `1.5`    | `initialize` `options.safeOverInterestingFallbackFactor` | Scales the midpoint between safe/interesting distances when picking a fallback spawn. Higher favors safer picks. |
+| `maxSpawnCandidates`                | `number` | `12`     | `initialize` `options.maxSpawnCandidates`                | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
+| `initialPromptDelay`                | `number` | `10_000` | `initialize` `options.initialPromptDelay`                | Time (in milliseconds) until the player is first asked to spawn or delay the prompt again.                       |
+| `promptDelay`                       | `number` | `10_000` | `initialize` `options.promptDelay`                       | Time (in milliseconds) until the player is asked to spawn or delay the prompt again (after clicking delay).      |
+| `queueProcessingDelay`              | `number` | `1_000`  | `initialize` `options.queueProcessingDelay`              | Delay (milliseconds) between processing spawn queue batches.                                                     |
 
 ---
 
@@ -253,9 +253,9 @@ type InitializeOptions = {
     minimumSafeDistance?: number; // Default 20
     maximumInterestingDistance?: number; // Default 40
     safeOverInterestingFallbackFactor?: number; // Default 1.5
-    initialPromptDelay?: number; // Default 10
-    promptDelay?: number; // Default 10
-    queueProcessingDelay?: number; // Default 1
+    initialPromptDelay?: number; // Default 10_000 (milliseconds)
+    promptDelay?: number; // Default 10_000 (milliseconds)
+    queueProcessingDelay?: number; // Default 1_000 (milliseconds)
 };
 ```
 
@@ -276,8 +276,8 @@ type InitializeOptions = {
 ### Lifecycle Flow
 
 1. Player joins or undeploys → `startDelayForPrompt()` is called
-2. Countdown timer displays for `initialPromptDelay` seconds (default: 10) on first prompt, or `promptDelay` seconds
-   (default: 10) on subsequent delays
+2. Countdown timer displays for `initialPromptDelay` milliseconds (default: 10_000) on first prompt, or `promptDelay`
+   milliseconds (default: 10_000) on subsequent delays
 3. UI prompt appears with "Spawn" and "Delay" buttons
 4. Player clicks "Spawn" → Player is added to spawn queue
 5. Player clicks "Delay" → Countdown restarts with `promptDelay` duration

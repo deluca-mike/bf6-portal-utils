@@ -1,10 +1,12 @@
-// version 1.2.0
+import { Timers } from '../timers/index.ts';
+
+// version 2.0.0
 export class Sounds {
-    private static readonly _DURATION_BUFFER: number = 1;
+    private static readonly _DURATION_BUFFER: number = 1_000; // 1 second buffer (in milliseconds) to add onto duration before making the sound object available for reuse.
 
-    private static readonly _DEFAULT_2D_DURATION: number = 3;
+    private static readonly _DEFAULT_2D_DURATION: number = 3_000; // 3 seconds default duration (in milliseconds) for 2D sounds.
 
-    private static readonly _DEFAULT_3D_DURATION: number = 10;
+    private static readonly _DEFAULT_3D_DURATION: number = 10_000; // 10 seconds default duration (in milliseconds) for 3D sounds.
 
     // A mapping of arrays of sound objects for each sfx asset that has been requested.
     // This mechanism ensures efficient sound management by reusing sound objects and avoiding unnecessary spawns.
@@ -41,13 +43,15 @@ export class Sounds {
         return this._SOUND_OBJECT_POOL.get(sfxAsset)!;
     }
 
+    // By default, the new `SoundObject` via `_getAvailableSoundObject` within `_DURATION_BUFFER` from now.
     private static _createSoundObject(
         soundObjects: Sounds.SoundObject[],
-        sfxAsset: mod.RuntimeSpawn_Common
+        sfxAsset: mod.RuntimeSpawn_Common,
+        availableTime: number = Date.now() + this._DURATION_BUFFER
     ): Sounds.SoundObject {
         const newSoundObject = {
             sfx: mod.SpawnObject(sfxAsset, mod.CreateVector(0, 0, 0), mod.CreateVector(0, 0, 0)),
-            availableTime: 0,
+            availableTime,
         };
 
         this._soundObjectsCount++;
@@ -62,10 +66,11 @@ export class Sounds {
         return newSoundObject;
     }
 
-    // Returns the first available `SoundObject` for the given sfx asset, and creates a new `SoundObject` if none is available.
+    // Returns the first available `SoundObject` for the given sfx asset, and creates a new `SoundObject` if none
+    // is available.
     private static _getAvailableSoundObject(
         sfxAsset: mod.RuntimeSpawn_Common,
-        currentTime: number = mod.GetMatchTimeElapsed()
+        currentTime: number = Date.now()
     ): Sounds.SoundObject {
         const soundObjects = this._getSoundObjects(sfxAsset);
 
@@ -82,68 +87,57 @@ export class Sounds {
         return this._createSoundObject(soundObjects, sfxAsset);
     }
 
-    // Creates a `PlayedSound` with that will automatically stop the underlying sound after the specified duration, and that can be stopped manually.
+    // Creates a `PlayedSound` with that will automatically stop the underlying sound after the specified duration, and
+    // that can be stopped manually.
     private static _createPlayedSound(
         soundObject: Sounds.SoundObject,
-        currentTime: number,
-        duration: number
+        duration: number,
+        currentTime: number = Date.now()
     ): Sounds.PlayedSound {
-        const availableTime =
+        duration = ~~duration; // Truncate to integer.
+
+        soundObject.availableTime =
             duration == 0
                 ? Number.MAX_SAFE_INTEGER
                 : (soundObject.availableTime = currentTime + duration + this._DURATION_BUFFER);
 
-        const stop = () => {
-            soundObject.availableTime = 0;
-            mod.StopSound(soundObject.sfx);
-        };
-
         if (duration > 0) {
-            mod.Wait(duration).then(() => {
-                this._log(Sounds.LogLevel.Debug, `Sound stopped automatically after ${duration} seconds.`);
-                stop();
-            });
+            soundObject.stopTimerId = Timers.setTimeout(() => {
+                this._log(Sounds.LogLevel.Debug, `Sound stopped automatically after ${duration}ms.`);
+                this._stop(soundObject);
+            }, duration);
         }
 
         return {
-            stop: () => {
-                if (mod.GetMatchTimeElapsed() > availableTime) {
-                    this._log(Sounds.LogLevel.Error, `Sound already stopped.`);
-                    return;
-                }
-
-                this._log(Sounds.LogLevel.Debug, `Sound stopped manually.`);
-
-                stop();
-            },
+            stop: () => this.stop(soundObject),
         };
     }
 
     private static _play2DSound(
         sfxAsset: mod.RuntimeSpawn_Common,
-        currentTime: number,
         duration: number,
         amplitude: number
     ): Sounds.PlayedSound {
+        const currentTime = Date.now();
         const soundObject = this._getAvailableSoundObject(sfxAsset, currentTime);
 
         mod.PlaySound(soundObject.sfx, amplitude);
 
         this._log(
             Sounds.LogLevel.Info,
-            `2D sound played for all players (amplitude ${amplitude.toFixed(2)}, duration ${duration.toFixed(2)}s).`
+            `2D sound played for all players (amplitude ${amplitude.toFixed(2)}, duration ${duration}ms).`
         );
 
-        return this._createPlayedSound(soundObject, currentTime, duration);
+        return this._createPlayedSound(soundObject, duration, currentTime);
     }
 
     private static _play2DSoundForPlayer(
         sfxAsset: mod.RuntimeSpawn_Common,
-        currentTime: number,
         duration: number,
         amplitude: number,
         player: mod.Player
     ): Sounds.PlayedSound {
+        const currentTime = Date.now();
         const soundObject = this._getAvailableSoundObject(sfxAsset, currentTime);
 
         mod.PlaySound(soundObject.sfx, amplitude, player);
@@ -152,38 +146,38 @@ export class Sounds {
             Sounds.LogLevel.Info,
             `2D sound played for player ${mod.GetObjId(player)} (amplitude ${amplitude.toFixed(
                 2
-            )}, duration ${duration.toFixed(2)}s).`
+            )}, duration ${duration}ms).`
         );
 
-        return this._createPlayedSound(soundObject, currentTime, duration);
+        return this._createPlayedSound(soundObject, duration, currentTime);
     }
 
     private static _play2DSoundForSquad(
         sfxAsset: mod.RuntimeSpawn_Common,
-        currentTime: number,
         duration: number,
         amplitude: number,
         squad: mod.Squad
     ): Sounds.PlayedSound {
+        const currentTime = Date.now();
         const soundObject = this._getAvailableSoundObject(sfxAsset, currentTime);
 
         mod.PlaySound(soundObject.sfx, amplitude, squad);
 
         this._log(
             Sounds.LogLevel.Info,
-            `2D sound played for squad (amplitude ${amplitude.toFixed(2)}, duration ${duration.toFixed(2)}s).`
+            `2D sound played for squad (amplitude ${amplitude.toFixed(2)}, duration ${duration}ms).`
         ); // TODO: Get Squad ID if and when API is fixed.
 
-        return this._createPlayedSound(soundObject, currentTime, duration);
+        return this._createPlayedSound(soundObject, duration, currentTime);
     }
 
     private static _play2DSoundForTeam(
         sfxAsset: mod.RuntimeSpawn_Common,
-        currentTime: number,
         duration: number,
         amplitude: number,
         team: mod.Team
     ): Sounds.PlayedSound {
+        const currentTime = Date.now();
         const soundObject = this._getAvailableSoundObject(sfxAsset, currentTime);
 
         mod.PlaySound(soundObject.sfx, amplitude, team);
@@ -192,24 +186,42 @@ export class Sounds {
             Sounds.LogLevel.Info,
             `2D sound played for player ${mod.GetObjId(team)} (amplitude ${amplitude.toFixed(
                 2
-            )}, duration ${duration.toFixed(2)}s).`
+            )}, duration ${duration}ms).`
         );
 
-        return this._createPlayedSound(soundObject, currentTime, duration);
+        return this._createPlayedSound(soundObject, duration, currentTime);
+    }
+
+    private static _stop(soundObject: Sounds.SoundObject): void {
+        mod.StopSound(soundObject.sfx);
+        Timers.clearTimeout(soundObject.stopTimerId);
+        soundObject.availableTime = 0;
+    }
+
+    public static stop(soundObject: Sounds.SoundObject): void {
+        Timers.clearTimeout(soundObject.stopTimerId);
+
+        if (Date.now() > soundObject.availableTime) {
+            this._log(Sounds.LogLevel.Info, `Sound already stopped.`);
+            return;
+        }
+
+        this._log(Sounds.LogLevel.Debug, `Sound stopped manually.`);
+
+        this._stop(soundObject);
     }
 
     public static play2D(sfxAsset: mod.RuntimeSpawn_Common, params: Sounds.Params2D = {}): Sounds.PlayedSound {
-        const duration = params.duration ?? this._DEFAULT_2D_DURATION;
-        const currentTime = mod.GetMatchTimeElapsed();
+        const duration = ~~(params.duration ?? this._DEFAULT_2D_DURATION); // Truncate to integer.
         const amplitude = params.amplitude ?? 1;
 
-        if (params.player) return this._play2DSoundForPlayer(sfxAsset, currentTime, duration, amplitude, params.player);
+        if (params.player) return this._play2DSoundForPlayer(sfxAsset, duration, amplitude, params.player);
 
-        if (params.squad) return this._play2DSoundForSquad(sfxAsset, currentTime, duration, amplitude, params.squad);
+        if (params.squad) return this._play2DSoundForSquad(sfxAsset, duration, amplitude, params.squad);
 
-        if (params.team) return this._play2DSoundForTeam(sfxAsset, currentTime, duration, amplitude, params.team);
+        if (params.team) return this._play2DSoundForTeam(sfxAsset, duration, amplitude, params.team);
 
-        return this._play2DSound(sfxAsset, currentTime, duration, amplitude);
+        return this._play2DSound(sfxAsset, duration, amplitude);
     }
 
     public static play3D(
@@ -221,7 +233,7 @@ export class Sounds {
         const soundObject = this._getAvailableSoundObject(sfxAsset, currentTime);
         const amplitude = params.amplitude ?? 1;
         const attenuationRange = params.attenuationRange ?? 10;
-        const duration = params.duration ?? this._DEFAULT_3D_DURATION;
+        const duration = ~~(params.duration ?? this._DEFAULT_3D_DURATION); // Truncate to integer.
 
         mod.PlaySound(soundObject.sfx, amplitude, position, attenuationRange);
 
@@ -229,10 +241,10 @@ export class Sounds {
             Sounds.LogLevel.Info,
             `3D sound played at position ${this._getVectorString(position)} (amplitude ${amplitude.toFixed(
                 2
-            )}, att. range ${attenuationRange.toFixed(2)}m, duration ${duration.toFixed(2)}s).`
+            )}, att. range ${attenuationRange.toFixed(2)}m, duration ${duration}ms).`
         ); // TODO: Get Squad ID if and when API is fixed.
 
-        return this._createPlayedSound(soundObject, currentTime, duration);
+        return this._createPlayedSound(soundObject, duration, currentTime);
     }
 
     // Attaches a logger and defines a minimum log level.
@@ -249,7 +261,7 @@ export class Sounds {
 
         if (soundObjects.length) return;
 
-        this._createSoundObject(soundObjects, sfxAsset);
+        this._createSoundObject(soundObjects, sfxAsset, 0); // Available time is 0 (i.e. immediately available).
     }
 
     // Returns the total number of `SoundObject`s created.
@@ -267,6 +279,7 @@ export namespace Sounds {
     export type SoundObject = {
         sfx: mod.SFX;
         availableTime: number;
+        stopTimerId?: number;
     };
 
     export type PlayedSound = {
@@ -278,13 +291,13 @@ export namespace Sounds {
         player?: mod.Player;
         squad?: mod.Squad;
         team?: mod.Team;
-        duration?: number; // 0 for infinite duration (i.e. for looping assets)
+        duration?: number; // In milliseconds, 0 for infinite duration (i.e. for looping assets)
     };
 
     export type Params3D = {
         amplitude?: number;
         attenuationRange?: number;
-        duration?: number; // 0 for infinite duration (i.e. for looping assets)
+        duration?: number; // In milliseconds, 0 for infinite duration (i.e. for looping assets)
     };
 
     export enum LogLevel {

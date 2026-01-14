@@ -8,12 +8,10 @@ common development tasks and provide robust, well-tested solutions for UI creati
 
 This repository is organized into focused modules, each addressing specific development needs:
 
-- **[Logger Module](./logger/)** – A powerful logging system that displays runtime text directly on-screen, solving
-  Battlefield Portal's debugging limitations. Works on all platforms, including console builds.
-
-- **[UI Helper Module](./ui/)** – Object-oriented TypeScript wrappers around Battlefield Portal's UI APIs, providing
-  strongly typed helpers, convenient defaults, and ergonomic interfaces for building complex HUDs, panels, and
-  interactive buttons.
+- **[Events Module](./events/)** – A centralized event subscription system that allows multiple handlers to subscribe to
+  the same Battlefield Portal event. This module implements all handlers once and exposes a subscription API, enabling
+  modular code organization, clean separation of concerns, and ensures various handlers execute asynchronously without
+  blocking each other.
 
 - **[FFA Spawning Module](./ffa-spawning/)** – Enables Free For All (FFA) spawning for custom Battlefield Portal
   experiences by short-circuiting the normal deploy process in favor of a custom UI prompt. Uses an intelligent
@@ -24,6 +22,9 @@ This repository is organized into focused modules, each addressing specific deve
   the interact key, even when there is no object that can be interacted with nearby. This utility enables custom UI
   triggers and special actions without relying on in-world physical interaction points or awkward movement combinations.
 
+- **[Logger Module](./logger/)** – A powerful logging system that displays runtime text directly on-screen, solving
+  Battlefield Portal's debugging limitations. Works on all platforms, including console builds.
+
 - **[Map Detector Module](./map-detector/)** – Detects the current map by analyzing the coordinates of Team 1's
   Headquarters (HQ), providing a reliable alternative to the broken `mod.IsCurrentMap` API. Supports detection of all
   available maps with fast, coordinate-based identification.
@@ -32,16 +33,32 @@ This repository is organized into focused modules, each addressing specific deve
   server, providing real-time performance metrics that help identify when the server is under stress or when script
   callbacks are being deprioritized by the game engine.
 
+- **[Raycast Module](./raycast/)** – Abstracts Battlefield Portal's raycasting functionality with automatic hit/miss
+  attribution to the correct rays. Handles attribution mechanics, manages time-to-live for rays, and provides a clean
+  callback-based API to make it easier to perform mass obstacle detection, line of sight checks, and interactive object
+  detection.
+
+- **[SolidUI Module](./solid-ui/)** – A reactive UI framework inspired by SolidJS, providing fine-grained reactivity for
+  Battlefield Portal UIs. Uses signals, effects, memos, and stores to create dynamic interfaces that update only the
+  specific properties that change, resulting in minimal overhead and maximum performance. Integrates seamlessly with the
+  UI Module.
+
 - **[Sounds Module](./sounds/)** – Abstracts away the nuance, oddities, and pitfalls of playing sounds at runtime in
   Battlefield Portal experiences. Provides efficient sound object management through automatic pooling and reuse,
   handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional), and manages sound
   durations automatically.
 
-- **[Timers Module](./timers/)** – Provides `setTimeout` and `setInterval` functionality since Battlefield Portal runs
-  in a QuickJS runtime that does not natively include these standard JavaScript timing functions.
+- **[Timers Module](./timers/)** – Provides `setTimeout` and `setInterval` functionality, since the BF6 Portal
+  Javascript runtime does not natively include these standard timing functions. Offers significant advantages over
+  `mod.Wait()`: timers can be cancelled with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently
+  without blocking, automatic error handling prevents timer failures from crashing your mod, and the familiar JavaScript
+  API makes code more readable and maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario
+  where you need cancellable or recurring delays.
 
-- **[Type Definitions](./mod/)** – Complete TypeScript type declarations for Battlefield Portal's `mod` namespace,
-  essential for type-safe development. Additional unofficial comments and documentation are added.
+- **[UI Module](./ui/)** – Object-oriented TypeScript wrappers around Battlefield Portal's UI APIs, providing strongly
+  typed helpers, convenient defaults, and ergonomic interfaces for building complex HUDs, panels, and interactive
+  buttons. Features automatic naming and UI input mode management, eliminating the need to manually track and
+  enable/disable scoped UI input mode when elements are shown or hidden.
 
 ## Getting Started
 

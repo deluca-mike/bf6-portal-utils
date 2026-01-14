@@ -1,4 +1,4 @@
-// version 1.2.0
+// version 1.2.1
 export class PerformanceStats {
     private stressThreshold: number = 25;
 
@@ -15,7 +15,7 @@ export class PerformanceStats {
     private log?: (text: string) => void;
 
     constructor(options?: PerformanceStats.Options) {
-        this.log = options?.log ?? (() => {});
+        this.log = options?.log;
         this.sampleRateSeconds = options?.sampleRateSeconds ?? 0.5;
         this.stressThreshold = options?.stressThreshold ?? 25;
         this.deprioritizedThreshold = options?.deprioritizedThreshold ?? 65;

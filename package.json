@@ -1,6 +1,6 @@
 {
     "name": "bf6-portal-utils",
-    "version": "5.0.0",
+    "version": "6.0.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
     "engines": {
@@ -10,7 +10,7 @@
         "prettier": "prettier --write ./**/*.ts ./*.mjs ./*.md ./*.json ./**/*.md ./**/*.json",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
-        "build:types": "tsc --project tsconfig.build.json"
+        "build:types": "tsc --project tsconfig.build.json && npm run prettier"
     },
     "repository": {
         "type": "git",

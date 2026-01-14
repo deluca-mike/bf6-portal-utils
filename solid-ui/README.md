@@ -637,7 +637,9 @@ SolidUI.h(MyButton, {
 **Important Notes:**
 
 - Properties that are functions are automatically made reactive
-- The `onClick` property is never made reactive (it's always passed through as-is)
+- Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made
+  reactive and are always passed through as-is. This includes event handlers like `onClick`, `onHover`, `onDelete`,
+  etc., but excludes properties like `onlyOnce`, `once`, or `online`
 - All reactive effects are automatically cleaned up when the UI element is deleted
 - You can mix static and reactive properties in the same props object
 
@@ -1104,6 +1106,67 @@ interface Context<T> {
 }
 ```
 
+### `SolidUI.Constructable<Params, Instance>`
+
+Defines the contract for any UI Class Constructor (Native or Custom). This type represents a class constructor that
+takes parameters of type `Params` and returns an instance of type `Instance`.
+
+```ts
+type Constructable<Params, Instance> = new (params: Params) => Instance;
+```
+
+**Usage:**
+
+This type is used internally by `SolidUI.h()` to accept UI class constructors like `UI.Button`, `UI.Container`, etc. You
+typically don't need to use this type directly, but it's useful for understanding how `h()` accepts class constructors.
+
+**Example:**
+
+```ts
+// UI.Button is a Constructable<ButtonParams, ButtonInstance>
+const button = SolidUI.h(UI.Button, {
+    // ... props
+});
+```
+
+### `SolidUI.FunctionalComponent<Params, Instance>`
+
+Defines the contract for a functional component. This type represents a function that takes reactive props of type
+`Reactive<Params>` and returns an instance of type `Instance`.
+
+```ts
+type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instance;
+```
+
+**Usage:**
+
+This type is used internally by `SolidUI.h()` to accept functional components. When you pass a function to `h()`, it's
+treated as a `FunctionalComponent`. The function receives props where each property can optionally be a Signal/Accessor.
+
+**Example:**
+
+```ts
+function MyButton(props: { team: number; onClick: () => void }) {
+    return SolidUI.h(UI.TextButton, {
+        message: mod.Message(mod.stringkeys.switchTeams, props.team),
+        onClick: props.onClick,
+        width: 200,
+        height: 40,
+    });
+}
+
+// MyButton is a FunctionalComponent<{ team: number; onClick: () => void }, TextButtonInstance>
+SolidUI.h(MyButton, {
+    team: 1,
+    onClick: async () => {
+        console.log('Clicked!');
+    },
+});
+```
+
+**Note:** Functional components receive props where values can be either static values or accessor functions (signals).
+The component can call accessors to get reactive values, but the props themselves are not automatically unwrapped.
+
 ---
 
 ## How It Works
@@ -1167,7 +1230,9 @@ will fail silently (errors are caught). Ensure your UI objects have proper sette
 ### Accessor Function Detection
 
 `SolidUI.h()` treats any function value as an accessor. If you need to pass a function as a static value (not reactive),
-you'll need to work around this. The `onClick` property is special-cased and never made reactive.
+you'll need to work around this. Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an
+uppercase letter) are never made reactive. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but
+excludes properties like `onlyOnce`, `once`, or `online`.
 
 ### Store Updates
 
