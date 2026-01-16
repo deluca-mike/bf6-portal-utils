@@ -2,7 +2,7 @@ import { SolidUI } from '../solid-ui/index.ts';
 import { UI } from '../ui/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 4.0.0
+// version: 4.1.0
 export namespace FFASpawning {
     export enum LogLevel {
         Debug = 0,
@@ -49,14 +49,14 @@ export namespace FFASpawning {
 
         private static _spawnQueue: Soldier[] = [];
 
-        // Time subsequent delays between prompts (in milliseconds).
-        private static _promptDelay: number = 10_000;
+        // Time subsequent delays between prompts (in seconds).
+        private static _promptDelay: number = 10;
 
-        // Time initial delay until the player is asked to spawn (in milliseconds).
+        // Time initial delay until the player is asked to spawn (in seconds).
         private static _initialPromptDelay: number = this._promptDelay;
 
-        // The delay between processing the spawn queue (in milliseconds).
-        private static _queueProcessingDelay: number = 1_000;
+        // The delay between processing the spawn queue (in seconds).
+        private static _queueProcessingDelay: number = 1;
 
         private static _queueProcessingEnabled: boolean = false;
 
@@ -189,7 +189,19 @@ export namespace FFASpawning {
                 mod.SpawnPlayerFromSpawnPoint(soldier._player, spawn.spawnPoint);
             }
 
-            Timers.setTimeout(() => this._processSpawnQueue(), this._queueProcessingDelay);
+            Timers.setTimeout(() => this._processSpawnQueue(), this._queueProcessingDelay * 1000);
+        }
+
+        private static _getPosition(player: mod.Player): { x: number; y: number; z: number } {
+            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return { x: 0, y: 0, z: 0 };
+
+            const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
+
+            return {
+                x: ~~(mod.XComponentOf(position) * 100),
+                y: ~~(mod.YComponentOf(position) * 100),
+                z: ~~(mod.ZComponentOf(position) * 100),
+            };
         }
 
         public static getVectorString(vector: mod.Vector): string {
@@ -274,7 +286,7 @@ export namespace FFASpawning {
         }
 
         // Every player that should be handled by this spawning system should be instantiated as a `FFASpawning`, usually in the `OnPlayerSpawned()` event.
-        constructor(player: mod.Player) {
+        constructor(player: mod.Player, showDebugPosition: boolean = false) {
             this._player = player;
             this._playerId = mod.GetObjId(player);
 
@@ -361,6 +373,38 @@ export namespace FFASpawning {
                 visible: () => delayCountdown() > 0,
                 receiver: player,
             });
+
+            if (showDebugPosition) {
+                const [playerPosition, setPlayerPosition] = SolidUI.createStore({ x: 0, y: 0, z: 0 });
+
+                this._updatePositionInterval = Timers.setInterval(() => {
+                    setPlayerPosition((state) => {
+                        const { x, y, z } = Soldier._getPosition(player);
+                        state.x = x;
+                        state.y = y;
+                        state.z = z;
+                    });
+                }, 1_000);
+
+                this._debugPositionUI = SolidUI.h(UI.Text, {
+                    width: 360,
+                    height: 26,
+                    anchor: mod.UIAnchor.BottomCenter,
+                    message: () =>
+                        mod.Message(
+                            mod.stringkeys.ffaSpawning.debug.position,
+                            playerPosition.x,
+                            playerPosition.y,
+                            playerPosition.z
+                        ),
+                    textSize: 20,
+                    textColor: UI.COLORS.BF_GREEN_BRIGHT,
+                    bgColor: UI.COLORS.BF_GREY_4,
+                    bgAlpha: 0.75,
+                    bgFill: mod.UIBgFill.Blur,
+                    receiver: player,
+                });
+            }
         }
 
         private _player: mod.Player;
@@ -376,6 +420,10 @@ export namespace FFASpawning {
         private _promptUI?: UI.Container;
 
         private _countdownUI?: UI.Text;
+
+        private _updatePositionInterval?: number;
+
+        private _debugPositionUI?: UI.Text;
 
         public get player(): mod.Player {
             return this._player;
@@ -434,9 +482,11 @@ export namespace FFASpawning {
             Soldier._log(FFASpawning.LogLevel.Info, `P_${this._playerId} is no longer valid.`);
 
             Timers.clearInterval(this._delayCountdownInterval);
+            Timers.clearInterval(this._updatePositionInterval);
 
             this._promptUI?.delete();
             this._countdownUI?.delete();
+            this._debugPositionUI?.delete();
 
             delete Soldier._ALL_SOLDIERS[this._playerId];
 

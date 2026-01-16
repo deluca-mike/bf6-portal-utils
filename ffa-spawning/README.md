@@ -63,9 +63,9 @@ export async function OnGameModeStarted(): Promise<void> {
         maximumInterestingDistance: 40, // Optional override (default 40)
         safeOverInterestingFallbackFactor: 1.5, // Optional override (default 1.5)
         maxSpawnCandidates: 12, // Optional override (default 12)
-        initialPromptDelay: 10_000, // Optional override (default 10_000 ms)
-        promptDelay: 10_000, // Optional override (default 10_000 ms)
-        queueProcessingDelay: 1_000, // Optional override (default 1_000 ms)
+        initialPromptDelay: 10, // Optional override (default 10 seconds)
+        promptDelay: 10, // Optional override (default 10 seconds)
+        queueProcessingDelay: 1, // Optional override (default 1 second)
     });
 
     // Enable spawn queue processing
@@ -77,7 +77,8 @@ export async function OnGameModeStarted(): Promise<void> {
 
 export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
     // Create a FFASpawning.Soldier instance for each player
-    const soldier = new FFASpawning.Soldier(eventPlayer);
+    // Pass `true` as the second parameter to enable debug position display (useful for finding spawn points).
+    const soldier = new FFASpawning.Soldier(eventPlayer, false);
 
     // Start the delay countdown for the player.
     soldier.startDelayForPrompt();
@@ -147,6 +148,38 @@ players.
 
 ---
 
+## Debugging & Development Tools
+
+### Debug Position Display
+
+The `Soldier` constructor accepts an optional `showDebugPosition` parameter (default: `false`) that enables a real-time
+position display for developers. When enabled, the player's X, Y, and Z coordinates are displayed at the bottom center
+of the screen, updating every second.
+
+**Use Case**: This feature is intended for developers who want to move around maps to find and document spawn positions,
+as Battlefield Portal does not provide a built-in way to display coordinates in-game.
+
+**Coordinate Format**: Coordinates are scaled by 100 and truncated (using integer truncation) to avoid Portal's decimal
+display issues. For example:
+
+- A position of `-100.24` will be displayed as `-10024`
+- A position of `50.67` will be displayed as `5067`
+
+To convert back to the actual world coordinates, divide the displayed value by 100.
+
+**Example Usage**:
+
+```ts
+export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
+    // Enable debug position display for development/testing for the first joining player (usually the admin).
+    const soldier = new FFASpawning.Soldier(eventPlayer, mod.GetObjId(eventPlayer) === 0);
+
+    soldier.startDelayForPrompt();
+}
+```
+
+---
+
 ## API Reference
 
 ### `namespace FFASpawning`
@@ -169,9 +202,9 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 
 #### Constructor
 
-| Signature                         | Description                                                                                                                                                                                                                         |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constructor(player: mod.Player)` | Every player that should be handled by this spawning system should be instantiated as a `FFASpawning.Soldier`, usually in the `OnPlayerJoinGame()` event. Creates the UI elements for human players (AI soldiers skip UI creation). |
+| Signature                                                      | Description                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constructor(player: mod.Player, showDebugPosition?: boolean)` | Every player that should be handled by this spawning system should be instantiated as a `FFASpawning.Soldier`, usually in the `OnPlayerJoinGame()` event. Creates the UI elements for human players (AI soldiers skip UI creation). When `showDebugPosition` is `true`, displays the player's X, Y, and Z coordinates (scaled by 100 and truncated) at the bottom center of the screen, updating every second. |
 
 #### Instance Properties
 
@@ -193,15 +226,15 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 The following values control spawning behavior. Most can be overridden via the optional `options` argument on
 `initialize()`.
 
-| Setting                             | Type     | Default  | How to change                                            | Description                                                                                                      |
-| ----------------------------------- | -------- | -------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `minimumSafeDistance`               | `number` | `20`     | `initialize` `options.minimumSafeDistance`               | Minimum distance (m) for a spawn to be considered safe.                                                          |
-| `maximumInterestingDistance`        | `number` | `40`     | `initialize` `options.maximumInterestingDistance`        | Maximum distance (m) for a spawn to still be considered interesting (not too far).                               |
-| `safeOverInterestingFallbackFactor` | `number` | `1.5`    | `initialize` `options.safeOverInterestingFallbackFactor` | Scales the midpoint between safe/interesting distances when picking a fallback spawn. Higher favors safer picks. |
-| `maxSpawnCandidates`                | `number` | `12`     | `initialize` `options.maxSpawnCandidates`                | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
-| `initialPromptDelay`                | `number` | `10_000` | `initialize` `options.initialPromptDelay`                | Time (in milliseconds) until the player is first asked to spawn or delay the prompt again.                       |
-| `promptDelay`                       | `number` | `10_000` | `initialize` `options.promptDelay`                       | Time (in milliseconds) until the player is asked to spawn or delay the prompt again (after clicking delay).      |
-| `queueProcessingDelay`              | `number` | `1_000`  | `initialize` `options.queueProcessingDelay`              | Delay (milliseconds) between processing spawn queue batches.                                                     |
+| Setting                             | Type     | Default | How to change                                            | Description                                                                                                      |
+| ----------------------------------- | -------- | ------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `minimumSafeDistance`               | `number` | `20`    | `initialize` `options.minimumSafeDistance`               | Minimum distance (m) for a spawn to be considered safe.                                                          |
+| `maximumInterestingDistance`        | `number` | `40`    | `initialize` `options.maximumInterestingDistance`        | Maximum distance (m) for a spawn to still be considered interesting (not too far).                               |
+| `safeOverInterestingFallbackFactor` | `number` | `1.5`   | `initialize` `options.safeOverInterestingFallbackFactor` | Scales the midpoint between safe/interesting distances when picking a fallback spawn. Higher favors safer picks. |
+| `maxSpawnCandidates`                | `number` | `12`    | `initialize` `options.maxSpawnCandidates`                | Max random spawn points inspected per queue pop. Higher improves quality but costs more checks.                  |
+| `initialPromptDelay`                | `number` | `10`    | `initialize` `options.initialPromptDelay`                | Time (in seconds) until the player is first asked to spawn or delay the prompt again.                            |
+| `promptDelay`                       | `number` | `10`    | `initialize` `options.promptDelay`                       | Time (in seconds) until the player is asked to spawn or delay the prompt again (after clicking delay).           |
+| `queueProcessingDelay`              | `number` | `1`     | `initialize` `options.queueProcessingDelay`              | Delay (in seconds) between processing spawn queue batches.                                                       |
 
 ---
 
@@ -253,9 +286,9 @@ type InitializeOptions = {
     minimumSafeDistance?: number; // Default 20
     maximumInterestingDistance?: number; // Default 40
     safeOverInterestingFallbackFactor?: number; // Default 1.5
-    initialPromptDelay?: number; // Default 10_000 (milliseconds)
-    promptDelay?: number; // Default 10_000 (milliseconds)
-    queueProcessingDelay?: number; // Default 1_000 (milliseconds)
+    initialPromptDelay?: number; // Default 10 (seconds)
+    promptDelay?: number; // Default 10 (seconds)
+    queueProcessingDelay?: number; // Default 1 (seconds)
 };
 ```
 
@@ -276,8 +309,8 @@ type InitializeOptions = {
 ### Lifecycle Flow
 
 1. Player joins or undeploys → `startDelayForPrompt()` is called
-2. Countdown timer displays for `initialPromptDelay` milliseconds (default: 10_000) on first prompt, or `promptDelay`
-   milliseconds (default: 10_000) on subsequent delays
+2. Countdown timer displays for `initialPromptDelay` seconds (default: 10) on first prompt, or `promptDelay` seconds
+   (default: 10) on subsequent delays
 3. UI prompt appears with "Spawn" and "Delay" buttons
 4. Player clicks "Spawn" → Player is added to spawn queue
 5. Player clicks "Delay" → Countdown restarts with `promptDelay` duration
@@ -298,10 +331,15 @@ your mod. The strings are automatically available under the `ffaSpawning` key:
             "spawn": "Spawn now",
             "delay": "Ask again in {} seconds"
         },
-        "countdown": "Spawning available in {} seconds..."
+        "countdown": "Spawning available in {} seconds...",
+        "debug": {
+            "position": "XYZ (x100): <{}, {}, {}>"
+        }
     }
 }
 ```
+
+The `debug.position` string is used when the `showDebugPosition` constructor parameter is enabled.
 
 ---
 

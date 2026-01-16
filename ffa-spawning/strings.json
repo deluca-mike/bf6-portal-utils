@@ -4,6 +4,9 @@
         "buttons": {
             "spawn": "Spawn now",
             "delay": "Ask again in {} seconds"
+        },
+        "debug": {
+            "position": "XYZ (x100): <{}, {}, {}>"
         }
     }
 }

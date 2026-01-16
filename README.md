@@ -48,12 +48,10 @@ This repository is organized into focused modules, each addressing specific deve
   handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional), and manages sound
   durations automatically.
 
-- **[Timers Module](./timers/)** – Provides `setTimeout` and `setInterval` functionality, since the BF6 Portal
-  Javascript runtime does not natively include these standard timing functions. Offers significant advantages over
-  `mod.Wait()`: timers can be cancelled with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently
-  without blocking, automatic error handling prevents timer failures from crashing your mod, and the familiar JavaScript
-  API makes code more readable and maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario
-  where you need cancellable or recurring delays.
+- **[Timers Module](./timers/)** – Reintroduces `setTimeout` and `setInterval` functionality into BF6 Portal; the
+  familiar JavaScript API makes code more readable and maintainable. It offers significant advantages over `mod.Wait()`
+  since timers can be cancelled and multiple timers can run concurrently without blocking. Ideal for periodic tasks,
+  delayed actions, debouncing, etc.
 
 - **[UI Module](./ui/)** – Object-oriented TypeScript wrappers around Battlefield Portal's UI APIs, providing strongly
   typed helpers, convenient defaults, and ergonomic interfaces for building complex HUDs, panels, and interactive
