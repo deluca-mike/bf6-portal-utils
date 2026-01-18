@@ -5,7 +5,8 @@ analyzing the coordinates of Team 1's Headquarters (HQ). This utility is necessa
 official Battlefield Portal API is currently broken and unreliable.
 
 The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and
-uses these coordinates to identify which map is currently active.
+uses these coordinates to identify which map is currently active. The module uses the `Logging` module for internal
+logging, allowing you to monitor map detection behavior and debug issues.
 
 > **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.Maps`, etc.) come from
 > [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
@@ -39,6 +40,9 @@ uses these coordinates to identify which map is currently active.
 import { MapDetector } from 'bf6-portal-utils/map-detector';
 
 export async function OnGameModeStarted(): Promise<void> {
+    // Optional: Configure logging for map detection debugging
+    MapDetector.setLogging((text) => console.log(text), MapDetector.LogLevel.Warning);
+
     // Get the current map as a MapDetector.Map enum
     const map = MapDetector.currentMap();
     if (map == MapDetector.Map.Downtown) {
@@ -70,23 +74,37 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ## API Reference
 
+### `namespace MapDetector`
+
+The `MapDetector` namespace contains map detection functions and related types.
+
+#### `MapDetector.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with
+`MapDetector.setLogging()` to configure the minimum log level for map detection logging.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Includes failed map detection and missing native enum entries. Default minimum log
+  level.
+- `Error` (3) – Error messages. Includes errors when getting HQ coordinates. Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
 ### `class MapDetector`
 
 #### Static Methods
 
-| Method                                       | Description                                                                                                                                                                |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `currentMap(): MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined.                                                                 |
-| `currentNativeMap(): mod.Maps \| undefined`  | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
-| `currentMapName(): string \| undefined`      | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined.                                                                  |
-
-#### Static Methods
-
-| Method                                                                          | Description                                                                                                                                                |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isCurrentMap(map: MapDetector.Map): boolean`                                   | Returns `true` if the current map matches the given `MapDetector.Map` enum value.                                                                          |
-| `isCurrentNativeMap(map: mod.Maps): boolean`                                    | Returns `true` if the current map matches the given `mod.Maps` enum value.                                                                                 |
-| `getHQCoordinates(decimalPlaces?: number): { x: number, y: number, z: number }` | Returns the Team 1 HQ coordinates rounded to the specified number of decimal places (default: 2). Useful for debugging or discovering new map coordinates. |
+| Method                                                                                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. This allows you to monitor and debug map detection behavior. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. For more information, see the [`Logging` module documentation](../logging/README.md). |
+| `currentMap(): MapDetector.Map \| undefined`                                                                   | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined.                                                                                                                                                                                                                                                                                                                                                                    |
+| `currentNativeMap(): mod.Maps \| undefined`                                                                    | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum.                                                                                                                                                                                                                                                                                                    |
+| `currentMapName(): string \| undefined`                                                                        | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined.                                                                                                                                                                                                                                                                                                                                                                     |
+| `isCurrentMap(map: MapDetector.Map): boolean`                                                                  | Returns `true` if the current map matches the given `MapDetector.Map` enum value.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `isCurrentNativeMap(map: mod.Maps): boolean`                                                                   | Returns `true` if the current map matches the given `mod.Maps` enum value.                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -94,7 +112,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 The `MapDetector` class supports detection of the following maps via the `MapDetector.Map` enum:
 
-- Area 22B
+- Area 22B (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
 - Blackwell Fields
 - Defense Nexus
 - Downtown
@@ -109,7 +127,7 @@ The `MapDetector` class supports detection of the following maps via the `MapDet
 - New Sobek City
 - Operation Firestorm
 - Portal Sandbox
-- Redline Storage
+- Redline Storage (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
 - Saints Quarter
 - Siege of Cairo
 
@@ -146,6 +164,9 @@ The `MapDetector` uses a coordinate-based detection system:
    known map HQ positions.
 2. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native
    `mod.Maps` enum where available.
+3. **Error Logging** – When map detection fails or HQ coordinate retrieval encounters errors, warnings and errors are
+   logged using the configured logger (if logging is enabled via `MapDetector.setLogging()`). This provides visibility
+   into detection issues without affecting functionality.
 
 The detection is fast and requires no additional setup, making it suitable for use in any event handler or game logic.
 

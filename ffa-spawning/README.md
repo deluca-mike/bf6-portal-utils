@@ -71,8 +71,8 @@ export async function OnGameModeStarted(): Promise<void> {
     // Enable spawn queue processing
     FFASpawning.Soldier.enableSpawnQueueProcessing();
 
-    // Optional: Set up logging
-    FFASpawning.Soldier.setLogging((text) => console.log(text), FFASpawning.LogLevel.Info);
+    // Optional: Configure logging for spawn system debugging
+    FFASpawning.setLogging((text) => console.log(text), FFASpawning.LogLevel.Info);
 }
 
 export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
@@ -115,6 +115,9 @@ Then build your mod using the bundler (see [bf6-portal-bundler](https://www.npmj
   other players.
 - **HQ Disabling** – The system automatically disables both team HQs during initialization to prevent default team-based
   spawning.
+- **Configurable Logging** – The system uses the `Logging` module for internal logging. Use `FFASpawning.setLogging()`
+  to configure a logger function, minimum log level, and whether to include error details. This provides visibility into
+  spawn system behavior, including spawn point selection, queue processing, and warnings.
 
 ---
 
@@ -186,6 +189,49 @@ export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
 
 The `FFASpawning` namespace contains the `Soldier` class and related types.
 
+#### `FFASpawning.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with
+`FFASpawning.setLogging()` to configure the minimum log level for spawn system logging.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose, includes detailed spawn point selection information.
+- `Info` (1) – Informational messages. Includes initialization and queue processing updates.
+- `Warning` (2) – Warning messages. Includes non-ideal spawn selections and invalid player warnings. Default minimum log
+  level.
+- `Error` (3) – Error messages. Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
+#### `FFASpawning.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+
+Configures logging for the FFASpawning module. The spawn system logs various events including spawn point selection,
+queue processing, and warnings. This allows you to monitor and debug spawn behavior.
+
+**Parameters:**
+
+- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
+  `LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+
+**Example:**
+
+```ts
+import { FFASpawning } from 'bf6-portal-utils/ffa-spawning';
+
+// Configure logging with console.log, minimum level of Info, and include error details
+FFASpawning.setLogging(
+    (text) => console.log(text),
+    FFASpawning.LogLevel.Info,
+    true // includeError
+);
+```
+
+**Note:** Logging is fail-safe and will not affect spawn system functionality if the logger fails. For more information
+on the logging functionality, see the [`Logging` module documentation](../logging/README.md).
+
 ### `class FFASpawning.Soldier`
 
 #### Static Methods
@@ -193,7 +239,6 @@ The `FFASpawning` namespace contains the `Soldier` class and related types.
 | Method                                                                                 | Description                                                                                                                                                                                                     |
 | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. Optional `options` let you override defaults for spawn distances, delays, and candidate limits. |
-| `setLogging(log: (text: string) => void, logLevel?: FFASpawning.LogLevel)`             | Attaches a logger function and defines a minimum log level. Useful for debugging spawn behavior. Default log level is `Info` if not specified.                                                                  |
 | `startDelayForPrompt(player: mod.Player)`                                              | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately.    |
 | `forceIntoQueue(player: mod.Player)`                                                   | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning.                                                                                            |
 | `enableSpawnQueueProcessing()`                                                         | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`).                                                           |
@@ -244,15 +289,15 @@ All types are defined inside the `FFASpawning` namespace in [`index.ts`](index.t
 
 ### `FFASpawning.LogLevel`
 
-Enumeration of log levels for filtering debug output:
+An enum re-exported from the `Logging` module for controlling logging verbosity. See the
+[`Logging` module documentation](../logging/README.md) for details.
 
-```ts
-enum LogLevel {
-    Debug = 0, // Most verbose
-    Info = 1, // Default level
-    Error = 2, // Only errors
-}
-```
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Default minimum log level.
+- `Error` (3) – Error messages. Least verbose.
 
 ### `FFASpawning.SpawnData`
 

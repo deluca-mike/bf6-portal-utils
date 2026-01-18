@@ -1,6 +1,8 @@
 import { UI } from '../ui/index.ts';
+import { UIContainer } from '../ui/components/container/index.ts';
+import { UIText } from '../ui/components/text/index.ts';
 
-// version: 3.0.1
+// version: 3.1.0
 export class Logger {
     private static readonly _PADDING: number = 10;
 
@@ -59,12 +61,31 @@ export class Logger {
         return mod.stringkeys.logger.chars[char] ?? mod.stringkeys.logger.chars['*'];
     }
 
+    /**
+     * Creates a new logger with specific options.
+     * @param player - The player to to draw the logger for.
+     * @param options - The options for the logger.
+     * @param options.staticRows - Whether to use static rows (`true`) or dynamic rows (`false`).
+     * @param options.truncate - Whether to truncate long messages with ellipses.
+     * @param options.parent - The parent container for the logger.
+     * @param options.anchor - The anchor for the logger.
+     * @param options.x - The x position of the logger.
+     * @param options.y - The y position of the logger.
+     * @param options.width - The width of the logger.
+     * @param options.height - The height of the logger.
+     * @param options.bgColor - The background color of the logger.
+     * @param options.bgAlpha - The background alpha of the logger.
+     * @param options.bgFill - The background fill of the logger.
+     * @param options.textColor - The text color of the logger.
+     * @param options.textScale - The text scale of the logger.
+     * @param options.visible - Whether to show the logger.
+     */
     constructor(player: mod.Player, options?: Logger.Options) {
         this._width = options?.width ?? 400;
         this._height = options?.height ?? 300;
         this._textColor = options?.textColor ?? UI.COLORS.BF_GREEN_BRIGHT;
 
-        this._window = new UI.Container({
+        this._window = new UIContainer({
             x: options?.x ?? 10,
             y: options?.y ?? 10,
             width: this._width,
@@ -74,7 +95,6 @@ export class Logger {
             bgColor: options?.bgColor ?? UI.COLORS.BF_GREY_4,
             bgAlpha: options?.bgAlpha ?? 0.5,
             bgFill: options?.bgFill ?? mod.UIBgFill.Blur,
-            padding: Logger._PADDING,
             visible: options?.visible ?? false,
             receiver: player,
         });
@@ -84,17 +104,17 @@ export class Logger {
         // this._scaleFactor = options?.textScale === 'small' ? 0.8 : options?.textScale === 'large' ? 1.2 : 1;
         this._scaleFactor = 1; // TODO: Implement fixes/corrections for part widths when scale factor is not 1.
         this._rowHeight = 20 * this._scaleFactor;
-        this._maxRows = ~~((this._height - Logger._PADDING) / this._rowHeight); // round down to nearest integer
+        this._maxRows = ~~((this._height - 2 * Logger._PADDING) / this._rowHeight); // round down to nearest integer
         this._nextRowIndex = this._maxRows - 1;
     }
 
-    private _window: UI.Container;
+    private _window: UIContainer;
 
     private _staticRows: boolean;
 
     private _truncate: boolean;
 
-    private _rows: { [rowIndex: number]: UI.Container } = {};
+    private _rows: { [rowIndex: number]: UIContainer } = {};
 
     private _nextRowIndex: number;
 
@@ -126,43 +146,72 @@ export class Logger {
         this._window.visible = visible;
     }
 
+    /**
+     * Show the logger.
+     * @returns The logger instance.
+     */
     public show(): Logger {
         this.visible = true;
         return this;
     }
 
+    /**
+     * Hide the logger.
+     * @returns The logger instance.
+     */
     public hide(): Logger {
         this.visible = false;
         return this;
     }
 
+    /**
+     * Toggle the visibility of the logger.
+     * @returns The logger instance.
+     */
     public toggle(): Logger {
         this.visible = !this.visible;
         return this;
     }
 
+    /**
+     * Clear the logger.
+     * @returns The logger instance.
+     */
     public clear(): Logger {
         Object.keys(this._rows).forEach((key) => this._deleteRow(parseInt(key)));
         return this;
     }
 
+    /**
+     * Destroy the logger.
+     */
     public destroy(): void {
         this.clear();
         this._window.delete();
     }
 
+    /**
+     * Log a message to the logger asynchronously (non-blocking microtask).
+     * @param text - The text to log.
+     * @param rowIndex - The row index to log the message to (if using static rows, default is 0).
+     * @returns The logger instance.
+     */
     public async logAsync(text: string, rowIndex?: number): Promise<void> {
-        return new Promise((resolve) => {
-            try {
-                this.log(text, rowIndex);
-            } catch {
-                // Swallow errors to prevent unhandled promise rejections when the promise is not awaited.
-            }
+        await Promise.resolve();
 
-            resolve();
-        });
+        try {
+            this.log(text, rowIndex);
+        } catch {
+            // Swallow errors to prevent unhandled promise rejections when the promise is not awaited.
+        }
     }
 
+    /**
+     * Log a message to the logger.
+     * @param text - The text to log.
+     * @param rowIndex - The row index to log the message to (if using static rows, default is 0).
+     * @returns The logger instance.
+     */
     public log(text: string, rowIndex?: number): Logger {
         if (this._staticRows) {
             this._logInRow(text, rowIndex ?? 0);
@@ -191,7 +240,7 @@ export class Logger {
         this._logNextParts(remaining);
     }
 
-    private _fillRow(row: UI.Container, parts: string[]): string[] | null {
+    private _fillRow(row: UIContainer, parts: string[]): string[] | null {
         let x = 0;
         let lastPartIndex = -1;
 
@@ -231,31 +280,27 @@ export class Logger {
         return false;
     }
 
-    private _prepareNextRow(): UI.Container {
-        const rowIndex = this._nextRowIndex;
-        const row = this._createRow(rowIndex, (this._maxRows - 1) * this._rowHeight);
-
-        this._nextRowIndex = (rowIndex + 1) % this._maxRows;
-
+    private _prepareNextRow(): UIContainer {
         Object.values(this._rows).forEach((row, index) => {
             if (!row) return;
 
-            const { y } = row.position;
+            if (row.y <= Logger._PADDING + 1) return this._deleteRow(index);
 
-            if (y <= 1) return this._deleteRow(index);
-
-            row.position = { x: 0, y: y - this._rowHeight };
+            row.y -= this._rowHeight;
         });
 
-        return row;
+        const rowIndex = this._nextRowIndex;
+        this._nextRowIndex = (rowIndex + 1) % this._maxRows;
+
+        return this._createRow(rowIndex, Logger._PADDING + (this._maxRows - 1) * this._rowHeight);
     }
 
-    private _createRow(rowIndex: number, y?: number): UI.Container {
+    private _createRow(rowIndex: number, y?: number): UIContainer {
         this._deleteRow(rowIndex);
 
-        const row = new UI.Container({
-            x: 0,
-            y: y ?? this._rowHeight * rowIndex,
+        const row = new UIContainer({
+            x: Logger._PADDING,
+            y: y ?? Logger._PADDING + this._rowHeight * rowIndex,
             width: this._width - Logger._PADDING * 2,
             height: this._rowHeight,
             anchor: mod.UIAnchor.TopLeft,
@@ -273,12 +318,12 @@ export class Logger {
         delete this._rows[rowIndex];
     }
 
-    private _createPartText(row: UI.Container, part: string, x: number, extraWidth: number = 0): number {
+    private _createPartText(row: UIContainer, part: string, x: number, extraWidth: number = 0): number {
         if (part === ' ') return 7; // Space won't be a character, but instead just an instruction for the next part to be offset by 7.
 
         const partWidth = this._getTextWidth(part) + extraWidth;
 
-        new UI.Text({
+        new UIText({
             x: x,
             y: 0,
             width: partWidth,
@@ -306,7 +351,7 @@ export namespace Logger {
     export interface Options {
         staticRows?: boolean;
         truncate?: boolean;
-        parent?: UI.Root | UI.Container;
+        parent?: UI.Root | UIContainer;
         anchor?: mod.UIAnchor;
         x?: number;
         y?: number;

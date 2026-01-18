@@ -1,10 +1,25 @@
+import { Logging } from '../logging/index.ts';
 export declare namespace UI {
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    export const LogLevel: typeof Logging.LogLevel;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
     /****** Types ******/
     type BaseParams = {
         anchor?: mod.UIAnchor;
         parent?: Parent;
         visible?: boolean;
-        padding?: number;
         bgColor?: mod.Vector;
         bgAlpha?: number;
         bgFill?: mod.UIBgFill;
@@ -46,13 +61,12 @@ export declare namespace UI {
           } & {
               size?: never;
           });
-    type ElementParams = BaseParams & EitherPosition & EitherSize;
-    type FinalElementParams = {
+    export type ElementParams = BaseParams & EitherPosition & EitherSize;
+    export type FinalElementParams = {
         name: string;
-        anchor: mod.UIAnchor;
         parent: Parent;
+        anchor: mod.UIAnchor;
         visible: boolean;
-        padding: number;
         bgColor: mod.Vector;
         bgAlpha: number;
         bgFill: mod.UIBgFill;
@@ -64,40 +78,6 @@ export declare namespace UI {
         receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
         uiInputModeWhenVisible: boolean;
     };
-    export type ChildParams<T extends ElementParams> = T & {
-        type: new (params: T, receiver?: mod.Player | mod.Team) => Element;
-    };
-    export type ContainerParams = ElementParams & {
-        childrenParams?: ChildParams<any>[];
-    };
-    export type TextParams = ElementParams & {
-        message: mod.Message;
-        textSize?: number;
-        textColor?: mod.Vector;
-        textAlpha?: number;
-        textAnchor?: mod.UIAnchor;
-    };
-    export type ButtonParams = ElementParams & {
-        buttonEnabled?: boolean;
-        baseColor?: mod.Vector;
-        baseAlpha?: number;
-        disabledColor?: mod.Vector;
-        disabledAlpha?: number;
-        pressedColor?: mod.Vector;
-        pressedAlpha?: number;
-        hoverColor?: mod.Vector;
-        hoverAlpha?: number;
-        focusedColor?: mod.Vector;
-        focusedAlpha?: number;
-        onClick?: (player: mod.Player) => Promise<void>;
-    };
-    export type TextButtonParams = ButtonParams & {
-        message: mod.Message;
-        textSize?: number;
-        textColor?: mod.Vector;
-        textAlpha?: number;
-        textAnchor?: mod.UIAnchor;
-    };
     /****** Interfaces ******/
     export interface Parent {
         name: string;
@@ -106,6 +86,9 @@ export declare namespace UI {
         children: Element[];
         attachChild(child: Element): void;
         detachChild(child: Element): void;
+    }
+    export interface Button {
+        onClick: ((player: mod.Player) => Promise<void>) | undefined;
     }
     /****** Classes ******/
     abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
@@ -119,21 +102,22 @@ export declare namespace UI {
         addInputModeRequester(element: Element): void;
         removeInputModeRequester(element: Element): void;
     }
-    class GlobalReceiver extends Receiver<undefined> {
+    export class GlobalReceiver extends Receiver<undefined> {
         static readonly instance: GlobalReceiver;
         private constructor();
     }
-    class TeamReceiver extends Receiver<mod.Team> {
+    export class TeamReceiver extends Receiver<mod.Team> {
         private static _instances;
         private constructor();
         static getInstance(receiver: mod.Team): TeamReceiver;
     }
-    class PlayerReceiver extends Receiver<mod.Player> {
+    export class PlayerReceiver extends Receiver<mod.Player> {
         private static _instances;
         private constructor();
         static getInstance(receiver: mod.Player): PlayerReceiver;
     }
     export abstract class Node {
+        protected readonly _logging: Logging;
         protected _name: string;
         protected _uiWidget: mod.UIWidget;
         protected _receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
@@ -147,8 +131,8 @@ export declare namespace UI {
         private _children;
         private constructor();
         get children(): Element[];
-        attachChild(child: Element): this;
-        detachChild(child: Element): this;
+        attachChild(child: Element): void;
+        detachChild(child: Element): void;
     }
     export abstract class Element extends Node {
         protected _parent: Parent;
@@ -162,9 +146,10 @@ export declare namespace UI {
         protected _bgFill: mod.UIBgFill;
         protected _depth: mod.UIDepth;
         protected _anchor: mod.UIAnchor;
-        protected _padding: number;
         protected _uiInputModeWhenVisible: boolean;
+        protected _deleted: boolean;
         constructor(params: FinalElementParams);
+        protected _isDeletedCheck(): boolean;
         get parent(): Parent;
         set parent(parent: Parent);
         setParent(parent: Parent): this;
@@ -174,6 +159,7 @@ export declare namespace UI {
         show(): this;
         hide(): this;
         toggle(): this;
+        get deleted(): boolean;
         delete(): void;
         get x(): number;
         set x(x: number);
@@ -208,153 +194,9 @@ export declare namespace UI {
         get anchor(): mod.UIAnchor;
         set anchor(anchor: mod.UIAnchor);
         setAnchor(anchor: mod.UIAnchor): this;
-        get padding(): number;
-        set padding(padding: number);
-        setPadding(padding: number): this;
         get uiInputModeWhenVisible(): boolean;
         set uiInputModeWhenVisible(newValue: boolean);
         setUiInputModeWhenVisible(newValue: boolean): this;
-    }
-    export class Container extends Element implements Parent {
-        private _children;
-        constructor(params: ContainerParams);
-        get children(): Element[];
-        delete(): void;
-        attachChild(child: Element): this;
-        detachChild(child: Element): this;
-    }
-    export class Text extends Element {
-        private _message;
-        private _textSize;
-        private _textColor;
-        private _textAlpha;
-        private _textAnchor;
-        constructor(params: TextParams);
-        get message(): mod.Message;
-        set message(message: mod.Message);
-        setMessage(message: mod.Message): this;
-        get textAlpha(): number;
-        set textAlpha(alpha: number);
-        setTextAlpha(alpha: number): this;
-        get textAnchor(): mod.UIAnchor;
-        set textAnchor(anchor: mod.UIAnchor);
-        setTextAnchor(anchor: mod.UIAnchor): this;
-        get textColor(): mod.Vector;
-        set textColor(color: mod.Vector);
-        setTextColor(color: mod.Vector): this;
-        get textSize(): number;
-        set textSize(size: number);
-        setTextSize(size: number): this;
-    }
-    export class Button extends Element {
-        private _buttonEnabled;
-        private _baseColor;
-        private _baseAlpha;
-        private _disabledColor;
-        private _disabledAlpha;
-        private _pressedColor;
-        private _pressedAlpha;
-        private _hoverColor;
-        private _hoverAlpha;
-        private _focusedColor;
-        private _focusedAlpha;
-        private _onClick;
-        constructor(params: ButtonParams);
-        delete(): void;
-        get enabled(): boolean;
-        set enabled(enabled: boolean);
-        setEnabled(enabled: boolean): this;
-        get baseColor(): mod.Vector;
-        set baseColor(color: mod.Vector);
-        setBaseColor(color: mod.Vector): this;
-        get baseAlpha(): number;
-        set baseAlpha(alpha: number);
-        setBaseAlpha(alpha: number): this;
-        get disabledColor(): mod.Vector;
-        set disabledColor(color: mod.Vector);
-        setDisabledColor(color: mod.Vector): this;
-        get disabledAlpha(): number;
-        set disabledAlpha(alpha: number);
-        setDisabledAlpha(alpha: number): this;
-        get pressedColor(): mod.Vector;
-        set pressedColor(color: mod.Vector);
-        setColorPressed(color: mod.Vector): this;
-        get pressedAlpha(): number;
-        set pressedAlpha(alpha: number);
-        setPressedAlpha(alpha: number): this;
-        get hoverColor(): mod.Vector;
-        set hoverColor(color: mod.Vector);
-        setHoverColor(color: mod.Vector): this;
-        get hoverAlpha(): number;
-        set hoverAlpha(alpha: number);
-        setHoverAlpha(alpha: number): this;
-        get focusedColor(): mod.Vector;
-        set focusedColor(color: mod.Vector);
-        setFocusedColor(color: mod.Vector): this;
-        get focusedAlpha(): number;
-        set focusedAlpha(alpha: number);
-        setFocusedAlpha(alpha: number): this;
-        get onClick(): ((player: mod.Player) => Promise<void>) | undefined;
-        set onClick(onClick: ((player: mod.Player) => Promise<void>) | undefined);
-        setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): this;
-    }
-    /**
-     * Base class for buttons that contain content elements (Text, Image, etc.).
-     * Handles the common pattern of wrapping a Button and content element in a Container.
-     * @template TContent - The type of the content element (Text, Image, etc.)
-     * @template TContentProps - Array of property names to delegate from the content element
-     */
-    abstract class BaseButtonWithContent<
-        TContent extends Element,
-        TContentProps extends readonly string[],
-    > extends Element {
-        protected _button: Button;
-        protected _content: TContent;
-        enabled: boolean;
-        baseColor: mod.Vector;
-        baseAlpha: number;
-        disabledColor: mod.Vector;
-        disabledAlpha: number;
-        pressedColor: mod.Vector;
-        pressedAlpha: number;
-        hoverColor: mod.Vector;
-        hoverAlpha: number;
-        focusedColor: mod.Vector;
-        focusedAlpha: number;
-        onClick: ((player: mod.Player) => Promise<void>) | undefined;
-        setEnabled: (enabled: boolean) => this;
-        setBaseColor: (color: mod.Vector) => this;
-        setBaseAlpha: (alpha: number) => this;
-        setDisabledColor: (color: mod.Vector) => this;
-        setDisabledAlpha: (alpha: number) => this;
-        setPressedColor: (color: mod.Vector) => this;
-        setPressedAlpha: (alpha: number) => this;
-        setHoverColor: (color: mod.Vector) => this;
-        setHoverAlpha: (alpha: number) => this;
-        setFocusedColor: (color: mod.Vector) => this;
-        setFocusedAlpha: (alpha: number) => this;
-        setOnClick: (onClick: ((player: mod.Player) => Promise<void>) | undefined) => this;
-        protected constructor(
-            params: ButtonParams,
-            createContent: (container: Container, params: ButtonParams) => TContent,
-            contentProperties: TContentProps
-        );
-        delete(): void;
-        set width(width: number);
-        set height(height: number);
-        set size(params: Size);
-    }
-    const TEXT_BUTTON_CONTENT_PROPERTIES: readonly ['message', 'textAlpha', 'textAnchor', 'textSize'];
-    export class TextButton extends BaseButtonWithContent<Text, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
-        message: mod.Message;
-        textAlpha: number;
-        textAnchor: mod.UIAnchor;
-        textSize: number;
-        setMessage: (message: mod.Message) => this;
-        setTextAlpha: (alpha: number) => this;
-        setTextAnchor: (anchor: mod.UIAnchor) => this;
-        setTextSize: (size: number) => this;
-        constructor(params: TextButtonParams);
     }
     /****** Constants ******/
     export const COLORS: {
@@ -384,6 +226,60 @@ export declare namespace UI {
         BF_YELLOW_DARK: mod.Vector;
     };
     export const ROOT_NODE: Root;
+    /**
+     * Registers a button and returns a function to unregister it.
+     * @param name - The name of the button.
+     * @param button - The button to register.
+     * @returns A function to unregister the button.
+     */
+    export function registerButton(name: string, button: Button): () => void;
+    /**
+     * Makes a name for a widget.
+     * @param parent - The parent of the widget.
+     * @param receiver - The receiver of the widget.
+     * @returns The name of the widget.
+     */
+    export function makeName(parent: Parent, receiver: GlobalReceiver | TeamReceiver | PlayerReceiver): string;
+    /**
+     * Delegates properties from a source object to a target object.
+     * Creates getters, setters, and setter methods (e.g., setPropertyName) for each property.
+     * @param target - The object to add properties to (typically `this`)
+     * @param source - The object to delegate to
+     * @param properties - Array of property names to delegate
+     */
+    export function delegateProperties<T extends object, S extends object>(
+        target: T,
+        source: S,
+        properties: readonly string[]
+    ): void;
+    /**
+     * Gets the position from the parameters, given either x/y or position.
+     * @param params - The parameters.
+     * @returns The position.
+     */
+    export function getPosition(params: ElementParams): Position;
+    /**
+     * Gets the size from the parameters, given either width/height or size.
+     * @param params - The parameters.
+     * @returns The size.
+     */
+    export function getSize(params: ElementParams): Size;
+    /**
+     * Gets the receiver from the parameters, given either player, team, or neither.
+     * @param parent - The parent of the widget.
+     * @param receiverParam - The receiver parameter.
+     * @returns The receiver.
+     */
+    export function getReceiver(
+        parent: Parent,
+        receiverParam?: mod.Player | mod.Team
+    ): GlobalReceiver | TeamReceiver | PlayerReceiver;
+    /**
+     * Handles a button event. Must be called in the `OnPlayerUIButtonEvent` handler.
+     * @param player - The player who pressed the button.
+     * @param widget - The widget that was pressed.
+     * @param event - The button event.
+     */
     export function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void;
     export {};
 }

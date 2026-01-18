@@ -7,7 +7,8 @@ maximum performance.
 
 `SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the
 Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates
-seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces.
+seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the
+`Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
 
 > **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It
 > assumes that UI objects have getters and setters for properties that need to be reactive. All Battlefield Portal types
@@ -48,6 +49,9 @@ seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive u
 ```ts
 import { SolidUI } from 'bf6-portal-utils/solid-ui';
 import { UI } from 'bf6-portal-utils/ui';
+
+// Optional: Configure logging for reactive system error monitoring
+SolidUI.setLogging((text) => console.log(text), SolidUI.LogLevel.Error);
 
 function createCounterUI(player: mod.Player): void {
     // Create a reactive signal
@@ -149,9 +153,62 @@ All reactive updates are batched and executed asynchronously via the microtask q
 - Game logic execution isn't blocked by UI updates
 - Updates happen right after the current execution context finishes
 
+### Configurable Error Logging
+
+Effect errors and flush errors are automatically logged using the `Logging` module. Use `SolidUI.setLogging()` to
+configure a logger function, minimum log level, and whether to include error details. This provides visibility into
+reactive system failures without requiring manual error handling in every effect.
+
 ---
 
 ## API Reference
+
+### `namespace SolidUI`
+
+The `SolidUI` namespace contains all reactive primitives and utility functions.
+
+#### `SolidUI.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `SolidUI.setLogging()` to
+configure the minimum log level for reactive system error logging.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Default minimum log level.
+- `Error` (3) – Error messages. Includes effect errors and flush errors. Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
+#### `SolidUI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+
+Configures logging for the SolidUI module. Effect errors and flush errors are automatically caught and logged using the
+configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
+
+**Parameters:**
+
+- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
+  `LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+
+**Example:**
+
+```ts
+import { SolidUI } from 'bf6-portal-utils/solid-ui';
+
+// Configure logging with console.log, minimum level of Error, and include error details
+SolidUI.setLogging(
+    (text) => console.log(text),
+    SolidUI.LogLevel.Error,
+    true // includeError
+);
+```
+
+**Note:** Error logging is automatic and fail-safe. Effect errors are caught and logged without affecting other effects
+or the reactive system. For more information on the logging functionality, see the
+[`Logging` module documentation](../logging/README.md).
 
 ### `SolidUI.createSignal<T>(initialValue: T): [Accessor<T>, Setter<T>]`
 
@@ -1200,6 +1257,12 @@ All updates are scheduled asynchronously:
 4. The flush runs all queued effects
 5. Effects update UI properties through the `UI` module's setters
 
+### Error Logging
+
+Effect errors and flush errors are caught and logged using the `Logging` module. The logging configuration can be set
+via `SolidUI.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into
+reactive system failures without manual error handling. Errors in one effect won't prevent other effects from executing.
+
 ### Component Lifecycle
 
 When you call `SolidUI.h()`:
@@ -1253,6 +1316,12 @@ store.value = 5;
 
 Effects execute in the order they were scheduled, but there's no guarantee of execution order across different signals.
 If you need specific ordering, chain effects manually or use a single effect.
+
+### Effect Error Handling
+
+Effect errors are automatically caught and logged (if logging is configured via `SolidUI.setLogging()`) to prevent one
+failing effect from breaking the entire reactive system. Errors are logged at the `Error` log level. If you need
+additional error handling, implement it inside your effects.
 
 ### Memory Management
 

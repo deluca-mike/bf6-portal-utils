@@ -1,5 +1,14 @@
-// version: 1.1.0
+import { Logging } from '../logging/index.ts';
+
+// version: 1.2.0
 export namespace Events {
+    const logging = new Logging('Events');
+
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    export const LogLevel = Logging.LogLevel;
+
     export enum Type {
         OngoingGlobal,
         OngoingAreaTrigger,
@@ -181,6 +190,20 @@ export namespace Events {
     const handlers = new Map<Type, Set<AllHandlers>>();
 
     /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void {
+        logging.setLogging(log, logLevel, includeError);
+    }
+
+    /**
      * Subscribe to an event.
      * @param type - The event type to subscribe to.
      * @param handler - The handler function to call when the event is triggered.
@@ -207,16 +230,24 @@ export namespace Events {
         handlers.get(type)?.delete(handler as AllHandlers);
     }
 
-    const noop = () => {};
-
+    /**
+     * Executes a handler function.
+     * @param handler - The handler function to execute.
+     * @param args - The arguments to pass to the handler function.
+     */
     function executeHandler<T extends Type>(handler: AllHandlers, args: Parameters<AllHandlers>): void {
         Promise.resolve()
-            .then(() => {
-                return (handler as HandlerForType<T>)(...args);
-            })
-            .catch(noop);
+            .then(() => (handler as HandlerForType<T>)(...args))
+            .catch((error: unknown) => {
+                logging.log(`Error in handler ${handler.name}:`, LogLevel.Error, error);
+            });
     }
 
+    /**
+     * Triggers an event.
+     * @param type - The event type to trigger.
+     * @param args - The arguments to pass to the handler function.
+     */
     export function trigger<T extends Type>(type: T, ...args: EventParameters<T>): void {
         const typeHandlers = handlers.get(type);
 
@@ -230,6 +261,7 @@ export namespace Events {
     }
 }
 
+/* eslint-disable jsdoc/require-jsdoc */
 export function OngoingGlobal(): void {
     Events.trigger(Events.Type.OngoingGlobal);
 }
@@ -496,3 +528,4 @@ export function OnVehicleDestroyed(vehicle: mod.Vehicle): void {
 export function OnVehicleSpawned(vehicle: mod.Vehicle): void {
     Events.trigger(Events.Type.OnVehicleSpawned, vehicle);
 }
+/* eslint-enable jsdoc/require-jsdoc */

@@ -1,9 +1,20 @@
+import { Logging } from '../logging/index.ts';
 export declare namespace FFASpawning {
-    enum LogLevel {
-        Debug = 0,
-        Info = 1,
-        Error = 2,
-    }
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    const LogLevel: typeof Logging.LogLevel;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
     type SpawnData = [x: number, y: number, z: number, orientation: number];
     type Spawn = {
         index: number;
@@ -33,21 +44,18 @@ export declare namespace FFASpawning {
         private static _queueProcessingDelay;
         private static _queueProcessingEnabled;
         private static _queueProcessingActive;
-        private static _logger?;
-        private static _logLevel;
-        private static _log;
         private static _getRotationVector;
         private static _getBestSpawnPoint;
         private static _getDistanceToClosestPlayer;
         private static _processSpawnQueue;
+        private static _getPosition;
         static getVectorString(vector: mod.Vector): string;
-        static setLogging(log?: (text: string) => void, logLevel?: FFASpawning.LogLevel): void;
         static initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions): void;
         static startDelayForPrompt(player: mod.Player): void;
         static forceIntoQueue(player: mod.Player): void;
         static enableSpawnQueueProcessing(): void;
         static disableSpawnQueueProcessing(): void;
-        constructor(player: mod.Player);
+        constructor(player: mod.Player, showDebugPosition?: boolean);
         private _player;
         private _playerId;
         private _isAISoldier;
@@ -55,6 +63,8 @@ export declare namespace FFASpawning {
         private _delayCountdownInterval?;
         private _promptUI?;
         private _countdownUI?;
+        private _updatePositionInterval?;
+        private _debugPositionUI?;
         get player(): mod.Player;
         get playerId(): number;
         startDelayForPrompt(delay?: number): void;

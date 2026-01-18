@@ -1,0 +1,57 @@
+import { Logging } from '../logging/index.ts';
+export declare class MultiClickDetector {
+    private static _logging;
+    private static _detectors;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    static setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
+    /**
+     * Handles the ongoing player event for a player so it needs to be called in the `OngoingPlayer` event handler.
+     * @param player - The player to handle the ongoing player event for.
+     */
+    static handleOngoingPlayer(player: mod.Player): void;
+    /**
+     * Prunes multi-click detectors associated to invalid players.
+     * This can be called periodically or called in the `OnPlayerLeaveGame` event handler, to clean up.
+     */
+    static pruneInvalidPlayers(): void;
+    /**
+     * Creates a new multi-click detector with specific options.
+     * @param player - The player to detect multi-click sequences for.
+     * @param callback - The callback to call when a multi-click sequence is detected.
+     * @param options - The options for the multi-click detector.
+     * @param options.soldierState - The soldier state boolean to use for the multi-click detector.
+     * @param options.windowMs - The window in milliseconds for a valid multi-click sequence.
+     * @param options.requiredClicks - The number of clicks required to trigger a multi-click sequence.
+     */
+    constructor(player: mod.Player, callback: () => Promise<void> | void, options?: MultiClickDetector.Options);
+    private _player;
+    private _lastState;
+    private _clickCount;
+    private _sequenceStartTime;
+    private _callback;
+    private _soldierState;
+    private _window;
+    private _requiredClicks;
+    private _handleOngoing;
+    /**
+     * Destroys the multi-click detector.
+     */
+    destroy(): void;
+}
+export declare namespace MultiClickDetector {
+    interface Options {
+        soldierState?: mod.SoldierStateBool;
+        windowMs?: number;
+        requiredClicks?: number;
+    }
+    const LogLevel: typeof Logging.LogLevel;
+}

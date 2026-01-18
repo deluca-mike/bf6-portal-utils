@@ -1,7 +1,10 @@
 import { Timers } from '../timers/index.ts';
+import { Logging } from '../logging/index.ts';
 
-// version: 1.0.0
+// version: 1.1.0
 export class Raycast {
+    private static _logging = new Logging('Raycast');
+
     private static _nextRayId: number = 0;
 
     private static _state: Map<number, Raycast.PlayerState> = new Map();
@@ -17,18 +20,51 @@ export class Raycast {
         Timers.setInterval(() => this.pruneAllStates(), this._PRUNE_INTERVAL_MS);
     }
 
-    static cast(
+    private constructor() {}
+
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    public static setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void {
+        this._logging.setLogging(log, logLevel, includeError);
+    }
+
+    public static cast(
         player: mod.Player,
         start: Raycast.Vector3,
         end: Raycast.Vector3,
         callbacks: Raycast.Callbacks<Raycast.Vector3>
     ): void;
 
-    static cast(player: mod.Player, start: mod.Vector, end: mod.Vector, callbacks: Raycast.Callbacks<mod.Vector>): void;
+    public static cast(
+        player: mod.Player,
+        start: mod.Vector,
+        end: mod.Vector,
+        callbacks: Raycast.Callbacks<mod.Vector>
+    ): void;
 
     /**
-     * Casts a ray with specific callbacks.
-     *
+     * Casts a ray with specific callbacks. The callback vector types must match the `start` and `end` vector types.
+     * @example
+     * ```ts
+     * Raycast.cast(player, { x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 10 }, {
+     *     onHit: (hitPoint, hitNormal) => {
+     *         console.log(`Ray hit at ${hitPoint.x}, ${hitPoint.y}, ${hitPoint.z}`);
+     *     },
+     * });
+     * Raycast.cast(player, mod.CreateVector(0, 0, 0), mod.CreateVector(10, 10, 10), {
+     *     onHit: (hitPoint, hitNormal) => {
+     *         console.log(`Ray hit at ${mod.XComponentOf(hitPoint)}, ${mod.YComponentOf(hitPoint)}, ${mod.ZComponentOf(hitPoint)}`);
+     *     },
+     * });
+     * ```
      * @param player - The player to assign the ray to.
      * @param start - The start position of the ray.
      * @param end - The end position of the ray.
@@ -91,7 +127,6 @@ export class Raycast {
     /**
      * Handles a ray hit event from `mod.OnRayCastHit`.
      * O(N) search (but this is fine given the expected low active ray count per player).
-     *
      * @param eventPlayer - The player the ray was assigned to.
      * @param eventPoint - The point where the ray hit a target.
      * @param eventNormal - The normal of the surface where the ray hit the target.
@@ -108,13 +143,19 @@ export class Raycast {
 
         if (ray.onHit) {
             try {
-                if (ray.nativeVectorReturn) {
-                    (ray.onHit as Raycast.HitCallback<mod.Vector>)?.(eventPoint, eventNormal);
-                } else {
-                    (ray.onHit as Raycast.HitCallback<Raycast.Vector3>)?.(point, this._parseModVector(eventNormal));
+                const result = ray.nativeVectorReturn
+                    ? (ray.onHit as Raycast.HitCallback<mod.Vector>)(eventPoint, eventNormal)
+                    : (ray.onHit as Raycast.HitCallback<Raycast.Vector3>)(point, this._parseModVector(eventNormal));
+
+                if (result instanceof Promise) {
+                    result.catch((error: unknown) => {
+                        // Catch and log async hit callback errors to prevent unhandled promise rejections.
+                        Raycast._logging.log('Error in async hit callback:', Raycast.LogLevel.Error, error);
+                    });
                 }
-            } catch {
-                // Silently ignore errors.
+            } catch (error: unknown) {
+                // Catch and log sync hit callback errors so the raycast functionality can still run.
+                Raycast._logging.log('Error in sync hit callback:', Raycast.LogLevel.Error, error);
             }
         }
 
@@ -125,7 +166,6 @@ export class Raycast {
      * Handles a ray miss event from `mod.OnRayCastMissed`.
      * Note that misses are only attributable to an active ray if the number of pending (yet attributed) misses equals
      * the number of active rays. If not, the miss is stored as a pending miss and wil be attributed later.
-     *
      * @param eventPlayer - The player the ray was assigned to.
      */
     public static handleMiss(eventPlayer: mod.Player): void {
@@ -142,7 +182,7 @@ export class Raycast {
      * You can hook this into the global `OnPlayerLeaveGame` event, but it will already be called automatically every
      * `_PRUNE_INTERVAL_MS`.
      */
-    public static pruneAllStates() {
+    public static pruneAllStates(): void {
         // We can iterate the map keys (playerIds)
         for (const [playerId, state] of this._state.entries()) {
             this._prunePlayerState(state);
@@ -156,8 +196,8 @@ export class Raycast {
     }
 
     /**
-     * Prunes a single player's state.
-     * Used during 'cast' to keep the active player's logic clean.
+     * Prunes a single player's state. Used during 'cast' to keep the active player's logic clean.
+     * @param state - The player state to prune.
      */
     private static _prunePlayerState(state: Raycast.PlayerState) {
         const now = Date.now();
@@ -166,11 +206,7 @@ export class Raycast {
         for (const [rayId, ray] of state.rays.entries()) {
             if (now - ray.timestamp <= this._DEFAULT_TTL_MS) continue;
 
-            try {
-                ray.onMiss?.();
-            } catch {
-                // Silently ignore errors.
-            }
+            this._handleMissCallback(ray);
 
             if (state.pendingMisses > 0) {
                 state.pendingMisses--;
@@ -189,6 +225,7 @@ export class Raycast {
     /**
      * Checks if the number of pending misses equals the number of active rays.
      * If so, all active rays are considered misses.
+     * @param state - The player state to resolve pending misses for.
      */
     private static _resolvePendingMisses(state: Raycast.PlayerState) {
         // If we have no rays, we cannot have pending misses, so clear the pending misses to prevent "orphan" miss
@@ -202,15 +239,27 @@ export class Raycast {
         if (state.pendingMisses < state.rays.size) return;
 
         for (const ray of state.rays.values()) {
-            try {
-                ray.onMiss?.();
-            } catch {
-                // Silently ignore errors.
-            }
+            this._handleMissCallback(ray);
         }
 
         state.rays.clear();
         state.pendingMisses = 0;
+    }
+
+    private static _handleMissCallback(ray: Raycast.PendingRay): void {
+        try {
+            const result = ray.onMiss?.();
+
+            if (result instanceof Promise) {
+                result.catch((error: unknown) => {
+                    // Catch and log async miss callback errors to prevent unhandled promise rejections.
+                    Raycast._logging.log('Error in async miss callback:', Raycast.LogLevel.Error, error);
+                });
+            }
+        } catch (error: unknown) {
+            // Catch and log sync miss callback errors so the raycast functionality can still run.
+            Raycast._logging.log('Error in sync miss callback:', Raycast.LogLevel.Error, error);
+        }
     }
 
     private static _popBestRay(
@@ -274,9 +323,9 @@ export namespace Raycast {
         z: number;
     }
 
-    export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => void;
+    export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
 
-    export type MissCallback = () => void;
+    export type MissCallback = () => Promise<void> | void;
 
     // Must have Hit (Miss optional) or Miss (Hit optional).
     export type Callbacks<T extends mod.Vector | Vector3> =
@@ -297,4 +346,6 @@ export namespace Raycast {
         pendingMisses: number;
         rays: Map<number, PendingRay>;
     }
+
+    export const LogLevel = Logging.LogLevel;
 }
