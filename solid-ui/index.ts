@@ -1,5 +1,30 @@
-// version: 2.0.0
+import { Logging } from '../logging/index.ts';
+
+// version: 2.1.0
 export namespace SolidUI {
+    /****** Logging ******/
+
+    const logging = new Logging('SolidUI');
+
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    export const LogLevel = Logging.LogLevel;
+
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void {
+        logging.setLogging(log, logLevel, includeError);
+    }
+
     /****** Classes and Types ******/
 
     class Subscriber {
@@ -121,7 +146,6 @@ export namespace SolidUI {
     const pendingEffects = new Set<Subscriber>();
     let isFlushPending = false;
     const MAX_FLUSH_CYCLES = 1_000;
-    const noop = () => {};
 
     // The function that processes the queue.
     function flush(): void {
@@ -133,8 +157,9 @@ export namespace SolidUI {
                 // Important: Clear the queue so the next frame isn't also broken.
                 pendingEffects.clear();
 
-                console.log(
-                    'SolidUI: Maximum reactive stack depth exceeded. You might have an infinite loop in an effect.'
+                logging.log(
+                    'SolidUI: Maximum reactive stack depth exceeded. You might have an infinite loop in an effect.',
+                    LogLevel.Error
                 );
             }
 
@@ -142,8 +167,9 @@ export namespace SolidUI {
 
             try {
                 sub.execute();
-            } catch {
-                // Swallow errors so one bad effect doesn't kill the whole UI.
+            } catch (error: unknown) {
+                // Catch and log errors so one bad effect doesn't kill the whole UI.
+                logging.log('Error in effect:', LogLevel.Error, error);
             }
         }
     }
@@ -161,7 +187,12 @@ export namespace SolidUI {
         // "Promise.resolve().then" pushes the flush to the microtask queue.
         // This ensures setting a signal returns execution to the game logic instantly, and the UI updates happen right
         // after the game logic finishes.
-        Promise.resolve().then(flush).catch(noop); // Swallow errors to prevent one effect from affecting others.
+        Promise.resolve()
+            .then(flush)
+            .catch((error: unknown) => {
+                // Catch and log flush errors to prevent one effect from affecting others.
+                logging.log('Error in flush:', LogLevel.Error, error);
+            });
     }
 
     /****** Reactivity Core ******/
@@ -183,15 +214,12 @@ export namespace SolidUI {
      * Executes a function without creating dependencies.
      * Any signals read inside `fn` will return their current value, but the surrounding Effect will not subscribe to
      * them.
-     *
      * @example
      * createEffect(() => {
      *     console.log(count()); // Tracks 'count'
      *     untrack(() => console.log(timer())); // Logs 'timer' but doesn't track it
      * });
-     *
      * @param fn - The function to execute.
-     *
      * @returns The return value of `fn`.
      */
     export function untrack<T>(fn: () => T): T {
@@ -207,9 +235,7 @@ export namespace SolidUI {
     /**
      * Creates a simple reactive state (a "Signal").
      * Signals are the atoms of reactivity. They hold a value and notify subscribers when changed.
-     *
      * @param initialValue - The starting value.
-     *
      * @returns A tuple `[read, write]`:
      *   - `read`: An {@link Accessor} to get the value and subscribe.
      *   - `write`: A {@link Setter} to update the value.
@@ -248,9 +274,7 @@ export namespace SolidUI {
      *   1. Runs `fn` immediately (synchronously).
      *   2. Tracks any Signal read during execution.
      *   3. Re-runs `fn` if any of those Signals change.
-     *
      * @param fn - The function to execute.
-     *
      * @returns A "disposer" function that manually stops the effect and frees memory.
      */
     export function createEffect(fn: () => void): () => void {
@@ -263,12 +287,9 @@ export namespace SolidUI {
      * Use this when a value depends on other signals. It is efficient because:
      *   - It caches the result.
      *   - It only notifies downstream listeners if the result actually changes.
-     *
      * @example
      * const fullName = createMemo(() => `${firstName()} ${lastName()}`);
-     *
      * @param fn - The function to memoize.
-     *
      * @returns The {@link Accessor} for the memoized value.
      */
     export function createMemo<T>(fn: () => T): Accessor<T> {
@@ -287,9 +308,7 @@ export namespace SolidUI {
      * You must manually call the provided `dispose` function to clean up everything created inside it.
      *
      * Use Case: Creating dynamic lists, global managers, or UI sections that live/die independently of their parent.
-     *
      * @param fn - A function that receives a `dispose` callback.
-     *
      * @returns The return value of `fn`.
      */
     export function createRoot<T>(fn: (dispose: () => void) => T): T {
@@ -346,9 +365,7 @@ export namespace SolidUI {
      *
      * Benefit: If you update `store.user.name`, only effects listening to `name` will run.
      * Effects listening to `store.user.age` will not run.
-     *
      * @param initialState - The initial object.
-     *
      * @returns A tuple `[store, setStore]`:
      *   - `store`: The reactive proxy object.
      *   - `setStore`: A setter function to update the store's properties.
@@ -406,7 +423,6 @@ export namespace SolidUI {
         defaultValue: T;
         /**
          * Runs the provided function within a scope where this Context is set to `value`.
-         *
          * @param value - The value to provide.
          * @param fn - The function to run within the scope.
          */
@@ -415,9 +431,7 @@ export namespace SolidUI {
 
     /**
      * Creates a Context object to pass data deeply without "prop drilling".
-     *
      * @param defaultValue - The value returned by `useContext` if no provider is found in the stack.
-     *
      * @returns A {@link Context} object.
      */
     export function createContext<T>(defaultValue: T): Context<T> {
@@ -443,9 +457,7 @@ export namespace SolidUI {
     /**
      * Reads the current value of a Context. It climbs the scope stack to find the nearest `provide` call for this
      * context. If none is found, it returns the default value.
-     *
      * @param context - The {@link Context} to read.
-     *
      * @returns The current value of the {@link Context}.
      */
     export function useContext<T>(context: Context<T>): T {
@@ -462,7 +474,6 @@ export namespace SolidUI {
      * If called inside an Effect, it runs before the Effect re-executes (or when it dies).
      *
      * Use Case: Clearing intervals, removing event listeners, or specialized cleanup logic.
-     *
      * @param fn - The cleanup function to register.
      */
     export function onCleanup(fn: () => void): void {
@@ -480,10 +491,8 @@ export namespace SolidUI {
 
     /**
      * The "HyperScript" factory function. Creates a UI Component and sets up reactivity.
-     *
      * @param component - Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component.
      * @param props - An object of properties. Values can be static OR reactive (Signals/Accessors).
-     *
      * @returns The created UI Instance.
      */
     export function h<P extends object, T>(
@@ -564,11 +573,8 @@ export namespace SolidUI {
      * If data moves (e.g., `["A", "B"]` -> `["B", "A"]`), the widgets at index 0 and 1 stay in place and simply update
      * their content to match the elements at their respective indexes.
      * This avoids destroying/recreating widgets, which is crucial for performance and Z-order stability.
-     *
      * @param each - The array signal to iterate over.
      * @param render - A builder function receiving the item (as a Signal) and the index (static number).
-     *
-     * @returns The return value of `render`.
      */
     export function Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void {
         // Track the disposers and data setters for every active row.

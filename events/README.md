@@ -45,6 +45,9 @@ non-blocking, ensuring optimal performance.
 ```ts
 import { Events } from 'bf6-portal-utils/events';
 
+// Optional: Configure error logging for handler failures
+Events.setLogging((text) => console.log(text), Events.LogLevel.Warning, true);
+
 // Subscribe to player deployment events
 function handlePlayerDeployed(player: mod.Player): void {
     console.log(`Player ${mod.GetObjId(player)} deployed`);
@@ -101,10 +104,15 @@ Events.subscribe(Events.Type.OnGameModeEnding, () => {
   `Promise<void>`). Both are fully supported.
 
 - **Error Isolation** – Errors thrown in one handler are caught and do not prevent other handlers from executing. This
-  ensures that a bug in one subscription doesn't break your entire event system.
+  ensures that a bug in one subscription doesn't break your entire event system. Handler errors are automatically logged
+  using the configured logger (if logging is enabled via `Events.setLogging()`).
 
 - **Non-Blocking Execution** – All handlers are executed asynchronously and non-blocking. The event system will not wait
   for handlers to complete before continuing execution.
+
+- **Configurable Error Logging** – Handler errors are automatically logged using the `Logging` module. Use
+  `Events.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This
+  provides visibility into handler failures without requiring manual error handling in every handler.
 
 ---
 
@@ -139,6 +147,55 @@ Available event types include:
 - `OnSpawnerSpawned`
 - `OnTimeLimitReached`
 - `OnVehicleDestroyed`, `OnVehicleSpawned`
+
+#### `Events.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Events.setLogging()` to
+configure the minimum log level for error logging in event handlers.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Default minimum log level.
+- `Error` (3) – Error messages. Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
+#### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+
+Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged
+using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
+
+**Parameters:**
+
+- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
+  `LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+
+**Example:**
+
+```ts
+import { Events } from 'bf6-portal-utils/events';
+
+// Configure logging with console.log, minimum level of Warning, and include error details
+Events.setLogging(
+    (text) => console.log(text),
+    Events.LogLevel.Warning,
+    true // includeError
+);
+
+// If a handler throws an error, it will be logged automatically
+Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
+    // If this throws, it will be logged as: <Events> Error in handler handleDeployment: [error details]
+    throw new Error('Something went wrong');
+});
+```
+
+**Note:** Error logging is automatic and fail-safe. Handler errors are caught and logged without affecting other
+handlers or the event system. For more information on the logging functionality, see the
+[`Logging` module documentation](../logging/README.md).
 
 #### `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
 
@@ -421,8 +478,13 @@ The `Events` module uses a centralized subscription system:
     - Both sync and async handlers work correctly
     - Execution is non-blocking
     - Errors in one handler don't affect others
+    - Handler errors are automatically caught and logged (if logging is configured via `Events.setLogging()`)
 
-5. **Type Safety** – TypeScript generics ensure that handlers match the correct signature for each event type at compile
+5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be
+   set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility
+   into handler failures without manual error handling.
+
+6. **Type Safety** – TypeScript generics ensure that handlers match the correct signature for each event type at compile
    time.
 
 ---

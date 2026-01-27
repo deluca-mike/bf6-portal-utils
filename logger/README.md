@@ -54,8 +54,8 @@ console builds.
   right for realtime traces.
 - **Performance considerations** – For long text messages or tall dynamic loggers, use `logAsync()` instead of `log()`.
   Long text can result in many 3-character Text UI Widgets, and in dynamic mode, moving all existing rows upward
-  requires many UI operations. By using `logAsync()` without `await`, the logging operation becomes non-blocking,
-  preventing frame drops or execution delays.
+  requires many UI operations. By using `logAsync()` without `await`, the logging operation becomes non-blocking by
+  being sent to the microtask queue, preventing frame drops or execution delays.
 
 ### Example
 
@@ -81,7 +81,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     dynamicLogger?.log(`Team: ${mod.GetObjId(mod.GetTeam(player))}`);
     dynamicLogger?.log(`Hello @ world $${(12345.6789).toFixed(2)}!!`);
 
-    // For long messages or performance-critical paths, use logAsync (non-blocking)
+    // For long messages or performance-critical paths, use logAsync (non-blocking).
     dynamicLogger?.logAsync(`Very long diagnostic message that would create many UI widgets...`);
 
     while (true) {
@@ -181,6 +181,7 @@ In particular:
 
 In no particular order, planned upcoming work and improvements include:
 
+- increased performance (reduced load) by moving all dynamic rows up in a container, rather than one by one.
 - breaking out the dynamic string "text boxes" into its own module so they can be used in generic UIs within Portal
 - window/text scales (i.e. "small", "medium", "large")
 - an input mode so you could call arbitrary `mod` functions from the "console", with autocompletion

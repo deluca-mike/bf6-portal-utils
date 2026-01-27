@@ -1,11 +1,13 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
+import jsdoc from 'eslint-plugin-jsdoc';
 
 export default [
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
     prettierConfig,
+    jsdoc.configs['flat/recommended-typescript'],
     {
         files: ['**/*.ts'],
         languageOptions: {
@@ -29,6 +31,7 @@ export default [
             'no-prototype-builtins': 'warn', // Access Object.prototype method 'hasOwnProperty'
             'no-empty': 'warn', // Empty block statement
             'no-debugger': 'warn', // Unexpected 'debugger' statement
+            'jsdoc/require-jsdoc': ['warn', { publicOnly: true }],
         },
     },
     {

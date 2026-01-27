@@ -8,7 +8,8 @@ and modular.
 The class tracks active rays per player, uses geometric distance calculations to match hit points to ray segments, and
 automatically handles cleanup of expired rays and player states. A time-to-live (TTL) system ensures that old rays don't
 accumulate in memory, and a sophisticated pending misses resolution system correctly attributes misses to rays when the
-native API provides ambiguous information.
+native API provides ambiguous information. The module uses the `Logging` module for internal logging, allowing you to
+monitor callback errors and debug raycast behavior.
 
 > **Note** The `Raycast` class depends on the `Timers` module (which is also maintained in this repository) for
 > automatic state pruning. All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, etc.) come from
@@ -44,6 +45,9 @@ native API provides ambiguous information.
 ```ts
 import { Raycast } from 'bf6-portal-utils/raycast';
 
+// Optional: Configure logging for raycast callback error monitoring
+Raycast.setLogging((text) => console.log(text), Raycast.LogLevel.Error);
+
 export function OnRayCastHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void {
     // Required: Forward the event to Raycast so it can attribute the hit to the correct ray
     Raycast.handleHit(eventPlayer, eventPoint, eventNormal);
@@ -74,13 +78,15 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
             z: mod.ZComponentOf(rayEnd),
         },
         {
-            onHit: (hitPoint, normal) => {
+            onHit: async (hitPoint, normal) => {
                 // Called when the ray hits a target
+                // Callbacks can be synchronous or asynchronous (return void or Promise<void>)
                 console.log(`Ray hit at <${hitPoint.x}, ${hitPoint.y}, ${hitPoint.z}>`);
                 console.log(`Surface normal: <${normal.x}, ${normal.y}, ${normal.z}>`);
             },
             onMiss: () => {
                 // Called when the ray misses (no target found)
+                // Callbacks can be synchronous or asynchronous (return void or Promise<void>)
                 console.log('Ray missed - no obstacle detected');
             },
         }
@@ -103,6 +109,10 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
   skipped during hit attribution and trigger their miss callbacks and are cleaned up automatically.
 - **Automatic Pruning** – The class automatically prunes expired rays every 5 seconds to prevent memory leaks. You can
   also manually call `pruneAllStates()` when players leave.
+- **Configurable Error Logging** – Callback errors (both synchronous and asynchronous) are automatically logged using
+  the `Logging` module. Use `Raycast.setLogging()` to configure a logger function, minimum log level, and whether to
+  include error details. This provides visibility into callback failures without requiring manual error handling in
+  every callback.
 
 ---
 
@@ -112,14 +122,29 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
 
 All methods are static. The class does not need to be instantiated.
 
+#### `Raycast.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Raycast.setLogging()` to
+configure the minimum log level for raycast callback error logging.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Default minimum log level.
+- `Error` (3) – Error messages. Includes callback errors (sync and async). Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
 #### Static Methods
 
-| Method                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cast(player: mod.Player, start: mod.Vector \| Raycast.Vector3, end: mod.Vector \| Raycast.Vector3, callbacks: Raycast.Callbacks): void` | Casts a ray from `start` to `end` for the given `player`. The `callbacks` object (of type `Raycast.Callbacks<T>`) must contain at least one of `onHit` or `onMiss`. The type of `start` and `end` (either `mod.Vector` or `Raycast.Vector3`) determines the generic type `T`, which in turn determines the type of `hitPoint` and `hitNormal` in the `onHit` callback. The ray is tracked internally and automatically cleaned up after the TTL expires. |
-| `handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void`                                              | Handles a ray hit event from `mod.OnRayCastHit`. Should be called in your `OnRayCastHit()` event handler. Matches the hit to the best-fitting ray using geometric calculations (skipping stale rays) and invokes the corresponding `onHit` callback.                                                                                                                                                                                                     |
-| `handleMiss(eventPlayer: mod.Player): void`                                                                                              | Handles a ray miss event from `mod.OnRayCastMissed`. Should be called in your `OnRayCastMissed()` event handler. Stores the miss as pending and resolves it when the number of pending misses equals the number of active rays.                                                                                                                                                                                                                          |
-| `pruneAllStates(): void`                                                                                                                 | Manually prunes all expired rays and removes empty player states. Ideally called in `OnPlayerLeaveGame()` to clean up memory, but automatic pruning runs every 5 seconds.                                                                                                                                                                                                                                                                                |
+| Method                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void`                           | Configures logging for the Raycast module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. This allows you to monitor and debug callback failures without breaking the raycast system. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. For more information, see the [`Logging` module documentation](../logging/README.md). |
+| `cast(player: mod.Player, start: mod.Vector \| Raycast.Vector3, end: mod.Vector \| Raycast.Vector3, callbacks: Raycast.Callbacks): void` | Casts a ray from `start` to `end` for the given `player`. The `callbacks` object (of type `Raycast.Callbacks<T>`) must contain at least one of `onHit` or `onMiss`. The type of `start` and `end` (either `mod.Vector` or `Raycast.Vector3`) determines the generic type `T`, which in turn determines the type of `hitPoint` and `hitNormal` in the `onHit` callback. The ray is tracked internally and automatically cleaned up after the TTL expires.            |
+| `handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void`                                              | Handles a ray hit event from `mod.OnRayCastHit`. Should be called in your `OnRayCastHit()` event handler. Matches the hit to the best-fitting ray using geometric calculations (skipping stale rays) and invokes the corresponding `onHit` callback.                                                                                                                                                                                                                |
+| `handleMiss(eventPlayer: mod.Player): void`                                                                                              | Handles a ray miss event from `mod.OnRayCastMissed`. Should be called in your `OnRayCastMissed()` event handler. Stores the miss as pending and resolves it when the number of pending misses equals the number of active rays.                                                                                                                                                                                                                                     |
+| `pruneAllStates(): void`                                                                                                                 | Manually prunes all expired rays and removes empty player states. Ideally called in `OnPlayerLeaveGame()` to clean up memory, but automatic pruning runs every 5 seconds.                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -145,9 +170,10 @@ function checkLineOfSight(player: mod.Player, target: mod.Player): Promise<boole
         const targetPos = mod.GetSoldierState(target, mod.SoldierStateVector.GetPosition);
 
         Raycast.cast(player, playerPos, targetPos, {
-            onHit: (hitPoint) => {
+            onHit: async (hitPoint) => {
                 // Ray hit something - check if it's the target (within 1 meter)
                 // Since we passed mod.Vector for start/end, hitPoint is also mod.Vector
+                // Callbacks can be async (return Promise<void>) or sync (return void)
                 const dx = mod.XComponentOf(hitPoint) - mod.XComponentOf(targetPos);
                 const dy = mod.YComponentOf(hitPoint) - mod.YComponentOf(targetPos);
                 const dz = mod.ZComponentOf(hitPoint) - mod.ZComponentOf(targetPos);
@@ -158,6 +184,7 @@ function checkLineOfSight(player: mod.Player, target: mod.Player): Promise<boole
             },
             onMiss: () => {
                 // Ray missed - no line of sight (obstacle or ray expired)
+                // Callbacks can be async (return Promise<void>) or sync (return void)
                 resolve(false);
             },
         });
@@ -194,7 +221,8 @@ export function OnPlayerLeaveGame(eventNumber: number): void {
 3. When the native `OnRayCastHit()` event fires, call `Raycast.handleHit()`.
 4. The class matches the hit to the best-fitting ray using geometric distance calculations (skipping stale rays).
 5. If a match is found, the `onHit` callback is invoked with the hit point and surface normal (the type matches the type
-   of `start` and `end`).
+   of `start` and `end`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Errors in
+   callbacks are automatically caught and logged if logging is configured.
 6. If the native `OnRayCastMissed()` event fires, call `Raycast.handleMiss()`.
 7. The class stores the miss as pending and resolves it when possible.
 8. Expired rays (older than 2 seconds) automatically trigger their `onMiss` callbacks and are cleaned up.
@@ -235,6 +263,10 @@ and misses to the correct rays:
     - Player states with no active rays and no pending misses are deleted entirely.
     - This prevents unbounded memory growth in long-running sessions.
 
+6. **Error Logging** – Callback errors (both synchronous and asynchronous) are caught and logged using the `Logging`
+   module. The logging configuration can be set via `Raycast.setLogging()`, allowing you to control verbosity and error
+   detail inclusion. This provides visibility into callback failures without manual error handling.
+
 ---
 
 ## Known Limitations & Caveats
@@ -250,8 +282,10 @@ and misses to the correct rays:
 - **TTL Precision** – Expired rays trigger their miss callbacks after the TTL expires, not at the exact expiration time.
   The actual cleanup happens during pruning operations (every 5 seconds) or lazy pruning (before adding new rays).
 
-- **Callback Errors** – Callback errors are silently caught and ignored to prevent one failing callback from breaking
-  the entire raycast system. If you need error handling, implement it inside your callbacks.
+- **Callback Errors** – Callback errors (both synchronous and asynchronous) are automatically caught and logged (if
+  logging is configured via `Raycast.setLogging()`) to prevent one failing callback from breaking the entire raycast
+  system. Errors are logged at the `Error` log level. If you need additional error handling, implement it inside your
+  callbacks.
 
 - **Player State Cleanup** – While automatic pruning runs every 5 seconds, it's good practice to call `pruneAllStates()`
   in `OnPlayerLeaveGame()` to immediately clean up state for disconnected players.
@@ -296,22 +330,27 @@ interface Vector3 {
 Generic callback function type for ray hits:
 
 ```ts
-type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => void;
+type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
 ```
 
 The `hitPoint` parameter is the 3D position where the ray hit, and `hitNormal` is the surface normal at the hit point.
 The type `T` matches the type of `start` and `end` passed to `cast()`—if you pass `mod.Vector`, the callbacks receive
 `mod.Vector`; if you pass `Raycast.Vector3`, they receive `Raycast.Vector3`.
 
+Callbacks can be synchronous (returning `void`) or asynchronous (returning `Promise<void>`). Errors in callbacks are
+automatically caught and logged if logging is configured via `Raycast.setLogging()`.
+
 ### `Raycast.MissCallback`
 
-Callback function type for ray misses:
+Called when a ray misses (no target found) or expires due to TTL:
 
 ```ts
-type MissCallback = () => void;
+type MissCallback = () => Promise<void> | void;
 ```
 
-Called when a ray misses (no target found) or expires due to TTL.
+Called when a ray misses (no target found) or expires due to TTL. Callbacks can be synchronous (returning `void`) or
+asynchronous (returning `Promise<void>`). Errors in callbacks are automatically caught and logged if logging is
+configured via `Raycast.setLogging()`.
 
 ### `Raycast.Callbacks`
 

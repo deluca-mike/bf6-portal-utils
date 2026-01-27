@@ -1,48 +1,76 @@
+import { Logging } from '../logging/index.ts';
 export declare class Sounds {
-    private static readonly _DURATION_BUFFER;
+    private static readonly _ZERO_VECTOR;
     private static readonly _DEFAULT_2D_DURATION;
     private static readonly _DEFAULT_3D_DURATION;
-    private static readonly _SOUND_OBJECT_POOL;
-    private static _logger?;
-    private static _logLevel;
-    private static _soundObjectsCount;
-    private static _log;
+    private static readonly _POOLS;
+    private static _logging;
+    private static _totalObjectCount;
+    private constructor();
     private static _getVectorString;
-    private static _getSoundObjects;
+    private static _getSoundObjectPool;
     private static _createSoundObject;
-    private static _getAvailableSoundObject;
-    private static _createPlayedSound;
-    private static _play2DSound;
-    private static _play2DSoundForPlayer;
-    private static _play2DSoundForSquad;
-    private static _play2DSoundForTeam;
-    private static _stop;
-    static stop(soundObject: Sounds.SoundObject): void;
-    static play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): Sounds.PlayedSound;
-    static play3D(
-        sfxAsset: mod.RuntimeSpawn_Common,
-        position: mod.Vector,
-        params?: Sounds.Params3D
-    ): Sounds.PlayedSound;
-    static setLogging(log?: (text: string) => void, logLevel?: Sounds.LogLevel): void;
+    private static _reserveSoundObject;
+    private static _createSoundStopper;
+    private static _stopAndMakeAvailable;
+    /**
+     * Plays a 2D sound.
+     * @param sfxAsset - The sfx asset to play.
+     * @param params - The parameters for the sound.
+     *   - `amplitude`: The amplitude of the sound.
+     *   - `target`: The target to play the sound for. Can be a `mod.Player`, `mod.Squad`, `mod.Team`, or `undefined` to
+     *               play the sound for all players.
+     *   - `duration`: The duration of the sound in milliseconds, 0 for infinite duration (i.e. for looping assets).
+     * @returns The played sound.
+     */
+    static play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): () => void;
+    /**
+     * Plays a 3D sound.
+     * @param sfxAsset - The sfx asset to play.
+     * @param position - The position to play the sound at.
+     * @param params - The parameters for the sound.
+     *   - `amplitude`: The amplitude of the sound.
+     *   - `attenuationRange`: The attenuation range of the sound.
+     *   - `duration`: The duration of the sound in milliseconds, 0 for infinite duration (i.e. for looping assets).
+     * @returns The played sound.
+     */
+    static play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): () => void;
+    /**
+     * Creates a new `SoundObject` for the given sfx asset, if it doesn't exist. This helps the game client load the
+     * sound asset in memory so it can play quicker when needed. This is only needed once per asset, if at all.
+     * @param sfxAsset - The sfx asset to preload.
+     */
     static preload(sfxAsset: mod.RuntimeSpawn_Common): void;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    static setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
     static get objectCount(): number;
-    static objectCountForAsset(sfxAsset: mod.RuntimeSpawn_Common): number;
+    static objectCountsForAsset(sfxAsset: mod.RuntimeSpawn_Common): Sounds.ObjectCounts;
 }
 export declare namespace Sounds {
     type SoundObject = {
         sfx: mod.SFX;
-        availableTime: number;
-        stopTimerId?: number;
+        objectPool: ObjectPool;
     };
-    type PlayedSound = {
-        stop: () => void;
+    type ObjectPool = {
+        available: Set<SoundObject>;
+        active: Set<SoundObject>;
+    };
+    type ObjectCounts = {
+        available: number;
+        active: number;
     };
     type Params2D = {
         amplitude?: number;
-        player?: mod.Player;
-        squad?: mod.Squad;
-        team?: mod.Team;
+        target?: mod.Player | mod.Squad | mod.Team;
         duration?: number;
     };
     type Params3D = {
@@ -50,9 +78,5 @@ export declare namespace Sounds {
         attenuationRange?: number;
         duration?: number;
     };
-    enum LogLevel {
-        Debug = 0,
-        Info = 1,
-        Error = 2,
-    }
+    const LogLevel: typeof Logging.LogLevel;
 }

@@ -1,13 +1,33 @@
 import { SolidUI } from '../solid-ui/index.ts';
-import { UI } from '../ui/index.ts';
 import { Timers } from '../timers/index.ts';
+import { Logging } from '../logging/index.ts';
 
-// version: 4.1.0
+import { UI } from '../ui/index.ts';
+import { UIContainer } from '../ui/components/container/index.ts';
+import { UITextButton } from '../ui/components/text-button/index.ts';
+import { UIText } from '../ui/components/text/index.ts';
+
+// version: 5.0.0
 export namespace FFASpawning {
-    export enum LogLevel {
-        Debug = 0,
-        Info = 1,
-        Error = 2,
+    const logging = new Logging('FFAS');
+
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    export const LogLevel = Logging.LogLevel;
+
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void {
+        logging.setLogging(log, logLevel, includeError);
     }
 
     export type SpawnData = [x: number, y: number, z: number, orientation: number];
@@ -62,16 +82,6 @@ export namespace FFASpawning {
 
         private static _queueProcessingActive: boolean = false;
 
-        private static _logger?: (text: string) => void;
-
-        private static _logLevel: FFASpawning.LogLevel = 2;
-
-        private static _log(logLevel: FFASpawning.LogLevel, text: string): void {
-            if (logLevel < this._logLevel) return;
-
-            this._logger?.(`<FFAS> ${text}`);
-        }
-
         private static _getRotationVector(orientation: number): mod.Vector {
             return mod.CreateVector(0, mod.DegreesToRadians(180 - orientation), 0);
         }
@@ -95,7 +105,10 @@ export namespace FFASpawning {
 
                 // If the spawn is ideal, return it.
                 if (distance >= this._minimumSafeDistance && distance <= this._maximumInterestingDistance) {
-                    this._log(FFASpawning.LogLevel.Debug, `Spawn-${index} is ideal (${distance.toFixed(2)}m).`);
+                    if (logging.willLog(LogLevel.Debug)) {
+                        logging.log(`Spawn-${index} is ideal (${distance.toFixed(2)}m).`, LogLevel.Debug);
+                    }
+
                     return candidate;
                 }
 
@@ -133,10 +146,7 @@ export namespace FFASpawning {
                           distance: interestingFallbackDistance,
                       };
 
-            this._log(
-                FFASpawning.LogLevel.Info,
-                `Spawn-${spawn.index} is the non-ideal fallback (${distance.toFixed(2)}m).`
-            );
+            logging.log(`Spawn-${spawn.index} is the non-ideal fallback (${distance.toFixed(2)}m).`, LogLevel.Warning);
 
             return spawn;
         }
@@ -161,16 +171,22 @@ export namespace FFASpawning {
             }
 
             if (this._spawns.length == 0) {
-                this._log(FFASpawning.LogLevel.Error, `No spawn points set.`);
+                logging.log(`No spawn points set.`, LogLevel.Warning);
                 this._queueProcessingActive = false;
                 return;
             }
 
-            this._log(FFASpawning.LogLevel.Debug, `Processing ${this._spawnQueue.length} in queue.`);
+            if (logging.willLog(LogLevel.Debug)) {
+                logging.log(`Processing ${this._spawnQueue.length} in queue.`, LogLevel.Debug);
+            }
 
             if (this._spawnQueue.length == 0) {
-                this._log(FFASpawning.LogLevel.Debug, `No players in queue. Suspending processing.`);
+                if (logging.willLog(LogLevel.Debug)) {
+                    logging.log(`No players in queue. Suspending processing.`, LogLevel.Debug);
+                }
+
                 this._queueProcessingActive = false;
+
                 return;
             }
 
@@ -181,10 +197,12 @@ export namespace FFASpawning {
 
                 const spawn = this._getBestSpawnPoint();
 
-                this._log(
-                    FFASpawning.LogLevel.Debug,
-                    `Spawning P_${soldier._playerId} at ${this.getVectorString(spawn.location)}.`
-                );
+                if (logging.willLog(LogLevel.Debug)) {
+                    logging.log(
+                        `Spawning P_${soldier._playerId} at ${this.getVectorString(spawn.location)}.`,
+                        LogLevel.Debug
+                    );
+                }
 
                 mod.SpawnPlayerFromSpawnPoint(soldier._player, spawn.spawnPoint);
             }
@@ -208,12 +226,6 @@ export namespace FFASpawning {
             return `<${mod.XComponentOf(vector).toFixed(2)}, ${mod.YComponentOf(vector).toFixed(2)}, ${mod
                 .ZComponentOf(vector)
                 .toFixed(2)}>`;
-        }
-
-        // Attaches a logger and defines a minimum log level.
-        public static setLogging(log?: (text: string) => void, logLevel?: FFASpawning.LogLevel): void {
-            this._logger = log;
-            this._logLevel = logLevel ?? FFASpawning.LogLevel.Info;
         }
 
         // Should be called in the `OnGameModeStarted()` event. Orientation is the compass angle integer.
@@ -246,13 +258,17 @@ export namespace FFASpawning {
             this._promptDelay = options?.promptDelay ?? this._promptDelay;
             this._queueProcessingDelay = options?.queueProcessingDelay ?? this._queueProcessingDelay;
 
-            this._log(FFASpawning.LogLevel.Info, `Initialized with ${this._spawns.length} spawn points.`);
+            if (logging.willLog(LogLevel.Info)) {
+                logging.log(`Initialized with ${this._spawns.length} spawn points.`, LogLevel.Info);
+            }
         }
 
         // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
         // AI soldiers will skip the countdown and spawn immediately.
         public static startDelayForPrompt(player: mod.Player): void {
-            this._log(FFASpawning.LogLevel.Debug, `Start delay request for P_${mod.GetObjId(player)}.`);
+            if (logging.willLog(LogLevel.Debug)) {
+                logging.log(`Start delay request for P_${mod.GetObjId(player)}.`, LogLevel.Debug);
+            }
 
             const soldier = this._ALL_SOLDIERS[mod.GetObjId(player)];
 
@@ -300,7 +316,7 @@ export namespace FFASpawning {
 
             this._delayCountdown = { get: delayCountdown, set: setDelayCountdown };
 
-            this._promptUI = SolidUI.h(UI.Container, {
+            this._promptUI = SolidUI.h(UIContainer, {
                 x: 0,
                 y: 0,
                 width: 440,
@@ -314,7 +330,7 @@ export namespace FFASpawning {
                 uiInputModeWhenVisible: true,
             });
 
-            SolidUI.h(UI.TextButton, {
+            SolidUI.h(UITextButton, {
                 parent: this._promptUI,
                 x: 0,
                 y: 20,
@@ -336,7 +352,7 @@ export namespace FFASpawning {
                 onClick: async (player: mod.Player): Promise<void> => this._addToQueue(),
             });
 
-            SolidUI.h(UI.TextButton, {
+            SolidUI.h(UITextButton, {
                 parent: this._promptUI,
                 x: 0,
                 y: 80,
@@ -358,7 +374,7 @@ export namespace FFASpawning {
                 onClick: async (player: mod.Player): Promise<void> => this.startDelayForPrompt(Soldier._promptDelay),
             });
 
-            this._countdownUI = SolidUI.h(UI.Text, {
+            this._countdownUI = SolidUI.h(UIText, {
                 x: 0,
                 y: 60,
                 width: 400,
@@ -386,7 +402,7 @@ export namespace FFASpawning {
                     });
                 }, 1_000);
 
-                this._debugPositionUI = SolidUI.h(UI.Text, {
+                this._debugPositionUI = SolidUI.h(UIText, {
                     width: 360,
                     height: 26,
                     anchor: mod.UIAnchor.BottomCenter,
@@ -417,13 +433,13 @@ export namespace FFASpawning {
 
         private _delayCountdownInterval?: number;
 
-        private _promptUI?: UI.Container;
+        private _promptUI?: UIContainer;
 
-        private _countdownUI?: UI.Text;
+        private _countdownUI?: UIText;
 
         private _updatePositionInterval?: number;
 
-        private _debugPositionUI?: UI.Text;
+        private _debugPositionUI?: UIText;
 
         public get player(): mod.Player {
             return this._player;
@@ -438,7 +454,9 @@ export namespace FFASpawning {
         public startDelayForPrompt(delay: number = Soldier._initialPromptDelay): void {
             if (this._isAISoldier) return this._addToQueue();
 
-            Soldier._log(FFASpawning.LogLevel.Debug, `Starting ${delay}s delay for P_${this._playerId}.`);
+            if (logging.willLog(LogLevel.Debug)) {
+                logging.log(`Starting ${delay}s delay for P_${this._playerId}.`, LogLevel.Debug);
+            }
 
             if (delay <= 0) return this._addToQueue();
 
@@ -465,21 +483,26 @@ export namespace FFASpawning {
 
             Soldier._spawnQueue.push(this);
 
-            Soldier._log(
-                FFASpawning.LogLevel.Debug,
-                `P_${this._playerId} added to queue (${Soldier._spawnQueue.length} total).`
-            );
+            if (logging.willLog(LogLevel.Debug)) {
+                logging.log(
+                    `P_${this._playerId} added to queue (${Soldier._spawnQueue.length} total).`,
+                    LogLevel.Debug
+                );
+            }
 
             if (!Soldier._queueProcessingEnabled || Soldier._queueProcessingActive) return;
 
-            Soldier._log(FFASpawning.LogLevel.Debug, `Restarting spawn queue processing.`);
+            if (logging.willLog(LogLevel.Debug)) {
+                logging.log(`Restarting spawn queue processing.`, LogLevel.Debug);
+            }
+
             Soldier._processSpawnQueue();
         }
 
         private _deleteIfNotValid(): boolean {
             if (mod.IsPlayerValid(this._player)) return false;
 
-            Soldier._log(FFASpawning.LogLevel.Info, `P_${this._playerId} is no longer valid.`);
+            logging.log(`P_${this._playerId} is no longer valid.`, LogLevel.Warning);
 
             Timers.clearInterval(this._delayCountdownInterval);
             Timers.clearInterval(this._updatePositionInterval);

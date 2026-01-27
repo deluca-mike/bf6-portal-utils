@@ -15,6 +15,8 @@ interactive buttons.
 2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
    mod. The bundler automatically handles code inlining.
 3. **Button handler** – Register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler.
+4. **Component imports** – UI components are now organized in subdirectories. Import them individually from their
+   respective paths (e.g., `import { UIContainer } from 'bf6-portal-utils/ui/components/container'`).
 
 ---
 
@@ -35,12 +37,14 @@ interactive buttons.
 
 ```ts
 import { UI } from 'bf6-portal-utils/ui';
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+import { UITextButton } from 'bf6-portal-utils/ui/components/text-button';
 
-let testMenu: UI.Container | undefined;
+let testMenu: UIContainer | undefined;
 
 export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     if (!testMenu) {
-        testMenu = new UI.Container({
+        testMenu = new UIContainer({
             position: { x: 0, y: 0 },
             size: { width: 200, height: 300 },
             anchor: mod.UIAnchor.Center,
@@ -48,7 +52,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
             uiInputModeWhenVisible: true,
             childrenParams: [
                 {
-                    type: UI.TextButton,
+                    type: UITextButton,
                     position: { x: 0, y: 0 },
                     size: { width: 200, height: 50 },
                     anchor: mod.UIAnchor.TopCenter,
@@ -60,9 +64,9 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     message: mod.Message(mod.stringkeys.ui.buttons.option1),
                     textSize: 36,
                     textColor: UI.COLORS.WHITE,
-                } as UI.ChildParams<UI.TextButtonParams>,
+                } as UIContainer.ChildParams<UITextButton.Params>,
                 {
-                    type: UI.TextButton,
+                    type: UITextButton,
                     position: { x: 0, y: 50 },
                     size: { width: 200, height: 50 },
                     anchor: mod.UIAnchor.TopCenter,
@@ -74,9 +78,9 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     message: mod.Message(mod.stringkeys.ui.buttons.option2),
                     textSize: 36,
                     textColor: UI.COLORS.WHITE,
-                } as UI.ChildParams<UI.TextButtonParams>,
+                } as UIContainer.ChildParams<UITextButton.Params>,
                 {
-                    type: UI.TextButton,
+                    type: UITextButton,
                     position: { x: 0, y: 0 },
                     size: { width: 50, height: 50 },
                     anchor: mod.UIAnchor.BottomCenter,
@@ -88,7 +92,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     message: mod.Message(mod.stringkeys.ui.buttons.close),
                     textSize: 36,
                     textColor: UI.COLORS.WHITE,
-                } as UI.ChildParams<UI.TextButtonParams>,
+                } as UIContainer.ChildParams<UITextButton.Params>,
             ],
             visible: true,
         });
@@ -113,7 +117,10 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 All setter methods return the instance, allowing you to chain multiple operations:
 
 ```ts
-const button = new UI.Button({
+import { UIButton } from 'bf6-portal-utils/ui/components/button';
+import { UIText } from 'bf6-portal-utils/ui/components/text';
+
+const button = new UIButton({
     position: { x: 100, y: 200 },
     size: { width: 200, height: 50 },
     onClick: async (player) => {
@@ -131,12 +138,12 @@ button
     .show();
 
 // Or update text content with chaining
-const text = new UI.Text({
-    message: mod.Message('Hello'),
+const text = new UIText({
+    message: mod.Message(mod.stringKeys.labels.hello), // 'Hello'
     position: { x: 0, y: 0 },
 });
 
-text.setMessage(mod.Message('Updated'))
+text.setMessage(mod.Message(mod.stringKeys.labels.updated)) // 'Updated'
     .setPosition({ x: 10, y: 20 })
     .setBgColor(UI.COLORS.WHITE)
     .setBgAlpha(0.5)
@@ -152,13 +159,16 @@ Elements automatically manage parent-child relationships. When you create an ele
 parents, or delete it, the parent's `children` array is automatically updated:
 
 ```ts
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+import { UIText } from 'bf6-portal-utils/ui/components/text';
+
 // Create containers
-const container1 = new UI.Container({ position: { x: 0, y: 0 }, size: { width: 200, height: 200 } });
-const container2 = new UI.Container({ position: { x: 200, y: 0 }, size: { width: 200, height: 200 } });
+const container1 = new UIContainer({ position: { x: 0, y: 0 }, size: { width: 200, height: 200 } });
+const container2 = new UIContainer({ position: { x: 200, y: 0 }, size: { width: 200, height: 200 } });
 
 // Create a text element as a child of container1
-const text = new UI.Text({
-    message: mod.Message('Hello'),
+const text = new UIText({
+    message: mod.Message(mod.stringKeys.labels.hello), // 'Hello'
     parent: container1,
 });
 
@@ -182,41 +192,114 @@ console.log(container2.children.length); // 0 (automatically removed)
 
 ## Core Concepts
 
-- **`UI` namespace** – A namespace that wraps `mod.*` UI functions and keeps track of active buttons/handlers.
+- **`UI` namespace** – A namespace that wraps `mod.*` UI functions and keeps track of active buttons/handlers. Provides
+  logging functionality via the `Logging` module for debugging and error tracking within UI components.
 - **`UI.Node` base class** – All UI nodes (root, containers, text, buttons) extend this class and have `name`,
-  `uiWidget`, and `receiver` getters. Use `instanceof` to check node types (e.g., `element instanceof UI.Container`).
+  `uiWidget`, and `receiver` getters. Use `instanceof` to check node types (e.g., `element instanceof UIContainer`).
 - **`UI.Parent` interface** – Interface implemented by nodes that can have children (`Root` and `Container`). Provides
-  `children`, `attachChild()`, and `detachChild()` methods for managing parent-child relationships.
+  `children`, `attachChild()`, and `detachChild()` methods for managing parent-child relationships. Children are stored
+  internally as a `Set<Element>` but exposed as an array via the `children` getter.
 - **`UI.Root` class** – The root node wrapping `mod.GetUIRoot()`. Has a private constructor with a single instance
   available as `UI.ROOT_NODE`. All elements default to this parent unless you supply `parent` in params.
 - **`UI.Element` base class** – Abstract base class that all created elements extend. Provides getters/setters for
   common properties (position, size, visibility, colors, etc.) with method chaining support. All property values are
   stored internally for fast retrieval without relying on `mod` namespace calls. Elements automatically manage
   parent-child relationships when created, moved, or deleted. Includes direct properties for `x`, `y`, `width`,
-  `height`, and `uiInputModeWhenVisible`.
-- **`UI.Container`, `UI.Text`, `UI.Button`, `UI.TextButton` classes** – Concrete classes that extend `Element` and
-  provide type-specific functionality. All setters return the instance for method chaining (fluent interface).
+  `height`, and `uiInputModeWhenVisible`. Elements have a protected `_deleted` member and `_isDeletedCheck()` method
+  that blocks and warns on any setter operations when the element is deleted. Elements also have a protected `_logging`
+  member that provides access to the UI namespace's logging instance for use in custom components.
+- **Component organization** – All UI component classes (e.g., `UIContainer`, `UIText`, `UIButton`, `UITextButton`) have
+  been moved to their own subdirectories under `ui/components/`. Each component can be individually imported from its
+  respective path, allowing for better code organization and independent versioning.
+- **`UI.Button` interface** – Interface that defines button-like behavior. Components that behave like buttons can
+  implement this interface and register themselves using `UI.registerButton()` so their `onClick` functions are called
+  when the button is pressed.
 - **Default colors** – `UI.COLORS` wraps common `mod.CreateVector(r, g, b)` presets so you rarely need to build vectors
   yourself. It includes BF palette colors.
 - **Receiver routing** – All elements can specify a `receiver` property (`mod.Player | mod.Team`) in their constructor
-  parameters to display UI to a specific audience. When omitted, elements inherit their parent's receiver (or use global
-  if parent is `UI.ROOT_NODE`). The `receiver` property (type `GlobalReceiver | TeamReceiver | PlayerReceiver`) is
-  available as a read-only property on `Node` (inherited by `Element`). To get the native receiver
-  (`mod.Player | mod.Team | undefined`), access `receiver.nativeReceiver`. Console warnings are displayed if an
-  element's receiver is incompatible with its parent's receiver.
+  parameters to display UI to a specific audience. When omitted, elements automatically adopt their parent's receiver
+  (or use global if parent is `UI.ROOT_NODE`). The `receiver` property (type
+  `GlobalReceiver | TeamReceiver | PlayerReceiver`) is available as a read-only property on `Node` (inherited by
+  `Element`). To get the native receiver (`mod.Player | mod.Team | undefined`), access `receiver.nativeReceiver`.
+  Console warnings are displayed if an element's receiver is incompatible with its parent's receiver.
 - **Method chaining** – All setter methods (e.g., `setPosition()`, `setSize()`, `setX()`, `setY()`, `show()`, `hide()`)
   return the instance, allowing you to chain multiple operations:
   `container.setPosition({ x: 10, y: 20 }).setSize({ width: 100, height: 50 }).show()`.
 - **Parent-child management** – When elements are created with a parent, moved between parents, or deleted, the parent's
-  `children` array is automatically maintained. The `parent` property must be either `UI.Root` or `UI.Container` (not
-  native `mod.UIWidget`). Containers track their children, and calling `delete()` on an element automatically removes it
-  from its parent's children list and deletes all child elements recursively.
+  `children` Set is automatically maintained. The `parent` property must be a `UI.Node` that adheres to the `UI.Parent`
+  interface (not native `mod.UIWidget`). Containers track their children internally as a `Set`, and calling `delete()`
+  on an element automatically removes it from its parent's children and deletes all child elements recursively.
 - **Position and Size parameters** – Constructor parameters support either `x`/`y` or `position` (mutually exclusive),
   and either `width`/`height` or `size` (mutually exclusive). All elements expose `x`, `y`, `width`, `height`,
   `position`, and `size` as properties with getters/setters.
 - **ChildParams type** – The `ChildParams<T extends ElementParams>` type allows you to specify child elements in
   `childrenParams` by passing the class constructor as the `type` property. This enables type-safe child definitions and
   paves the way for custom UI elements. The type parameter must extend `ElementParams`.
+- **Padding** – Despite padding being a common parameter for the underlying `mod` namespace UI widgets, it is not a
+  property of the base `Element` class because it is not available for all UI widgets, and the width of contained
+  contents (i.e. text or elements in a container) do not have their heights and widths automatically adjusted to
+  compensate for their parent's padding. Since users need to manage positions and sizes themselves to compensate for
+  padding, it is a current design decision to omit padding as a base property. It will be reintroduced later when this
+  library supports automatic sizing and relative widths (i.e. percentages of their parent).
+
+---
+
+## Logging
+
+The `UI` namespace provides logging functionality through the `Logging` module, allowing you to configure error logging
+and debug messages for UI operations. This is particularly useful for tracking issues with deleted elements, button
+registration conflicts, and other UI-related warnings.
+
+### `UI.LogLevel`
+
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `UI.setLogging()` to
+configure the minimum log level for UI logging.
+
+Available log levels:
+
+- `Debug` (0) – Debug-level messages. Most verbose.
+- `Info` (1) – Informational messages.
+- `Warning` (2) – Warning messages. Default minimum log level.
+- `Error` (3) – Error messages. Least verbose.
+
+For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
+
+### `UI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+
+Configures logging for the UI module. When UI operations encounter issues (such as attempting to modify a deleted
+element or registering a duplicate button), they are automatically logged using the configured logger.
+
+**Parameters:**
+
+- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
+  `LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+
+**Example:**
+
+```ts
+import { UI } from 'bf6-portal-utils/ui';
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+
+// Configure logging with console.log, minimum level of Warning, and include error details
+UI.setLogging(
+    (text) => console.log(text),
+    UI.LogLevel.Warning,
+    true // includeError
+);
+
+// If an element is modified after deletion, it will be logged automatically
+const container = new UIContainer({
+    /* ... */
+});
+container.delete();
+container.visible = true; // Logs: <UI> Element [name] already deleted. (Warning)
+```
+
+**Note:** Logging is automatic and fail-safe. UI operation warnings and errors are logged without affecting the
+operation or the UI system. The `_logging` member is available as a protected property on `Element` for use in custom UI
+components that extend `Element`.
 
 ---
 
@@ -287,8 +370,6 @@ getter/setter pairs and method chaining support. All property values are stored 
 
 - **`anchor: mod.UIAnchor`** (getter/setter) – Anchor point for positioning.
 - **`setAnchor(anchor: mod.UIAnchor): Element`** – Sets anchor and returns `this` for method chaining.
-- **`padding: number`** (getter/setter) – Padding value.
-- **`setPadding(padding: number): Element`** – Sets padding and returns `this` for method chaining.
 - **`depth: mod.UIDepth`** (getter/setter) – Z-order depth.
 - **`setDepth(depth: mod.UIDepth): Element`** – Sets depth and returns `this` for method chaining.
 
@@ -303,15 +384,20 @@ getter/setter pairs and method chaining support. All property values are stored 
 
 **Lifecycle:**
 
+- **`deleted: boolean`** (getter) – Read-only property indicating whether the element has been deleted. Once an element
+  is deleted, all setter operations are blocked and a warning is logged if they are used.
 - **`delete(): void`** – Deletes the widget from Battlefield Portal and automatically removes it from its parent's
-  children list. Does not return `this` (element is destroyed).
+  children list. Sets the `deleted` flag to `true` and blocks all future setter operations. Does not return `this`
+  (element is destroyed and no other calls on it should be performed).
 
 **Method Chaining Example:**
 
 All properties support both normal setter syntax and method chaining:
 
 ```ts
-const container = new UI.Container({
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+
+const container = new UIContainer({
     /* ... */
 });
 
@@ -330,185 +416,28 @@ container
     .show();
 ```
 
-### `class UI.Container extends UI.Element`
+### `UI.registerButton(name: string, button: Button): () => void`
 
-Creates a container (`mod.AddUIContainer`) and any nested children defined via `childrenParams`.
+Registers a button with the UI system so that its `onClick` function is called when the button is pressed. Components
+that behave like buttons should call this function during construction to register themselves.
 
-#### Constructor Parameters
+**Parameters:**
 
-| Param                    | Type / Default                          | Notes                                                                                                                                                                                                  |
-| ------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `x`, `y`                 | `number = 0`                            | Position relative to `anchor`. Mutually exclusive with `position`.                                                                                                                                     |
-| `position`               | `UI.Position \| undefined`              | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                                                               |
-| `width`, `height`        | `number = 0`                            | Size in screen units. Mutually exclusive with `size`.                                                                                                                                                  |
-| `size`                   | `UI.Size \| undefined`                  | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                                                                 |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`    | See `mod/index.d.ts` for enum values.                                                                                                                                                                  |
-| `parent`                 | `UI.Parent \| undefined`                | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                                                                            |
-| `visible`                | `boolean = true`                        | Initial visibility.                                                                                                                                                                                    |
-| `padding`                | `number = 0`                            | Container padding.                                                                                                                                                                                     |
-| `bgColor`                | `mod.Vector = UI.COLORS.WHITE`          | Background color.                                                                                                                                                                                      |
-| `bgAlpha`                | `number = 0`                            | Background opacity.                                                                                                                                                                                    |
-| `bgFill`                 | `mod.UIBgFill = mod.UIBgFill.None`      | Fill mode.                                                                                                                                                                                             |
-| `depth`                  | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order.                                                                                                                                                                                               |
-| `receiver`               | `mod.Player \| mod.Team \| undefined`   | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers.                                              |
-| `uiInputModeWhenVisible` | `boolean = false`                       | Automatically manage UI input mode based on visibility (see UI Input Mode Management section).                                                                                                         |
-| `childrenParams`         | `Array<UI.ChildParams<any>> = []`       | Nested elements automatically receive this container as `parent`. Each child must have a `type` property set to the class constructor (e.g., `UI.Container`, `UI.Text`, `UI.Button`, `UI.TextButton`). |
+- `name` – The name of the button (typically the element's widget name).
+- `button` – The button instance that implements the `Button` interface.
 
-#### Properties & Methods
+**Returns:**
 
-Inherits all properties and methods from `UI.Element` (see below), plus:
+- A function that can be called to unregister the button. This is a convenience method for cleanup.
 
-- **`children: Element[]`** – Array of child elements. Automatically maintained when children are created, moved, or
-  deleted. Elements are automatically added when created with this container as their parent, and automatically removed
-  when deleted or moved to another parent.
-
-### `class UI.Text extends UI.Element`
-
-Creates a text widget via `mod.AddUIText`.
-
-#### Constructor Parameters
-
-| Param                    | Type / Default                          | Notes                                                                                                                                                     |
-| ------------------------ | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y`                 | `number = 0`                            | Position relative to `anchor`. Mutually exclusive with `position`.                                                                                        |
-| `position`               | `UI.Position \| undefined`              | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                  |
-| `width`, `height`        | `number = 0`                            | Size in screen units. Mutually exclusive with `size`.                                                                                                     |
-| `size`                   | `UI.Size \| undefined`                  | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                    |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`    | See `mod/index.d.ts` for enum values.                                                                                                                     |
-| `parent`                 | `UI.Parent \| undefined`                | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                               |
-| `visible`                | `boolean = true`                        | Initial visibility.                                                                                                                                       |
-| `padding`                | `number = 0`                            | Container padding.                                                                                                                                        |
-| `bgColor`                | `mod.Vector = UI.COLORS.WHITE`          | Background color.                                                                                                                                         |
-| `bgAlpha`                | `number = 0`                            | Background opacity.                                                                                                                                       |
-| `bgFill`                 | `mod.UIBgFill = mod.UIBgFill.None`      | Fill mode.                                                                                                                                                |
-| `depth`                  | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order.                                                                                                                                                  |
-| `receiver`               | `mod.Player \| mod.Team \| undefined`   | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
-| `uiInputModeWhenVisible` | `boolean = false`                       | Automatically manage UI input mode based on visibility (see UI Input Mode Management section).                                                            |
-| `message`                | `mod.Message`                           | **Required.** Text label content (see `mod/index.d.ts` for message helpers). Note: `mod.Message` is opaque and cannot be unpacked into a string.          |
-| `textSize`               | `number = 36`                           | Font size.                                                                                                                                                |
-| `textColor`              | `mod.Vector = UI.COLORS.BLACK`          | Text color.                                                                                                                                               |
-| `textAlpha`              | `number = 1`                            | Text opacity.                                                                                                                                             |
-| `textAnchor`             | `mod.UIAnchor = mod.UIAnchor.Center`    | Alignment inside the text widget.                                                                                                                         |
-
-#### Properties & Methods
-
-Inherits all properties and methods from `UI.Element` (see above), plus:
-
-- **`message: mod.Message`** (getter/setter) – The text content. Use the setter to update the message. Note:
-  `mod.Message` is opaque and cannot be unpacked into a string.
-- **`setMessage(message: mod.Message): Text`** – Sets the message and returns `this` for method chaining.
-- **`textSize: number`** (getter/setter) – Font size.
-- **`setTextSize(size: number): Text`** – Sets font size and returns `this` for method chaining.
-- **`textColor: mod.Vector`** (getter/setter) – Text color.
-- **`setTextColor(color: mod.Vector): Text`** – Sets text color and returns `this` for method chaining.
-- **`textAlpha: number`** (getter/setter) – Text opacity.
-- **`setTextAlpha(alpha: number): Text`** – Sets text opacity and returns `this` for method chaining.
-- **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
-- **`setTextAnchor(anchor: mod.UIAnchor): Text`** – Sets text anchor and returns `this` for method chaining.
-
-### `class UI.Button extends UI.Element`
-
-Creates a button widget via `mod.AddUIButton`.
-
-#### Constructor Parameters
-
-| Param                    | Type / Default                                       | Notes                                                                                                                                                     |
-| ------------------------ | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y`                 | `number = 0`                                         | Position relative to `anchor`. Mutually exclusive with `position`.                                                                                        |
-| `position`               | `UI.Position \| undefined`                           | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                  |
-| `width`, `height`        | `number = 0`                                         | Size in screen units. Mutually exclusive with `size`.                                                                                                     |
-| `size`                   | `UI.Size \| undefined`                               | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                    |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`                 | See `mod/index.d.ts` for enum values.                                                                                                                     |
-| `parent`                 | `UI.Parent \| undefined`                             | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                               |
-| `visible`                | `boolean = true`                                     | Initial visibility.                                                                                                                                       |
-| `padding`                | `number = 0`                                         | Container padding.                                                                                                                                        |
-| `bgColor`                | `mod.Vector = UI.COLORS.WHITE`                       | Button background color.                                                                                                                                  |
-| `bgAlpha`                | `number = 1`                                         | Button background opacity.                                                                                                                                |
-| `bgFill`                 | `mod.UIBgFill = mod.UIBgFill.Solid`                  | Button fill mode.                                                                                                                                         |
-| `depth`                  | `mod.UIDepth = mod.UIDepth.AboveGameUI`              | Z-order.                                                                                                                                                  |
-| `receiver`               | `mod.Player \| mod.Team \| undefined`                | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
-| `uiInputModeWhenVisible` | `boolean = false`                                    | Automatically manage UI input mode based on visibility (see UI Input Mode Management section).                                                            |
-| `buttonEnabled`          | `boolean = true`                                     | Initial enabled state.                                                                                                                                    |
-| `baseColor`              | `mod.Vector = UI.COLORS.BF_GREY_2`                   | Base button color.                                                                                                                                        |
-| `baseAlpha`              | `number = 1`                                         | Base button opacity.                                                                                                                                      |
-| `disabledColor`          | `mod.Vector = UI.COLORS.BF_GREY_3`                   | Disabled state color.                                                                                                                                     |
-| `disabledAlpha`          | `number = 1`                                         | Disabled state opacity.                                                                                                                                   |
-| `pressedColor`           | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT`             | Pressed state color.                                                                                                                                      |
-| `pressedAlpha`           | `number = 1`                                         | Pressed state opacity.                                                                                                                                    |
-| `hoverColor`             | `mod.Vector = UI.COLORS.BF_GREY_1`                   | Hover state color.                                                                                                                                        |
-| `hoverAlpha`             | `number = 1`                                         | Hover state opacity.                                                                                                                                      |
-| `focusedColor`           | `mod.Vector = UI.COLORS.BF_GREY_1`                   | Focused state color.                                                                                                                                      |
-| `focusedAlpha`           | `number = 1`                                         | Focused state opacity.                                                                                                                                    |
-| `onClick`                | `(player: mod.Player) => Promise<void> \| undefined` | Click handler stored in the button instance.                                                                                                              |
-
-#### Properties & Methods
-
-Inherits all properties and methods from `UI.Element` (see above), plus:
-
-- **`enabled: boolean`** (getter/setter) – Button enabled state.
-- **`setEnabled(enabled: boolean): Button`** – Sets enabled state and returns `this` for method chaining.
-- **`onClick: ((player: mod.Player) => Promise<void>) | undefined`** (getter/setter) – Click handler.
-- **`setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): Button`** – Sets click handler and
-  returns `this` for method chaining.
-
-**Color & Alpha Getters/Setters** (all support method chaining):
-
-- **`baseColor`, `disabledColor`, `focusedColor`, `hoverColor`, `pressedColor: mod.Vector`** (getter/setter)
-- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setHoverColor(color)`,
-  `setPressedColor(color): Button`**
-- **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `hoverAlpha`, `pressedAlpha: number`** (getter/setter)
-- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setHoverAlpha(alpha)`,
-  `setPressedAlpha(alpha): Button`**
-
-### `class UI.TextButton extends UI.Element`
-
-A button with integrated text content. Extends `BaseButtonWithContent` and combines `Button` and `Text` functionality
-into a single element. The button and text are wrapped in a container, and properties are delegated appropriately.
-
-#### Constructor Parameters
-
-| Param                                        | Type / Default                       | Notes                                                                                                 |
-| -------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| All parameters from `UI.ButtonParams`, plus: |
-| `message`                                    | `mod.Message`                        | **Required.** Text label content. Note: `mod.Message` is opaque and cannot be unpacked into a string. |
-| `textSize`                                   | `number = 36`                        | Font size.                                                                                            |
-| `textColor`                                  | `mod.Vector = UI.COLORS.BLACK`       | Text color.                                                                                           |
-| `textAlpha`                                  | `number = 1`                         | Text opacity.                                                                                         |
-| `textAnchor`                                 | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget.                                                                     |
-
-#### Properties & Methods
-
-Inherits all properties and methods from `UI.Element` and delegates button and text properties:
-
-**Button properties** (delegated from internal `Button`):
-
-- All button color, alpha, enabled, onClick, bgColor, bgAlpha, and bgFill properties (see `UI.Button` above)
-
-**Text properties** (delegated from internal `Text`):
-
-- **`message: mod.Message`** (getter/setter) – The text content.
-- **`setMessage(message: mod.Message): TextButton`** – Sets the message and returns `this` for method chaining.
-- **`textSize: number`** (getter/setter) – Font size.
-- **`setTextSize(size: number): TextButton`** – Sets font size and returns `this` for method chaining.
-- **`textColor: mod.Vector`** (getter/setter) – Text color.
-- **`setTextColor(color: mod.Vector): TextButton`** – Sets text color and returns `this` for method chaining.
-- **`textAlpha: number`** (getter/setter) – Text opacity.
-- **`setTextAlpha(alpha: number): TextButton`** – Sets text opacity and returns `this` for method chaining.
-- **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
-- **`setTextAnchor(anchor: mod.UIAnchor): TextButton`** – Sets text anchor and returns `this` for method chaining.
-
-**Overrides:**
-
-- **`width: number`** (getter/setter) – Setting width also updates the button widget and text width.
-- **`height: number`** (getter/setter) – Setting height also updates the button widget and text height.
-- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and text size.
-- **`setSize(params: UI.Size): TextButton`** – Sets size for container, button, and text, returns `this`.
+**Note:** If a button with the same name is already registered, a warning is logged and an empty unregister function is
+returned. Button registration is typically handled automatically by button components during construction.
 
 ### `UI.handleButtonEvent(player, widget, event)`
 
 Utility callback meant to be used in the `OnPlayerUIButtonEvent` handler for global subscriptions. Ignores `event` (the
 Battlefield Portal `mod.UIButtonEvent` is currently unreliable) and resolves the registered `onClick` handler from the
-button instance. Note: This function does not return a Promise; it handles errors internally.
+button registry. Note: This function does not return a Promise; it handles errors internally.
 
 ---
 
@@ -538,27 +467,6 @@ type Size = {
 };
 ```
 
-### `UI.ChildParams<T extends ElementParams>`
-
-Generic type for child element parameters in `childrenParams`. The type parameter must extend `ElementParams`. The
-`type` property must be set to the class constructor.
-
-```ts
-type ChildParams<T extends ElementParams> = T & {
-    type: new (params: T, receiver?: mod.Player | mod.Team) => Element;
-};
-```
-
-Example usage:
-
-```ts
-{
-    type: UI.Text,
-    message: mod.Message('Hello'),
-    position: { x: 0, y: 0 },
-}
-```
-
 ### `UI.Node`
 
 Base class for all UI nodes. Provides:
@@ -568,7 +476,24 @@ Base class for all UI nodes. Provides:
 - `receiver: GlobalReceiver | TeamReceiver | PlayerReceiver` (getter) – The target audience receiver (read-only). To get
   the native receiver (`mod.Player | mod.Team | undefined`), access `receiver.nativeReceiver`.
 
-Use `instanceof` to check node types at runtime (e.g., `node instanceof UI.Container`).
+Use `instanceof` to check node types at runtime. For example, with imported components:
+
+```ts
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+import { UIText } from 'bf6-portal-utils/ui/components/text';
+
+if (element instanceof UIContainer) {
+    // element is a container
+}
+```
+
+### `UI.Button` (interface)
+
+Interface that defines button-like behavior. Components that behave like buttons should implement this interface and
+register themselves using `UI.registerButton()`.
+
+- `onClick: ((player: mod.Player) => Promise<void>) | undefined` – The click handler function that is called when the
+  button is pressed. Can be `undefined` if the button doesn't have a click handler.
 
 ### `UI.Parent` (interface)
 
@@ -578,7 +503,8 @@ implement this interface to accept children.
 - `name: string` (getter) – The widget name
 - `uiWidget: mod.UIWidget` (getter) – The underlying UI widget
 - `receiver: GlobalReceiver | TeamReceiver | PlayerReceiver` (getter) – The receiver for this parent
-- `children: Element[]` (getter) – Array of child elements
+- `children: Element[]` (getter) – Array of child elements (children are stored internally as a `Set<Element>` but
+  exposed as an array)
 - `attachChild(child: Element): void` – Adds a child to this parent (called automatically when elements are created or
   moved).
 - `detachChild(child: Element): void` – Removes a child from this parent (called automatically when elements are moved
@@ -597,50 +523,6 @@ the `UI.Element` API section above. All property values are stored internally fo
 parent-child relationships: when created, it's added to its parent's children; when the parent is changed, it's moved
 between parents' children lists; when deleted, it's removed from its parent's children.
 
-### `UI.Container extends UI.Element implements UI.Parent`
-
-Class for container widgets. Extends `Element` and implements `Parent`. Adds:
-
-- `children: Element[]` (getter) – Array of child elements, automatically maintained
-- `delete(): void` – Overrides `Element.delete()` to recursively delete all children before deleting the container
-
-### `UI.Text extends UI.Element`
-
-Class for text widgets. Extends `Element` and adds:
-
-- `message: mod.Message` (getter/setter) – Note: `mod.Message` is opaque and cannot be unpacked into a string
-- `setMessage(message: mod.Message): Text` (method chaining)
-- `textSize: number` (getter/setter)
-- `setTextSize(size: number): Text` (method chaining)
-- `textColor: mod.Vector` (getter/setter)
-- `setTextColor(color: mod.Vector): Text` (method chaining)
-- `textAlpha: number` (getter/setter)
-- `setTextAlpha(alpha: number): Text` (method chaining)
-- `textAnchor: mod.UIAnchor` (getter/setter)
-- `setTextAnchor(anchor: mod.UIAnchor): Text` (method chaining)
-
-### `UI.Button extends UI.Element`
-
-Class for button widgets. Extends `Element` and adds:
-
-- `enabled: boolean` (getter/setter)
-- `setEnabled(enabled: boolean): Button` (method chaining)
-- `onClick: ((player: mod.Player) => Promise<void>) | undefined` (getter/setter)
-- `setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): Button` (method chaining)
-- Color getters/setters: `baseColor`, `disabledColor`, `focusedColor`, `hoverColor`, `pressedColor`
-- Color setter methods: `setBaseColor()`, `setDisabledColor()`, `setFocusedColor()`, `setHoverColor()`,
-  `setPressedColor()` (all return `Button`)
-- Alpha getters/setters: `baseAlpha`, `disabledAlpha`, `focusedAlpha`, `hoverAlpha`, `pressedAlpha`
-- Alpha setter methods: `setBaseAlpha()`, `setDisabledAlpha()`, `setFocusedAlpha()`, `setHoverAlpha()`,
-  `setPressedAlpha()` (all return `Button`)
-- `delete(): void` – Overrides `Element.delete()` to clean up button references before deleting the button
-
-### `UI.TextButton extends UI.Element`
-
-Class for buttons with integrated text content. Extends `BaseButtonWithContent` and combines `Button` and `Text`
-functionality. Delegates properties from both the internal button and text elements. See the `UI.TextButton` API section
-above for details.
-
 ### `UI.BaseParams`
 
 Base interface for common properties reused by other parameter interfaces.
@@ -650,7 +532,6 @@ type BaseParams = {
     anchor?: mod.UIAnchor;
     parent?: Parent;
     visible?: boolean;
-    padding?: number;
     bgColor?: mod.Vector;
     bgAlpha?: number;
     bgFill?: mod.UIBgFill;
@@ -669,57 +550,6 @@ type ElementParams = BaseParams & EitherPosition & EitherSize;
 
 // EitherPosition: either { position: Position } OR { x?: number; y?: number } (mutually exclusive)
 // EitherSize: either { size: Size } OR { width?: number; height?: number } (mutually exclusive)
-```
-
-### `UI.ContainerParams extends ElementParams`
-
-```ts
-type ContainerParams = ElementParams & {
-    childrenParams?: ChildParams<any>[];
-};
-```
-
-### `UI.TextParams extends ElementParams`
-
-```ts
-type TextParams = ElementParams & {
-    message: mod.Message; // Required (no default)
-    textSize?: number; // Default: 36
-    textColor?: mod.Vector; // Default: UI.COLORS.BLACK
-    textAlpha?: number; // Default: 1
-    textAnchor?: mod.UIAnchor; // Default: mod.UIAnchor.Center
-};
-```
-
-### `UI.ButtonParams extends ElementParams`
-
-```ts
-type ButtonParams = ElementParams & {
-    buttonEnabled?: boolean; // Default: true
-    baseColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_2
-    baseAlpha?: number; // Default: 1
-    disabledColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_3
-    disabledAlpha?: number; // Default: 1
-    pressedColor?: mod.Vector; // Default: UI.COLORS.BF_GREEN_BRIGHT
-    pressedAlpha?: number; // Default: 1
-    hoverColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_1
-    hoverAlpha?: number; // Default: 1
-    focusedColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_1
-    focusedAlpha?: number; // Default: 1
-    onClick?: (player: mod.Player) => Promise<void>;
-};
-```
-
-### `UI.TextButtonParams extends ButtonParams`
-
-```ts
-type TextButtonParams = ButtonParams & {
-    message: mod.Message; // Required (no default)
-    textSize?: number; // Default: 36
-    textColor?: mod.Vector; // Default: UI.COLORS.BLACK
-    textAlpha?: number; // Default: 1
-    textAnchor?: mod.UIAnchor; // Default: mod.UIAnchor.Center
-};
 ```
 
 ---
@@ -757,31 +587,34 @@ disabling UI input mode based on the element's visibility state.
 ### Usage Example
 
 ```ts
+import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+import { UITextButton } from 'bf6-portal-utils/ui/components/text-button';
+
 // Create a menu with interactive buttons
-const menu = new UI.Container({
+const menu = new UIContainer({
     position: { x: 0, y: 0 },
     size: { width: 300, height: 400 },
     receiver: player,
     uiInputModeWhenVisible: true, // Enable automatic UI input mode management
     childrenParams: [
         {
-            type: UI.TextButton,
+            type: UITextButton,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
-            message: mod.Message('Button 1'),
+            message: mod.Message(mod.stringKeys.labels.button1), // 'Button 1'
             onClick: async (p) => {
                 // Handle click
             },
-        } as UI.ChildParams<UI.TextButtonParams>,
+        } as UIContainer.ChildParams<UITextButton.Params>,
         {
-            type: UI.TextButton,
+            type: UITextButton,
             position: { x: 0, y: 60 },
             size: { width: 200, height: 50 },
-            message: mod.Message('Button 2'),
+            message: mod.Message(mod.stringKeys.labels.button2), // 'Button 2'
             onClick: async (p) => {
                 // Handle click
             },
-        } as UI.ChildParams<UI.TextButtonParams>,
+        } as UIContainer.ChildParams<UITextButton.Params>,
     ],
 });
 
@@ -830,13 +663,19 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
 - The `parent` property in parameter interfaces must be a `UI.Parent` (i.e., `UI.Root` or `UI.Container`). Parent-child
   relationships are automatically managed.
 - **Parent-child relationships** are automatically maintained:
-    - When an element is created with a parent, it's automatically added to the parent's `children` array via
-      `attachChild()`.
+    - When an element is created with a parent, it's automatically added to the parent's `children` Set via
+      `attachChild()`. Children are stored internally as a `Set<Element>` but exposed as an array via the `children`
+      getter.
     - When an element's `parent` is changed (via setter or `setParent()`), it's removed from the old parent's children
       via `detachChild()` and added to the new parent's children via `attachChild()`.
-    - When an element is deleted, it's automatically removed from its parent's `children` array via `detachChild()`.
-- **Receiver inheritance**: Elements inherit their parent's receiver unless explicitly specified in constructor
-  parameters. Console warnings are displayed if an element's receiver is incompatible with its parent's receiver.
+    - When an element is deleted, it's automatically removed from its parent's `children` Set via `detachChild()`.
+- **Receiver inheritance**: Elements automatically adopt their parent's receiver if a receiver is not explicitly
+  specified in constructor parameters. The `getReceiver()` utility function handles this logic, checking the parent's
+  receiver and using it if no receiver is provided. Console warnings are displayed if an element's receiver is
+  incompatible with its parent's receiver.
+- **Deleted element protection**: Once an element is deleted (via `delete()`), the `_deleted` flag is set to `true` and
+  all setter operations are blocked using `_isDeletedCheck()`. Attempts to modify deleted elements will log a warning
+  and return early without performing the operation.
 
 ---
 
@@ -844,11 +683,11 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
 
 The following features are planned for upcoming releases:
 
-### Image Widget Support
+### Relative Sizing and Padding
 
-Support for `UIImage` and `UIWeaponImage` widget types will be added, providing classes similar to `Container`, `Text`,
-and `Button` for displaying images and weapon icons in the UI. These will follow the same patterns as existing elements
-and can be used in `childrenParams` with the `ChildParams` type.
+Since padding is currently not supported since the user is still forced to compensate text and child sizing to take into
+account parent padding, an upcoming feature will support relative sizing (i.e. "50%" of parent) and automatic padding
+compensation.
 
 ### Custom UI Elements
 
@@ -857,11 +696,9 @@ checkboxes, dropdowns, clocks, progress bars, etc.) that integrate seamlessly wi
 elements must extend `Element` and can be used in `childrenParams` by passing the class constructor as the `type`
 property.
 
-### Scoped Receiver Inheritance
-
-Support for parent containers with a different receiver scope than their children. For example, a container created for
-a team (via `receiver: mod.Team`) can have child elements that are scoped to individual players. This may allow for more
-flexible UI hierarchies where shared containers can contain player-specific elements.
+Custom elements can use the protected `_logging` member to log messages within the UI namespace, and should use
+`_isDeletedCheck()` to protect setter operations from being called on deleted elements. Custom button-like components
+should implement the `Button` interface and register themselves using `UI.registerButton()` during construction.
 
 ### Auto-Rename UI Widgets
 

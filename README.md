@@ -18,16 +18,21 @@ This repository is organized into focused modules, each addressing specific deve
   algorithm to find safe spawn points that are appropriately distanced from other players, reducing the chance of
   spawning directly into combat. It also handles AI players.
 
-- **[Interact Multi-Click Detector Module](./interact-multi-click-detector/)** – Detects when a player has multi-clicked
-  the interact key, even when there is no object that can be interacted with nearby. This utility enables custom UI
-  triggers and special actions without relying on in-world physical interaction points or awkward movement combinations.
-
 - **[Logger Module](./logger/)** – A powerful logging system that displays runtime text directly on-screen, solving
   Battlefield Portal's debugging limitations. Works on all platforms, including console builds.
+
+- **[Logging Module](./logging/)** – A fail-safe logging abstraction that provides configurable log level filtering and
+  error handling for Battlefield Portal experiences. Can be used directly in mods or integrated into other modules to
+  provide consistent, safe logging functionality that prevents logging failures from crashing your mod.
 
 - **[Map Detector Module](./map-detector/)** – Detects the current map by analyzing the coordinates of Team 1's
   Headquarters (HQ), providing a reliable alternative to the broken `mod.IsCurrentMap` API. Supports detection of all
   available maps with fast, coordinate-based identification.
+
+- **[Multi-Click Detector Module](./multi-click-detector/)** – Detects when a player has rapidly triggered a soldier
+  state multiple times in quick succession. By default monitors the interact state, enabling custom UI triggers and
+  special actions without relying on in-world physical interaction points. Supports configurable soldier states, time
+  windows, and click counts for flexible multi-click detection.
 
 - **[Performance Stats Module](./performance-stats/)** – Monitors and tracks the estimated runtime tick rate of the
   server, providing real-time performance metrics that help identify when the server is under stress or when script
@@ -37,6 +42,11 @@ This repository is organized into focused modules, each addressing specific deve
   attribution to the correct rays. Handles attribution mechanics, manages time-to-live for rays, and provides a clean
   callback-based API to make it easier to perform mass obstacle detection, line of sight checks, and interactive object
   detection.
+
+- **[Scavenger Drop Module](./scavenger-drop/)** – Detects when a player scavenges a dead player's kit bag by monitoring
+  proximity to dead bodies. Provides automatic detection with performance-optimized checking that scales frequency based
+  on distance, configurable callbacks for custom actions (such as ammo resupply), and automatic cleanup when drops
+  expire or are scavenged.
 
 - **[SolidUI Module](./solid-ui/)** – A reactive UI framework inspired by SolidJS, providing fine-grained reactivity for
   Battlefield Portal UIs. Uses signals, effects, memos, and stores to create dynamic interfaces that update only the
@@ -56,7 +66,8 @@ This repository is organized into focused modules, each addressing specific deve
 - **[UI Module](./ui/)** – Object-oriented TypeScript wrappers around Battlefield Portal's UI APIs, providing strongly
   typed helpers, convenient defaults, and ergonomic interfaces for building complex HUDs, panels, and interactive
   buttons. Features automatic naming and UI input mode management, eliminating the need to manually track and
-  enable/disable scoped UI input mode when elements are shown or hidden.
+  enable/disable scoped UI input mode when elements are shown or hidden. Includes a growing list of components in
+  subdirectories (containers, buttons, text, images, etc.) that can be separately imported for modular UI construction.
 
 ## Getting Started
 

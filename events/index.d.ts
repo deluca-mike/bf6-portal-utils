@@ -1,4 +1,9 @@
+import { Logging } from '../logging/index.ts';
 export declare namespace Events {
+    /**
+     * Log levels for controlling logging verbosity.
+     */
+    export const LogLevel: typeof Logging.LogLevel;
     export enum Type {
         OngoingGlobal = 0,
         OngoingAreaTrigger = 1,
@@ -155,6 +160,17 @@ export declare namespace Events {
     type EventParameters<T extends Type> =
         EventTypeName<T> extends keyof Signature ? Parameters<Signature[EventTypeName<T>]> : never;
     /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
+    /**
      * Subscribe to an event.
      * @param type - The event type to subscribe to.
      * @param handler - The handler function to call when the event is triggered.
@@ -167,6 +183,11 @@ export declare namespace Events {
      * @param handler - The handler function that was subscribed.
      */
     export function unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void;
+    /**
+     * Triggers an event.
+     * @param type - The event type to trigger.
+     * @param args - The arguments to pass to the handler function.
+     */
     export function trigger<T extends Type>(type: T, ...args: EventParameters<T>): void;
     export {};
 }
