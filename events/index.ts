@@ -74,84 +74,70 @@ export namespace Events {
         OnVehicleSpawned,
     }
 
+    /** Trigger function signatures derived from the exported trigger functions below (single source of truth). */
     type Signature = {
-        OngoingGlobal: () => void;
-        OngoingAreaTrigger: (areaTrigger: mod.AreaTrigger) => void;
-        OngoingCapturePoint: (capturePoint: mod.CapturePoint) => void;
-        OngoingEmplacementSpawner: (emplacementSpawner: mod.EmplacementSpawner) => void;
-        OngoingHQ: (hq: mod.HQ) => void;
-        OngoingInteractPoint: (interactPoint: mod.InteractPoint) => void;
-        OngoingLootSpawner: (lootSpawner: mod.LootSpawner) => void;
-        OngoingMCOM: (mcom: mod.MCOM) => void;
-        OngoingPlayer: (player: mod.Player) => void;
-        OngoingRingOfFire: (ringOfFire: mod.RingOfFire) => void;
-        OngoingSector: (sector: mod.Sector) => void;
-        OngoingSpawner: (spawner: mod.Spawner) => void;
-        OngoingSpawnPoint: (spawnPoint: mod.SpawnPoint) => void;
-        OngoingTeam: (team: mod.Team) => void;
-        OngoingVehicle: (vehicle: mod.Vehicle) => void;
-        OngoingVehicleSpawner: (vehicleSpawner: mod.VehicleSpawner) => void;
-        OngoingWaypointPath: (waypointPath: mod.WaypointPath) => void;
-        OngoingWorldIcon: (worldIcon: mod.WorldIcon) => void;
-        OnAIMoveToFailed: (player: mod.Player) => void;
-        OnAIMoveToRunning: (player: mod.Player) => void;
-        OnAIMoveToSucceeded: (player: mod.Player) => void;
-        OnAIParachuteRunning: (player: mod.Player) => void;
-        OnAIParachuteSucceeded: (player: mod.Player) => void;
-        OnAIWaypointIdleFailed: (player: mod.Player) => void;
-        OnAIWaypointIdleRunning: (player: mod.Player) => void;
-        OnAIWaypointIdleSucceeded: (player: mod.Player) => void;
-        OnCapturePointCaptured: (capturePoint: mod.CapturePoint) => void;
-        OnCapturePointCapturing: (capturePoint: mod.CapturePoint) => void;
-        OnCapturePointLost: (capturePoint: mod.CapturePoint) => void;
-        OnGameModeEnding: () => void;
-        OnGameModeStarted: () => void;
-        OnMandown: (player: mod.Player, otherPlayer: mod.Player) => void;
-        OnMCOMArmed: (mcom: mod.MCOM) => void;
-        OnMCOMDefused: (mcom: mod.MCOM) => void;
-        OnMCOMDestroyed: (mcom: mod.MCOM) => void;
-        OnPlayerDamaged: (
-            player: mod.Player,
-            otherPlayer: mod.Player,
-            damageType: mod.DamageType,
-            weaponUnlock: mod.WeaponUnlock
-        ) => void;
-        OnPlayerDeployed: (player: mod.Player) => void;
-        OnPlayerDied: (
-            player: mod.Player,
-            otherPlayer: mod.Player,
-            deathType: mod.DeathType,
-            weaponUnlock: mod.WeaponUnlock
-        ) => void;
-        OnPlayerEarnedKill: (
-            player: mod.Player,
-            otherPlayer: mod.Player,
-            deathType: mod.DeathType,
-            weaponUnlock: mod.WeaponUnlock
-        ) => void;
-        OnPlayerEarnedKillAssist: (player: mod.Player, otherPlayer: mod.Player) => void;
-        OnPlayerEnterAreaTrigger: (player: mod.Player, areaTrigger: mod.AreaTrigger) => void;
-        OnPlayerEnterCapturePoint: (player: mod.Player, capturePoint: mod.CapturePoint) => void;
-        OnPlayerEnterVehicle: (player: mod.Player, vehicle: mod.Vehicle) => void;
-        OnPlayerEnterVehicleSeat: (player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object) => void;
-        OnPlayerExitAreaTrigger: (player: mod.Player, areaTrigger: mod.AreaTrigger) => void;
-        OnPlayerExitCapturePoint: (player: mod.Player, capturePoint: mod.CapturePoint) => void;
-        OnPlayerExitVehicle: (player: mod.Player, vehicle: mod.Vehicle) => void;
-        OnPlayerExitVehicleSeat: (player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object) => void;
-        OnPlayerInteract: (player: mod.Player, interactPoint: mod.InteractPoint) => void;
-        OnPlayerJoinGame: (player: mod.Player) => void;
-        OnPlayerLeaveGame: (number: number) => void;
-        OnPlayerSwitchTeam: (player: mod.Player, team: mod.Team) => void;
-        OnPlayerUIButtonEvent: (player: mod.Player, uiWidget: mod.UIWidget, uiButtonEvent: mod.UIButtonEvent) => void;
-        OnPlayerUndeploy: (player: mod.Player) => void;
-        OnRayCastHit: (player: mod.Player, point: mod.Vector, normal: mod.Vector) => void;
-        OnRayCastMissed: (player: mod.Player) => void;
-        OnRevived: (player: mod.Player, otherPlayer: mod.Player) => void;
-        OnRingOfFireZoneSizeChange: (ringOfFire: mod.RingOfFire, number: number) => void;
-        OnSpawnerSpawned: (player: mod.Player, spawner: mod.Spawner) => void;
-        OnTimeLimitReached: () => void;
-        OnVehicleDestroyed: (vehicle: mod.Vehicle) => void;
-        OnVehicleSpawned: (vehicle: mod.Vehicle) => void;
+        OngoingGlobal: typeof OngoingGlobal;
+        OngoingAreaTrigger: typeof OngoingAreaTrigger;
+        OngoingCapturePoint: typeof OngoingCapturePoint;
+        OngoingEmplacementSpawner: typeof OngoingEmplacementSpawner;
+        OngoingHQ: typeof OngoingHQ;
+        OngoingInteractPoint: typeof OngoingInteractPoint;
+        OngoingLootSpawner: typeof OngoingLootSpawner;
+        OngoingMCOM: typeof OngoingMCOM;
+        OngoingPlayer: typeof OngoingPlayer;
+        OngoingRingOfFire: typeof OngoingRingOfFire;
+        OngoingSector: typeof OngoingSector;
+        OngoingSpawner: typeof OngoingSpawner;
+        OngoingSpawnPoint: typeof OngoingSpawnPoint;
+        OngoingTeam: typeof OngoingTeam;
+        OngoingVehicle: typeof OngoingVehicle;
+        OngoingVehicleSpawner: typeof OngoingVehicleSpawner;
+        OngoingWaypointPath: typeof OngoingWaypointPath;
+        OngoingWorldIcon: typeof OngoingWorldIcon;
+        OnAIMoveToFailed: typeof OnAIMoveToFailed;
+        OnAIMoveToRunning: typeof OnAIMoveToRunning;
+        OnAIMoveToSucceeded: typeof OnAIMoveToSucceeded;
+        OnAIParachuteRunning: typeof OnAIParachuteRunning;
+        OnAIParachuteSucceeded: typeof OnAIParachuteSucceeded;
+        OnAIWaypointIdleFailed: typeof OnAIWaypointIdleFailed;
+        OnAIWaypointIdleRunning: typeof OnAIWaypointIdleRunning;
+        OnAIWaypointIdleSucceeded: typeof OnAIWaypointIdleSucceeded;
+        OnCapturePointCaptured: typeof OnCapturePointCaptured;
+        OnCapturePointCapturing: typeof OnCapturePointCapturing;
+        OnCapturePointLost: typeof OnCapturePointLost;
+        OnGameModeEnding: typeof OnGameModeEnding;
+        OnGameModeStarted: typeof OnGameModeStarted;
+        OnMandown: typeof OnMandown;
+        OnMCOMArmed: typeof OnMCOMArmed;
+        OnMCOMDefused: typeof OnMCOMDefused;
+        OnMCOMDestroyed: typeof OnMCOMDestroyed;
+        OnPlayerDamaged: typeof OnPlayerDamaged;
+        OnPlayerDeployed: typeof OnPlayerDeployed;
+        OnPlayerDied: typeof OnPlayerDied;
+        OnPlayerEarnedKill: typeof OnPlayerEarnedKill;
+        OnPlayerEarnedKillAssist: typeof OnPlayerEarnedKillAssist;
+        OnPlayerEnterAreaTrigger: typeof OnPlayerEnterAreaTrigger;
+        OnPlayerEnterCapturePoint: typeof OnPlayerEnterCapturePoint;
+        OnPlayerEnterVehicle: typeof OnPlayerEnterVehicle;
+        OnPlayerEnterVehicleSeat: typeof OnPlayerEnterVehicleSeat;
+        OnPlayerExitAreaTrigger: typeof OnPlayerExitAreaTrigger;
+        OnPlayerExitCapturePoint: typeof OnPlayerExitCapturePoint;
+        OnPlayerExitVehicle: typeof OnPlayerExitVehicle;
+        OnPlayerExitVehicleSeat: typeof OnPlayerExitVehicleSeat;
+        OnPlayerInteract: typeof OnPlayerInteract;
+        OnPlayerJoinGame: typeof OnPlayerJoinGame;
+        OnPlayerLeaveGame: typeof OnPlayerLeaveGame;
+        OnPlayerSwitchTeam: typeof OnPlayerSwitchTeam;
+        OnPlayerUIButtonEvent: typeof OnPlayerUIButtonEvent;
+        OnPlayerUndeploy: typeof OnPlayerUndeploy;
+        OnRayCastHit: typeof OnRayCastHit;
+        OnRayCastMissed: typeof OnRayCastMissed;
+        OnRevived: typeof OnRevived;
+        OnRingOfFireZoneSizeChange: typeof OnRingOfFireZoneSizeChange;
+        OnSpawnerSpawned: typeof OnSpawnerSpawned;
+        OnTimeLimitReached: typeof OnTimeLimitReached;
+        OnVehicleDestroyed: typeof OnVehicleDestroyed;
+        OnVehicleSpawned: typeof OnVehicleSpawned;
     };
 
     /** Typed channel for a single event: subscribe(handler), unsubscribe(handler), and trigger(...args). */
