@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version: 1.2.0
+// version: 1.3.0
 export namespace Events {
     const logging = new Logging('Events');
 
@@ -9,6 +9,13 @@ export namespace Events {
      */
     export const LogLevel = Logging.LogLevel;
 
+    /**
+     * Enum of event type identifiers. Use these values with `Events.subscribe(type, handler)` and
+     * `Events.trigger(type, ...args)` when you need to pass an event type by value (e.g. dynamic
+     * dispatch, iteration). For direct subscribe/trigger with full IntelliSense, prefer the
+     * per-event channels instead (e.g. `Events.OnPlayerDied.subscribe(handler)`,
+     * `Events.OnPlayerDied.trigger(player, otherPlayer, deathType, weaponUnlock)`).
+     */
     export enum Type {
         OngoingGlobal,
         OngoingAreaTrigger,
@@ -152,16 +159,24 @@ export namespace Events {
          * @returns Function to call to unsubscribe this handler.
          */
         subscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): () => void;
+
         /**
          * Unsubscribe a handler previously added with `subscribe`. Pass the same function reference.
          * @param handler - The same function reference that was passed to `subscribe`.
          */
         unsubscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): void;
+
         /**
          * Trigger this event. Pass the same arguments as the exported trigger function for this event.
          * @param args - Event payload; types match the corresponding standalone trigger function (e.g. `OnPlayerDied`).
          */
         trigger(...args: Parameters<Signature[K]>): void;
+
+        /**
+         * Return the number of handlers currently subscribed to this event.
+         * @returns Count of subscribed handlers (0 if none).
+         */
+        handlerCount(): number;
     };
 
     /**
@@ -276,24 +291,36 @@ export namespace Events {
         }
     }
 
+    /**
+     * Return the number of handlers currently subscribed to an event.
+     * @param type - The event type to query.
+     * @returns Count of subscribed handlers (0 if none).
+     */
+    export function handlerCount<T extends Type>(type: T): number {
+        return handlers.get(type)?.size ?? 0;
+    }
+
     /** Build per-event channel objects so users can call Events.OngoingInteractPoint.subscribe(handler), etc. */
     (function initChannels(): void {
-        const sub = subscribe;
-        const unsub = unsubscribe;
-        const trig = trigger;
         const typeKeys = Object.keys(Type) as (keyof typeof Type)[];
+
         for (const key of typeKeys) {
             const typeValue = Type[key];
+
             if (typeof typeValue !== 'number') continue; // skip reverse enum entries
+
             (Events as unknown as Record<string, EventChannel<keyof Signature>>)[key] = {
                 subscribe(handler: AllHandlers): () => void {
-                    return sub(typeValue, handler as HandlerForType<typeof typeValue>);
+                    return subscribe(typeValue, handler as HandlerForType<typeof typeValue>);
                 },
                 unsubscribe(handler: AllHandlers): void {
-                    unsub(typeValue, handler as HandlerForType<typeof typeValue>);
+                    unsubscribe(typeValue, handler as HandlerForType<typeof typeValue>);
                 },
                 trigger(...args: Parameters<AllHandlers>): void {
-                    trig(typeValue, ...(args as EventParameters<typeof typeValue>));
+                    trigger(typeValue, ...(args as EventParameters<typeof typeValue>));
+                },
+                handlerCount(): number {
+                    return handlerCount(typeValue);
                 },
             };
         }
@@ -304,148 +331,145 @@ export namespace Events {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Declaration merge only; members come from EventChannelsMap. */
 export interface Events extends Events.EventChannelsMap {}
 
-/** Typed ref for same-file standalone trigger functions (channels are assigned at runtime). */
-const E = Events as typeof Events & Events.EventChannelsMap;
-
 /* eslint-disable jsdoc/require-jsdoc */
 export function OngoingGlobal(): void {
-    E.OngoingGlobal.trigger();
+    (Events as typeof Events & Events.EventChannelsMap).OngoingGlobal.trigger();
 }
 
 export function OngoingAreaTrigger(areaTrigger: mod.AreaTrigger): void {
-    E.OngoingAreaTrigger.trigger(areaTrigger);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingAreaTrigger.trigger(areaTrigger);
 }
 
 export function OngoingCapturePoint(capturePoint: mod.CapturePoint): void {
-    E.OngoingCapturePoint.trigger(capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingCapturePoint.trigger(capturePoint);
 }
 
 export function OngoingEmplacementSpawner(emplacementSpawner: mod.EmplacementSpawner): void {
-    E.OngoingEmplacementSpawner.trigger(emplacementSpawner);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingEmplacementSpawner.trigger(emplacementSpawner);
 }
 
 export function OngoingHQ(hq: mod.HQ): void {
-    E.OngoingHQ.trigger(hq);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingHQ.trigger(hq);
 }
 
 export function OngoingInteractPoint(interactPoint: mod.InteractPoint): void {
-    E.OngoingInteractPoint.trigger(interactPoint);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingInteractPoint.trigger(interactPoint);
 }
 
 export function OngoingLootSpawner(lootSpawner: mod.LootSpawner): void {
-    E.OngoingLootSpawner.trigger(lootSpawner);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingLootSpawner.trigger(lootSpawner);
 }
 
 export function OngoingMCOM(mcom: mod.MCOM): void {
-    E.OngoingMCOM.trigger(mcom);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingMCOM.trigger(mcom);
 }
 
 export function OngoingPlayer(player: mod.Player): void {
-    E.OngoingPlayer.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingPlayer.trigger(player);
 }
 
 export function OngoingRingOfFire(ringOfFire: mod.RingOfFire): void {
-    E.OngoingRingOfFire.trigger(ringOfFire);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingRingOfFire.trigger(ringOfFire);
 }
 
 export function OngoingSector(sector: mod.Sector): void {
-    E.OngoingSector.trigger(sector);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingSector.trigger(sector);
 }
 
 export function OngoingSpawner(spawner: mod.Spawner): void {
-    E.OngoingSpawner.trigger(spawner);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingSpawner.trigger(spawner);
 }
 
 export function OngoingSpawnPoint(spawnPoint: mod.SpawnPoint): void {
-    E.OngoingSpawnPoint.trigger(spawnPoint);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingSpawnPoint.trigger(spawnPoint);
 }
 
 export function OngoingTeam(team: mod.Team): void {
-    E.OngoingTeam.trigger(team);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingTeam.trigger(team);
 }
 
 export function OngoingVehicle(vehicle: mod.Vehicle): void {
-    E.OngoingVehicle.trigger(vehicle);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingVehicle.trigger(vehicle);
 }
 
 export function OngoingVehicleSpawner(vehicleSpawner: mod.VehicleSpawner): void {
-    E.OngoingVehicleSpawner.trigger(vehicleSpawner);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingVehicleSpawner.trigger(vehicleSpawner);
 }
 
 export function OngoingWaypointPath(waypointPath: mod.WaypointPath): void {
-    E.OngoingWaypointPath.trigger(waypointPath);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingWaypointPath.trigger(waypointPath);
 }
 
 export function OngoingWorldIcon(worldIcon: mod.WorldIcon): void {
-    E.OngoingWorldIcon.trigger(worldIcon);
+    (Events as typeof Events & Events.EventChannelsMap).OngoingWorldIcon.trigger(worldIcon);
 }
 
 export function OnAIMoveToFailed(player: mod.Player): void {
-    E.OnAIMoveToFailed.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIMoveToFailed.trigger(player);
 }
 
 export function OnAIMoveToRunning(player: mod.Player): void {
-    E.OnAIMoveToRunning.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIMoveToRunning.trigger(player);
 }
 
 export function OnAIMoveToSucceeded(player: mod.Player): void {
-    E.OnAIMoveToSucceeded.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIMoveToSucceeded.trigger(player);
 }
 
 export function OnAIParachuteRunning(player: mod.Player): void {
-    E.OnAIParachuteRunning.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIParachuteRunning.trigger(player);
 }
 
 export function OnAIParachuteSucceeded(player: mod.Player): void {
-    E.OnAIParachuteSucceeded.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIParachuteSucceeded.trigger(player);
 }
 
 export function OnAIWaypointIdleFailed(player: mod.Player): void {
-    E.OnAIWaypointIdleFailed.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIWaypointIdleFailed.trigger(player);
 }
 
 export function OnAIWaypointIdleRunning(player: mod.Player): void {
-    E.OnAIWaypointIdleRunning.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIWaypointIdleRunning.trigger(player);
 }
 
 export function OnAIWaypointIdleSucceeded(player: mod.Player): void {
-    E.OnAIWaypointIdleSucceeded.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnAIWaypointIdleSucceeded.trigger(player);
 }
 
 export function OnCapturePointCaptured(capturePoint: mod.CapturePoint): void {
-    E.OnCapturePointCaptured.trigger(capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnCapturePointCaptured.trigger(capturePoint);
 }
 
 export function OnCapturePointCapturing(capturePoint: mod.CapturePoint): void {
-    E.OnCapturePointCapturing.trigger(capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnCapturePointCapturing.trigger(capturePoint);
 }
 
 export function OnCapturePointLost(capturePoint: mod.CapturePoint): void {
-    E.OnCapturePointLost.trigger(capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnCapturePointLost.trigger(capturePoint);
 }
 
 export function OnGameModeEnding(): void {
-    E.OnGameModeEnding.trigger();
+    (Events as typeof Events & Events.EventChannelsMap).OnGameModeEnding.trigger();
 }
 
 export function OnGameModeStarted(): void {
-    E.OnGameModeStarted.trigger();
+    (Events as typeof Events & Events.EventChannelsMap).OnGameModeStarted.trigger();
 }
 
 export function OnMandown(player: mod.Player, otherPlayer: mod.Player): void {
-    E.OnMandown.trigger(player, otherPlayer);
+    (Events as typeof Events & Events.EventChannelsMap).OnMandown.trigger(player, otherPlayer);
 }
 
 export function OnMCOMArmed(mcom: mod.MCOM): void {
-    E.OnMCOMArmed.trigger(mcom);
+    (Events as typeof Events & Events.EventChannelsMap).OnMCOMArmed.trigger(mcom);
 }
 
 export function OnMCOMDefused(mcom: mod.MCOM): void {
-    E.OnMCOMDefused.trigger(mcom);
+    (Events as typeof Events & Events.EventChannelsMap).OnMCOMDefused.trigger(mcom);
 }
 
 export function OnMCOMDestroyed(mcom: mod.MCOM): void {
-    E.OnMCOMDestroyed.trigger(mcom);
+    (Events as typeof Events & Events.EventChannelsMap).OnMCOMDestroyed.trigger(mcom);
 }
 
 export function OnPlayerDamaged(
@@ -454,11 +478,16 @@ export function OnPlayerDamaged(
     damageType: mod.DamageType,
     weaponUnlock: mod.WeaponUnlock
 ): void {
-    E.OnPlayerDamaged.trigger(player, otherPlayer, damageType, weaponUnlock);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerDamaged.trigger(
+        player,
+        otherPlayer,
+        damageType,
+        weaponUnlock
+    );
 }
 
 export function OnPlayerDeployed(player: mod.Player): void {
-    E.OnPlayerDeployed.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerDeployed.trigger(player);
 }
 
 export function OnPlayerDied(
@@ -467,7 +496,12 @@ export function OnPlayerDied(
     deathType: mod.DeathType,
     weaponUnlock: mod.WeaponUnlock
 ): void {
-    E.OnPlayerDied.trigger(player, otherPlayer, deathType, weaponUnlock);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerDied.trigger(
+        player,
+        otherPlayer,
+        deathType,
+        weaponUnlock
+    );
 }
 
 export function OnPlayerEarnedKill(
@@ -476,59 +510,64 @@ export function OnPlayerEarnedKill(
     deathType: mod.DeathType,
     weaponUnlock: mod.WeaponUnlock
 ): void {
-    E.OnPlayerEarnedKill.trigger(player, otherPlayer, deathType, weaponUnlock);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEarnedKill.trigger(
+        player,
+        otherPlayer,
+        deathType,
+        weaponUnlock
+    );
 }
 
 export function OnPlayerEarnedKillAssist(player: mod.Player, otherPlayer: mod.Player): void {
-    E.OnPlayerEarnedKillAssist.trigger(player, otherPlayer);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEarnedKillAssist.trigger(player, otherPlayer);
 }
 
 export function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void {
-    E.OnPlayerEnterAreaTrigger.trigger(player, areaTrigger);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEnterAreaTrigger.trigger(player, areaTrigger);
 }
 
 export function OnPlayerEnterCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void {
-    E.OnPlayerEnterCapturePoint.trigger(player, capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEnterCapturePoint.trigger(player, capturePoint);
 }
 
 export function OnPlayerEnterVehicle(player: mod.Player, vehicle: mod.Vehicle): void {
-    E.OnPlayerEnterVehicle.trigger(player, vehicle);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEnterVehicle.trigger(player, vehicle);
 }
 
 export function OnPlayerEnterVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void {
-    E.OnPlayerEnterVehicleSeat.trigger(player, vehicle, seat);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerEnterVehicleSeat.trigger(player, vehicle, seat);
 }
 
 export function OnPlayerExitAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void {
-    E.OnPlayerExitAreaTrigger.trigger(player, areaTrigger);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerExitAreaTrigger.trigger(player, areaTrigger);
 }
 
 export function OnPlayerExitCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void {
-    E.OnPlayerExitCapturePoint.trigger(player, capturePoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerExitCapturePoint.trigger(player, capturePoint);
 }
 
 export function OnPlayerExitVehicle(player: mod.Player, vehicle: mod.Vehicle): void {
-    E.OnPlayerExitVehicle.trigger(player, vehicle);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerExitVehicle.trigger(player, vehicle);
 }
 
 export function OnPlayerExitVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void {
-    E.OnPlayerExitVehicleSeat.trigger(player, vehicle, seat);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerExitVehicleSeat.trigger(player, vehicle, seat);
 }
 
 export function OnPlayerInteract(player: mod.Player, interactPoint: mod.InteractPoint): void {
-    E.OnPlayerInteract.trigger(player, interactPoint);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerInteract.trigger(player, interactPoint);
 }
 
 export function OnPlayerJoinGame(player: mod.Player): void {
-    E.OnPlayerJoinGame.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerJoinGame.trigger(player);
 }
 
 export function OnPlayerLeaveGame(number: number): void {
-    E.OnPlayerLeaveGame.trigger(number);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerLeaveGame.trigger(number);
 }
 
 export function OnPlayerSwitchTeam(player: mod.Player, team: mod.Team): void {
-    E.OnPlayerSwitchTeam.trigger(player, team);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerSwitchTeam.trigger(player, team);
 }
 
 export function OnPlayerUIButtonEvent(
@@ -536,42 +575,44 @@ export function OnPlayerUIButtonEvent(
     uiWidget: mod.UIWidget,
     uiButtonEvent: mod.UIButtonEvent
 ): void {
-    E.OnPlayerUIButtonEvent.trigger(player, uiWidget, uiButtonEvent);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerUIButtonEvent.trigger(player, uiWidget, uiButtonEvent);
 }
 
 export function OnPlayerUndeploy(player: mod.Player): void {
-    E.OnPlayerUndeploy.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnPlayerUndeploy.trigger(player);
 }
 
 export function OnRayCastHit(player: mod.Player, point: mod.Vector, normal: mod.Vector): void {
-    E.OnRayCastHit.trigger(player, point, normal);
+    (Events as typeof Events & Events.EventChannelsMap).OnRayCastHit.trigger(player, point, normal);
 }
 
 export function OnRayCastMissed(player: mod.Player): void {
-    E.OnRayCastMissed.trigger(player);
+    (Events as typeof Events & Events.EventChannelsMap).OnRayCastMissed.trigger(player);
 }
 
 export function OnRevived(player: mod.Player, otherPlayer: mod.Player): void {
-    E.OnRevived.trigger(player, otherPlayer);
+    (Events as typeof Events & Events.EventChannelsMap).OnRevived.trigger(player, otherPlayer);
 }
 
 export function OnRingOfFireZoneSizeChange(ringOfFire: mod.RingOfFire, number: number): void {
-    E.OnRingOfFireZoneSizeChange.trigger(ringOfFire, number);
+    (Events as typeof Events & Events.EventChannelsMap).OnRingOfFireZoneSizeChange.trigger(ringOfFire, number);
 }
 
 export function OnSpawnerSpawned(player: mod.Player, spawner: mod.Spawner): void {
-    E.OnSpawnerSpawned.trigger(player, spawner);
+    (Events as typeof Events & Events.EventChannelsMap).OnSpawnerSpawned.trigger(player, spawner);
 }
 
 export function OnTimeLimitReached(): void {
-    E.OnTimeLimitReached.trigger();
+    if (!mod.GetMatchTimeElapsed()) return; // Avoids a bug where this event is triggered by the server prematurely.
+
+    (Events as typeof Events & Events.EventChannelsMap).OnTimeLimitReached.trigger();
 }
 
 export function OnVehicleDestroyed(vehicle: mod.Vehicle): void {
-    E.OnVehicleDestroyed.trigger(vehicle);
+    (Events as typeof Events & Events.EventChannelsMap).OnVehicleDestroyed.trigger(vehicle);
 }
 
 export function OnVehicleSpawned(vehicle: mod.Vehicle): void {
-    E.OnVehicleSpawned.trigger(vehicle);
+    (Events as typeof Events & Events.EventChannelsMap).OnVehicleSpawned.trigger(vehicle);
 }
 /* eslint-enable jsdoc/require-jsdoc */

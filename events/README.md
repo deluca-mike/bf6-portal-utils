@@ -3,8 +3,18 @@
 This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience
 developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only
 be implemented and exported once per entire project. This module implements all event handlers once, automatically
-hooking into every Battlefield Portal event, and exposes a single subscription API that allows you to subscribe and
-unsubscribe to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
+hooking into every Battlefield Portal event, and exposes subscription APIs that allow you to subscribe and unsubscribe
+to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
+
+You can use **two styles of API**:
+
+- **Event-channel style (recommended)** – Each event is exposed as a channel object (e.g. `Events.OnPlayerDied`,
+  `Events.OngoingInteractPoint`) with `subscribe`, `unsubscribe`, `trigger`, and `handlerCount` functions. This style
+  typically has **better full IntelliSense compatibility** and is **more readable**, since the event name and method are
+  colocated (e.g. `Events.OnPlayerDied.subscribe(handler)`).
+- **Enum style** – Pass the event type as the first argument (e.g.
+  `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Useful when you need to pass an event type by value (e.g.
+  dynamic dispatch, iteration).
 
 The module provides full type safety through TypeScript generics, ensuring that event handlers match the correct
 signature for each event type. Handlers can be synchronous or asynchronous (returning `void` or `Promise<void>`), and
@@ -33,10 +43,12 @@ non-blocking, ensuring optimal performance.
     ```ts
     import { Events } from 'bf6-portal-utils/events';
     ```
-3. Subscribe to events using `Events.subscribe()` with the event type and your handler function. The function returns an
-   unsubscribe function for convenience.
-4. Unsubscribe when needed by calling the returned unsubscribe function, or use `Events.unsubscribe()` with the same
-   event type and handler reference.
+3. Subscribe to events using the **event-channel style** (e.g. `Events.OnPlayerDeployed.subscribe(handler)`) for the
+   best IntelliSense and readability, or the **enum style** (`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`).
+   Both return an unsubscribe function for convenience.
+4. Unsubscribe when needed by calling the returned unsubscribe function, or use
+   `Events.OnPlayerDeployed.unsubscribe(handler)` (channel style) or
+   `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (enum style).
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
 
@@ -75,12 +87,12 @@ function handleOngoingPlayer(player: mod.Player): void {
 }
 
 // Set up subscriptions at module load time (top-level code)
-const unsubscribeDeployed = Events.subscribe(Events.Type.OnPlayerDeployed, handlePlayerDeployed);
-const unsubscribeDied = Events.subscribe(Events.Type.OnPlayerDied, handlePlayerDied);
-const unsubscribeOngoing = Events.subscribe(Events.Type.OngoingPlayer, handleOngoingPlayer);
+const unsubscribeDeployed = Events.OnPlayerDeployed.subscribe(handlePlayerDeployed);
+const unsubscribeDied = Events.OnPlayerDied.subscribe(handlePlayerDied);
+const unsubscribeOngoing = Events.OngoingPlayer.subscribe(handleOngoingPlayer);
 
 // Optional: Clean up subscriptions when the game mode ends
-Events.subscribe(Events.Type.OnGameModeEnding, () => {
+Events.OnGameModeEnding.subscribe(() => {
     unsubscribeDeployed();
     unsubscribeDied();
     unsubscribeOngoing();
@@ -98,7 +110,9 @@ Events.subscribe(Events.Type.OnGameModeEnding, () => {
   be called when the event fires.
 
 - **Type Safety** – TypeScript ensures that your handler function signature matches the event type. For example,
-  `OnPlayerDeployed` handlers must accept a single `mod.Player` parameter.
+  `OnPlayerDeployed` handlers must accept a single `mod.Player` parameter. The event-channel style
+  (`Events.OnPlayerDeployed.subscribe(...)`) typically gives the best IntelliSense (parameter types and completion)
+  because the event is known at the call site.
 
 - **Synchronous and Asynchronous Handlers** – Handlers can be synchronous (returning `void`) or asynchronous (returning
   `Promise<void>`). Both are fully supported.
@@ -120,9 +134,168 @@ Events.subscribe(Events.Type.OnGameModeEnding, () => {
 
 ### `namespace Events`
 
+The `Events` namespace exposes:
+
+- **Per-event channels** – One object per event (e.g. `Events.OnPlayerDied`, `Events.OngoingInteractPoint`), each with
+  `subscribe`, `unsubscribe`, `trigger`, and `handlerCount`. **Prefer this style** for better IntelliSense and
+  readability.
+- **Enum-based API** – `Events.Type` enum plus `Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`,
+  `Events.trigger(type, ...args)`, and `Events.handlerCount(type)`. Use when you need to pass an event type by value
+  (e.g. iteration, dynamic dispatch).
+
+#### Per-event channels
+
+Each event is exposed as a channel with the same name as the event (e.g. `Events.OnPlayerDied`,
+`Events.OngoingInteractPoint`). Using the channel is **recommended** for better IntelliSense and readability: the
+handler and trigger arguments are fully typed for that event at the call site.
+
+##### `Events.<EventName>.subscribe(handler): () => void`
+
+Subscribes a handler function to this event. The handler will be called whenever the event fires. The handler signature
+is fully typed for this event (e.g.
+`Events.OnPlayerDied.subscribe((player, otherPlayer, deathType, weaponUnlock) => { ... })`).
+
+**Parameters:**
+
+- `handler` – A function matching the signature for this event. Can be synchronous or asynchronous. Parameter types are
+  inferred (best IntelliSense when using the channel).
+
+**Returns:**
+
+- A function that can be called to unsubscribe the handler.
+
+##### `Events.<EventName>.unsubscribe(handler): void`
+
+Unsubscribes a handler function from this event. The handler must be the same function reference that was used in
+`subscribe()`.
+
+**Parameters:**
+
+- `handler` – The same function reference that was passed to `subscribe()`.
+
+##### `Events.<EventName>.trigger(...args): void`
+
+Manually triggers this event with the given parameters. Primarily useful for debugging or testing. In normal operation,
+events are automatically triggered by the Battlefield Portal runtime. The argument list is fully typed for this event.
+
+**Parameters:**
+
+- `...args` – The parameters matching this event's signature (e.g. for `OnPlayerDied`: `player`, `otherPlayer`,
+  `deathType`, `weaponUnlock`).
+
+##### `Events.<EventName>.handlerCount(): number`
+
+Returns the number of handlers currently subscribed to this event. Useful for debugging (e.g. checking that
+subscriptions were cleaned up) or conditional logic.
+
+**Returns:**
+
+- The count of subscribed handlers (0 if none).
+
+#### Enum-based API
+
+#### `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
+
+Subscribes a handler function to an event type (enum-style API). The handler will be called whenever the event fires.
+
+**Parameters:**
+
+- `type` – The event type from `Events.Type` enum
+- `handler` – A function matching the signature for the event type. Can be synchronous or asynchronous.
+
+**Returns:**
+
+- A function that can be called to unsubscribe the handler. This is a convenience method that avoids needing to store
+  the handler reference separately.
+
+**Example:**
+
+```ts
+// Using the returned unsubscribe function
+const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
+    console.log(`Player deployed: ${mod.GetObjId(player)}`);
+});
+
+// Later, unsubscribe
+unsubscribe();
+```
+
+#### `Events.unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
+
+Unsubscribes a handler function from an event type (enum-style API). The handler must be the same function reference
+that was used in `subscribe()`.
+
+**Parameters:**
+
+- `type` – The event type from `Events.Type` enum
+- `handler` – The same function reference that was used in `subscribe()`
+
+**Example:**
+
+```ts
+const handler = (player: mod.Player) => {
+    console.log(`Player deployed: ${mod.GetObjId(player)}`);
+};
+
+// Option 1: Use the returned unsubscribe function (recommended)
+const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, handler);
+// Later...
+unsubscribe();
+
+// Option 2: Use Events.unsubscribe with the handler reference
+Events.subscribe(Events.Type.OnPlayerDeployed, handler);
+// Later...
+Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
+```
+
+#### `Events.trigger<T extends Type>(type: T, ...args: EventParameters<T>): void`
+
+Manually triggers an event with the given parameters (enum-style API). This is primarily useful for debugging or testing
+purposes. In normal operation, events are automatically triggered by the Battlefield Portal runtime when the
+corresponding game events occur.
+
+**Parameters:**
+
+- `type` – The event type from `Events.Type` enum
+- `...args` – The parameters matching the event type's signature
+
+**Example:**
+
+```ts
+// For debugging: manually trigger OnPlayerDeployed
+const testPlayer = mod.GetPlayers()[0];
+Events.trigger(Events.Type.OnPlayerDeployed, testPlayer);
+```
+
+#### `Events.handlerCount<T extends Type>(type: T): number`
+
+Returns the number of handlers currently subscribed to an event type (enum-style API). Useful for debugging (e.g.
+checking that subscriptions were cleaned up) or conditional logic.
+
+**Parameters:**
+
+- `type` – The event type from `Events.Type` enum
+
+**Returns:**
+
+- The count of subscribed handlers (0 if none).
+
+**Example:**
+
+```ts
+Events.subscribe(Events.Type.OnPlayerDeployed, handleDeployed);
+Events.handlerCount(Events.Type.OnPlayerDeployed); // 1
+
+// Per-event channel also exposes handlerCount()
+Events.OnPlayerDeployed.handlerCount(); // 1
+```
+
 #### `enum Events.Type`
 
-An enum containing all available event types. Use these values with `subscribe()`, `unsubscribe()`, and `trigger()`.
+An enum containing all available event types. Use these values with the enum-style API:
+`Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`, `Events.trigger(type, ...args)`, and
+`Events.handlerCount(type)`. When you don't need to pass the event type by value, prefer the per-event channel (e.g.
+`Events.OnPlayerDied`) instead.
 
 Available event types include:
 
@@ -187,7 +360,7 @@ Events.setLogging(
 );
 
 // If a handler throws an error, it will be logged automatically
-Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
+Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
     // If this throws, it will be logged as: <Events> Error in handler handleDeployment: [error details]
     throw new Error('Something went wrong');
 });
@@ -196,79 +369,6 @@ Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
 **Note:** Error logging is automatic and fail-safe. Handler errors are caught and logged without affecting other
 handlers or the event system. For more information on the logging functionality, see the
 [`Logging` module documentation](../logging/README.md).
-
-#### `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
-
-Subscribes a handler function to an event type. The handler will be called whenever the event fires.
-
-**Parameters:**
-
-- `type` – The event type from `Events.Type` enum
-- `handler` – A function matching the signature for the event type. Can be synchronous or asynchronous.
-
-**Returns:**
-
-- A function that can be called to unsubscribe the handler. This is a convenience method that avoids needing to store
-  the handler reference separately.
-
-**Example:**
-
-```ts
-// Using the returned unsubscribe function
-const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
-    console.log(`Player deployed: ${mod.GetObjId(player)}`);
-});
-
-// Later, unsubscribe
-unsubscribe();
-```
-
-#### `Events.unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
-
-Unsubscribes a handler function from an event type. The handler must be the same function reference that was used in
-`subscribe()`.
-
-**Parameters:**
-
-- `type` – The event type from `Events.Type` enum
-- `handler` – The same function reference that was used in `subscribe()`
-
-**Example:**
-
-```ts
-const handler = (player: mod.Player) => {
-    console.log(`Player deployed: ${mod.GetObjId(player)}`);
-};
-
-// Option 1: Use the returned unsubscribe function (recommended)
-const unsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, handler);
-// Later...
-unsubscribe();
-
-// Option 2: Use Events.unsubscribe with the handler reference
-Events.subscribe(Events.Type.OnPlayerDeployed, handler);
-// Later...
-Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
-```
-
-#### `Events.trigger<T extends Type>(type: T, ...args: EventParameters<T>): void`
-
-Manually triggers an event with the given parameters. This is primarily useful for debugging or testing purposes. In
-normal operation, events are automatically triggered by the Battlefield Portal runtime when the corresponding game
-events occur.
-
-**Parameters:**
-
-- `type` – The event type from `Events.Type` enum
-- `...args` – The parameters matching the event type's signature
-
-**Example:**
-
-```ts
-// For debugging: manually trigger OnPlayerDeployed
-const testPlayer = mod.GetPlayers()[0];
-Events.trigger(Events.Type.OnPlayerDeployed, testPlayer);
-```
 
 ---
 
@@ -516,6 +616,16 @@ The `Events` module uses a centralized subscription system:
 - [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
   Portal.
 - Battlefield Builder docs – For information about available events and their parameters.
+
+---
+
+## Future Work
+
+- **Subscribe-time filtering** – Most events are about a target (e.g. a specific player, vehicle, or object). A future
+  version may allow specifying filter criteria at subscribe-time (e.g. “only when this player dies” for `OnPlayerDied`),
+  so handlers run only when the event payload matches. That would make features like `once` (run handler once then
+  unsubscribe), `clearAll`, and `removeAllListeners` meaningful at a filtered level (e.g. “once for this player” or
+  “clear all listeners for this player”) instead of only at the whole-event level.
 
 ---
 
