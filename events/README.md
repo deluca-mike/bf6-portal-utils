@@ -12,7 +12,7 @@ You can use **two styles of API**:
   `Events.OngoingInteractPoint`) with `subscribe`, `unsubscribe`, `trigger`, and `handlerCount` functions. This style
   typically has **better full IntelliSense compatibility** and is **more readable**, since the event name and method are
   colocated (e.g. `Events.OnPlayerDied.subscribe(handler)`).
-- **Enum style** – Pass the event type as the first argument (e.g.
+- **Object style** – Pass the event type as the first argument (e.g.
   `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Useful when you need to pass an event type by value (e.g.
   dynamic dispatch, iteration).
 
@@ -44,11 +44,11 @@ non-blocking, ensuring optimal performance.
     import { Events } from 'bf6-portal-utils/events';
     ```
 3. Subscribe to events using the **event-channel style** (e.g. `Events.OnPlayerDeployed.subscribe(handler)`) for the
-   best IntelliSense and readability, or the **enum style** (`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`).
-   Both return an unsubscribe function for convenience.
+   best IntelliSense and readability, or the **object style**
+   (`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Both return an unsubscribe function for convenience.
 4. Unsubscribe when needed by calling the returned unsubscribe function, or use
    `Events.OnPlayerDeployed.unsubscribe(handler)` (channel style) or
-   `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (enum style).
+   `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (object style).
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
 
@@ -136,7 +136,7 @@ Events.OnGameModeEnding.subscribe(() => {
 
 The `Events` namespace exposes two styles of API: **per-event channels** (e.g.
 `Events.OnPlayerDied.subscribe(handler)`), which typically have better IntelliSense and readability, and the
-**enum-based API** (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to
+**object-based API** (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to
 pass an event type by value (e.g. iteration, dynamic dispatch).
 
 #### Subscribe
@@ -150,11 +150,11 @@ synchronous or asynchronous. Returns a function that can be called to unsubscrib
 - **Parameters:** `handler` – A function matching the signature for this event. Parameter types are inferred.
 - **Returns:** A function that can be called to unsubscribe the handler.
 
-**Enum style** – Use when you need to pass the event type by value.
+**Object style** – Use when you need to pass the event type by value.
 
 - **Signature:** `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
-- **Parameters:** `type` – The event type from `Events.Type` enum; `handler` – A function matching the signature for the
-  event type.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – A function
+  matching the signature for the event type.
 - **Returns:** A function that can be called to unsubscribe the handler.
 
 **Examples:**
@@ -167,7 +167,7 @@ const joinGameUnsubscribe = Events.OnPlayerJoinGame.subscribe((player: mod.Playe
 // Later, unsubscribe
 joinGameUnsubscribe();
 
-// Enum style
+// Object style
 const playerDeployedUnsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
     console.log(`Player deployed: ${mod.GetObjId(player)}`);
 });
@@ -188,8 +188,8 @@ Unsubscribes a handler function from an event. The handler must be the same func
 **Enum style:**
 
 - **Signature:** `Events.unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
-- **Parameters:** `type` – The event type from `Events.Type` enum; `handler` – The same function reference that was used
-  in `subscribe()`.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – The same
+  function reference that was used in `subscribe()`.
 
 **Examples:**
 
@@ -201,7 +201,7 @@ Events.OnPlayerDeployed.subscribe(handler);
 // Later...
 Events.OnPlayerDeployed.unsubscribe(handler);
 
-// Enum style
+// Object style
 Events.subscribe(Events.Type.OnPlayerDeployed, handler);
 // Later...
 Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
@@ -220,8 +220,8 @@ events are automatically triggered by the Battlefield Portal runtime when the co
 **Enum style:**
 
 - **Signature:** `Events.trigger<T extends Type>(type: T, ...args: EventParameters<T>): void`
-- **Parameters:** `type` – The event type from `Events.Type` enum; `...args` – The parameters matching the event type's
-  signature.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `...args` – The
+  parameters matching the event type's signature.
 
 **Examples:**
 
@@ -231,7 +231,7 @@ const testPlayer = mod.ValueInArray(mod.AllPlayers(), 0) as mod.Player;
 // Channel style
 Events.OnPlayerDeployed.trigger(testPlayer);
 
-// Enum style
+// Object style
 Events.trigger(Events.Type.OnPlayerDeployed, testPlayer);
 ```
 
@@ -258,16 +258,31 @@ were cleaned up) or conditional logic.
 Events.OnPlayerDeployed.subscribe(someHandler);
 Events.OnPlayerDeployed.handlerCount(); // 1
 
-// Enum style
+// Object style
 Events.subscribe(Events.Type.OnPlayerDeployed, someOtherHandler);
 Events.handlerCount(Events.Type.OnPlayerDeployed); // 2
 ```
 
-#### `enum Events.Type`
+#### `Events.Type`
 
-An enum containing all available event types. Use these values with the enum-style API:
-`Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`, `Events.trigger(type, ...args)`, and
-`Events.handlerCount(type)`.
+An object mapping each event name to its trigger function (e.g. `Events.Type.OnPlayerDeployed`). Use these values with
+the object-style API: `Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`,
+`Events.trigger(type, ...args)`, and `Events.handlerCount(type)`. You can also use it for typed references to event
+payloads (e.g. `Parameters<typeof Events.Type.OnPlayerDied>`) or to call a trigger by name (e.g.
+`Events.Type.OnPlayerDeployed(somePlayer)`).
+
+**Example (typed payload / dynamic dispatch):**
+
+```ts
+import { Events } from 'bf6-portal-utils/events';
+
+// Typed payload for OnPlayerDied
+type OnPlayerDiedPayload = Parameters<typeof Events.Type.OnPlayerDied>;
+// [player: mod.Player, otherPlayer: mod.Player, deathType: mod.DeathType, weaponUnlock: mod.WeaponUnlock]
+
+// Call a trigger by name (mostly for debugging or testing).
+Events.Type.OnPlayerDeployed(somePlayer);
+```
 
 Available event types include:
 
