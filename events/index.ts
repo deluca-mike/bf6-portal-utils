@@ -154,6 +154,18 @@ export namespace Events {
         OnVehicleSpawned: (vehicle: mod.Vehicle) => void;
     };
 
+    /** Typed channel for a single event: subscribe(handler), unsubscribe(handler), and trigger(...args). */
+    export type EventChannel<K extends keyof Signature> = {
+        subscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): () => void;
+        unsubscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): void;
+        trigger(...args: Parameters<Signature[K]>): void;
+    };
+
+    /** Map of event name -> { subscribe, unsubscribe, trigger } with correct handler/args types. */
+    export type EventChannelsMap = {
+        [K in keyof typeof Type]: K extends keyof Signature ? EventChannel<K> : never;
+    };
+
     // Get the enum key name from the enum value.
     type EventTypeName<T extends Type> = {
         [K in keyof typeof Type]: (typeof Type)[K] extends T ? K : never;
@@ -259,7 +271,30 @@ export namespace Events {
             executeHandler(handler as AllHandlers, args as Parameters<AllHandlers>);
         }
     }
+
+    /** Build per-event channel objects so users can call Events.OngoingInteractPoint.subscribe(handler), etc. */
+    (function initChannels(): void {
+        const typeKeys = Object.keys(Type) as (keyof typeof Type)[];
+        for (const key of typeKeys) {
+            const typeValue = Type[key];
+            if (typeof typeValue !== 'number') continue; // skip reverse enum entries
+            (Events as unknown as Record<string, EventChannel<keyof Signature>>)[key] = {
+                subscribe(handler: AllHandlers): () => void {
+                    return Events.subscribe(typeValue, handler as HandlerForType<typeof typeValue>);
+                },
+                unsubscribe(handler: AllHandlers): void {
+                    Events.unsubscribe(typeValue, handler as HandlerForType<typeof typeValue>);
+                },
+                trigger(...args: Parameters<AllHandlers>): void {
+                    Events.trigger(typeValue, ...(args as EventParameters<typeof typeValue>));
+                },
+            };
+        }
+    })();
 }
+
+/** Declare Events namespace also has per-event channels (OngoingInteractPoint, OnPlayerDied, etc.). */
+export interface Events extends Events.EventChannelsMap {}
 
 /* eslint-disable jsdoc/require-jsdoc */
 export function OngoingGlobal(): void {
