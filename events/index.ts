@@ -140,14 +140,34 @@ export namespace Events {
         OnVehicleSpawned: typeof OnVehicleSpawned;
     };
 
-    /** Typed channel for a single event: subscribe(handler), unsubscribe(handler), and trigger(...args). */
+    /**
+     * Typed channel for a single event. Each event (e.g. `Events.OngoingInteractPoint`, `Events.OnPlayerDied`)
+     * exposes this interface with `subscribe`, `unsubscribe`, and `trigger` typed to that event's payload.
+     * @template K - Event name; handler and trigger args are inferred from the corresponding trigger function.
+     */
     export type EventChannel<K extends keyof Signature> = {
+        /**
+         * Subscribe a handler for this event. The handler receives the same arguments as this event's trigger.
+         * @param handler - Callback invoked when the event is triggered; args match the event's payload.
+         * @returns Function to call to unsubscribe this handler.
+         */
         subscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): () => void;
+        /**
+         * Unsubscribe a handler previously added with `subscribe`. Pass the same function reference.
+         * @param handler - The same function reference that was passed to `subscribe`.
+         */
         unsubscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): void;
+        /**
+         * Trigger this event. Pass the same arguments as the exported trigger function for this event.
+         * @param args - Event payload; types match the corresponding standalone trigger function (e.g. `OnPlayerDied`).
+         */
         trigger(...args: Parameters<Signature[K]>): void;
     };
 
-    /** Map of event name -> { subscribe, unsubscribe, trigger } with correct handler/args types. */
+    /**
+     * Map of each event name to its typed channel (`subscribe`, `unsubscribe`, `trigger`).
+     * Merged onto the Events namespace so you get e.g. `Events.OngoingInteractPoint.subscribe(handler)`.
+     */
     export type EventChannelsMap = {
         [K in keyof typeof Type]: K extends keyof Signature ? EventChannel<K> : never;
     };
