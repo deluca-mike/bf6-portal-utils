@@ -40,9 +40,21 @@ export declare class ScavengerDrop {
     stop(): void;
 }
 export declare namespace ScavengerDrop {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     const LogLevel: typeof Logging.LogLevel;
+    /**
+     * The options for the ScavengerDrop instance.
+     */
     interface Options {
+        /**
+         * The duration of the scavenger drop in milliseconds.
+         */
         duration?: number;
+        /**
+         * The interval at which to check for scavengers in milliseconds.
+         */
         checkInterval?: number;
     }
 }

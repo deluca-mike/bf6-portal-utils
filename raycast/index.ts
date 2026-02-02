@@ -1,7 +1,7 @@
 import { Timers } from '../timers/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 1.1.0
+// version: 1.1.1
 export class Raycast {
     private static _logging = new Logging('Raycast');
 
@@ -53,7 +53,6 @@ export class Raycast {
     /**
      * Casts a ray with specific callbacks. The callback vector types must match the `start` and `end` vector types.
      * @example
-     * ```ts
      * Raycast.cast(player, { x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 10 }, {
      *     onHit: (hitPoint, hitNormal) => {
      *         console.log(`Ray hit at ${hitPoint.x}, ${hitPoint.y}, ${hitPoint.z}`);
@@ -64,7 +63,6 @@ export class Raycast {
      *         console.log(`Ray hit at ${mod.XComponentOf(hitPoint)}, ${mod.YComponentOf(hitPoint)}, ${mod.ZComponentOf(hitPoint)}`);
      *     },
      * });
-     * ```
      * @param player - The player to assign the ray to.
      * @param start - The start position of the ray.
      * @param end - The end position of the ray.
@@ -317,17 +315,28 @@ export class Raycast {
 }
 
 export namespace Raycast {
+    /**
+     * A simple transparent 3D vector interface.
+     */
     export interface Vector3 {
         x: number;
         y: number;
         z: number;
     }
 
+    /**
+     * A callback function type for ray hits.
+     */
     export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
 
+    /**
+     * A callback function type for ray misses.
+     */
     export type MissCallback = () => Promise<void> | void;
 
-    // Must have Hit (Miss optional) or Miss (Hit optional).
+    /**
+     * A callback object type for the `cast()` method. Must have Hit (Miss optional) or Miss (Hit optional).
+     */
     export type Callbacks<T extends mod.Vector | Vector3> =
         | { onHit: HitCallback<T>; onMiss?: MissCallback }
         | { onHit?: HitCallback<T>; onMiss: MissCallback };
@@ -347,5 +356,8 @@ export namespace Raycast {
         rays: Map<number, PendingRay>;
     }
 
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     export const LogLevel = Logging.LogLevel;
 }

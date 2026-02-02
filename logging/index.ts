@@ -1,4 +1,4 @@
-// version: 1.0.0
+// version: 1.0.1
 export class Logging {
     constructor(tag: string) {
         this._tag = tag;
@@ -87,6 +87,9 @@ export class Logging {
 }
 
 export namespace Logging {
+    /**
+     * The log levels.
+     */
     export enum LogLevel {
         Debug = 0,
         Info = 1,

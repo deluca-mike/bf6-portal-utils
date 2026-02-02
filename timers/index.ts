@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version: 1.1.0
+// version: 1.1.1
 export class Timers {
     private static readonly _ACTIVE_IDS = new Set<number>();
 
@@ -152,7 +152,6 @@ export class Timers {
     }
 
     /**
-     * Returns the number of active timers.
      * @returns The number of active timers.
      */
     public static getActiveTimerCount(): number {
@@ -161,5 +160,8 @@ export class Timers {
 }
 
 export namespace Timers {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     export const LogLevel = Logging.LogLevel;
 }

@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version 3.1.0
+// version 3.1.1
 export namespace MapDetector {
     const logging = new Logging('MD');
 

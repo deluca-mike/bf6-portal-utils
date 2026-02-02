@@ -1,10 +1,14 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.0
+// version: 1.0.1
 export class UIWeaponImage extends UI.Element {
     protected _weapon: mod.Weapons;
     protected _weaponPackage: mod.WeaponPackage;
 
+    /**
+     * Creates a new weapon image.
+     * @param params - The parameters for the weapon image.
+     */
     public constructor(params: UIWeaponImage.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
@@ -67,12 +71,18 @@ export class UIWeaponImage extends UI.Element {
         }
     }
 
+    /**
+     * The weapon of the weapon image.
+     */
     public get weapon(): mod.Weapons {
         return this._weapon;
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the weapon.
+     * Sets the weapon of the weapon image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
+     * been created.
+     * @param weapon - The new weapon.
      */
     public set weapon(weapon: mod.Weapons) {
         if (this._isDeletedCheck()) return;
@@ -81,21 +91,29 @@ export class UIWeaponImage extends UI.Element {
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the weapon.
+     * Sets the weapon of the weapon image. Useful for chaining operations.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
+     * been created.
      * @param weapon - The weapon to set.
-     * @returns The UIWeaponImage instance.
+     * @returns This element instance.
      */
     public setWeapon(weapon: mod.Weapons): this {
         this._weapon = weapon;
         return this;
     }
 
+    /**
+     * The weapon package of the weapon image.
+     */
     public get weaponPackage(): mod.WeaponPackage {
         return this._weaponPackage;
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the weapon package.
+     * Sets the weapon package of the weapon image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
+     * after it has been created.
+     * @param weaponPackage - The new weapon package.
      */
     public set weaponPackage(weaponPackage: mod.WeaponPackage) {
         if (this._isDeletedCheck()) return;
@@ -104,9 +122,11 @@ export class UIWeaponImage extends UI.Element {
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the weapon package.
+     * Sets the weapon package of the weapon image. Useful for chaining operations.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
+     * after it has been created.
      * @param weaponPackage - The weapon package to set.
-     * @returns The UIWeaponImage instance.
+     * @returns This element instance.
      */
     public setWeaponPackage(weaponPackage: mod.WeaponPackage): this {
         this._weaponPackage = weaponPackage;
@@ -115,6 +135,9 @@ export class UIWeaponImage extends UI.Element {
 }
 
 export namespace UIWeaponImage {
+    /**
+     * The parameters for creating a new weapon image.
+     */
     export type Params = UI.ElementParams & {
         weapon: mod.Weapons;
         weaponPackage?: mod.WeaponPackage;

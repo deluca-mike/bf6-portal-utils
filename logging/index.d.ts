@@ -28,6 +28,9 @@ export declare class Logging {
     setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Logging.LogLevel, includeError?: boolean): void;
 }
 export declare namespace Logging {
+    /**
+     * The log levels.
+     */
     enum LogLevel {
         Debug = 0,
         Info = 1,

@@ -1,25 +1,22 @@
 # Map Detector Module
 
-This TypeScript `MapDetector` class enables Battlefield Portal experience developers to detect the current map by
-analyzing the coordinates of Team 1's Headquarters (HQ). This utility is necessary because `mod.IsCurrentMap` from the
-official Battlefield Portal API is currently broken and unreliable.
+<ai>
 
-The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and
-uses these coordinates to identify which map is currently active. The module uses the `Logging` module for internal
-logging, allowing you to monitor map detection behavior and debug issues.
+This TypeScript `MapDetector` class enables Battlefield Portal experience developers to detect the current map by analyzing the coordinates of Team 1's Headquarters (HQ). This utility is necessary because `mod.IsCurrentMap` from the official Battlefield Portal API is currently broken and unreliable.
 
-> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.Maps`, etc.) come from
-> [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
+</ai>
+
+The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and uses these coordinates to identify which map is currently active. The module uses the `Logging` module for internal logging, allowing you to monitor map detection behavior and debug issues.
+
+> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.Maps`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
-   mod. The bundler automatically handles code inlining.
-3. **Spatial data assumption** – This utility assumes that the spatial data loaded with the map has not changed the
-   location of Team 1's HQ. If custom spatial modifications have moved the HQ, detection may fail.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **Spatial data assumption** – This utility assumes that the spatial data loaded with the map has not changed the location of Team 1's HQ. If custom spatial modifications have moved the HQ, detection may fail.
 
 ---
 
@@ -31,8 +28,9 @@ logging, allowing you to monitor map detection behavior and debug issues.
     import { MapDetector } from 'bf6-portal-utils/map-detector';
     ```
 3. Access the current map using any of the provided getters or methods.
-4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
-   automatically inline the code).
+4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -45,12 +43,14 @@ export async function OnGameModeStarted(): Promise<void> {
 
     // Get the current map as a MapDetector.Map enum
     const map = MapDetector.currentMap();
+
     if (map == MapDetector.Map.Downtown) {
         // Handle Downtown-specific logic
     }
 
     // Get the current map as a mod.Maps enum (native API)
     const nativeMap = MapDetector.currentNativeMap();
+
     if (nativeMap == mod.Maps.Granite_MainStreet) {
         // Handle using native enum
     }
@@ -70,6 +70,8 @@ export async function OnGameModeStarted(): Promise<void> {
 }
 ```
 
+</ai>
+
 ---
 
 ## API Reference
@@ -80,15 +82,13 @@ The `MapDetector` namespace contains map detection functions and related types.
 
 #### `MapDetector.LogLevel`
 
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with
-`MapDetector.setLogging()` to configure the minimum log level for map detection logging.
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `MapDetector.setLogging()` to configure the minimum log level for map detection logging.
 
 Available log levels:
 
 - `Debug` (0) – Debug-level messages. Most verbose.
 - `Info` (1) – Informational messages.
-- `Warning` (2) – Warning messages. Includes failed map detection and missing native enum entries. Default minimum log
-  level.
+- `Warning` (2) – Warning messages. Includes failed map detection and missing native enum entries. Default minimum log level.
 - `Error` (3) – Error messages. Includes errors when getting HQ coordinates. Least verbose.
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
@@ -97,16 +97,18 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 #### Static Methods
 
-| Method                                                                                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. This allows you to monitor and debug map detection behavior. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. For more information, see the [`Logging` module documentation](../logging/README.md). |
-| `currentMap(): MapDetector.Map \| undefined`                                                                   | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined.                                                                                                                                                                                                                                                                                                                                                                    |
-| `currentNativeMap(): mod.Maps \| undefined`                                                                    | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum.                                                                                                                                                                                                                                                                                                    |
-| `currentMapName(): string \| undefined`                                                                        | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined.                                                                                                                                                                                                                                                                                                                                                                     |
-| `isCurrentMap(map: MapDetector.Map): boolean`                                                                  | Returns `true` if the current map matches the given `MapDetector.Map` enum value.                                                                                                                                                                                                                                                                                                                                                                                             |
-| `isCurrentNativeMap(map: mod.Maps): boolean`                                                                   | Returns `true` if the current map matches the given `mod.Maps` enum value.                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Method | Description |
+| --- | --- |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. This allows you to monitor and debug map detection behavior. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
+| `currentMap(): MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined. |
+| `currentNativeMap(): mod.Maps \| undefined` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
+| `currentMapName(): string \| undefined` | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined. |
+| `isCurrentMap(map: MapDetector.Map): boolean` | Returns `true` if the current map matches the given `MapDetector.Map` enum value. |
+| `isCurrentNativeMap(map: mod.Maps): boolean` | Returns `true` if the current map matches the given `mod.Maps` enum value. |
 
 ---
+
+<ai>
 
 ## Supported Maps
 
@@ -137,22 +139,19 @@ The `MapDetector` class supports detection of the following maps via the `MapDet
 
 ### Missing Maps in Native Enum
 
-The maps **"Area 22B"** and **"Redline Storage"** are not available in the native `mod.Maps` enum due to an oversight in
-the Battlefield Portal API. As a result:
+The maps **"Area 22B"** and **"Redline Storage"** are not available in the native `mod.Maps` enum due to an oversight in the Battlefield Portal API. As a result:
 
 - `MapDetector.currentNativeMap` will return `undefined` for these maps (they are not present in `mod.Maps`).
-- `MapDetector.isCurrentNativeMap()` will always return `false` for these maps when checking against any `mod.Maps`
-  value.
+- `MapDetector.isCurrentNativeMap()` will always return `false` for these maps when checking against any `mod.Maps` value.
 - `MapDetector.currenMap` and `MapDetector.isCurrentMap` **will behave correctly for these maps**.
 
-Therefore, use `MapDetector.Map` enum values and the `isCurrentMap()` method when working with these maps (or
-preferably, for all maps).
+Therefore, use `MapDetector.Map` enum values and the `isCurrentMap()` method when working with these maps (or preferably, for all maps).
 
 ### Detection Method
 
-The detector identifies maps primarily by the X-coordinate of Team 1's HQ, with Y-coordinate used for disambiguation in
-two cases (Mirak Valley vs New Sobek City). If custom spatial data or modifications have moved the HQ from its default
-position, detection will fail and all getters will return `undefined`.
+The detector identifies maps primarily by the X-coordinate of Team 1's HQ, with Y-coordinate used for disambiguation in two cases (Mirak Valley vs New Sobek City). If custom spatial data or modifications have moved the HQ from its default position, detection will fail and all getters will return `undefined`.
+
+</ai>
 
 ---
 
@@ -160,13 +159,9 @@ position, detection will fail and all getters will return `undefined`.
 
 The `MapDetector` uses a coordinate-based detection system:
 
-1. **Coordinate Matching** – The detector compares the Team 1's HQ X-coordinate (and Y-coordinate when needed) against
-   known map HQ positions.
-2. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native
-   `mod.Maps` enum where available.
-3. **Error Logging** – When map detection fails or HQ coordinate retrieval encounters errors, warnings and errors are
-   logged using the configured logger (if logging is enabled via `MapDetector.setLogging()`). This provides visibility
-   into detection issues without affecting functionality.
+1. **Coordinate Matching** – The detector compares the Team 1's HQ X-coordinate (and Y-coordinate when needed) against known map HQ positions.
+2. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native `mod.Maps` enum where available.
+3. **Error Logging** – When map detection fails or HQ coordinate retrieval encounters errors, warnings and errors are logged using the configured logger (if logging is enabled via `MapDetector.setLogging()`). This provides visibility into detection issues without affecting functionality.
 
 The detection is fast and requires no additional setup, making it suitable for use in any event handler or game logic.
 
@@ -174,18 +169,14 @@ The detection is fast and requires no additional setup, making it suitable for u
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
-  Portal.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about spatial data and HQ positioning.
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. If you discover new maps that need to be added, or encounter issues with
-detection accuracy, please open an issue or reach out through the project channels. Contributions to expand map support
-are welcome.
+This module is under **active development**. If you discover new maps that need to be added, or encounter issues with detection accuracy, please open an issue or reach out through the project channels. Contributions to expand map support are welcome.
 
 ---

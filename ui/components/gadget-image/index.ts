@@ -1,9 +1,13 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.0
+// version: 1.0.1
 export class UIGadgetImage extends UI.Element {
     protected _gadget: mod.Gadgets;
 
+    /**
+     * Creates a new gadget image.
+     * @param params - The parameters for the gadget image.
+     */
     public constructor(params: UIGadgetImage.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
@@ -62,12 +66,18 @@ export class UIGadgetImage extends UI.Element {
         }
     }
 
+    /**
+     * The gadget of the gadget image.
+     */
     public get gadget(): mod.Gadgets {
         return this._gadget;
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the gadget.
+     * Sets the gadget of the gadget image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
+     * been created.
+     * @param gadget - The new gadget.
      */
     public set gadget(gadget: mod.Gadgets) {
         if (this._isDeletedCheck()) return;
@@ -76,9 +86,11 @@ export class UIGadgetImage extends UI.Element {
     }
 
     /**
-     * @deprecated Currently not supported as underlying Portal API lacks the ability to set the gadget.
-     * @param gadget - The gadget to set.
-     * @returns The UIGadgetImage instance.
+     * Sets the gadget of the gadget image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
+     * been created.
+     * @param gadget - The new gadget.
+     * @returns This element instance.
      */
     public setGadget(gadget: mod.Gadgets): this {
         this._gadget = gadget;
@@ -87,6 +99,9 @@ export class UIGadgetImage extends UI.Element {
 }
 
 export namespace UIGadgetImage {
+    /**
+     * The parameters for creating a new gadget image.
+     */
     export type Params = UI.ElementParams & {
         gadget: mod.Gadgets;
     };

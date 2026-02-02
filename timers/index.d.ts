@@ -47,11 +47,13 @@ export declare class Timers {
      */
     static clear(id: number | undefined | null): void;
     /**
-     * Returns the number of active timers.
      * @returns The number of active timers.
      */
     static getActiveTimerCount(): number;
 }
 export declare namespace Timers {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     const LogLevel: typeof Logging.LogLevel;
 }

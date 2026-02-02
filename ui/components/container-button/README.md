@@ -1,15 +1,18 @@
 # UIContainerButton Component
 
-The `UIContainerButton` component creates a button that contains a `UIContainer` as its content. This allows you to
-create interactive buttons that can hold child elements, enabling complex nested UI structures within a clickable
-button.
+<ai>
 
-> **Note** This component extends `UIContentButton<UIContainer>`. For information about the base `UI` namespace
-> functionality, see the [main UI documentation](../../README.md).
+The `UIContainerButton` component creates a button that contains a `UIContainer` as its content. This allows you to create interactive buttons that can hold child elements, enabling complex nested UI structures within a clickable button.
+
+</ai>
+
+> **Note** This component extends `UIContentButton<UIContainer>`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIContainerButton } from 'bf6-portal-utils/ui/components/container-button';
@@ -45,29 +48,25 @@ const button = new UIContainerButton({
 // Access the inner container
 const innerContainer = button.innerContainer;
 console.log(innerContainer.children.length); // 2
-```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
-
+// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
     UI.handleButtonEvent(player, widget, event);
 }
 ```
 
+</ai>
+
 ---
 
 ## Constructor Parameters
 
-| Param                                        | Type / Default                        | Notes                                                                  |
-| -------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| Param | Type / Default | Notes |
+| --- | --- | --- |
 | All parameters from `UIButton.Params`, plus: |
-| All parameters from `UIContainer.Params`:    |
-| `childrenParams`                             | `Array<UIContainer.ChildParams<any>>` | Nested elements automatically receive the inner container as `parent`. |
-| `padding`                                    | `number = 0`                          | Container padding.                                                     |
+| All parameters from `UIContainer.Params`: |
+| `childrenParams` | `Array<UIContainer.ChildParams<any>>` | Nested elements automatically receive the inner container as `parent`. |
+| `padding` | `number = 0` | Container padding. |
 
 For complete parameter lists, see:
 
@@ -90,8 +89,7 @@ For complete parameter lists, see:
 - **Lifecycle**: `delete()`, `deleted`
 - **Parent Management**: `parent`, `setParent()`
 
-For complete documentation of these properties, see the
-[main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
@@ -105,27 +103,21 @@ All button properties are delegated from the internal `UIButton` instance:
 
 ### ContainerButton-Specific
 
-- **`innerContainer: UIContainer`** (getter) – The inner container that holds child elements. Use this to access and
-  manage the container's children.
+- **`innerContainer: UIContainer`** (getter) – The inner container that holds child elements. Use this to access and manage the container's children.
 
-- **`padding: number`** (getter/setter) – Container padding. The inner container's size is automatically adjusted to
-  account for padding.
+- **`padding: number`** (getter/setter) – Container padding. The inner container's size is automatically adjusted to account for padding.
 
 - **`setPadding(padding: number): UIContainerButton`** – Sets padding and returns `this` for method chaining.
 
 ### Overrides
 
-- **`width: number`** (getter/setter) – Setting width also updates the button widget and inner container width,
-  accounting for padding.
+- **`width: number`** (getter/setter) – Setting width also updates the button widget and inner container width, accounting for padding.
 
-- **`height: number`** (getter/setter) – Setting height also updates the button widget and inner container height,
-  accounting for padding.
+- **`height: number`** (getter/setter) – Setting height also updates the button widget and inner container height, accounting for padding.
 
-- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and inner container size, accounting
-  for padding.
+- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and inner container size, accounting for padding.
 
-- **`setSize(params: UI.Size): UIContainerButton`** – Sets size for container, button, and inner container, returns
-  `this`.
+- **`setSize(params: UI.Size): UIContainerButton`** – Sets size for container, button, and inner container, returns `this`.
 
 ---
 
@@ -139,24 +131,23 @@ type Params = UIButton.Params & UIContainer.Params;
 
 ---
 
+<ai>
+
 ## Usage Notes
 
-- **Inner Container Access**: Use the `innerContainer` property to access the container that holds child elements. You
-  can use this to manage children, check the children array, etc.
+- **Inner Container Access**: Use the `innerContainer` property to access the container that holds child elements. You can use this to manage children, check the children array, etc.
 
-- **Child Management**: Children added via `childrenParams` are automatically added to the inner container, not the
-  button itself. Use `innerContainer.children` to access them.
+- **Child Management**: Children added via `childrenParams` are automatically added to the inner container, not the button itself. Use `innerContainer.children` to access them.
 
-- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (outer
-  container, button, and inner container), ensuring they stay in sync.
+- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (outer container, button, and inner container), ensuring they stay in sync.
 
-- **Padding**: The component supports padding, which creates space between the button border and the inner container.
-  The inner container's size is automatically adjusted to account for padding.
+- **Padding**: The component supports padding, which creates space between the button border and the inner container. The inner container's size is automatically adjusted to account for padding.
 
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for
-  button clicks to work. See the Quick Start section above.
+- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+
+</ai>
 
 ---
 
@@ -166,5 +157,4 @@ type Params = UIButton.Params & UIContainer.Params;
 - [UIContentButton Documentation](../content-button/README.md) – For information about the base class
 - [UIButton Documentation](../button/README.md) – For information about button properties
 - [UIContainer Documentation](../container/README.md) – For information about container properties
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations

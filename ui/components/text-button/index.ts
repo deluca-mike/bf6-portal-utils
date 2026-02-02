@@ -5,7 +5,7 @@ import { UIText } from '../text/index.ts';
 
 const TEXT_BUTTON_CONTENT_PROPERTIES: readonly string[] = ['message', 'textSize', 'textAnchor'] as const;
 
-// version: 6.0.0
+// version: 6.0.1
 export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
     // UIText properties (delegated via delegateProperties)
     declare public message: mod.Message;
@@ -21,6 +21,10 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
 
     protected _textDisabledAlpha: number;
 
+    /**
+     * Creates a new text button.
+     * @param params - The parameters for the text button.
+     */
     public constructor(params: UITextButton.Params) {
         const createContent = (parent: UI.Parent, width: number, height: number): UIText => {
             const textParams: UIText.Params = {
@@ -58,10 +62,16 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         }
     }
 
+    /**
+     * @inheritdoc
+     */
     public override get enabled(): boolean {
         return this._button.enabled;
     }
 
+    /**
+     * @inheritdoc
+     */
     public override set enabled(enabled: boolean) {
         if (this._isDeletedCheck()) return;
 
@@ -69,15 +79,25 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         this._setContentEnabled(enabled);
     }
 
+    /**
+     * @inheritdoc
+     */
     public override setEnabled(enabled: boolean): this {
         this.enabled = enabled;
         return this;
     }
 
+    /**
+     * The color of the text when the button is enabled.
+     */
     public get textColor(): mod.Vector {
         return this._content.textColor;
     }
 
+    /**
+     * Sets the color of the text when the button is enabled.
+     * @param color - The new color.
+     */
     public set textColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
@@ -88,15 +108,27 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         }
     }
 
+    /**
+     * Sets the color of the text when the button is enabled. Useful for chaining operations.
+     * @param color - The new color.
+     * @returns This element instance.
+     */
     public setTextColor(color: mod.Vector): this {
         this.textColor = color;
         return this;
     }
 
+    /**
+     * The alpha of the text when the button is enabled.
+     */
     public get textAlpha(): number {
         return this._content.textAlpha;
     }
 
+    /**
+     * Sets the alpha of the text when the button is enabled.
+     * @param alpha - The new alpha.
+     */
     public set textAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
@@ -107,15 +139,27 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         }
     }
 
+    /**
+     * Sets the alpha of the text when the button is enabled. Useful for chaining operations.
+     * @param alpha - The new alpha.
+     * @returns This element instance.
+     */
     public setTextAlpha(alpha: number): this {
         this.textAlpha = alpha;
         return this;
     }
 
+    /**
+     * The color of the text when the button is disabled.
+     */
     public get textDisabledColor(): mod.Vector {
         return this._textDisabledColor;
     }
 
+    /**
+     * Sets the color of the text when the button is disabled.
+     * @param color - The new color.
+     */
     public set textDisabledColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
@@ -126,15 +170,27 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         }
     }
 
+    /**
+     * Sets the color of the text when the button is disabled. Useful for chaining operations.
+     * @param color - The new color.
+     * @returns This element instance.
+     */
     public setTextDisabledColor(color: mod.Vector): this {
         this.textDisabledColor = color;
         return this;
     }
 
+    /**
+     * The alpha of the text when the button is disabled.
+     */
     public get textDisabledAlpha(): number {
         return this._textDisabledAlpha;
     }
 
+    /**
+     * Sets the alpha of the text when the button is disabled.
+     * @param alpha - The new alpha.
+     */
     public set textDisabledAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
@@ -145,6 +201,11 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
         }
     }
 
+    /**
+     * Sets the alpha of the text when the button is disabled. Useful for chaining operations.
+     * @param alpha - The new alpha.
+     * @returns This element instance.
+     */
     public setTextDisabledAlpha(alpha: number): this {
         this.textDisabledAlpha = alpha;
         return this;
@@ -152,6 +213,9 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
 }
 
 export namespace UITextButton {
+    /**
+     * The parameters for creating a new text button.
+     */
     export type Params = UIButton.Params &
         UIText.Params & {
             textDisabledColor?: mod.Vector;

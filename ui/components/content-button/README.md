@@ -1,25 +1,18 @@
 # UIContentButton Component
 
-The `UIContentButton` is an abstract base class for buttons that contain content elements (such as text or images). It
-handles the common pattern of wrapping a `UIButton` and a content element in a `UIContainer`, managing their layout, and
-delegating properties appropriately. It is need because natively (via the `mod` namespace UI widget system) only
-containers can be parents and have children.
+<ai>
 
-This class is not meant to be instantiated directly. Instead, use concrete implementations like `UITextButton` which
-extends this class, or build you own buttons with content by extending this class.
+The `UIContentButton` is an abstract base class for buttons that contain content elements (such as text or images). It handles the common pattern of wrapping a `UIButton` and a content element in a `UIContainer`, managing their layout, and delegating properties appropriately. It is need because natively (via the `mod` namespace UI widget system) only containers can be parents and have children.
 
-> **Note** This component extends `UI.Element`. For information about the base `UI` namespace functionality, see the
-> [main UI documentation](../../README.md).
+This class is not meant to be instantiated directly. Instead, use concrete implementations like `UITextButton` which extends this class, or build you own buttons with content by extending this class.
 
----
+</ai>
 
-## Import
-
-```ts
-import { UIContentButton } from 'bf6-portal-utils/ui/components/content-button';
-```
+> **Note** This component extends `UI.Element`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
+
+<ai>
 
 ## Architecture
 
@@ -37,12 +30,15 @@ The class automatically:
 - Manages padding and size synchronization between all three layers
 - Handles cleanup when deleted
 
+</ai>
+
 ---
+
+<ai>
 
 ## Constructor
 
-The constructor is `protected` and should not be called directly. Concrete implementations should call `super()` with
-appropriate parameters.
+The constructor is `protected` and should not be called directly. Concrete implementations should call `super()` with appropriate parameters.
 
 ```ts
 protected constructor(
@@ -55,9 +51,10 @@ protected constructor(
 **Parameters:**
 
 - `params` – The parameters for the content button, including all `UIButton.Params` plus optional `padding`
-- `createContent` – A factory function that creates the content element given a parent and a prescribed inner width and
-  height
+- `createContent` – A factory function that creates the content element given a parent and a prescribed inner width and height
 - `contentProperties` – An array of property names to delegate from the content element to the instance
+
+</ai>
 
 ---
 
@@ -75,8 +72,7 @@ protected constructor(
 - **Lifecycle**: `delete()`, `deleted`
 - **Parent Management**: `parent`, `setParent()`
 
-For complete documentation of these properties, see the
-[main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
@@ -90,13 +86,11 @@ All button properties are automatically delegated from the internal `UIButton` i
 
 ### Delegated from Content Element
 
-Properties specified in `contentProperties` are automatically delegated from the internal content element. For example,
-`UITextButton` delegates `message`, `textSize`, and `textAnchor` from the internal `UIText` instance.
+Properties specified in `contentProperties` are automatically delegated from the internal content element. For example, `UITextButton` delegates `message`, `textSize`, and `textAnchor` from the internal `UIText` instance.
 
 ### ContentButton-Specific
 
-- **`padding: number`** (getter/setter) – Container padding. The content element's size is automatically adjusted to
-  account for padding.
+- **`padding: number`** (getter/setter) – Container padding. The content element's size is automatically adjusted to account for padding.
 
 - **`setPadding(padding: number): UIContentButton`** – Sets padding and returns `this` for method chaining.
 
@@ -106,14 +100,11 @@ Properties specified in `contentProperties` are automatically delegated from the
 
 ### Overrides
 
-- **`width: number`** (getter/setter) – Setting width also updates the button widget and content element width,
-  accounting for padding.
+- **`width: number`** (getter/setter) – Setting width also updates the button widget and content element width, accounting for padding.
 
-- **`height: number`** (getter/setter) – Setting height also updates the button widget and content element height,
-  accounting for padding.
+- **`height: number`** (getter/setter) – Setting height also updates the button widget and content element height, accounting for padding.
 
-- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and content element size, accounting
-  for padding.
+- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and content element size, accounting for padding.
 
 - **`setSize(params: UI.Size): UIContentButton`** – Sets size for container, button, and content, returns `this`.
 
@@ -142,27 +133,25 @@ To create a custom content button, extend `UIContentButton` and specify:
 3. A factory function to create the content element
 4. Any additional properties or behavior specific to your content type
 
-See [TextButton](../text-button/README.md), [ImageButton](../image-button/README.md),
-[WeaponImageButton](../weapon-image-button/README.md), and [GadgetImageButton](../gadget-image-button/README.md) for
-examples.
+See [TextButton](../text-button/README.md), [ImageButton](../image-button/README.md), [WeaponImageButton](../weapon-image-button/README.md), and [GadgetImageButton](../gadget-image-button/README.md) for examples.
 
 ---
 
+<ai>
+
 ## Usage Notes
 
-- **Padding Handling**: When padding is set, the content element's size is automatically reduced by `padding * 2` (once
-  for each side) to account for the padding space.
+- **Padding Handling**: When padding is set, the content element's size is automatically reduced by `padding * 2` (once for each side) to account for the padding space.
 
-- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (container,
-  button, and content), ensuring they stay in sync.
+- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (container, button, and content), ensuring they stay in sync.
 
-- **Property Delegation**: Properties are delegated using `UI.delegateProperties()`, which creates getters, setters, and
-  setter methods (e.g., `setPropertyName`) for each property.
+- **Property Delegation**: Properties are delegated using `UI.delegateProperties()`, which creates getters, setters, and setter methods (e.g., `setPropertyName`) for each property.
 
-- **Internal Elements**: The internal button and content elements are not exposed as public properties. Access them
-  through the delegated properties instead.
+- **Internal Elements**: The internal button and content elements are not exposed as public properties. Access them through the delegated properties instead.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+
+</ai>
 
 ---
 
@@ -171,5 +160,4 @@ examples.
 - [Main UI Documentation](../../README.md) – For information about the base `UI` namespace and `Element` class
 - [UITextButton Documentation](../text-button/README.md) – For an example implementation
 - [UIButton Documentation](../button/README.md) – For information about button properties
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations
