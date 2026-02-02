@@ -1,7 +1,11 @@
 # UIContainer Component
 
+<ai>
+
 The `UIContainer` component creates a container widget that can hold child elements. Containers are useful for grouping
 UI elements together and managing their layout as a single unit.
+
+</ai>
 
 > **Note** This component extends `UI.Element` and implements `UI.Parent`. For information about the base `UI` namespace
 > functionality, see the [main UI documentation](../../README.md).
@@ -9,6 +13,8 @@ UI elements together and managing their layout as a single unit.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIContainer } from 'bf6-portal-utils/ui/components/container';
@@ -40,6 +46,8 @@ console.log(container.children.length); // 1
 container.delete();
 ```
 
+</ai>
+
 ---
 
 ## Constructor Parameters
@@ -50,7 +58,7 @@ container.delete();
 | `position`               | `UI.Position \| undefined`                 | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                                                           |
 | `width`, `height`        | `number = 0`                               | Size in screen units. Mutually exclusive with `size`.                                                                                                                                              |
 | `size`                   | `UI.Size \| undefined`                     | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                                                             |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`       | See `mod/index.d.ts` for enum values.                                                                                                                                                              |
+| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`       | See `mod` namespace for enum values.                                                                                                                                                               |
 | `parent`                 | `UI.Parent \| undefined`                   | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                                                                        |
 | `visible`                | `boolean = true`                           | Initial visibility.                                                                                                                                                                                |
 | `bgColor`                | `mod.Vector = UI.COLORS.WHITE`             | Background color.                                                                                                                                                                                  |
@@ -93,10 +101,13 @@ For complete documentation of these properties, see the
 
 ## Type Definitions
 
+<ai>
+
 ### `UIContainer.ChildParams<T extends UI.ElementParams>`
 
 Generic type for child element parameters in `childrenParams`. The type parameter must extend `ElementParams`. The
-`type` property must be set to the class constructor.
+`type` property must be set to the class constructor. This generic type enables developers to create custom UI elements
+(like checkboxes, dropdowns, clocks, progress bars, etc.) that integrate seamlessly with the existing UI system.
 
 ```ts
 type ChildParams<T extends UI.ElementParams> = T & {
@@ -121,6 +132,8 @@ const container = new UIContainer({
 });
 ```
 
+</ai>
+
 ### `UIContainer.Params`
 
 ```ts
@@ -131,24 +144,10 @@ type Params = UI.ElementParams & {
 
 ---
 
-## Usage Notes
-
-- **Parent-Child Relationships**: When you create child elements via `childrenParams`, they automatically receive the
-  container as their parent. The container's `children` array is automatically maintained.
-
-- **Recursive Deletion**: Calling `delete()` on a container recursively deletes all child elements before deleting the
-  container itself.
-
-- **Children Storage**: Children are stored internally as a `Set<Element>` but exposed as an array via the `children`
-  getter.
-
-- **Receiver Inheritance**: Child elements automatically inherit the container's receiver unless explicitly specified in
-  their constructor parameters.
-
----
-
 ## Further Reference
 
-- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace and `Element` class
+- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace, `Element` class, and
+  [element behavior conventions](../../README.md#element-behavior-conventions) (parent-child relationships, recursive
+  deletion, receiver inheritance, etc.)
 - [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
   declarations

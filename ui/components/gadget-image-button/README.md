@@ -1,8 +1,12 @@
 # UIGadgetImageButton Component
 
+<ai>
+
 The `UIGadgetImageButton` component creates a button with an integrated gadget image. It combines `UIButton` and
 `UIGadgetImage` functionality into a single element, wrapping both in a container and delegating properties
 appropriately.
+
+</ai>
 
 > **Note** This component extends `UIContentButton<UIGadgetImage>`. For information about the base `UI` namespace
 > functionality, see the [main UI documentation](../../README.md).
@@ -10,6 +14,8 @@ appropriately.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIGadgetImageButton } from 'bf6-portal-utils/ui/components/gadget-image-button';
@@ -28,18 +34,14 @@ const button = new UIGadgetImageButton({
 
 // Update button properties
 button.setEnabled(false).setBaseColor(UI.COLORS.BLUE);
-```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
-
+// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
     UI.handleButtonEvent(player, widget, event);
 }
 ```
+
+</ai>
 
 ---
 

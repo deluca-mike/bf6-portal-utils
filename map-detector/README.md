@@ -1,8 +1,12 @@
 # Map Detector Module
 
+<ai>
+
 This TypeScript `MapDetector` class enables Battlefield Portal experience developers to detect the current map by
 analyzing the coordinates of Team 1's Headquarters (HQ). This utility is necessary because `mod.IsCurrentMap` from the
 official Battlefield Portal API is currently broken and unreliable.
+
+</ai>
 
 The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and
 uses these coordinates to identify which map is currently active. The module uses the `Logging` module for internal
@@ -33,6 +37,8 @@ logging, allowing you to monitor map detection behavior and debug issues.
 3. Access the current map using any of the provided getters or methods.
 4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -72,6 +78,8 @@ export async function OnGameModeStarted(): Promise<void> {
 }
 ```
 
+</ai>
+
 ---
 
 ## API Reference
@@ -109,6 +117,8 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | `isCurrentNativeMap(map: mod.Maps): boolean`                                                                   | Returns `true` if the current map matches the given `mod.Maps` enum value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ---
+
+<ai>
 
 ## Supported Maps
 
@@ -155,6 +165,8 @@ preferably, for all maps).
 The detector identifies maps primarily by the X-coordinate of Team 1's HQ, with Y-coordinate used for disambiguation in
 two cases (Mirak Valley vs New Sobek City). If custom spatial data or modifications have moved the HQ from its default
 position, detection will fail and all getters will return `undefined`.
+
+</ai>
 
 ---
 

@@ -1,5 +1,7 @@
 # Multi-Click Detector Module
 
+<ai>
+
 This TypeScript `MultiClickDetector` class enables Battlefield Portal experience developers to detect when a player has
 rapidly triggered a soldier state multiple times in quick succession. The detector can monitor any soldier state boolean
 from `mod.SoldierStateBool`, allowing you to detect multi-click sequences for various player actions.
@@ -13,6 +15,8 @@ By default, the detector monitors `mod.SoldierStateBool.IsInteracting`, which is
 the interact state goes `true` for 1 tick even when there is no object that can be interacted with nearby. This makes it
 ideal for detecting multi-click sequences without requiring physical interaction points, and is useful because there is
 no keybind Portal experience developers can hook into to open up a custom UI.
+
+</ai>
 
 Key features include instance-based construction with per-instance configuration, automatic error handling that prevents
 callback failures from crashing your mod, and configurable logging for debugging detector behavior. The module uses the
@@ -45,6 +49,8 @@ callback failures from crashing your mod, and configurable logging for debugging
 5. Optionally set up logging for debugging (recommended during development).
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -84,6 +90,8 @@ export async function OnPlayerLeaveGame(player: mod.Player): Promise<void> {
     MultiClickDetector.pruneInvalidPlayers();
 }
 ```
+
+</ai>
 
 ---
 
@@ -227,6 +235,8 @@ The `MultiClickDetector` uses edge detection and time-windowed counting to detec
 
 ---
 
+<ai>
+
 ## Usage Patterns
 
 - **Basic Detection** – Create a detector instance for a player with a callback. The callback is triggered when the
@@ -245,6 +255,10 @@ The `MultiClickDetector` uses edge detection and time-windowed counting to detec
 
 - **Error Logging** – Configure logging using `setLogging()` to monitor callback errors and debug detector behavior
   during development.
+
+</ai>
+
+<ai>
 
 ### Example: Multiple Detectors per Player
 
@@ -299,7 +313,11 @@ export async function OnPlayerLeaveGame(eventNumber: number): Promise<void> {
 }
 ```
 
+</ai>
+
 ---
+
+<ai>
 
 ## Choosing a Soldier State
 
@@ -337,6 +355,8 @@ that doesn't affect the player's character visually or mechanically.
 **Use case:** Consider these if you need more than one multi-click detection (and you've already used the
 `IsInteracting` state), or if you are comfortable forcing players to physically jitter a bit, but not have to change
 their `Interact` keybind set to `Tap`.
+
+</ai>
 
 ### Not Recommended: Other Soldier States
 
@@ -379,10 +399,14 @@ are difficult, if not impossible or impractical, to toggle in quick succession:
     - Errors or rejections from async callbacks are automatically caught and logged (if logging is configured)
     - If you need to await async operations, handle that inside your callback
 
+<ai>
+
 - **Memory Considerations** – You should not hold onto the detector reference returned form the `new MultiClickDetector`
   call unless you expressly plan on destroying it later with `destroy()` and discarding the reference. It is recommended
   to call `MultiClickDetector.pruneInvalidPlayers()` in the `OnPlayerLeaveGame` event handler. Following this advice
   will avoid memory leaks and will prevent callback references from being retained in memory.
+
+</ai>
 
 ---
 

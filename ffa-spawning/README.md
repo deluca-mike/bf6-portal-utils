@@ -1,5 +1,7 @@
 # FFA Spawning Module
 
+<ai>
+
 This TypeScript `FFASpawning.Soldier` class enables Free For All (FFA) spawning for custom Battlefield Portal
 experiences by short-circuiting the normal deploy process in favor of a custom UI prompt. The system asks players if
 they would like to spawn now or be asked again after a delay, allowing players to adjust their loadout and settings at
@@ -7,6 +9,8 @@ the deploy screen without being locked out.
 
 The spawning system uses an intelligent algorithm to find safe spawn points that are appropriately distanced from other
 players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times.
+
+</ai>
 
 > **Note** The `FFASpawning` namespace depends on the `UI` namespace (which is also maintained in this repository) and
 > the `mod` namespace (available in the `bf6-portal-mod-types` package). Internally, it uses `Timers` for cancellable
@@ -19,7 +23,7 @@ players, reducing the chance of spawning directly into combat while maintaining 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
 2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
    mod. The bundler automatically handles code inlining and strings.json merging.
-3. **Button handler** – Register `UI.handleButtonClick` in your `OnPlayerUIButtonEvent` event handler.
+3. **Button handler** – Register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler.
 
 ---
 
@@ -40,6 +44,8 @@ players, reducing the chance of spawning directly into combat while maintaining 
    prompt flow.
 8. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code and merge all `strings.json` files).
+
+<ai>
 
 ### Example
 
@@ -95,9 +101,11 @@ export async function OnPlayerUIButtonEvent(
     event: mod.UIButtonEvent
 ): Promise<void> {
     // Required: Handle button clicks for the spawn UI
-    await UI.handleButtonClick(player, widget, event);
+    await UI.handleButtonEvent(player, widget, event);
 }
 ```
+
+</ai>
 
 Then build your mod using the bundler (see [bf6-portal-bundler](https://www.npmjs.com/package/bf6-portal-bundler)).
 
@@ -151,6 +159,8 @@ players.
 
 ---
 
+<ai>
+
 ## Debugging & Development Tools
 
 ### Debug Position Display
@@ -180,6 +190,8 @@ export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
     soldier.startDelayForPrompt();
 }
 ```
+
+</ai>
 
 ---
 
@@ -342,6 +354,8 @@ type InitializeOptions = {
 
 ## Event Wiring & Lifecycle
 
+<ai>
+
 ### Required Event Handlers
 
 1. **`OnGameModeStarted()`** – Call `FFASpawning.Soldier.initialize()` with your spawn points and
@@ -350,7 +364,9 @@ type InitializeOptions = {
 3. **`OnPlayerJoinGame()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to begin the spawn flow for new players.
 4. **`OnPlayerUndeploy()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to restart the spawn flow when players
    die or undeploy.
-5. **`OnPlayerUIButtonEvent()`** – Register `UI.handleButtonClick()` to handle button presses from the spawn UI.
+5. **`OnPlayerUIButtonEvent()`** – Register `UI.handleButtonEvent()` to handle button presses from the spawn UI.
+
+</ai>
 
 ### Lifecycle Flow
 
@@ -372,6 +388,8 @@ your mod.
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top
@@ -384,6 +402,8 @@ your mod.
   unless you know what you are doing).
 - **Spawn Point Cleanup** – Spawn points created during initialization are not automatically cleaned up. This is
   typically fine as they persist for the duration of the match.
+
+</ai>
 
 ---
 

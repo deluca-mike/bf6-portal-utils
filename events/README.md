@@ -1,10 +1,14 @@
 # Events Module
 
+<ai>
+
 This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience
 developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only
 be implemented and exported once per entire project. This module implements all event handlers once, automatically
 hooking into every Battlefield Portal event, and exposes subscription APIs that allow you to subscribe and unsubscribe
 to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
+
+</ai>
 
 You can use **two styles of API**:
 
@@ -26,6 +30,8 @@ non-blocking, ensuring optimal performance.
 
 ---
 
+<ai>
+
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
@@ -33,6 +39,8 @@ non-blocking, ensuring optimal performance.
    mod. The bundler automatically handles code inlining.
 3. **No duplicate event handlers** – Do not implement or export any Battlefield Portal event handler functions in your
    codebase. This module handles all event hooking automatically.
+
+</ai>
 
 ---
 
@@ -51,6 +59,8 @@ non-blocking, ensuring optimal performance.
    `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (object style).
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -99,6 +109,8 @@ Events.OnGameModeEnding.subscribe(() => {
     unsubscribeOngoing();
 });
 ```
+
+</ai>
 
 ---
 
@@ -160,8 +172,10 @@ synchronous or asynchronous. Returns a function that can be called to unsubscrib
 
 **Examples:**
 
+<ai>
+
 ```ts
-// Channel style
+// Channel style (preferred)
 const joinGameUnsubscribe = Events.OnPlayerJoinGame.subscribe((player: mod.Player) => {
     console.log(`Player joined game: ${mod.GetObjId(player)}`);
 });
@@ -175,6 +189,8 @@ const playerDeployedUnsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed,
 // Later, unsubscribe
 playerDeployedUnsubscribe();
 ```
+
+</ai>
 
 #### Unsubscribe
 
@@ -194,10 +210,12 @@ Unsubscribes a handler function from an event. The handler must be the same func
 
 **Examples:**
 
+<ai>
+
 ```ts
 const handler = (player: mod.Player) => console.log(`Player deployed: ${mod.GetObjId(player)}`);
 
-// Channel style
+// Channel style (preferred)
 Events.OnPlayerDeployed.subscribe(handler);
 // Later...
 Events.OnPlayerDeployed.unsubscribe(handler);
@@ -207,6 +225,10 @@ Events.subscribe(Events.Type.OnPlayerDeployed, handler);
 // Later...
 Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
 ```
+
+</ai>
+
+<ai>
 
 #### Trigger
 
@@ -229,12 +251,14 @@ events are automatically triggered by the Battlefield Portal runtime when the co
 ```ts
 const testPlayer = mod.ValueInArray(mod.AllPlayers(), 0) as mod.Player;
 
-// Channel style
+// Channel style (preferred)
 Events.OnPlayerDeployed.trigger(testPlayer);
 
 // Object style
 Events.trigger(Events.Type.OnPlayerDeployed, testPlayer);
 ```
+
+</ai>
 
 #### Handler Count
 
@@ -254,8 +278,10 @@ were cleaned up) or conditional logic.
 
 **Examples:**
 
+<ai>
+
 ```ts
-// Channel style
+// Channel style (preferred)
 Events.OnPlayerDeployed.subscribe(someHandler);
 Events.OnPlayerDeployed.handlerCount(); // 1
 
@@ -263,6 +289,10 @@ Events.OnPlayerDeployed.handlerCount(); // 1
 Events.subscribe(Events.Type.OnPlayerDeployed, someOtherHandler);
 Events.handlerCount(Events.Type.OnPlayerDeployed); // 2
 ```
+
+</ai>
+
+<ai>
 
 #### `Events.Type`
 
@@ -284,6 +314,10 @@ type OnPlayerDiedPayload = Parameters<typeof Events.Type.OnPlayerDied>;
 // Call a trigger by name (mostly for debugging or testing).
 Events.Type.OnPlayerDeployed(somePlayer);
 ```
+
+</ai>
+
+<ai>
 
 Available event types include:
 
@@ -308,6 +342,8 @@ Available event types include:
 - `OnSpawnerSpawned`
 - `OnTimeLimitReached`
 - `OnVehicleDestroyed`, `OnVehicleSpawned`
+
+</ai>
 
 #### `Events.LogLevel`
 
@@ -338,6 +374,8 @@ using the configured logger. This allows you to monitor and debug handler failur
 
 **Example:**
 
+<ai>
+
 ```ts
 import { Events } from 'bf6-portal-utils/events';
 
@@ -355,11 +393,15 @@ Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
 });
 ```
 
+</ai>
+
 **Note:** Error logging is automatic and fail-safe. Handler errors are caught and logged without affecting other
 handlers or the event system. For more information on the logging functionality, see the
 [`Logging` module documentation](../logging/README.md).
 
 ---
+
+<ai>
 
 ## Usage Patterns
 
@@ -546,6 +588,8 @@ This example demonstrates:
 - **Clean separation of concerns** – Stats tracking, logging, and UI updates are handled in separate files but all
   respond to the same game events.
 
+</ai>
+
 ---
 
 ## How It Works
@@ -578,6 +622,8 @@ The `Events` module uses a centralized subscription system:
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Single Event Hook Requirement** – You must not implement or export any Battlefield Portal event handler functions in
@@ -595,6 +641,8 @@ The `Events` module uses a centralized subscription system:
 
 - **Non-Blocking Nature** – Because handlers execute asynchronously and non-blocking, you cannot rely on handlers
   completing before other code executes. Use promises or callbacks if you need to wait for handler completion.
+
+</ai>
 
 ---
 

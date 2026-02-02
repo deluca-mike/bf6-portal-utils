@@ -1,5 +1,7 @@
 # Logger Module
 
+<ai>
+
 This TypeScript `Logger` class removes the biggest Battlefield Portal debugging pain point: until now you could only
 display strings that were pre-uploaded to the Experience website via a `strings.json` file, and displaying concatenated
 string with more than 3 parts was tricky, if not impossible. Further, `console.log` is only available for PC users, with
@@ -10,6 +12,8 @@ console builds.
 - **Dynamic mode** behaves like a scrolling console, always appending at the bottom and pushing older rows upward.
 - **Static mode** lets you target a specific row index (e.g., keep player position on row 10 while other diagnostics
   fill lines 0‑9).
+
+</ai>
 
 > **Note** The `Logger` depends on the shared `UI` helper (containers, text widgets, etc.) which is also maintained in
 > this repository. Keep that namespace/class above the logger in your mod file. All Battlefield Portal types referenced
@@ -45,6 +49,8 @@ console builds.
 
 ---
 
+<ai>
+
 ## Usage Patterns
 
 - **Static dashboards** – Pin persistent diagnostics (positions, squad metadata, timers) to precise rows.
@@ -56,6 +62,10 @@ console builds.
   Long text can result in many 3-character Text UI Widgets, and in dynamic mode, moving all existing rows upward
   requires many UI operations. By using `logAsync()` without `await`, the logging operation becomes non-blocking by
   being sent to the microtask queue, preventing frame drops or execution delays.
+
+</ai>
+
+<ai>
 
 ### Example
 
@@ -100,6 +110,8 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     }
 }
 ```
+
+</ai>
 
 ---
 

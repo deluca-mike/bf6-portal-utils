@@ -1,5 +1,7 @@
 # UIContentButton Component
 
+<ai>
+
 The `UIContentButton` is an abstract base class for buttons that contain content elements (such as text or images). It
 handles the common pattern of wrapping a `UIButton` and a content element in a `UIContainer`, managing their layout, and
 delegating properties appropriately. It is need because natively (via the `mod` namespace UI widget system) only
@@ -8,18 +10,14 @@ containers can be parents and have children.
 This class is not meant to be instantiated directly. Instead, use concrete implementations like `UITextButton` which
 extends this class, or build you own buttons with content by extending this class.
 
+</ai>
+
 > **Note** This component extends `UI.Element`. For information about the base `UI` namespace functionality, see the
 > [main UI documentation](../../README.md).
 
 ---
 
-## Import
-
-```ts
-import { UIContentButton } from 'bf6-portal-utils/ui/components/content-button';
-```
-
----
+<ai>
 
 ## Architecture
 
@@ -37,7 +35,11 @@ The class automatically:
 - Manages padding and size synchronization between all three layers
 - Handles cleanup when deleted
 
+</ai>
+
 ---
+
+<ai>
 
 ## Constructor
 
@@ -58,6 +60,8 @@ protected constructor(
 - `createContent` – A factory function that creates the content element given a parent and a prescribed inner width and
   height
 - `contentProperties` – An array of property names to delegate from the content element to the instance
+
+</ai>
 
 ---
 
@@ -148,6 +152,8 @@ examples.
 
 ---
 
+<ai>
+
 ## Usage Notes
 
 - **Padding Handling**: When padding is set, the content element's size is automatically reduced by `padding * 2` (once
@@ -163,6 +169,8 @@ examples.
   through the delegated properties instead.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+
+</ai>
 
 ---
 

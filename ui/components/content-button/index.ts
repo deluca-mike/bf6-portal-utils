@@ -1,8 +1,9 @@
 import { UI } from '../../index.ts';
 import { UIButton } from '../button/index.ts';
 
+// version: 6.0.1
+
 /**
- * version: 6.0.1
  * Base class for buttons that contain content elements (Text, Image, etc.).
  * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)

@@ -1,8 +1,12 @@
 # UIImageButton Component
 
+<ai>
+
 The `UIImageButton` component creates a button with an integrated image. It combines `UIButton` and `UIImage`
 functionality into a single element, wrapping both in a container and delegating properties appropriately. The image
 automatically updates its appearance when the button is enabled or disabled.
+
+</ai>
 
 > **Note** This component extends `UIContentButton<UIImage>`. For information about the base `UI` namespace
 > functionality, see the [main UI documentation](../../README.md).
@@ -10,6 +14,8 @@ automatically updates its appearance when the button is enabled or disabled.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIImageButton } from 'bf6-portal-utils/ui/components/image-button';
@@ -29,18 +35,14 @@ const button = new UIImageButton({
 
 // Update button and image properties
 button.setImageType(mod.UIImageType.CrownSolid).setImageColor(UI.COLORS.BLUE).setEnabled(false);
-```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
-
+// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
     UI.handleButtonEvent(player, widget, event);
 }
 ```
+
+</ai>
 
 ---
 

@@ -1,7 +1,11 @@
 # UIImage Component
 
+<ai>
+
 The `UIImage` component creates a widget that displays an image. Images are useful for displaying icons, graphics, or
 other visual elements in the UI.
+
+</ai>
 
 > **Note** This component extends `UI.Element`. For information about the base `UI` namespace functionality, see the
 > [main UI documentation](../../README.md).
@@ -9,6 +13,8 @@ other visual elements in the UI.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIImage } from 'bf6-portal-utils/ui/components/image';
@@ -28,6 +34,8 @@ const image = new UIImage({
 image.setImageType(mod.UIImageType.Icon).setImageColor(UI.COLORS.BLUE).setImageAlpha(0.8);
 ```
 
+</ai>
+
 ---
 
 ## Constructor Parameters
@@ -38,7 +46,7 @@ image.setImageType(mod.UIImageType.Icon).setImageColor(UI.COLORS.BLUE).setImageA
 | `position`               | `UI.Position \| undefined`              | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                  |
 | `width`, `height`        | `number = 0`                            | Size in screen units. Mutually exclusive with `size`.                                                                                                     |
 | `size`                   | `UI.Size \| undefined`                  | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                    |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`    | See `mod/index.d.ts` for enum values.                                                                                                                     |
+| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`    | See `mod` namespace for enum values.                                                                                                                      |
 | `parent`                 | `UI.Parent \| undefined`                | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                               |
 | `visible`                | `boolean = true`                        | Initial visibility.                                                                                                                                       |
 | `bgColor`                | `mod.Vector = UI.COLORS.WHITE`          | Background color.                                                                                                                                         |
@@ -102,8 +110,8 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
-- **Image Types**: The `imageType` parameter determines what image is displayed. See `mod/index.d.ts` for available
-  image types.
+- **Image Types**: The `imageType` parameter determines what image is displayed. See `mod` namespace for available image
+  types.
 
 - **Color Tinting**: The `imageColor` property applies a color tint to the image. Use `UI.COLORS.WHITE` for no tinting,
   or other colors to tint the image.

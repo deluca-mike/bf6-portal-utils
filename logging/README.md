@@ -1,5 +1,7 @@
 # Logging Module
 
+<ai>
+
 This TypeScript `Logging` class provides a fail-safe logging abstraction for Battlefield Portal experience developers.
 It abstracts away the logic to log text and errors to an arbitrary logging method in a fail-safe way, with configurable
 log level filtering. The class can be used directly within a BF6 Portal experience or can be used within other modules
@@ -8,6 +10,8 @@ to provide consistent, safe logging functionality.
 Key features include fail-safe error handling that prevents logging failures from crashing your mod, configurable log
 level filtering to control verbosity, optional error message inclusion, support for both synchronous and asynchronous
 logger functions, and automatic error-to-string conversion that safely handles any error type.
+
+</ai>
 
 > **Note** The `Logging` class is self-contained and requires no additional modules or setup. All Battlefield Portal
 > types referenced below come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
@@ -34,6 +38,8 @@ logger functions, and automatic error-to-string conversion that safely handles a
 5. Use `log()` to write log messages with optional log levels and error information.
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example: Direct Usage in Portal Experience
 
@@ -103,6 +109,8 @@ export namespace MyModule {
 // MyModule.setLogging((text) => console.log(text), MyModule.LogLevel.Info);
 ```
 
+</ai>
+
 ---
 
 ## Core Concepts
@@ -158,6 +166,8 @@ Log levels are compared numerically, so `Error` (3) > `Warning` (2) > `Info` (1)
 if their log level is greater than or equal to the configured minimum log level.
 
 ---
+
+<ai>
 
 ## Usage Patterns
 
@@ -264,6 +274,8 @@ export async function OnGameModeStarted(): Promise<void> {
 }
 ```
 
+</ai>
+
 ---
 
 ## How It Works
@@ -294,15 +306,20 @@ The `Logging` class implements fail-safe logging with the following mechanisms:
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Error String Conversion Limitations** – While the class safely converts errors to strings, complex error objects may
   lose information in the conversion process. Only the error message (for `Error` instances) or the result of `String()`
-  conversion is preserved.
+  conversion is preserved. Also, while a logger like `console.log` can easily accept complex and log error objects or
+  strings, other UI loggers (like the `Logger` module) may not, so consider `includeError = false` unless necessary.
 
 - **Async Logger Timing** – If a logger function returns a `Promise`, the `log()` method does not await it. The promise
   is handled in a fire-and-forget manner to prevent blocking. This means you cannot rely on the log operation completing
   before your code continues.
+
+</ai>
 
 ---
 

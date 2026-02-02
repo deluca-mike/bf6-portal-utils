@@ -1,9 +1,13 @@
 # Sounds Module
 
+<ai>
+
 This TypeScript `Sounds` class abstracts away and handles the nuance, oddities, and pitfalls that come with playing
 sounds at runtime in Battlefield Portal experiences. The module provides efficient sound object management through
 automatic pooling and reuse, handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D
 positional), manages sound durations automatically, and provides manual control when needed.
+
+</ai>
 
 Key features include automatic sound object reuse to minimize spawn overhead, intelligent availability tracking to
 prevent sound conflicts, automatic stopping after specified durations, and support for infinite-duration sounds (e.g.,
@@ -36,6 +40,8 @@ looping assets).
 4. Call `Sounds.play2D()` or `Sounds.play3D()` to play sounds as needed.
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -114,6 +120,8 @@ export async function OnPlayerDied(
     });
 }
 ```
+
+</ai>
 
 ---
 
@@ -315,6 +323,8 @@ The `Sounds` class uses a pooling and reuse system to efficiently manage sound p
   playing many long-duration sounds simultaneously, you may see gradual growth in the number of sound objects. See
   Future Work for planned improvements.
 
+<ai>
+
 - **Infinite Duration Objects** – Sound objects with infinite duration (`duration: 0`) remain in the `active` set until
   manually stopped. **Important:** For infinite-duration sounds, you must keep a reference to the returned stop function
   so you can call it when needed. Without this reference, the sound will play indefinitely (whether or not it's actually
@@ -324,6 +334,8 @@ The `Sounds` class uses a pooling and reuse system to efficiently manage sound p
 
 - **Concurrent Playback** – The system allows multiple instances of sounds to play simultaneously for a given location
   or target. If you need to prevent overlapping sounds, you'll need to implement that logic yourself.
+
+</ai>
 
 ---
 

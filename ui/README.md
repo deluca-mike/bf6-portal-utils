@@ -1,8 +1,12 @@
 # UI Module
 
+<ai>
+
 This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing
-strongly typed helpers, convenient defaults, and ergonomic getters/setters for building complex HUDs, panels, and
-interactive buttons.
+strongly typed helpers, convenient defaults, ergonomic getters/setters, and automatic management of various UI mechanics
+for building complex HUDs, panels, and interactive buttons.
+
+</ai>
 
 > **Note** The `UI` namespace depends on the `mod` namespace (available in the `bf6-portal-mod-types` package). All
 > types referenced below (`mod.UIWidget`, `mod.Vector`, `mod.UIAnchor`, etc.) are documented in that package.
@@ -33,6 +37,8 @@ interactive buttons.
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
 
+<ai>
+
 ### Example
 
 ```ts
@@ -44,11 +50,13 @@ let testMenu: UIContainer | undefined;
 
 export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     if (!testMenu) {
+        // Can include children upon construction of the container.
         testMenu = new UIContainer({
             position: { x: 0, y: 0 },
             size: { width: 200, height: 300 },
             anchor: mod.UIAnchor.Center,
             receiver: eventPlayer,
+            visible: true,
             uiInputModeWhenVisible: true,
             childrenParams: [
                 {
@@ -79,32 +87,27 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     textSize: 36,
                     textColor: UI.COLORS.WHITE,
                 } as UIContainer.ChildParams<UITextButton.Params>,
-                {
-                    type: UITextButton,
-                    position: { x: 0, y: 0 },
-                    size: { width: 50, height: 50 },
-                    anchor: mod.UIAnchor.BottomCenter,
-                    bgColor: UI.COLORS.GREY_25,
-                    baseColor: UI.COLORS.BLACK,
-                    onClick: async (player: mod.Player): Promise<void> => {
-                        testMenu?.hide();
-                    },
-                    message: mod.Message(mod.stringkeys.ui.buttons.close),
-                    textSize: 36,
-                    textColor: UI.COLORS.WHITE,
-                } as UIContainer.ChildParams<UITextButton.Params>,
             ],
-            visible: true,
+        });
+
+        // And even add a child to the container.
+        new UITextButton({
+            parent: testMenu,
+            position: { x: 0, y: 0 },
+            size: { width: 50, height: 50 },
+            anchor: mod.UIAnchor.BottomCenter,
+            bgColor: UI.COLORS.GREY_25,
+            baseColor: UI.COLORS.BLACK,
+            onClick: async (player: mod.Player): Promise<void> => {
+                testMenu?.hide();
+            },
+            message: mod.Message(mod.stringkeys.ui.buttons.close),
+            textSize: 36,
+            textColor: UI.COLORS.WHITE,
         });
     }
 
-    while (true) {
-        await mod.Wait(0.5);
-
-        if (!mod.GetSoldierState(eventPlayer, mod.SoldierStateBool.IsReloading)) continue;
-
-        testMenu?.show();
-    }
+    testMenu?.show();
 }
 
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
@@ -188,6 +191,8 @@ text.delete();
 console.log(container2.children.length); // 0 (automatically removed)
 ```
 
+</ai>
+
 ---
 
 ## Core Concepts
@@ -232,15 +237,43 @@ console.log(container2.children.length); // 0 (automatically removed)
 - **Position and Size parameters** – Constructor parameters support either `x`/`y` or `position` (mutually exclusive),
   and either `width`/`height` or `size` (mutually exclusive). All elements expose `x`, `y`, `width`, `height`,
   `position`, and `size` as properties with getters/setters.
-- **ChildParams type** – The `ChildParams<T extends ElementParams>` type allows you to specify child elements in
-  `childrenParams` by passing the class constructor as the `type` property. This enables type-safe child definitions and
-  paves the way for custom UI elements. The type parameter must extend `ElementParams`.
 - **Padding** – Despite padding being a common parameter for the underlying `mod` namespace UI widgets, it is not a
   property of the base `Element` class because it is not available for all UI widgets, and the width of contained
   contents (i.e. text or elements in a container) do not have their heights and widths automatically adjusted to
   compensate for their parent's padding. Since users need to manage positions and sizes themselves to compensate for
   padding, it is a current design decision to omit padding as a base property. It will be reintroduced later when this
   library supports automatic sizing and relative widths (i.e. percentages of their parent).
+
+<ai>
+
+### Custom UI Elements
+
+Custom elements (like checkboxes, dropdowns, clocks, progress bars, etc.) can be built by extending the `Element` class
+and accepting a `params` object that extends the `ElementParams` interface as the sole argument to their constructor.
+They can use the protected `_logging` member to log messages within the UI namespace, and should use `_isDeletedCheck()`
+to protect setter operations from being called on deleted elements. Custom button-like components should implement the
+`Button` interface and register themselves using `UI.registerButton()` during construction.
+
+### Element Behavior Conventions
+
+The following behaviors apply to the built-in UI elements in this repository. Custom elements that extend `Element`
+should ideally implement these conventions for consistency, but doing so is not guaranteed. Custom implementations may
+differ, and edge cases may exist.
+
+- **Parent-Child Relationships**: When you create child elements via `childrenParams` (on containers), they
+  automatically receive the container as their parent. When you instantiate a child element with a parent, it's
+  automatically added to the parent's `children` array. The parent's `children` array is automatically maintained.
+
+- **Recursive Deletion**: Calling `delete()` on a container recursively deletes all child elements before deleting the
+  container itself.
+
+- **Children Storage**: Children are stored internally as a `Set<Element>` but exposed as an array via the `children`
+  getter.
+
+- **Receiver Inheritance**: Child elements automatically inherit their parent's receiver unless explicitly specified in
+  their constructor parameters.
+
+</ai>
 
 ---
 
@@ -294,6 +327,7 @@ UI.setLogging(
 const container = new UIContainer({
     /* ... */
 });
+
 container.delete();
 container.visible = true; // Logs: <UI> Element [name] already deleted. (Warning)
 ```
@@ -391,6 +425,8 @@ getter/setter pairs and method chaining support. All property values are stored 
   children list. Sets the `deleted` flag to `true` and blocks all future setter operations. Does not return `this`
   (element is destroyed and no other calls on it should be performed).
 
+<ai>
+
 **Method Chaining Example:**
 
 All properties support both normal setter syntax and method chaining:
@@ -416,6 +452,8 @@ container
     .setAnchor(mod.UIAnchor.TopLeft)
     .show();
 ```
+
+</ai>
 
 ### `UI.registerButton(name: string, button: Button): () => void`
 
@@ -555,11 +593,16 @@ type ElementParams = BaseParams & EitherPosition & EitherSize;
 
 ---
 
+<ai>
+
 ## UI Input Mode Management
 
-The `uiInputModeWhenVisible` property provides automatic management of UI input mode, eliminating the need to manually
-call `mod.EnableUIInputMode` in most cases. When enabled on an element, the UI module automatically handles enabling and
-disabling UI input mode based on the element's visibility state.
+The `uiInputModeWhenVisible` property provides automatic management of UI input mode (which is what allows a player to
+click on UI buttons), eliminating the need to manually call `mod.EnableUIInputMode` in most cases. When enabled on an
+element, the UI module automatically handles enabling and disabling UI input mode based on the element's visibility
+state.
+
+</ai>
 
 ### How It Works
 
@@ -584,6 +627,8 @@ disabling UI input mode based on the element's visibility state.
 3. **Multiple elements support**: Multiple interactive elements can safely share the same receiver—UI input mode stays
    enabled as long as any element is visible.
 4. **Automatic cleanup**: When elements are deleted, their requests are automatically released.
+
+<ai>
 
 ### Usage Example
 
@@ -621,14 +666,20 @@ const menu = new UIContainer({
 
 // Simply show/hide the menu—UI input mode is managed automatically
 menu.show(); // UI input mode is enabled for the player
+
 // ... user interacts with buttons ...
 menu.hide(); // UI input mode is disabled for the player (when no other requesters exist)
 
 // You can also enable/disable the feature dynamically
 menu.uiInputModeWhenVisible = false; // Disable automatic management
+
 // ... later ...
 menu.uiInputModeWhenVisible = true; // Re-enable automatic management
 ```
+
+</ai>
+
+<ai>
 
 ### When to Use
 
@@ -650,7 +701,11 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
   as you do not have any elements with `uiInputModeWhenVisible` enabled.
 - Elements inherit their receiver from their parent, so UI input mode management respects the receiver hierarchy.
 
+</ai>
+
 ---
+
+<ai>
 
 ## Event Wiring & Lifecycle
 
@@ -678,6 +733,8 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
   all setter operations are blocked using `_isDeletedCheck()`. Attempts to modify deleted elements will log a warning
   and return early without performing the operation.
 
+</ai>
+
 ---
 
 ## Future Work
@@ -689,17 +746,6 @@ The following features are planned for upcoming releases:
 Since padding is currently not supported since the user is still forced to compensate text and child sizing to take into
 account parent padding, an upcoming feature will support relative sizing (i.e. "50%" of parent) and automatic padding
 compensation.
-
-### Custom UI Elements
-
-The `ChildParams<T>` type and `Parent` interface architecture enables developers to create custom UI elements (like
-checkboxes, dropdowns, clocks, progress bars, etc.) that integrate seamlessly with the existing UI system. Custom
-elements must extend `Element` and can be used in `childrenParams` by passing the class constructor as the `type`
-property.
-
-Custom elements can use the protected `_logging` member to log messages within the UI namespace, and should use
-`_isDeletedCheck()` to protect setter operations from being called on deleted elements. Custom button-like components
-should implement the `Button` interface and register themselves using `UI.registerButton()` during construction.
 
 ### Auto-Rename UI Widgets
 

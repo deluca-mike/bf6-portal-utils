@@ -1,7 +1,11 @@
 # UIWeaponImage Component
 
+<ai>
+
 The `UIWeaponImage` component creates a widget that displays an image of a weapon. Weapon images are useful for
 displaying weapon icons in the UI, such as in weapon selection menus or loadout screens.
+
+</ai>
 
 > **Note** This component extends `UI.Element`. For information about the base `UI` namespace functionality, see the
 > [main UI documentation](../../README.md).
@@ -9,6 +13,8 @@ displaying weapon icons in the UI, such as in weapon selection menus or loadout 
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIWeaponImage } from 'bf6-portal-utils/ui/components/weapon-image';
@@ -29,6 +35,8 @@ const weaponImage = new UIWeaponImage({
 });
 ```
 
+</ai>
+
 ---
 
 ## Constructor Parameters
@@ -39,7 +47,7 @@ const weaponImage = new UIWeaponImage({
 | `position`               | `UI.Position \| undefined`                         | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                  |
 | `width`, `height`        | `number = 0`                                       | Size in screen units. Mutually exclusive with `size`.                                                                                                     |
 | `size`                   | `UI.Size \| undefined`                             | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                    |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`               | See `mod/index.d.ts` for enum values.                                                                                                                     |
+| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`               | See `mod` namespace for enum values.                                                                                                                      |
 | `parent`                 | `UI.Parent \| undefined`                           | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                               |
 | `visible`                | `boolean = true`                                   | Initial visibility. Note: The underlying Portal API lacks the ability to define starting invisibility, so visibility is set manually after construction.  |
 | `depth`                  | `mod.UIDepth = mod.UIDepth.AboveGameUI`            | Z-order.                                                                                                                                                  |

@@ -1,5 +1,7 @@
 # SolidUI Module
 
+<ai>
+
 This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlefield Portal, inspired by
 [SolidJS](https://github.com/solidjs/solid). Unlike traditional frameworks that re-render entire components, `SolidUI`
 uses fine-grained reactivity to update only the specific UI properties that change, resulting in minimal overhead and
@@ -9,6 +11,8 @@ maximum performance.
 Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates
 seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the
 `Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
+
+</ai>
 
 > **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It
 > assumes that UI objects have getters and setters for properties that need to be reactive. All Battlefield Portal types
@@ -24,7 +28,7 @@ seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive u
    mod. The bundler automatically handles code inlining.
 3. **UI Module** – While `SolidUI` is decoupled from the `UI` module, all examples and use cases assume you're using
    [`UI`](../ui/README.md) classes.
-4. **Button handler** – If using `UI.Button` or `UI.TextButton`, register `UI.handleButtonClick` once in your
+4. **Button handler** – If using `UI.Button` or `UI.TextButton`, register `UI.handleButtonEvent` once in your
    `OnPlayerUIButtonEvent` event handler.
 
 ---
@@ -41,6 +45,8 @@ seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive u
 4. Use `SolidUI.h()` to create UI components with reactive properties
 5. Pass accessor functions (signals) as property values to make them reactive
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod
+
+<ai>
 
 ### Example
 
@@ -100,6 +106,8 @@ function createCounterUI(player: mod.Player): void {
     "increment": "Increment"
 }
 ```
+
+</ai>
 
 ---
 
@@ -227,6 +235,8 @@ A tuple `[read, write]`:
 - `read`: An `Accessor<T>` function to get the value and subscribe to changes
 - `write`: A `Setter<T>` function to update the value
 
+<ai>
+
 **Example:**
 
 ```ts
@@ -257,6 +267,8 @@ const container = SolidUI.h(UI.Container, {
 setVisible(true); // Container becomes visible automatically
 ```
 
+</ai>
+
 ### `SolidUI.createEffect(fn: () => void): () => void`
 
 Creates a side effect that runs immediately and re-runs whenever its dependencies change. This is the bridge between
@@ -275,6 +287,8 @@ reactive state and the outside world (e.g., updating UI props, logs, timers).
 **Returns:**
 
 A "disposer" function that manually stops the effect and frees memory.
+
+<ai>
 
 **Example:**
 
@@ -296,6 +310,8 @@ dispose();
 **Note:** Effects created inside `SolidUI.h()` are automatically cleaned up when the UI element is deleted. You
 typically don't need to manually dispose of them unless creating standalone effects.
 
+</ai>
+
 ### `SolidUI.createMemo<T>(fn: () => T): Accessor<T>`
 
 Creates a "Computed Value" or "Derived Signal". Use this when a value depends on other signals. It is efficient because:
@@ -310,6 +326,8 @@ Creates a "Computed Value" or "Derived Signal". Use this when a value depends on
 **Returns:**
 
 An `Accessor<T>` for the memoized value.
+
+<ai>
 
 **Example:**
 
@@ -346,6 +364,8 @@ SolidUI.h(UI.Text, {
 }
 ```
 
+</ai>
+
 ### `SolidUI.createStore<T extends object>(initialState: T): [T, (fn: (state: T) => void) => void]`
 
 Creates a reactive proxy object for handling nested state. Unlike `createSignal` (which tracks the whole value),
@@ -364,6 +384,8 @@ A tuple `[store, setStore]`:
 
 - `store`: The reactive proxy object. Access properties normally (e.g., `store.user.name`)
 - `setStore`: A setter function that accepts a producer function to update the store
+
+<ai>
 
 **Example:**
 
@@ -426,6 +448,8 @@ setUIState((s) => {
     "value": "Value: {}"
 }
 ```
+
+</ai>
 
 ### `SolidUI.createRoot<T>(fn: (dispose: () => void) => T): T`
 
@@ -490,6 +514,8 @@ A `Context<T>` object with:
 - `defaultValue`: The default value
 - `provide(value: T, fn: () => void)`: Runs `fn` within a scope where this context is set to `value`
 
+<ai>
+
 **Example:**
 
 ```ts
@@ -510,6 +536,8 @@ ThemeContext.provide('dark', () => {
 // Use the context
 const theme = SolidUI.useContext(ThemeContext); // Returns 'dark' if inside provide, 'light' otherwise
 ```
+
+</ai>
 
 ### `SolidUI.useContext<T>(context: Context<T>): T`
 
@@ -547,6 +575,8 @@ component to subscribe to that signal.
 
 The return value of `fn`
 
+<ai>
+
 **Example:**
 
 ```ts
@@ -562,6 +592,8 @@ SolidUI.createEffect(() => {
 });
 ```
 
+</ai>
+
 ### `SolidUI.onCleanup(fn: () => void): void`
 
 Registers a cleanup callback for the current reactive scope. If called inside a component created with `SolidUI.h()`, it
@@ -572,6 +604,8 @@ runs when the component is deleted. If called inside an Effect, it runs before t
 **Parameters:**
 
 - `fn` – The cleanup function to register
+
+<ai>
 
 **Example:**
 
@@ -594,6 +628,8 @@ SolidUI.onCleanup(() => {
 **Note:** Cleanup functions registered via `onCleanup` inside `SolidUI.h()` are automatically called when the UI
 element's `delete()` method is invoked.
 
+</ai>
+
 ### `SolidUI.h<P extends object, T>(component, props, receiver?): T`
 
 The "HyperScript" factory function. Creates a UI Component and sets up reactivity. This is the primary function for
@@ -609,6 +645,8 @@ creating reactive UI elements.
 **Returns:**
 
 The created UI Instance
+
+<ai>
 
 **How Reactivity Works:**
 
@@ -701,6 +739,8 @@ SolidUI.h(MyButton, {
 - All reactive effects are automatically cleaned up when the UI element is deleted
 - You can mix static and reactive properties in the same props object
 
+</ai>
+
 ### `SolidUI.Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void`
 
 A generic List Renderer optimized for Game UI. Different from `array.map()` in that `Index` renders components based on
@@ -720,6 +760,8 @@ widgets, which is crucial for performance and Z-order stability.
 **Returns:**
 
 `void` (this function doesn't return a value)
+
+<ai>
 
 **Example:**
 
@@ -774,6 +816,8 @@ setItems((prev) => [
 }
 ```
 
+</ai>
+
 **Performance Benefits:**
 
 - Widgets are reused when possible (based on index position)
@@ -782,6 +826,8 @@ setItems((prev) => [
 - Efficient for frequently updating lists (e.g., scoreboards, player lists)
 
 ---
+
+<ai>
 
 ## Usage Patterns
 
@@ -1050,6 +1096,10 @@ function createScoreboard(player: mod.Player): void {
 }
 ```
 
+</ai>
+
+<ai>
+
 ### Real-World Example: Spawn UI
 
 This example is based on the [`FFASpawning`](../ffa-spawning/index.ts) module, demonstrating a complete reactive UI
@@ -1114,6 +1164,8 @@ function createSpawnUI(player: mod.Player): void {
     setDelayCountdown(10);
 }
 ```
+
+</ai>
 
 ---
 
@@ -1191,6 +1243,8 @@ type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instan
 This type is used internally by `SolidUI.h()` to accept functional components. When you pass a function to `h()`, it's
 treated as a `FunctionalComponent`. The function receives props where each property can optionally be a Signal/Accessor.
 
+<ai>
+
 **Example:**
 
 ```ts
@@ -1214,6 +1268,8 @@ SolidUI.h(MyButton, {
 
 **Note:** Functional components receive props where values can be either static values or accessor functions (signals).
 The component can call accessors to get reactive values, but the props themselves are not automatically unwrapped.
+
+</ai>
 
 ---
 
@@ -1269,6 +1325,8 @@ When you call `SolidUI.h()`:
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 ### UI Module Dependency
@@ -1323,6 +1381,8 @@ effects or roots, you must manually dispose of them to prevent memory leaks.
 
 All reactive updates are asynchronous. If you need synchronous updates (not recommended), you'll need to use the
 underlying `UI` module directly.
+
+</ai>
 
 ---
 

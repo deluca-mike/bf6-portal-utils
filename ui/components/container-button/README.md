@@ -1,8 +1,12 @@
 # UIContainerButton Component
 
+<ai>
+
 The `UIContainerButton` component creates a button that contains a `UIContainer` as its content. This allows you to
 create interactive buttons that can hold child elements, enabling complex nested UI structures within a clickable
 button.
+
+</ai>
 
 > **Note** This component extends `UIContentButton<UIContainer>`. For information about the base `UI` namespace
 > functionality, see the [main UI documentation](../../README.md).
@@ -10,6 +14,8 @@ button.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIContainerButton } from 'bf6-portal-utils/ui/components/container-button';
@@ -45,18 +51,14 @@ const button = new UIContainerButton({
 // Access the inner container
 const innerContainer = button.innerContainer;
 console.log(innerContainer.children.length); // 2
-```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
-
+// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
     UI.handleButtonEvent(player, widget, event);
 }
 ```
+
+</ai>
 
 ---
 
@@ -139,6 +141,8 @@ type Params = UIButton.Params & UIContainer.Params;
 
 ---
 
+<ai>
+
 ## Usage Notes
 
 - **Inner Container Access**: Use the `innerContainer` property to access the container that holds child elements. You
@@ -157,6 +161,8 @@ type Params = UIButton.Params & UIContainer.Params;
   button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+
+</ai>
 
 ---
 

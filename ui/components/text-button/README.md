@@ -1,8 +1,12 @@
 # UITextButton Component
 
+<ai>
+
 The `UITextButton` component creates a button with integrated text content. It combines `UIButton` and `UIText`
 functionality into a single element, wrapping both in a container and delegating properties appropriately. The text
 automatically updates its appearance when the button is enabled or disabled.
+
+</ai>
 
 > **Note** This component extends `UIContentButton<UIText>`. For information about the base `UI` namespace
 > functionality, see the [main UI documentation](../../README.md).
@@ -10,6 +14,8 @@ automatically updates its appearance when the button is enabled or disabled.
 ---
 
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UITextButton } from 'bf6-portal-utils/ui/components/text-button';
@@ -31,18 +37,15 @@ button
     .setMessage(mod.Message(mod.stringKeys.labels.updated)) // 'Updated'
     .setTextColor(UI.COLORS.WHITE)
     .setEnabled(false);
-```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
+//You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
 
 export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
     UI.handleButtonEvent(player, widget, event);
 }
 ```
+
+</ai>
 
 ---
 
@@ -141,6 +144,8 @@ type Params = UIButton.Params &
 
 ---
 
+<ai>
+
 ## Usage Notes
 
 - **Automatic Text State Management**: When the button's `enabled` state changes, the text automatically switches
@@ -156,6 +161,8 @@ type Params = UIButton.Params &
   button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+
+</ai>
 
 ---
 

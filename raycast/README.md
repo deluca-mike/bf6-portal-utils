@@ -1,9 +1,13 @@
 # Raycast Module
 
+<ai>
+
 This TypeScript `Raycast` class abstracts the raycasting functionality of BF6 Portal and handles attributing raycast
 hits and misses to the correct raycasts created, since the native functionality does not do this. This significantly
 improves the developer experience, along with being able to pass hit and miss callbacks, which makes code more readable
 and modular.
+
+</ai>
 
 The class tracks active rays per player, uses geometric distance calculations to match hit points to ray segments, and
 automatically handles cleanup of expired rays and player states. A time-to-live (TTL) system ensures that old rays don't
@@ -39,6 +43,8 @@ monitor callback errors and debug raycast behavior.
    callbacks object (at least one of `onHit` or `onMiss` must be provided).
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -94,6 +100,8 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
 }
 ```
 
+</ai>
+
 ---
 
 ## Core Concepts
@@ -148,6 +156,8 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 ---
 
+<ai>
+
 ## Usage Patterns
 
 - **Obstacle Detection** – Cast rays from players to detect walls, terrain, or other obstacles ahead of them.
@@ -155,6 +165,10 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 - **Weapon Targeting** – Use raycasts to determine where a weapon shot would hit before actually firing.
 - **Spawn Point Validation** – Check if a potential spawn location is clear of obstacles before spawning a player.
 - **Interactive Objects** – Detect what objects a player is looking at or pointing at for interaction systems.
+
+</ai>
+
+<ai>
 
 ### Example: Line of Sight Check
 
@@ -203,6 +217,8 @@ export function OnPlayerLeaveGame(eventNumber: number): void {
     Raycast.pruneAllStates();
 }
 ```
+
+</ai>
 
 ---
 
@@ -269,6 +285,8 @@ and misses to the correct rays:
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Multiple Simultaneous Rays** – The class can handle multiple rays from the same player, but if many rays are cast in
@@ -293,6 +311,8 @@ and misses to the correct rays:
 - **Distance Epsilon** – The hit attribution uses a 0.5m (`_DISTANCE_EPSILON`) sanity cap for distance comparisons. The
   algorithm finds the best-fitting ray (lowest error) among all candidates, and only considers rays where the error is
   within this tolerance. This acts as a sanity check to prevent misattribution rather than a strict matching threshold.
+
+</ai>
 
 ---
 

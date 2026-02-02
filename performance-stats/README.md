@@ -1,5 +1,7 @@
 # Performance Stats Module
 
+<ai>
+
 This TypeScript `PerformanceStats` class enables Battlefield Portal experience developers to monitor and track the
 estimated runtime tick rate of the server their experience is running on. The utility provides real-time performance
 metrics that can help identify when the server is under stress or when script callbacks are being deprioritized by the
@@ -7,6 +9,11 @@ game engine.
 
 The system uses a sampling approach to calculate tick rate by counting ticks over a configurable time window, providing
 a "virtual rate" metric that reflects the actual performance of your script's execution environment.
+
+It is not recommended to use this module in its current state as it lacks core functionality to return meaningful
+metrics.
+
+</ai>
 
 > **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Wait`, etc.) come from
 > [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.

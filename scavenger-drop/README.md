@@ -1,5 +1,7 @@
 # ScavengerDrop Module
 
+<ai>
+
 This TypeScript `ScavengerDrop` class provides functionality for Battlefield Portal experiences to detect when a player
 scavenges a dead player's kit bag. In Battlefield 6, when a player dies, they drop a bag containing their kit that
 despawns after approximately 37 seconds. Players can pick up weapons from these bags, but the default behavior does not
@@ -17,6 +19,8 @@ drops are far away), automatic expiration after the configured duration (default
 bag despawn time), graceful error handling that prevents callback failures from crashing your mod, and configurable
 logging for debugging scavenger drop behavior. The module uses the `Timers` module for interval management and the
 `Logging` module for internal logging.
+
+</ai>
 
 > **Note** The `ScavengerDrop` class requires the `Timers` and `Logging` modules from this package. All Battlefield
 > Portal types referenced below (`mod.ClosestPlayerTo`, `mod.Resupply`, etc.) come from
@@ -44,6 +48,8 @@ logging for debugging scavenger drop behavior. The module uses the `Timers` modu
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
 
+<ai>
+
 ### Example
 
 ```ts
@@ -69,6 +75,8 @@ export function OnPlayerDied(
     });
 }
 ```
+
+</ai>
 
 ---
 
@@ -143,6 +151,8 @@ An interface for configuring scavenger drop behavior.
 
 ---
 
+<ai>
+
 ## Usage Patterns
 
 - **Basic ammo resupply** – Use `mod.Resupply()` in the callback to give players full ammo when they scavenge a kit.
@@ -154,6 +164,10 @@ An interface for configuring scavenger drop behavior.
 - **Custom loot systems** – Implement custom loot mechanics beyond the default kit bag behavior.
 - **Drop cleanup** – Use `stop()` to manually cancel drops when needed (e.g., if a player respawns before the drop
   expires).
+
+</ai>
+
+<ai>
 
 ### Example: Custom Duration and Check Interval and Async Callback Handling
 
@@ -185,6 +199,8 @@ export function OnPlayerDied(
     );
 }
 ```
+
+</ai>
 
 ---
 
@@ -243,6 +259,8 @@ The `ScavengerDrop` class implements scavenger detection using Battlefield Porta
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Position Capture** – The drop captures the position of the dead player's body at creation time. If the body moves
@@ -273,6 +291,8 @@ The `ScavengerDrop` class implements scavenger detection using Battlefield Porta
 
 - **Concurrent Drops** – Multiple drops can exist simultaneously and operate independently. Each drop maintains its own
   timers and state. There is no built-in limit on the number of concurrent drops.
+
+</ai>
 
 ---
 

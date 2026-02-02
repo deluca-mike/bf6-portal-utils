@@ -1,9 +1,13 @@
 # Timers Module
 
+<ai>
+
 This TypeScript `Timers` class provides `setTimeout` and `setInterval` functionality for Battlefield Portal experiences
 which run in a QuickJS runtime, which does not natively include these standard JavaScript timing functions. The module
 uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs,
 and provides error handling to ensure robust timer execution.
+
+</ai>
 
 **Why use Timers instead of `mod.Wait()`?** The `Timers` module offers significant advantages: timers can be cancelled
 with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently without blocking, automatic error handling
@@ -41,6 +45,8 @@ uses the `Logging` module for internal logging, allowing you to monitor callback
 4. Use `Timers.setTimeout()` and `Timers.setInterval()` just like you would in standard JavaScript.
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
    automatically inline the code).
+
+<ai>
 
 ### Example
 
@@ -120,6 +126,8 @@ export async function OnGameModeStarted(): Promise<void> {
     );
 }
 ```
+
+</ai>
 
 ---
 
@@ -231,27 +239,6 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 - **Performance monitoring** – Use `getActiveTimerCount()` to monitor the number of active timers and debug potential
   timer leaks or performance issues.
 
-### Example: Periodic Spawn System
-
-```ts
-import { Timers } from 'bf6-portal-utils/timers';
-
-let vehicleSpawnInterval: number | undefined;
-
-export async function OnGameModeStarted(): Promise<void> {
-    // Spawn a vehicle every 60 seconds
-    vehicleSpawnInterval = Timers.setInterval(() => {
-        const spawnPoint = mod.GetRandomSpawnPoint(mod.GetTeam(1));
-        mod.SpawnVehicle(mod.RuntimeSpawn_Common.Vehicle_Tank_T90, spawnPoint);
-    }, 60_000);
-}
-
-export async function OnGameModeEnded(): Promise<void> {
-    // Clean up the interval
-    Timers.clearInterval(vehicleSpawnInterval);
-}
-```
-
 ### Example: Debounced Input Handler
 
 ```ts
@@ -273,7 +260,7 @@ export async function OnPlayerUIButtonEvent(
     // Set a new debounce timer
     const timerId = Timers.setTimeout(() => {
         // This only runs if the player doesn't click again within 0.5 seconds
-        handleButtonClick(player, widget);
+        handleButtonClick(player, widget); // Some button click handler
         debounceTimers.delete(playerId);
     }, 500);
 
