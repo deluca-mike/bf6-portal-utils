@@ -81,6 +81,7 @@ async function handlePlayerDied(
 function handleOngoingPlayer(player: mod.Player): void {
     // This will be called every tick for every player
     const health = mod.GetSoldierState(player, mod.SoldierStateNumber.Health);
+
     if (health < 10) {
         // Low health logic
     }
@@ -322,7 +323,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+#### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Events.LogLevel, includeError?: boolean): void`
 
 Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged
 using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
@@ -331,8 +332,9 @@ using the configured logger. This allows you to monitor and debug handler failur
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
-  `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+  `Events.LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime
+  error can be very large and may cause issues with UI loggers.
 
 **Example:**
 

@@ -69,12 +69,21 @@ declare namespace EventsTypes {
         readonly OnVehicleDestroyed: typeof OnVehicleDestroyed;
         readonly OnVehicleSpawned: typeof OnVehicleSpawned;
     };
+    /**
+     * Extract parameters from a function type.
+     */
     export type Parameters<T> = T extends (...args: infer P) => void ? P : never;
-    /** Trigger function types (single source of truth); same shape as Events.Type. */
+    /**
+     * Trigger function types (single source of truth); same shape as Events.Type.
+     */
     export type Signature = typeof Type;
-    /** One of the trigger function names (a key from Events.Type). */
+    /**
+     * One of the trigger function names (a key from Events.Type).
+     */
     export type SignatureKey = keyof Signature;
-    /** One of the trigger functions (a value from Events.Type). */
+    /**
+     * One of the trigger functions (a value from Events.Type).
+     */
     export type TypeValue = Signature[SignatureKey];
     /**
      * Typed channel for a single event. Each event (e.g. `Events.OngoingInteractPoint`, `Events.OnPlayerDied`)
@@ -114,28 +123,38 @@ declare namespace EventsTypes {
     type EventTypeName<T extends TypeValue> = {
         [K in SignatureKey]: Signature[K] extends T ? K : never;
     }[SignatureKey];
+    /**
+     * Get the handler function type for a specific event type.
+     * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
+     */
     export type HandlerForType<T extends TypeValue> =
         EventTypeName<T> extends SignatureKey
             ? Signature[EventTypeName<T>] extends (...args: infer P) => void
                 ? (...args: P) => void | Promise<void>
                 : never
             : never;
+    /**
+     * Get the parameter tuple for a specific event type.
+     */
     export type EventParameters<T extends TypeValue> =
         EventTypeName<T> extends SignatureKey ? Parameters<Signature[EventTypeName<T>]> : never;
+    /**
+     * Create a union of all possible handler types.
+     * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
+     */
     export type AllHandlers = {
         [K in SignatureKey]: Signature[K] extends (...args: infer P) => void
             ? (...args: P) => void | Promise<void>
             : never;
     }[SignatureKey];
-    /**
-     * Log levels for controlling logging verbosity.
-     */
-    export const LogLevel: typeof Logging.LogLevel;
     export {};
 }
 declare class EventsImplementation {
     private static readonly _logging;
     private static readonly _handlers;
+    /**
+     * The event types.
+     */
     static readonly Type: {
         readonly OngoingGlobal: typeof OngoingGlobal;
         readonly OngoingAreaTrigger: typeof OngoingAreaTrigger;
@@ -200,6 +219,10 @@ declare class EventsImplementation {
         readonly OnVehicleDestroyed: typeof OnVehicleDestroyed;
         readonly OnVehicleSpawned: typeof OnVehicleSpawned;
     };
+    /**
+     * The logging levels.
+     */
+    static readonly LogLevel: typeof Logging.LogLevel;
     private constructor();
     /**
      * Executes a handler function.

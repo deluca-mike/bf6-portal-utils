@@ -68,15 +68,45 @@ export declare namespace Sounds {
         available: number;
         active: number;
     };
+    /**
+     * The parameters for 2D sound playback.
+     */
     type Params2D = {
+        /**
+         * The amplitude of the sound. Default is 1.
+         */
         amplitude?: number;
+        /**
+         * The target to play the sound for. Default is undefined, which means all players hear the sound.
+         * If specified, only this player/squad/team hears the sound. If undefined, all players hear the sound.
+         */
         target?: mod.Player | mod.Squad | mod.Team;
+        /**
+         * The duration of the sound in milliseconds, 0 for infinite duration (i.e. for looping assets).
+         * Default is 3,000 milliseconds.
+         */
         duration?: number;
     };
+    /**
+     * The parameters for 3D sound playback.
+     */
     type Params3D = {
+        /**
+         * The amplitude of the sound. Default is 1.
+         */
         amplitude?: number;
+        /**
+         * The attenuation range of the sound. Default is 10 meters.
+         */
         attenuationRange?: number;
+        /**
+         * The duration of the sound in milliseconds, 0 for infinite duration (i.e. for looping assets).
+         * Default is 10,000 milliseconds.
+         */
         duration?: number;
     };
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     const LogLevel: typeof Logging.LogLevel;
 }

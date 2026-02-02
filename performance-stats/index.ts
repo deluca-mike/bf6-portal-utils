@@ -1,4 +1,4 @@
-// version 1.2.1
+// version 1.2.3
 export class PerformanceStats {
     private stressThreshold: number = 25;
 
@@ -14,6 +14,10 @@ export class PerformanceStats {
 
     private log?: (text: string) => void;
 
+    /**
+     * Creates a new PerformanceStats instance.
+     * @param options - The options for the PerformanceStats instance.
+     */
     constructor(options?: PerformanceStats.Options) {
         this.log = options?.log;
         this.sampleRateSeconds = options?.sampleRateSeconds ?? 0.5;
@@ -21,17 +25,24 @@ export class PerformanceStats {
         this.deprioritizedThreshold = options?.deprioritizedThreshold ?? 65;
     }
 
+    /**
+     * @returns The current tick rate.
+     */
     public get tickRate(): number {
         return this.cachedTickRate;
     }
 
-    // This should be called once every tick, so it is best to be called in the `OngoingGlobal()` event handler.
+    /**
+     * This should be called once every tick, so it is best to be called in the `OngoingGlobal()` event handler.
+     */
     public trackTick(): void {
         this.tickBucket++;
     }
 
-    // This starts the performance tracking heartbeat, which is a loop that tracks the performance of the script. It can be called once, any time.
-    // If called multiple times, it will only start one loop.
+    /**
+     * This starts the performance tracking heartbeat, which is a loop that tracks the performance of the script. It can be called once, any time.
+     * If called multiple times, it will only start one loop.
+     */
     public startHeartbeat(): void {
         if (this.isStarted) return;
 
@@ -67,10 +78,25 @@ export class PerformanceStats {
 }
 
 export namespace PerformanceStats {
+    /**
+     * The options for the PerformanceStats instance.
+     */
     export type Options = {
+        /**
+         * The logging function to use.
+         */
         log?: (text: string) => void;
+        /**
+         * The stress threshold.
+         */
         stressThreshold?: number;
+        /**
+         * The deprioritized threshold.
+         */
         deprioritizedThreshold?: number;
+        /**
+         * The sample rate in seconds.
+         */
         sampleRateSeconds?: number;
     };
 }

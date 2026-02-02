@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version 2.0.0
+// version 2.0.1
 export class MultiClickDetector {
     private static _logging = new Logging('MCD');
 
@@ -149,11 +149,26 @@ export class MultiClickDetector {
 }
 
 export namespace MultiClickDetector {
+    /**
+     * The options for the multi-click detector.
+     */
     export interface Options {
+        /**
+         * The soldier state boolean to use for the multi-click detector.
+         */
         soldierState?: mod.SoldierStateBool;
+        /**
+         * The window in milliseconds for a valid multi-click sequence.
+         */
         windowMs?: number;
+        /**
+         * The number of clicks required to trigger a multi-click sequence.
+         */
         requiredClicks?: number;
     }
 
+    /**
+     * The log levels.
+     */
     export const LogLevel = Logging.LogLevel;
 }

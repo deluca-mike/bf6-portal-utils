@@ -7,7 +7,7 @@ import { UIContainer } from '../ui/components/container/index.ts';
 import { UITextButton } from '../ui/components/text-button/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 5.0.0
+// version: 5.0.1
 export namespace FFASpawning {
     const logging = new Logging('FFAS');
 
@@ -30,24 +30,68 @@ export namespace FFASpawning {
         logging.setLogging(log, logLevel, includeError);
     }
 
+    /**
+     * Type for defining spawn point data when initializing the system:
+     * <x, y, z> world position where the player should spawn.
+     * Orientation is the compass angle (0-360) for spawn direction.
+     */
     export type SpawnData = [x: number, y: number, z: number, orientation: number];
 
+    /**
+     * Internal type representing a processed spawn point:
+     */
     export type Spawn = {
+        /**
+         * Index in the spawns array.
+         */
         index: number;
+        /**
+         * Battlefield Portal spawn point object.
+         */
         spawnPoint: mod.SpawnPoint;
+        /**
+         * World position.
+         */
         location: mod.Vector;
     };
 
+    /**
+     * Optional overrides for spawn selection thresholds, delays, and candidate limits when calling `initialize()`:
+     */
     export type InitializeOptions = {
+        /**
+         * The maximum number of random spawns to consider when trying to find a spawn point for a player.
+         */
         maxSpawnCandidates?: number;
+        /**
+         * The minimum distance a spawn point must be to another player to be considered safe.
+         */
         minimumSafeDistance?: number;
+        /**
+         * The maximum distance a spawn point must be to another player to be considered acceptable.
+         */
         maximumInterestingDistance?: number;
+        /**
+         * The amount to scale the midpoint between the `_minimumSafeDistance` and `_maximumInterestingDistance` to evaluate a fallback spawn.
+         */
         safeOverInterestingFallbackFactor?: number;
+        /**
+         * The initial delay before prompting the player to spawn (in seconds).
+         */
         initialPromptDelay?: number;
+        /**
+         * The delay between prompts (in seconds).
+         */
         promptDelay?: number;
+        /**
+         * The delay between processing the spawn queue (in seconds).
+         */
         queueProcessingDelay?: number;
     };
 
+    /**
+     * Class representing a soldier who spawning will be managed by this module.
+     */
     export class Soldier {
         private static readonly _ALL_SOLDIERS: { [playerId: number]: Soldier } = {};
 
@@ -222,13 +266,22 @@ export namespace FFASpawning {
             };
         }
 
+        /**
+         * Converts a mod.Vector to a string in the format `<x, y, z>`.
+         * @param vector - The mod.Vector to convert.
+         * @returns The string representation of the mod.Vector.
+         */
         public static getVectorString(vector: mod.Vector): string {
             return `<${mod.XComponentOf(vector).toFixed(2)}, ${mod.YComponentOf(vector).toFixed(2)}, ${mod
                 .ZComponentOf(vector)
                 .toFixed(2)}>`;
         }
 
-        // Should be called in the `OnGameModeStarted()` event. Orientation is the compass angle integer.
+        /**
+         * Initializes the spawning system. Should be called in the `OnGameModeStarted()` event.
+         * @param spawns - The spawn points to use.
+         * @param options - The options to use.
+         */
         public static initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions): void {
             mod.EnableHQ(mod.GetHQ(1), false);
             mod.EnableHQ(mod.GetHQ(2), false);
@@ -263,8 +316,12 @@ export namespace FFASpawning {
             }
         }
 
-        // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-        // AI soldiers will skip the countdown and spawn immediately.
+        /**
+         * Starts the countdown before prompting the player to spawn or delay again.
+         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
+         * AI soldiers will skip the countdown and spawn immediately.
+         * @param player - The player to start the delay for.
+         */
         public static startDelayForPrompt(player: mod.Player): void {
             if (logging.willLog(LogLevel.Debug)) {
                 logging.log(`Start delay request for P_${mod.GetObjId(player)}.`, LogLevel.Debug);
@@ -277,7 +334,10 @@ export namespace FFASpawning {
             soldier.startDelayForPrompt();
         }
 
-        // Forces a player to be added to the spawn queue, skipping the countdown and prompt.
+        /**
+         * Forces a player to be added to the spawn queue, skipping the countdown and prompt.
+         * @param player - The player to force into the queue.
+         */
         public static forceIntoQueue(player: mod.Player): void {
             if (!mod.IsPlayerValid(player)) return;
 
@@ -288,7 +348,9 @@ export namespace FFASpawning {
             soldier._addToQueue();
         }
 
-        // Enables the processing of the spawn queue.
+        /**
+         * Enables the processing of the spawn queue.
+         */
         public static enableSpawnQueueProcessing(): void {
             if (this._queueProcessingEnabled) return;
 
@@ -296,12 +358,19 @@ export namespace FFASpawning {
             this._processSpawnQueue();
         }
 
-        // Disables the processing of the spawn queue.
+        /**
+         * Disables the processing of the spawn queue.
+         */
         public static disableSpawnQueueProcessing(): void {
             this._queueProcessingEnabled = false;
         }
 
-        // Every player that should be handled by this spawning system should be instantiated as a `FFASpawning`, usually in the `OnPlayerSpawned()` event.
+        /**
+         * Every player that should be handled by this spawning system should be instantiated as a `FFASpawning`,
+         * usually in the `OnPlayerJoinGame()` event.
+         * @param player - The player to instantiate the `FFASpawning` for.
+         * @param showDebugPosition - Whether to show the debug position.
+         */
         constructor(player: mod.Player, showDebugPosition: boolean = false) {
             this._player = player;
             this._playerId = mod.GetObjId(player);
@@ -441,16 +510,26 @@ export namespace FFASpawning {
 
         private _debugPositionUI?: UIText;
 
+        /**
+         * @returns The player associated with this `Soldier` instance.
+         */
         public get player(): mod.Player {
             return this._player;
         }
 
+        /**
+         * @returns The unique ID of the player associated with this instance.
+         */
         public get playerId(): number {
             return this._playerId;
         }
 
-        // Starts the countdown before prompting the player to spawn or delay again, usually in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-        // AI soldiers will skip the countdown and spawn immediately.
+        /**
+         * Starts the countdown before prompting the player to spawn or delay again.
+         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
+         * AI soldiers will skip the countdown and spawn immediately.
+         * @param delay - The delay to start the countdown for (in seconds). Defaults to the initial prompt delay.
+         */
         public startDelayForPrompt(delay: number = Soldier._initialPromptDelay): void {
             if (this._isAISoldier) return this._addToQueue();
 

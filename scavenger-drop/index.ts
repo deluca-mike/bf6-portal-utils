@@ -1,7 +1,7 @@
 import { Timers } from '../timers/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 1.0.0
+// version: 1.0.1
 export class ScavengerDrop {
     private static _logging = new Logging('SCAV');
 
@@ -139,10 +139,22 @@ export class ScavengerDrop {
 }
 
 export namespace ScavengerDrop {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     export const LogLevel = Logging.LogLevel;
 
+    /**
+     * The options for the ScavengerDrop instance.
+     */
     export interface Options {
+        /**
+         * The duration of the scavenger drop in milliseconds.
+         */
         duration?: number;
+        /**
+         * The interval at which to check for scavengers in milliseconds.
+         */
         checkInterval?: number;
     }
 }

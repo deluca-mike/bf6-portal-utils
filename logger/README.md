@@ -77,12 +77,13 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
         dynamicLogger = new Logger(eventPlayer, { staticRows: false, visible: true, anchor: mod.UIAnchor.TopRight });
     }
 
+    // While logAsync is preferred, you can still use log() for short messages if order guarantees matter.
     dynamicLogger?.log(`Player: ${mod.GetObjId(player)}`);
     dynamicLogger?.log(`Team: ${mod.GetObjId(mod.GetTeam(player))}`);
     dynamicLogger?.log(`Hello @ world $${(12345.6789).toFixed(2)}!!`);
 
-    // For long messages or performance-critical paths, use logAsync (non-blocking).
-    dynamicLogger?.logAsync(`Very long diagnostic message that would create many UI widgets...`);
+    // For long messages or performance-critical paths, always use logAsync (non-blocking).
+    dynamicLogger?.logAsync(`Very long diagnostic message that will create many UI widgets...`);
 
     while (true) {
         const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);

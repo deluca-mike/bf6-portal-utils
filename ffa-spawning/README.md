@@ -214,7 +214,8 @@ queue processing, and warnings. This allows you to monitor and debug spawn behav
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
   `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime
+  error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -367,24 +368,7 @@ type InitializeOptions = {
 ## Strings File
 
 This module includes a `strings.json` file that will be automatically merged by `bf6-portal-bundler` when you bundle
-your mod. The strings are automatically available under the `ffaSpawning` key:
-
-```json
-{
-    "ffaSpawning": {
-        "buttons": {
-            "spawn": "Spawn now",
-            "delay": "Ask again in {} seconds"
-        },
-        "countdown": "Spawning available in {} seconds...",
-        "debug": {
-            "position": "XYZ (x100): <{}, {}, {}>"
-        }
-    }
-}
-```
-
-The `debug.position` string is used when the `showDebugPosition` constructor parameter is enabled.
+your mod.
 
 ---
 
@@ -393,8 +377,8 @@ The `debug.position` string is used when the `showDebugPosition` constructor par
 - **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top
   of each other if no safe spawn point is found within `maxSpawnCandidates` iterations. Consider adjusting
   `maxSpawnCandidates` via the `initialize()` options or adding more spawn points to mitigate this.
-- **UI Input Mode** – The system manages `mod.EnableUIInputMode()` automatically. Be careful not to conflict with other
-  UI systems that also control input mode.
+- **UI Input Mode** – The system delegates automatic `mod.EnableUIInputMode()` management to the `UI` module. Be careful
+  not to conflict with other UI systems that do not use the `UI` module that also control input mode.
 - **HQ Disabling** – The system automatically disables both team HQs during initialization. If you need team-based
   spawning elsewhere, you'll need to re-enable HQs manually (but you really should not be mixing this with other systems
   unless you know what you are doing).

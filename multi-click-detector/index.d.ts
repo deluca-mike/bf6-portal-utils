@@ -48,10 +48,25 @@ export declare class MultiClickDetector {
     destroy(): void;
 }
 export declare namespace MultiClickDetector {
+    /**
+     * The options for the multi-click detector.
+     */
     interface Options {
+        /**
+         * The soldier state boolean to use for the multi-click detector.
+         */
         soldierState?: mod.SoldierStateBool;
+        /**
+         * The window in milliseconds for a valid multi-click sequence.
+         */
         windowMs?: number;
+        /**
+         * The number of clicks required to trigger a multi-click sequence.
+         */
         requiredClicks?: number;
     }
+    /**
+     * The log levels.
+     */
     const LogLevel: typeof Logging.LogLevel;
 }

@@ -191,7 +191,8 @@ configured logger. This allows you to monitor and debug reactive system failures
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
   `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime
+  error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -840,6 +841,7 @@ function createModalUI(player: mod.Player): void {
         UI.Container,
         {
             visible: isOpen, // Reactive visibility
+            uiInputModeWhenVisible: true, // Automatically manages input mode
             width: 400,
             height: 300,
             bgColor: UI.COLORS.BLACK,
@@ -855,17 +857,11 @@ function createModalUI(player: mod.Player): void {
         width: 200,
         height: 50,
         message: mod.Message(mod.stringkeys.close),
-        onClick: async () => {
-            setIsOpen(false);
-            mod.EnableUIInputMode(false, player);
-        },
+        onClick: async () => setIsOpen(false),
     });
 
-    // Function to show the modal
-    return () => {
-        setIsOpen(true);
-        mod.EnableUIInputMode(true, player);
-    };
+    // Function to toggle the modal visibility
+    return () => setIsOpen(!isOpen());
 }
 ```
 
@@ -1072,13 +1068,8 @@ function createSpawnUI(player: mod.Player): void {
             width: 440,
             height: 140,
             anchor: mod.UIAnchor.Center,
-            visible: () => {
-                const visible = delayCountdown() === 0;
-                if (visible) {
-                    mod.EnableUIInputMode(true, player);
-                }
-                return visible;
-            },
+            visible: () => delayCountdown() === 0,
+            uiInputModeWhenVisible: true, // Automatically manages input mode
             bgColor: UI.COLORS.BF_GREY_4,
             bgAlpha: 0.5,
             bgFill: mod.UIBgFill.Blur,

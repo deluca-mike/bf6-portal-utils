@@ -64,13 +64,25 @@ export declare class Raycast {
     private static _isVector3;
 }
 export declare namespace Raycast {
+    /**
+     * A simple transparent 3D vector interface.
+     */
     interface Vector3 {
         x: number;
         y: number;
         z: number;
     }
+    /**
+     * A callback function type for ray hits.
+     */
     type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
+    /**
+     * A callback function type for ray misses.
+     */
     type MissCallback = () => Promise<void> | void;
+    /**
+     * A callback object type for the `cast()` method. Must have Hit (Miss optional) or Miss (Hit optional).
+     */
     type Callbacks<T extends mod.Vector | Vector3> =
         | {
               onHit: HitCallback<T>;
@@ -93,5 +105,8 @@ export declare namespace Raycast {
         pendingMisses: number;
         rays: Map<number, PendingRay>;
     }
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
     const LogLevel: typeof Logging.LogLevel;
 }

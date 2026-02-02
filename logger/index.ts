@@ -2,7 +2,7 @@ import { UI } from '../ui/index.ts';
 import { UIContainer } from '../ui/components/container/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 3.1.0
+// version: 3.1.1
 export class Logger {
     private static readonly _PADDING: number = 10;
 
