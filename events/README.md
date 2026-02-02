@@ -132,12 +132,12 @@ Events.OnGameModeEnding.subscribe(() => {
 
 ## API Reference
 
-### `namespace Events`
+### `Events`
 
-The `Events` namespace exposes two styles of API: **per-event channels** (e.g.
-`Events.OnPlayerDied.subscribe(handler)`), which typically have better IntelliSense and readability, and the
-**object-based API** (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to
-pass an event type by value (e.g. iteration, dynamic dispatch).
+The `Events` class exposes two styles of API: **per-event channels** (e.g. `Events.OnPlayerDied.subscribe(handler)`),
+which typically have better IntelliSense and readability, and the **object-based API** (e.g.
+`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to pass an event type by value
+(e.g. iteration, dynamic dispatch).
 
 #### Subscribe
 
