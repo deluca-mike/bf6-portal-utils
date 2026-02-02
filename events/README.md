@@ -2,31 +2,18 @@
 
 <ai>
 
-This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience
-developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only
-be implemented and exported once per entire project. This module implements all event handlers once, automatically
-hooking into every Battlefield Portal event, and exposes subscription APIs that allow you to subscribe and unsubscribe
-to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
+This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only be implemented and exported once per entire project. This module implements all event handlers once, automatically hooking into every Battlefield Portal event, and exposes subscription APIs that allow you to subscribe and unsubscribe to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
 
 </ai>
 
 You can use **two styles of API**:
 
-- **Event-channel style (recommended)** – Each event is exposed as a channel object (e.g. `Events.OnPlayerDied`,
-  `Events.OngoingInteractPoint`) with `subscribe`, `unsubscribe`, `trigger`, and `handlerCount` functions. This style
-  typically has **better full IntelliSense compatibility** and is **more readable**, since the event name and method are
-  colocated (e.g. `Events.OnPlayerDied.subscribe(handler)`).
-- **Object style** – Pass the event type as the first argument (e.g.
-  `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Useful when you need to pass an event type by value (e.g.
-  dynamic dispatch, iteration).
+- **Event-channel style (recommended)** – Each event is exposed as a channel object (e.g. `Events.OnPlayerDied`, `Events.OngoingInteractPoint`) with `subscribe`, `unsubscribe`, `trigger`, and `handlerCount` functions. This style typically has **better full IntelliSense compatibility** and is **more readable**, since the event name and method are colocated (e.g. `Events.OnPlayerDied.subscribe(handler)`).
+- **Object style** – Pass the event type as the first argument (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Useful when you need to pass an event type by value (e.g. dynamic dispatch, iteration).
 
-The module provides full type safety through TypeScript generics, ensuring that event handlers match the correct
-signature for each event type. Handlers can be synchronous or asynchronous (returning `void` or `Promise<void>`), and
-errors in one handler won't prevent other handlers from executing. All handlers are executed asynchronously and
-non-blocking, ensuring optimal performance.
+The module provides full type safety through TypeScript generics, ensuring that event handlers match the correct signature for each event type. Handlers can be synchronous or asynchronous (returning `void` or `Promise<void>`), and errors in one handler won't prevent other handlers from executing. All handlers are executed asynchronously and non-blocking, ensuring optimal performance.
 
-> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vehicle`, `mod.AreaTrigger`, etc.) come
-> from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
+> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vehicle`, `mod.AreaTrigger`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
@@ -35,10 +22,8 @@ non-blocking, ensuring optimal performance.
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
-   mod. The bundler automatically handles code inlining.
-3. **No duplicate event handlers** – Do not implement or export any Battlefield Portal event handler functions in your
-   codebase. This module handles all event hooking automatically.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **No duplicate event handlers** – Do not implement or export any Battlefield Portal event handler functions in your codebase. This module handles all event hooking automatically.
 
 </ai>
 
@@ -51,14 +36,9 @@ non-blocking, ensuring optimal performance.
     ```ts
     import { Events } from 'bf6-portal-utils/events';
     ```
-3. Subscribe to events using the **event-channel style** (e.g. `Events.OnPlayerDeployed.subscribe(handler)`) for the
-   best IntelliSense and readability, or the **object style**
-   (`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Both return an unsubscribe function for convenience.
-4. Unsubscribe when needed by calling the returned unsubscribe function, or use
-   `Events.OnPlayerDeployed.unsubscribe(handler)` (channel style) or
-   `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (object style).
-5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
-   automatically inline the code).
+3. Subscribe to events using the **event-channel style** (e.g. `Events.OnPlayerDeployed.subscribe(handler)`) for the best IntelliSense and readability, or the **object style** (`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Both return an unsubscribe function for convenience.
+4. Unsubscribe when needed by calling the returned unsubscribe function, or use `Events.OnPlayerDeployed.unsubscribe(handler)` (channel style) or `Events.unsubscribe(Events.Type.OnPlayerDeployed, handler)` (object style).
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
 
@@ -116,30 +96,19 @@ Events.OnGameModeEnding.subscribe(() => {
 
 ## Core Concepts
 
-- **Single Event Hook** – This module implements all Battlefield Portal event handler functions once. You should not
-  implement or export any event handlers in your own code.
+- **Single Event Hook** – This module implements all Battlefield Portal event handler functions once. You should not implement or export any event handlers in your own code.
 
-- **Multiple Subscriptions** – You can subscribe multiple handlers to the same event type. All subscribed handlers will
-  be called when the event fires.
+- **Multiple Subscriptions** – You can subscribe multiple handlers to the same event type. All subscribed handlers will be called when the event fires.
 
-- **Type Safety** – TypeScript ensures that your handler function signature matches the event type. For example,
-  `OnPlayerDeployed` handlers must accept a single `mod.Player` parameter. The event-channel style
-  (`Events.OnPlayerDeployed.subscribe(...)`) typically gives the best IntelliSense (parameter types and completion)
-  because the event is known at the call site.
+- **Type Safety** – TypeScript ensures that your handler function signature matches the event type. For example, `OnPlayerDeployed` handlers must accept a single `mod.Player` parameter. The event-channel style (`Events.OnPlayerDeployed.subscribe(...)`) typically gives the best IntelliSense (parameter types and completion) because the event is known at the call site.
 
-- **Synchronous and Asynchronous Handlers** – Handlers can be synchronous (returning `void`) or asynchronous (returning
-  `Promise<void>`). Both are fully supported.
+- **Synchronous and Asynchronous Handlers** – Handlers can be synchronous (returning `void`) or asynchronous (returning `Promise<void>`). Both are fully supported.
 
-- **Error Isolation** – Errors thrown in one handler are caught and do not prevent other handlers from executing. This
-  ensures that a bug in one subscription doesn't break your entire event system. Handler errors are automatically logged
-  using the configured logger (if logging is enabled via `Events.setLogging()`).
+- **Error Isolation** – Errors thrown in one handler are caught and do not prevent other handlers from executing. This ensures that a bug in one subscription doesn't break your entire event system. Handler errors are automatically logged using the configured logger (if logging is enabled via `Events.setLogging()`).
 
-- **Non-Blocking Execution** – All handlers are executed asynchronously and non-blocking. The event system will not wait
-  for handlers to complete before continuing execution.
+- **Non-Blocking Execution** – All handlers are executed asynchronously and non-blocking. The event system will not wait for handlers to complete before continuing execution.
 
-- **Configurable Error Logging** – Handler errors are automatically logged using the `Logging` module. Use
-  `Events.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This
-  provides visibility into handler failures without requiring manual error handling in every handler.
+- **Configurable Error Logging** – Handler errors are automatically logged using the `Logging` module. Use `Events.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into handler failures without requiring manual error handling in every handler.
 
 ---
 
@@ -147,15 +116,11 @@ Events.OnGameModeEnding.subscribe(() => {
 
 ### `Events`
 
-The `Events` class exposes two styles of API: **per-event channels** (e.g. `Events.OnPlayerDied.subscribe(handler)`),
-which typically have better IntelliSense and readability, and the **object-based API** (e.g.
-`Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to pass an event type by value
-(e.g. iteration, dynamic dispatch).
+The `Events` class exposes two styles of API: **per-event channels** (e.g. `Events.OnPlayerDied.subscribe(handler)`), which typically have better IntelliSense and readability, and the **object-based API** (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`), which is useful when you need to pass an event type by value (e.g. iteration, dynamic dispatch).
 
 #### Subscribe
 
-Subscribes a handler function to an event. The handler will be called whenever the event fires. Handlers can be
-synchronous or asynchronous. Returns a function that can be called to unsubscribe the handler.
+Subscribes a handler function to an event. The handler will be called whenever the event fires. Handlers can be synchronous or asynchronous. Returns a function that can be called to unsubscribe the handler.
 
 **Channel style** – Prefer this for better IntelliSense; the handler signature is fully typed for that event.
 
@@ -166,8 +131,7 @@ synchronous or asynchronous. Returns a function that can be called to unsubscrib
 **Object style** – Use when you need to pass the event type by value.
 
 - **Signature:** `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
-- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – A function
-  matching the signature for the event type.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – A function matching the signature for the event type.
 - **Returns:** A function that can be called to unsubscribe the handler.
 
 **Examples:**
@@ -194,8 +158,7 @@ playerDeployedUnsubscribe();
 
 #### Unsubscribe
 
-Unsubscribes a handler function from an event. The handler must be the same function reference that was used in
-`subscribe()`.
+Unsubscribes a handler function from an event. The handler must be the same function reference that was used in `subscribe()`.
 
 **Channel style:**
 
@@ -205,8 +168,7 @@ Unsubscribes a handler function from an event. The handler must be the same func
 **Enum style:**
 
 - **Signature:** `Events.unsubscribe<T extends Type>(type: T, handler: HandlerForType<T>): void`
-- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – The same
-  function reference that was used in `subscribe()`.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – The same function reference that was used in `subscribe()`.
 
 **Examples:**
 
@@ -232,8 +194,7 @@ Events.unsubscribe(Events.Type.OnPlayerDeployed, handler);
 
 #### Trigger
 
-Manually triggers an event with the given parameters. Primarily useful for debugging or testing. In normal operation,
-events are automatically triggered by the Battlefield Portal runtime when the corresponding game events occur.
+Manually triggers an event with the given parameters. Primarily useful for debugging or testing. In normal operation, events are automatically triggered by the Battlefield Portal runtime when the corresponding game events occur.
 
 **Channel style:**
 
@@ -243,8 +204,7 @@ events are automatically triggered by the Battlefield Portal runtime when the co
 **Enum style:**
 
 - **Signature:** `Events.trigger<T extends Type>(type: T, ...args: EventParameters<T>): void`
-- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `...args` – The
-  parameters matching the event type's signature.
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `...args` – The parameters matching the event type's signature.
 
 **Examples:**
 
@@ -262,8 +222,7 @@ Events.trigger(Events.Type.OnPlayerDeployed, testPlayer);
 
 #### Handler Count
 
-Returns the number of handlers currently subscribed to an event. Useful for debugging (e.g. checking that subscriptions
-were cleaned up) or conditional logic.
+Returns the number of handlers currently subscribed to an event. Useful for debugging (e.g. checking that subscriptions were cleaned up) or conditional logic.
 
 **Channel style:**
 
@@ -296,11 +255,7 @@ Events.handlerCount(Events.Type.OnPlayerDeployed); // 2
 
 #### `Events.Type`
 
-An object mapping each event name to its trigger function (e.g. `Events.Type.OnPlayerDeployed`). Use these values with
-the object-style API: `Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`,
-`Events.trigger(type, ...args)`, and `Events.handlerCount(type)`. You can also use it for typed references to event
-payloads (e.g. `Parameters<typeof Events.Type.OnPlayerDied>`) or to call a trigger by name (e.g.
-`Events.Type.OnPlayerDeployed(somePlayer)`).
+An object mapping each event name to its trigger function (e.g. `Events.Type.OnPlayerDeployed`). Use these values with the object-style API: `Events.subscribe(type, handler)`, `Events.unsubscribe(type, handler)`, `Events.trigger(type, ...args)`, and `Events.handlerCount(type)`. You can also use it for typed references to event payloads (e.g. `Parameters<typeof Events.Type.OnPlayerDied>`) or to call a trigger by name (e.g. `Events.Type.OnPlayerDeployed(somePlayer)`).
 
 **Example (typed payload / dynamic dispatch):**
 
@@ -321,21 +276,13 @@ Events.Type.OnPlayerDeployed(somePlayer);
 
 Available event types include:
 
-- `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`,
-  `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`,
-  `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`,
-  `OngoingWaypointPath`, `OngoingWorldIcon`
-- `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`, `OnAIParachuteRunning`, `OnAIParachuteSucceeded`,
-  `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
+- `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
+- `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`, `OnAIParachuteRunning`, `OnAIParachuteSucceeded`, `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
 - `OnCapturePointCaptured`, `OnCapturePointCapturing`, `OnCapturePointLost`
 - `OnGameModeEnding`, `OnGameModeStarted`
 - `OnMandown`
 - `OnMCOMArmed`, `OnMCOMDefused`, `OnMCOMDestroyed`
-- `OnPlayerDamaged`, `OnPlayerDeployed`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`,
-  `OnPlayerEnterAreaTrigger`, `OnPlayerEnterCapturePoint`, `OnPlayerEnterVehicle`, `OnPlayerEnterVehicleSeat`,
-  `OnPlayerExitAreaTrigger`, `OnPlayerExitCapturePoint`, `OnPlayerExitVehicle`, `OnPlayerExitVehicleSeat`,
-  `OnPlayerInteract`, `OnPlayerJoinGame`, `OnPlayerLeaveGame`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`,
-  `OnPlayerUndeploy`
+- `OnPlayerDamaged`, `OnPlayerDeployed`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`, `OnPlayerEnterAreaTrigger`, `OnPlayerEnterCapturePoint`, `OnPlayerEnterVehicle`, `OnPlayerEnterVehicleSeat`, `OnPlayerExitAreaTrigger`, `OnPlayerExitCapturePoint`, `OnPlayerExitVehicle`, `OnPlayerExitVehicleSeat`, `OnPlayerInteract`, `OnPlayerJoinGame`, `OnPlayerLeaveGame`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`, `OnPlayerUndeploy`
 - `OnRayCastHit`, `OnRayCastMissed`
 - `OnRevived`
 - `OnRingOfFireZoneSizeChange`
@@ -347,8 +294,7 @@ Available event types include:
 
 #### `Events.LogLevel`
 
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Events.setLogging()` to
-configure the minimum log level for error logging in event handlers.
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Events.setLogging()` to configure the minimum log level for error logging in event handlers.
 
 Available log levels:
 
@@ -361,16 +307,13 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 #### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Events.LogLevel, includeError?: boolean): void`
 
-Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged
-using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
+Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
 
 **Parameters:**
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
-- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
-  `Events.LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime
-  error can be very large and may cause issues with UI loggers.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `Events.LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -395,9 +338,7 @@ Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
 
 </ai>
 
-**Note:** Error logging is automatic and fail-safe. Handler errors are caught and logged without affecting other
-handlers or the event system. For more information on the logging functionality, see the
-[`Logging` module documentation](../logging/README.md).
+**Note:** Error logging is automatic and fail-safe. Handler errors are caught and logged without affecting other handlers or the event system. For more information on the logging functionality, see the [`Logging` module documentation](../logging/README.md).
 
 ---
 
@@ -405,25 +346,19 @@ handlers or the event system. For more information on the logging functionality,
 
 ## Usage Patterns
 
-- **Modular Event Handling** – Split your event handling logic across multiple files or modules. Each module can
-  subscribe to the events it needs without conflicts.
+- **Modular Event Handling** – Split your event handling logic across multiple files or modules. Each module can subscribe to the events it needs without conflicts.
 
-- **Conditional Subscriptions** – Subscribe and unsubscribe handlers dynamically based on game state. For example, only
-  subscribe to vehicle events when vehicles are enabled.
+- **Conditional Subscriptions** – Subscribe and unsubscribe handlers dynamically based on game state. For example, only subscribe to vehicle events when vehicles are enabled.
 
-- **Multiple Handlers per Event** – Subscribe multiple handlers to the same event to handle different concerns
-  separately (e.g., one handler for logging, another for game logic, another for UI updates).
+- **Multiple Handlers per Event** – Subscribe multiple handlers to the same event to handle different concerns separately (e.g., one handler for logging, another for game logic, another for UI updates).
 
-- **Async Operations** – Use async handlers for operations that require waiting, such as delayed actions or sequential
-  operations.
+- **Async Operations** – Use async handlers for operations that require waiting, such as delayed actions or sequential operations.
 
-- **Error Handling** – Since errors in handlers are isolated, you can add try-catch blocks within individual handlers
-  for fine-grained error handling without affecting other subscriptions.
+- **Error Handling** – Since errors in handlers are isolated, you can add try-catch blocks within individual handlers for fine-grained error handling without affecting other subscriptions.
 
 ### Advanced Example
 
-This example demonstrates how multiple modules across different files can subscribe to the same events independently,
-highlighting the key benefit of the Events system. Each module handles its own concerns without conflicts.
+This example demonstrates how multiple modules across different files can subscribe to the same events independently, highlighting the key benefit of the Events system. Each module handles its own concerns without conflicts.
 
 **File: `src/stats/player-stats.ts`**
 
@@ -578,15 +513,13 @@ Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
 
 This example demonstrates:
 
-- **Multiple subscriptions to the same event** – `OnPlayerEarnedKill` is subscribed to by `PlayerStats` and
-  `GameLogger`, and all handlers execute independently.
+- **Multiple subscriptions to the same event** – `OnPlayerEarnedKill` is subscribed to by `PlayerStats` and `GameLogger`, and all handlers execute independently.
 
 - **Modular code organization** – Each module manages its own subscriptions without knowing about other modules.
 
 - **No conflicts** – All modules can subscribe to any event without interfering with each other.
 
-- **Clean separation of concerns** – Stats tracking, logging, and UI updates are handled in separate files but all
-  respond to the same game events.
+- **Clean separation of concerns** – Stats tracking, logging, and UI updates are handled in separate files but all respond to the same game events.
 
 </ai>
 
@@ -596,29 +529,21 @@ This example demonstrates:
 
 The `Events` module uses a centralized subscription system:
 
-1. **Event Hook Implementation** – The module exports all Battlefield Portal event handler functions (e.g.,
-   `OnPlayerDeployed`, `OngoingPlayer`, etc.). These functions are automatically called by the Battlefield Portal
-   runtime when events occur.
+1. **Event Hook Implementation** – The module exports all Battlefield Portal event handler functions (e.g., `OnPlayerDeployed`, `OngoingPlayer`, etc.). These functions are automatically called by the Battlefield Portal runtime when events occur.
 
-2. **Internal Triggering** – When a Battlefield Portal event occurs, the corresponding exported function calls
-   `Events.trigger()` with the event type and parameters.
+2. **Internal Triggering** – When a Battlefield Portal event occurs, the corresponding exported function calls `Events.trigger()` with the event type and parameters.
 
-3. **Handler Storage** – Subscribed handlers are stored in a `Map<Type, Set<AllHandlers>>`, allowing multiple handlers
-   per event type.
+3. **Handler Storage** – Subscribed handlers are stored in a `Map<Type, Set<AllHandlers>>`, allowing multiple handlers per event type.
 
-4. **Handler Execution** – When an event is triggered, all subscribed handlers are executed asynchronously using
-   `Promise.resolve()`. This ensures:
+4. **Handler Execution** – When an event is triggered, all subscribed handlers are executed asynchronously using `Promise.resolve()`. This ensures:
     - Both sync and async handlers work correctly
     - Execution is non-blocking
     - Errors in one handler don't affect others
     - Handler errors are automatically caught and logged (if logging is configured via `Events.setLogging()`)
 
-5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be
-   set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility
-   into handler failures without manual error handling.
+5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into handler failures without manual error handling.
 
-6. **Type Safety** – TypeScript generics ensure that handlers match the correct signature for each event type at compile
-   time.
+6. **Type Safety** – TypeScript generics ensure that handlers match the correct signature for each event type at compile time.
 
 ---
 
@@ -626,21 +551,15 @@ The `Events` module uses a centralized subscription system:
 
 ## Known Limitations & Caveats
 
-- **Single Event Hook Requirement** – You must not implement or export any Battlefield Portal event handler functions in
-  your own code. If you do, they will conflict with this module's implementations and cause undefined behavior.
+- **Single Event Hook Requirement** – You must not implement or export any Battlefield Portal event handler functions in your own code. If you do, they will conflict with this module's implementations and cause undefined behavior.
 
-- **Handler Reference Equality** – When unsubscribing, you must pass the exact same function reference that was used in
-  `subscribe()`. Anonymous functions cannot be unsubscribed unless you store the reference. **Recommended:** Use the
-  unsubscribe function returned by `subscribe()` instead of storing handler references.
+- **Handler Reference Equality** – When unsubscribing, you must pass the exact same function reference that was used in `subscribe()`. Anonymous functions cannot be unsubscribed unless you store the reference. **Recommended:** Use the unsubscribe function returned by `subscribe()` instead of storing handler references.
 
-- **Execution Order** – Handler execution order is not guaranteed. If you need handlers to execute in a specific order,
-  chain them manually or use a single handler that calls other functions in order.
+- **Execution Order** – Handler execution order is not guaranteed. If you need handlers to execute in a specific order, chain them manually or use a single handler that calls other functions in order.
 
-- **No Return Values** – Event handlers cannot return values to the caller. All handlers return `void` or
-  `Promise<void>`. If you need to collect results, use shared state or callbacks.
+- **No Return Values** – Event handlers cannot return values to the caller. All handlers return `void` or `Promise<void>`. If you need to collect results, use shared state or callbacks.
 
-- **Non-Blocking Nature** – Because handlers execute asynchronously and non-blocking, you cannot rely on handlers
-  completing before other code executes. Use promises or callbacks if you need to wait for handler completion.
+- **Non-Blocking Nature** – Because handlers execute asynchronously and non-blocking, you cannot rely on handlers completing before other code executes. Use promises or callbacks if you need to wait for handler completion.
 
 </ai>
 
@@ -648,29 +567,20 @@ The `Events` module uses a centralized subscription system:
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
-  Portal.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 - Battlefield Builder docs – For information about available events and their parameters.
 
 ---
 
 ## Future Work
 
-- **Subscribe-time filtering** – Most events are about a target (e.g. a specific player, vehicle, or object). A future
-  version may allow specifying filter criteria at subscribe-time (e.g. “only when this player dies” for `OnPlayerDied`),
-  so handlers run only when the event payload matches. That would make features like `once` (run handler once then
-  unsubscribe), `clearAll`, and `removeAllListeners` meaningful at a filtered level (e.g. “once for this player” or
-  “clear all listeners for this player”) instead of only at the whole-event level.
+- **Subscribe-time filtering** – Most events are about a target (e.g. a specific player, vehicle, or object). A future version may allow specifying filter criteria at subscribe-time (e.g. “only when this player dies” for `OnPlayerDied`), so handlers run only when the event payload matches. That would make features like `once` (run handler once then unsubscribe), `clearAll`, and `removeAllListeners` meaningful at a filtered level (e.g. “once for this player” or “clear all listeners for this player”) instead of only at the whole-event level.
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are
-welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases
-help shape the roadmap (additional event types, handler prioritization, execution order control, etc.), so please share
-your experiences.
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (additional event types, handler prioritization, execution order control, etc.), so please share your experiences.
 
 ---

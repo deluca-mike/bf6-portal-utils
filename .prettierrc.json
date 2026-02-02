@@ -20,10 +20,9 @@
         {
             "files": "*.md",
             "options": {
-                "proseWrap": "always",
+                "proseWrap": "never",
                 "tabWidth": 4,
-                "useTabs": false,
-                "printWidth": 120
+                "useTabs": false
             }
         }
     ]

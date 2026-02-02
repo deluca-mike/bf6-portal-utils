@@ -2,34 +2,22 @@
 
 <ai>
 
-This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlefield Portal, inspired by
-[SolidJS](https://github.com/solidjs/solid). Unlike traditional frameworks that re-render entire components, `SolidUI`
-uses fine-grained reactivity to update only the specific UI properties that change, resulting in minimal overhead and
-maximum performance.
+This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlefield Portal, inspired by [SolidJS](https://github.com/solidjs/solid). Unlike traditional frameworks that re-render entire components, `SolidUI` uses fine-grained reactivity to update only the specific UI properties that change, resulting in minimal overhead and maximum performance.
 
-`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the
-Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates
-seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the
-`Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
+`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the `Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
 
 </ai>
 
-> **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It
-> assumes that UI objects have getters and setters for properties that need to be reactive. All Battlefield Portal types
-> referenced below (`mod.Player`, `mod.Vector`, etc.) come from
-> [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types).
+> **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It assumes that UI objects have getters and setters for properties that need to be reactive. All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, etc.) come from [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types).
 
 ---
 
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
-   mod. The bundler automatically handles code inlining.
-3. **UI Module** – While `SolidUI` is decoupled from the `UI` module, all examples and use cases assume you're using
-   [`UI`](../ui/README.md) classes.
-4. **Button handler** – If using `UI.Button` or `UI.TextButton`, register `UI.handleButtonEvent` once in your
-   `OnPlayerUIButtonEvent` event handler.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
+3. **UI Module** – While `SolidUI` is decoupled from the `UI` module, all examples and use cases assume you're using [`UI`](../ui/README.md) classes.
+4. **Button handler** – If using `UI.Button` or `UI.TextButton`, register `UI.handleButtonEvent` once in your `OnPlayerUIButtonEvent` event handler.
 
 ---
 
@@ -115,30 +103,25 @@ function createCounterUI(player: mod.Player): void {
 
 ### Fine-Grained Reactivity
 
-`SolidUI` uses a fine-grained reactive system where individual properties update independently. When you pass an
-accessor function (signal) as a property value, `SolidUI` automatically:
+`SolidUI` uses a fine-grained reactive system where individual properties update independently. When you pass an accessor function (signal) as a property value, `SolidUI` automatically:
 
 1. Reads the initial value to set up the UI element
 2. Creates an effect that watches the signal
 3. Updates only that specific property when the signal changes
 
-This means if you have a `Text` element with a reactive `message` and `textColor`, updating the message won't cause the
-color to be re-evaluated, and vice versa.
+This means if you have a `Text` element with a reactive `message` and `textColor`, updating the message won't cause the color to be re-evaluated, and vice versa.
 
 ### Signals: The Atoms of Reactivity
 
-Signals are the fundamental reactive primitives in `SolidUI`. They hold a value and notify subscribers when changed.
-Unlike traditional state management, signals track dependencies automatically:
+Signals are the fundamental reactive primitives in `SolidUI`. They hold a value and notify subscribers when changed. Unlike traditional state management, signals track dependencies automatically:
 
-- **Reading a signal** (calling the accessor function) inside an effect or reactive property automatically subscribes to
-  it
+- **Reading a signal** (calling the accessor function) inside an effect or reactive property automatically subscribes to it
 - **Updating a signal** automatically triggers all subscribed effects
 - **No manual dependency arrays** – dependencies are tracked automatically
 
 ### Render-Once Mental Model
 
-Components created with `SolidUI.h()` run once to set up the UI structure. The reactive system handles all updates
-automatically. This means:
+Components created with `SolidUI.h()` run once to set up the UI structure. The reactive system handles all updates automatically. This means:
 
 - Component functions execute once (not on every state change)
 - Reactive properties update independently
@@ -163,9 +146,7 @@ All reactive updates are batched and executed asynchronously via the microtask q
 
 ### Configurable Error Logging
 
-Effect errors and flush errors are automatically logged using the `Logging` module. Use `SolidUI.setLogging()` to
-configure a logger function, minimum log level, and whether to include error details. This provides visibility into
-reactive system failures without requiring manual error handling in every effect.
+Effect errors and flush errors are automatically logged using the `Logging` module. Use `SolidUI.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into reactive system failures without requiring manual error handling in every effect.
 
 ---
 
@@ -177,8 +158,7 @@ The `SolidUI` namespace contains all reactive primitives and utility functions.
 
 #### `SolidUI.LogLevel`
 
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `SolidUI.setLogging()` to
-configure the minimum log level for reactive system error logging.
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `SolidUI.setLogging()` to configure the minimum log level for reactive system error logging.
 
 Available log levels:
 
@@ -191,16 +171,13 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 #### `SolidUI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
 
-Configures logging for the SolidUI module. Effect errors and flush errors are automatically caught and logged using the
-configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
+Configures logging for the SolidUI module. Effect errors and flush errors are automatically caught and logged using the configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
 
 **Parameters:**
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
-- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to
-  `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime
-  error can be very large and may cause issues with UI loggers.
+- `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
+- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -215,14 +192,11 @@ SolidUI.setLogging(
 );
 ```
 
-**Note:** Error logging is automatic and fail-safe. Effect errors are caught and logged without affecting other effects
-or the reactive system. For more information on the logging functionality, see the
-[`Logging` module documentation](../logging/README.md).
+**Note:** Error logging is automatic and fail-safe. Effect errors are caught and logged without affecting other effects or the reactive system. For more information on the logging functionality, see the [`Logging` module documentation](../logging/README.md).
 
 ### `SolidUI.createSignal<T>(initialValue: T): [Accessor<T>, Setter<T>]`
 
-Creates a simple reactive state (a "Signal"). Signals are the atoms of reactivity. They hold a value and notify
-subscribers when changed.
+Creates a simple reactive state (a "Signal"). Signals are the atoms of reactivity. They hold a value and notify subscribers when changed.
 
 **Parameters:**
 
@@ -271,8 +245,7 @@ setVisible(true); // Container becomes visible automatically
 
 ### `SolidUI.createEffect(fn: () => void): () => void`
 
-Creates a side effect that runs immediately and re-runs whenever its dependencies change. This is the bridge between
-reactive state and the outside world (e.g., updating UI props, logs, timers).
+Creates a side effect that runs immediately and re-runs whenever its dependencies change. This is the bridge between reactive state and the outside world (e.g., updating UI props, logs, timers).
 
 **Behavior:**
 
@@ -307,8 +280,7 @@ setCount(10); // Logs: "Count is now: 10"
 dispose();
 ```
 
-**Note:** Effects created inside `SolidUI.h()` are automatically cleaned up when the UI element is deleted. You
-typically don't need to manually dispose of them unless creating standalone effects.
+**Note:** Effects created inside `SolidUI.h()` are automatically cleaned up when the UI element is deleted. You typically don't need to manually dispose of them unless creating standalone effects.
 
 </ai>
 
@@ -368,11 +340,9 @@ SolidUI.h(UI.Text, {
 
 ### `SolidUI.createStore<T extends object>(initialState: T): [T, (fn: (state: T) => void) => void]`
 
-Creates a reactive proxy object for handling nested state. Unlike `createSignal` (which tracks the whole value),
-`createStore` tracks individual properties.
+Creates a reactive proxy object for handling nested state. Unlike `createSignal` (which tracks the whole value), `createStore` tracks individual properties.
 
-**Benefit:** If you update `store.user.name`, only effects listening to `name` will run. Effects listening to
-`store.user.age` will not run.
+**Benefit:** If you update `store.user.name`, only effects listening to `name` will run. Effects listening to `store.user.age` will not run.
 
 **Parameters:**
 
@@ -453,15 +423,13 @@ setUIState((s) => {
 
 ### `SolidUI.createRoot<T>(fn: (dispose: () => void) => T): T`
 
-Creates a reactive scope that is detached from the parent. Unlike Effects, a Root does not track dependencies and does
-not auto-dispose. You must manually call the provided `dispose` function to clean up everything created inside it.
+Creates a reactive scope that is detached from the parent. Unlike Effects, a Root does not track dependencies and does not auto-dispose. You must manually call the provided `dispose` function to clean up everything created inside it.
 
 **Use Case:** Creating dynamic lists, global managers, or UI sections that live/die independently of their parent.
 
 **Parameters:**
 
-- `fn` – A function that receives a `dispose` callback. All effects and cleanup functions created inside this scope will
-  be disposed when `dispose` is called.
+- `fn` – A function that receives a `dispose` callback. All effects and cleanup functions created inside this scope will be disposed when `dispose` is called.
 
 **Returns:**
 
@@ -494,13 +462,11 @@ rootDispose?.();
 }
 ```
 
-**Note:** `SolidUI.h()` internally uses `createRoot` to manage component lifecycles. You typically don't need to call
-`createRoot` directly unless creating standalone reactive scopes.
+**Note:** `SolidUI.h()` internally uses `createRoot` to manage component lifecycles. You typically don't need to call `createRoot` directly unless creating standalone reactive scopes.
 
 ### `SolidUI.createContext<T>(defaultValue: T): Context<T>`
 
-Creates a Context object to pass data deeply without "prop drilling". Contexts are useful for dependency injection,
-theming, or sharing data across many components.
+Creates a Context object to pass data deeply without "prop drilling". Contexts are useful for dependency injection, theming, or sharing data across many components.
 
 **Parameters:**
 
@@ -541,8 +507,7 @@ const theme = SolidUI.useContext(ThemeContext); // Returns 'dark' if inside prov
 
 ### `SolidUI.useContext<T>(context: Context<T>): T`
 
-Reads the current value of a Context. It climbs the scope stack to find the nearest `provide` call for this context. If
-none is found, it returns the default value.
+Reads the current value of a Context. It climbs the scope stack to find the nearest `provide` call for this context. If none is found, it returns the default value.
 
 **Parameters:**
 
@@ -558,14 +523,11 @@ See `createContext` example above.
 
 ### `SolidUI.untrack<T>(fn: () => T): T`
 
-Executes a function without creating dependencies. Any signals read inside `fn` will return their current value, but the
-surrounding Effect will not subscribe to them.
+Executes a function without creating dependencies. Any signals read inside `fn` will return their current value, but the surrounding Effect will not subscribe to them.
 
 **Use Case:** Reading a signal for logging or conditional logic without creating a reactive dependency.
 
-**Note:** If you need to read signals outside of UI code (like in your game logic), you can simply call the signal
-normally as it will not incur any overhead. `untrack` is specifically to read a signal in UI code without causing that
-component to subscribe to that signal.
+**Note:** If you need to read signals outside of UI code (like in your game logic), you can simply call the signal normally as it will not incur any overhead. `untrack` is specifically to read a signal in UI code without causing that component to subscribe to that signal.
 
 **Parameters:**
 
@@ -596,8 +558,7 @@ SolidUI.createEffect(() => {
 
 ### `SolidUI.onCleanup(fn: () => void): void`
 
-Registers a cleanup callback for the current reactive scope. If called inside a component created with `SolidUI.h()`, it
-runs when the component is deleted. If called inside an Effect, it runs before the Effect re-executes (or when it dies).
+Registers a cleanup callback for the current reactive scope. If called inside a component created with `SolidUI.h()`, it runs when the component is deleted. If called inside an Effect, it runs before the Effect re-executes (or when it dies).
 
 **Use Case:** Clearing intervals, removing event listeners, or specialized cleanup logic.
 
@@ -625,21 +586,18 @@ SolidUI.onCleanup(() => {
 });
 ```
 
-**Note:** Cleanup functions registered via `onCleanup` inside `SolidUI.h()` are automatically called when the UI
-element's `delete()` method is invoked.
+**Note:** Cleanup functions registered via `onCleanup` inside `SolidUI.h()` are automatically called when the UI element's `delete()` method is invoked.
 
 </ai>
 
 ### `SolidUI.h<P extends object, T>(component, props, receiver?): T`
 
-The "HyperScript" factory function. Creates a UI Component and sets up reactivity. This is the primary function for
-creating reactive UI elements.
+The "HyperScript" factory function. Creates a UI Component and sets up reactivity. This is the primary function for creating reactive UI elements.
 
 **Parameters:**
 
 - `component` – Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component function
-- `props` – An object of properties. Values can be static OR reactive (Signals/Accessors). If a value is a function,
-  it's treated as an accessor and made reactive.
+- `props` – An object of properties. Values can be static OR reactive (Signals/Accessors). If a value is a function, it's treated as an accessor and made reactive.
 - `receiver` – (Optional) The specific player or team this UI is for
 
 **Returns:**
@@ -733,9 +691,7 @@ SolidUI.h(MyButton, {
 **Important Notes:**
 
 - Properties that are functions are automatically made reactive
-- Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made
-  reactive and are always passed through as-is. This includes event handlers like `onClick`, `onHover`, `onDelete`,
-  etc., but excludes properties like `onlyOnce`, `once`, or `online`
+- Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive and are always passed through as-is. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`
 - All reactive effects are automatically cleaned up when the UI element is deleted
 - You can mix static and reactive properties in the same props object
 
@@ -743,12 +699,9 @@ SolidUI.h(MyButton, {
 
 ### `SolidUI.Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void`
 
-A generic List Renderer optimized for Game UI. Different from `array.map()` in that `Index` renders components based on
-their array position, not their value.
+A generic List Renderer optimized for Game UI. Different from `array.map()` in that `Index` renders components based on their array position, not their value.
 
-**Key Behavior:** If data moves (e.g., `["A", "B"]` → `["B", "A"]`), the widgets at index 0 and 1 stay in place and
-simply update their content to match the elements at their respective indexes. This avoids destroying/recreating
-widgets, which is crucial for performance and Z-order stability.
+**Key Behavior:** If data moves (e.g., `["A", "B"]` → `["B", "A"]`), the widgets at index 0 and 1 stay in place and simply update their content to match the elements at their respective indexes. This avoids destroying/recreating widgets, which is crucial for performance and Z-order stability.
 
 **Parameters:**
 
@@ -1102,8 +1055,7 @@ function createScoreboard(player: mod.Player): void {
 
 ### Real-World Example: Spawn UI
 
-This example is based on the [`FFASpawning`](../ffa-spawning/index.ts) module, demonstrating a complete reactive UI
-system.
+This example is based on the [`FFASpawning`](../ffa-spawning/index.ts) module, demonstrating a complete reactive UI system.
 
 ```ts
 function createSpawnUI(player: mod.Player): void {
@@ -1175,9 +1127,7 @@ All types are defined inside the `SolidUI` namespace in [`solid-ui/index.ts`](in
 
 ### `SolidUI.Accessor<T>`
 
-A generic function that retrieves the current value of a reactive signal. Calling an Accessor establishes a
-"dependency." If you call this function inside an Effect or reactive property, that Effect will automatically re-run
-whenever the Signal's value changes.
+A generic function that retrieves the current value of a reactive signal. Calling an Accessor establishes a "dependency." If you call this function inside an Effect or reactive property, that Effect will automatically re-run whenever the Signal's value changes.
 
 ```ts
 type Accessor<T> = () => T;
@@ -1208,8 +1158,7 @@ interface Context<T> {
 
 ### `SolidUI.Constructable<Params, Instance>`
 
-Defines the contract for any UI Class Constructor (Native or Custom). This type represents a class constructor that
-takes parameters of type `Params` and returns an instance of type `Instance`.
+Defines the contract for any UI Class Constructor (Native or Custom). This type represents a class constructor that takes parameters of type `Params` and returns an instance of type `Instance`.
 
 ```ts
 type Constructable<Params, Instance> = new (params: Params) => Instance;
@@ -1217,8 +1166,7 @@ type Constructable<Params, Instance> = new (params: Params) => Instance;
 
 **Usage:**
 
-This type is used internally by `SolidUI.h()` to accept UI class constructors like `UI.Button`, `UI.Container`, etc. You
-typically don't need to use this type directly, but it's useful for understanding how `h()` accepts class constructors.
+This type is used internally by `SolidUI.h()` to accept UI class constructors like `UI.Button`, `UI.Container`, etc. You typically don't need to use this type directly, but it's useful for understanding how `h()` accepts class constructors.
 
 **Example:**
 
@@ -1231,8 +1179,7 @@ const button = SolidUI.h(UI.Button, {
 
 ### `SolidUI.FunctionalComponent<Params, Instance>`
 
-Defines the contract for a functional component. This type represents a function that takes reactive props of type
-`Reactive<Params>` and returns an instance of type `Instance`.
+Defines the contract for a functional component. This type represents a function that takes reactive props of type `Reactive<Params>` and returns an instance of type `Instance`.
 
 ```ts
 type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instance;
@@ -1240,8 +1187,7 @@ type FunctionalComponent<Params, Instance> = (props: Reactive<Params>) => Instan
 
 **Usage:**
 
-This type is used internally by `SolidUI.h()` to accept functional components. When you pass a function to `h()`, it's
-treated as a `FunctionalComponent`. The function receives props where each property can optionally be a Signal/Accessor.
+This type is used internally by `SolidUI.h()` to accept functional components. When you pass a function to `h()`, it's treated as a `FunctionalComponent`. The function receives props where each property can optionally be a Signal/Accessor.
 
 <ai>
 
@@ -1266,8 +1212,7 @@ SolidUI.h(MyButton, {
 });
 ```
 
-**Note:** Functional components receive props where values can be either static values or accessor functions (signals).
-The component can call accessors to get reactive values, but the props themselves are not automatically unwrapped.
+**Note:** Functional components receive props where values can be either static values or accessor functions (signals). The component can call accessors to get reactive values, but the props themselves are not automatically unwrapped.
 
 </ai>
 
@@ -1306,9 +1251,7 @@ All updates are scheduled asynchronously:
 
 ### Error Logging
 
-Effect errors and flush errors are caught and logged using the `Logging` module. The logging configuration can be set
-via `SolidUI.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into
-reactive system failures without manual error handling. Errors in one effect won't prevent other effects from executing.
+Effect errors and flush errors are caught and logged using the `Logging` module. The logging configuration can be set via `SolidUI.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into reactive system failures without manual error handling. Errors in one effect won't prevent other effects from executing.
 
 ### Component Lifecycle
 
@@ -1331,25 +1274,19 @@ When you call `SolidUI.h()`:
 
 ### UI Module Dependency
 
-While `SolidUI` is decoupled from the `UI` module, it assumes that UI objects have getters and setters for properties.
-It has only been tested with the `UI` module. Using it with other UI systems may require adaptation.
+While `SolidUI` is decoupled from the `UI` module, it assumes that UI objects have getters and setters for properties. It has only been tested with the `UI` module. Using it with other UI systems may require adaptation.
 
 ### Property Assignment
 
-`SolidUI.h()` uses property setters to update UI elements. If a property is read-only or doesn't have a setter, updates
-will fail silently (errors are caught). Ensure your UI objects have proper setters for reactive properties.
+`SolidUI.h()` uses property setters to update UI elements. If a property is read-only or doesn't have a setter, updates will fail silently (errors are caught). Ensure your UI objects have proper setters for reactive properties.
 
 ### Accessor Function Detection
 
-`SolidUI.h()` treats any function value as an accessor. If you need to pass a function as a static value (not reactive),
-you'll need to work around this. Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an
-uppercase letter) are never made reactive. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but
-excludes properties like `onlyOnce`, `once`, or `online`.
+`SolidUI.h()` treats any function value as an accessor. If you need to pass a function as a static value (not reactive), you'll need to work around this. Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`.
 
 ### Store Updates
 
-Store updates must use the `setStore` function with a producer. Direct assignment to store properties (e.g.,
-`store.value = 5`) works but may not trigger reactivity correctly in all cases. Always use the setter:
+Store updates must use the `setStore` function with a producer. Direct assignment to store properties (e.g., `store.value = 5`) works but may not trigger reactivity correctly in all cases. Always use the setter:
 
 ```ts
 // ✅ Correct
@@ -1363,24 +1300,19 @@ store.value = 5;
 
 ### Effect Execution Order
 
-Effects execute in the order they were scheduled, but there's no guarantee of execution order across different signals.
-If you need specific ordering, chain effects manually or use a single effect.
+Effects execute in the order they were scheduled, but there's no guarantee of execution order across different signals. If you need specific ordering, chain effects manually or use a single effect.
 
 ### Effect Error Handling
 
-Effect errors are automatically caught and logged (if logging is configured via `SolidUI.setLogging()`) to prevent one
-failing effect from breaking the entire reactive system. Errors are logged at the `Error` log level. If you need
-additional error handling, implement it inside your effects.
+Effect errors are automatically caught and logged (if logging is configured via `SolidUI.setLogging()`) to prevent one failing effect from breaking the entire reactive system. Errors are logged at the `Error` log level. If you need additional error handling, implement it inside your effects.
 
 ### Memory Management
 
-Effects and subscriptions are automatically cleaned up when UI elements are deleted. However, if you create standalone
-effects or roots, you must manually dispose of them to prevent memory leaks.
+Effects and subscriptions are automatically cleaned up when UI elements are deleted. However, if you create standalone effects or roots, you must manually dispose of them to prevent memory leaks.
 
 ### Async Updates
 
-All reactive updates are asynchronous. If you need synchronous updates (not recommended), you'll need to use the
-underlying `UI` module directly.
+All reactive updates are asynchronous. If you need synchronous updates (not recommended), you'll need to use the underlying `UI` module directly.
 
 </ai>
 
@@ -1390,21 +1322,15 @@ underlying `UI` module directly.
 
 - [`UI` Module Documentation](../ui/README.md) – The UI helper module that `SolidUI` is designed to work with
 - [`FFASpawning` Module](../ffa-spawning/index.ts) – Real-world example of `SolidUI` usage
-- [SolidJS Documentation](https://www.solidjs.com/docs/latest) – Inspiration and design philosophy (note: `SolidUI` uses
-  HyperScript, not JSX)
+- [SolidJS Documentation](https://www.solidjs.com/docs/latest) – Inspiration and design philosophy (note: `SolidUI` uses HyperScript, not JSX)
 - [SolidJS GitHub](https://github.com/solidjs/solid) – Original SolidJS implementation
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
-  Portal
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are
-welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases
-help shape the roadmap (additional reactive primitives, performance optimizations, developer experience improvements,
-etc.), so please share your experiences.
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (additional reactive primitives, performance optimizations, developer experience improvements, etc.), so please share your experiences.
 
 ---

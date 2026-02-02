@@ -2,14 +2,11 @@
 
 <ai>
 
-The `UITextButton` component creates a button with integrated text content. It combines `UIButton` and `UIText`
-functionality into a single element, wrapping both in a container and delegating properties appropriately. The text
-automatically updates its appearance when the button is enabled or disabled.
+The `UITextButton` component creates a button with integrated text content. It combines `UIButton` and `UIText` functionality into a single element, wrapping both in a container and delegating properties appropriately. The text automatically updates its appearance when the button is enabled or disabled.
 
 </ai>
 
-> **Note** This component extends `UIContentButton<UIText>`. For information about the base `UI` namespace
-> functionality, see the [main UI documentation](../../README.md).
+> **Note** This component extends `UIContentButton<UIText>`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
 
@@ -51,17 +48,17 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 
 ## Constructor Parameters
 
-| Param                                        | Type / Default                       | Notes                                                                                                 |
-| -------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Param | Type / Default | Notes |
+| --- | --- | --- |
 | All parameters from `UIButton.Params`, plus: |
-| `message`                                    | `mod.Message`                        | **Required.** Text label content. Note: `mod.Message` is opaque and cannot be unpacked into a string. |
-| `textSize`                                   | `number = 36`                        | Font size.                                                                                            |
-| `textColor`                                  | `mod.Vector = UI.COLORS.BLACK`       | Text color (used when button is enabled).                                                             |
-| `textAlpha`                                  | `number = 1`                         | Text opacity (used when button is enabled).                                                           |
-| `textAnchor`                                 | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget.                                                                     |
-| `textDisabledColor`                          | `mod.Vector = UI.COLORS.BF_GREY_2`   | Text color when button is disabled.                                                                   |
-| `textDisabledAlpha`                          | `number = 1`                         | Text opacity when button is disabled.                                                                 |
-| `padding`                                    | `number = 0`                         | Container padding.                                                                                    |
+| `message` | `mod.Message` | **Required.** Text label content. Note: `mod.Message` is opaque and cannot be unpacked into a string. |
+| `textSize` | `number = 36` | Font size. |
+| `textColor` | `mod.Vector = UI.COLORS.BLACK` | Text color (used when button is enabled). |
+| `textAlpha` | `number = 1` | Text opacity (used when button is enabled). |
+| `textAnchor` | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget. |
+| `textDisabledColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Text color when button is disabled. |
+| `textDisabledAlpha` | `number = 1` | Text opacity when button is disabled. |
+| `padding` | `number = 0` | Container padding. |
 
 For a complete list of `UIButton.Params`, see the [UIButton documentation](../button/README.md).
 
@@ -81,8 +78,7 @@ For a complete list of `UIButton.Params`, see the [UIButton documentation](../bu
 - **Lifecycle**: `delete()`, `deleted`
 - **Parent Management**: `parent`, `setParent()`
 
-For complete documentation of these properties, see the
-[main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
@@ -112,11 +108,9 @@ Text properties are delegated from the internal `UIText` instance:
 - **`textAlpha: number`** (getter/setter) – Text opacity (used when button is enabled).
 - **`setTextAlpha(alpha: number): UITextButton`** – Sets text opacity and returns `this` for method chaining.
 - **`textDisabledColor: mod.Vector`** (getter/setter) – Text color when button is disabled.
-- **`setTextDisabledColor(color: mod.Vector): UITextButton`** – Sets disabled text color and returns `this` for method
-  chaining.
+- **`setTextDisabledColor(color: mod.Vector): UITextButton`** – Sets disabled text color and returns `this` for method chaining.
 - **`textDisabledAlpha: number`** (getter/setter) – Text opacity when button is disabled.
-- **`setTextDisabledAlpha(alpha: number): UITextButton`** – Sets disabled text opacity and returns `this` for method
-  chaining.
+- **`setTextDisabledAlpha(alpha: number): UITextButton`** – Sets disabled text opacity and returns `this` for method chaining.
 - **`padding: number`** (getter/setter) – Container padding.
 - **`setPadding(padding: number): UITextButton`** – Sets padding and returns `this` for method chaining.
 
@@ -148,17 +142,13 @@ type Params = UIButton.Params &
 
 ## Usage Notes
 
-- **Automatic Text State Management**: When the button's `enabled` state changes, the text automatically switches
-  between `textColor`/`textAlpha` (enabled) and `textDisabledColor`/`textDisabledAlpha` (disabled).
+- **Automatic Text State Management**: When the button's `enabled` state changes, the text automatically switches between `textColor`/`textAlpha` (enabled) and `textDisabledColor`/`textDisabledAlpha` (disabled).
 
-- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and text size,
-  accounting for padding.
+- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and text size, accounting for padding.
 
-- **Padding**: The component supports padding, which creates space between the button border and the text content. The
-  text size is automatically adjusted to account for padding.
+- **Padding**: The component supports padding, which creates space between the button border and the text content. The text size is automatically adjusted to account for padding.
 
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for
-  button clicks to work. See the Quick Start section above.
+- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
@@ -172,5 +162,4 @@ type Params = UIButton.Params &
 - [UIContentButton Documentation](../content-button/README.md) – For information about the base class
 - [UIButton Documentation](../button/README.md) – For information about button properties
 - [UIText Documentation](../text/README.md) – For information about text properties
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations

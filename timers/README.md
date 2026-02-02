@@ -2,35 +2,22 @@
 
 <ai>
 
-This TypeScript `Timers` class provides `setTimeout` and `setInterval` functionality for Battlefield Portal experiences
-which run in a QuickJS runtime, which does not natively include these standard JavaScript timing functions. The module
-uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs,
-and provides error handling to ensure robust timer execution.
+This TypeScript `Timers` class provides `setTimeout` and `setInterval` functionality for Battlefield Portal experiences which run in a QuickJS runtime, which does not natively include these standard JavaScript timing functions. The module uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs, and provides error handling to ensure robust timer execution.
 
 </ai>
 
-**Why use Timers instead of `mod.Wait()`?** The `Timers` module offers significant advantages: timers can be cancelled
-with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently without blocking, automatic error handling
-prevents timer failures from crashing your mod, and the familiar JavaScript API makes code more readable and
-maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario where you need cancellable or
-recurring delays. See the [Comparing Timers to mod.Wait()](#comparing-timers-to-modwait) section below for a detailed
-comparison.
+**Why use Timers instead of `mod.Wait()`?** The `Timers` module offers significant advantages: timers can be cancelled with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently without blocking, automatic error handling prevents timer failures from crashing your mod, and the familiar JavaScript API makes code more readable and maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario where you need cancellable or recurring delays. See the [Comparing Timers to mod.Wait()](#comparing-timers-to-modwait) section below for a detailed comparison.
 
-Key features include automatic timer ID management, graceful error handling that prevents timer failures from crashing
-your mod, support for immediate interval execution, and configurable logging for debugging timer behavior. The module
-uses the `Logging` module for internal logging, allowing you to monitor callback errors and debug timer behavior.
+Key features include automatic timer ID management, graceful error handling that prevents timer failures from crashing your mod, support for immediate interval execution, and configurable logging for debugging timer behavior. The module uses the `Logging` module for internal logging, allowing you to monitor callback errors and debug timer behavior.
 
-> **Note** The `Timers` class is self-contained and requires no additional modules or setup. All Battlefield Portal
-> types referenced below (`mod.Wait`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact
-> signatures.
+> **Note** The `Timers` class is self-contained and requires no additional modules or setup. All Battlefield Portal types referenced below (`mod.Wait`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
 
 ---
 
 ## Prerequisites
 
 1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your
-   mod. The bundler automatically handles code inlining.
+2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
 
 ---
 
@@ -43,8 +30,7 @@ uses the `Logging` module for internal logging, allowing you to monitor callback
     ```
 3. Optionally set up logging for debugging (recommended during development).
 4. Use `Timers.setTimeout()` and `Timers.setInterval()` just like you would in standard JavaScript.
-5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will
-   automatically inline the code).
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
 
@@ -133,48 +119,30 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ## Core Concepts
 
-- **Timer IDs** – Each timer (timeout or interval) is assigned a unique numeric ID that can be used to cancel it later.
-  IDs are auto-incremented starting from 1.
-- **Active Timer Tracking** – The system maintains a set of active timer IDs. When a timer is cleared or completes, its
-  ID is removed from the active set.
-- **Error Handling** – Callback errors (both synchronous and asynchronous) are caught and logged (if logging is
-  configured) but do not stop timer execution. System errors (e.g., `mod.Wait()` failures) are also handled gracefully.
-- **Asynchronous Execution** – Timers run asynchronously using `async/await` with `mod.Wait()`, so they don't block your
-  main event handlers.
-- **Fire-and-Forget** – Timer callbacks are executed in fire-and-forget async functions, so you don't need to await
-  them.
-- **Configurable Error Logging** – Callback errors are automatically logged using the `Logging` module. Use
-  `Timers.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This
-  provides visibility into timer failures without requiring manual error handling in every callback.
+- **Timer IDs** – Each timer (timeout or interval) is assigned a unique numeric ID that can be used to cancel it later. IDs are auto-incremented starting from 1.
+- **Active Timer Tracking** – The system maintains a set of active timer IDs. When a timer is cleared or completes, its ID is removed from the active set.
+- **Error Handling** – Callback errors (both synchronous and asynchronous) are caught and logged (if logging is configured) but do not stop timer execution. System errors (e.g., `mod.Wait()` failures) are also handled gracefully.
+- **Asynchronous Execution** – Timers run asynchronously using `async/await` with `mod.Wait()`, so they don't block your main event handlers.
+- **Fire-and-Forget** – Timer callbacks are executed in fire-and-forget async functions, so you don't need to await them.
+- **Configurable Error Logging** – Callback errors are automatically logged using the `Logging` module. Use `Timers.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into timer failures without requiring manual error handling in every callback.
 
 ---
 
 ## Comparing Timers to mod.Wait()
 
-While `mod.Wait()` is the underlying API used by this module, the `Timers` class provides significant advantages that
-make it a better choice for most timing scenarios:
+While `mod.Wait()` is the underlying API used by this module, the `Timers` class provides significant advantages that make it a better choice for most timing scenarios:
 
 ### Key Advantages
 
-- **Cancellable Timers** – Unlike `mod.Wait()`, which cannot be cancelled once started, timers can be cancelled at any
-  time using `clearTimeout()` or `clearInterval()`. This is essential for scenarios like respawn timers that should be
-  cancelled if a player spawns early, or debouncing where you need to reset a delay.
+- **Cancellable Timers** – Unlike `mod.Wait()`, which cannot be cancelled once started, timers can be cancelled at any time using `clearTimeout()` or `clearInterval()`. This is essential for scenarios like respawn timers that should be cancelled if a player spawns early, or debouncing where you need to reset a delay.
 
-- **Concurrent Execution** – Multiple timers can run simultaneously without blocking each other or your main event
-  handlers. With `mod.Wait()`, you'd need to carefully manage async functions and await chains, which becomes unwieldy
-  with multiple concurrent delays.
+- **Concurrent Execution** – Multiple timers can run simultaneously without blocking each other or your main event handlers. With `mod.Wait()`, you'd need to carefully manage async functions and await chains, which becomes unwieldy with multiple concurrent delays.
 
-- **Automatic Error Handling** – Timer callbacks are wrapped in error handling that prevents failures from crashing your
-  mod. If a callback throws an error, it's caught and logged (if logging is enabled), but other timers continue running
-  normally.
+- **Automatic Error Handling** – Timer callbacks are wrapped in error handling that prevents failures from crashing your mod. If a callback throws an error, it's caught and logged (if logging is enabled), but other timers continue running normally.
 
-- **Familiar JavaScript API** – `setTimeout()` and `setInterval()` are standard JavaScript functions that most
-  developers already know. This makes code more readable and maintainable compared to manually managing `mod.Wait()`
-  calls in async functions.
+- **Familiar JavaScript API** – `setTimeout()` and `setInterval()` are standard JavaScript functions that most developers already know. This makes code more readable and maintainable compared to manually managing `mod.Wait()` calls in async functions.
 
-- **Periodic Tasks Made Easy** – `setInterval()` provides a clean way to run recurring operations without manually
-  implementing loops with `mod.Wait()`. The timer automatically handles the repetition and can be cancelled when no
-  longer needed.
+- **Periodic Tasks Made Easy** – `setInterval()` provides a clean way to run recurring operations without manually implementing loops with `mod.Wait()`. The timer automatically handles the repetition and can be cancelled when no longer needed.
 
 ### Ideal Use Cases
 
@@ -183,11 +151,9 @@ The `Timers` module is particularly well-suited for:
 - **Periodic tasks** – Scoreboard updates, health checks, periodic spawns, or any recurring operation
 - **Delayed actions** – Respawn timers, delayed announcements, cleanup tasks that should happen after a delay
 - **Debouncing** – Input handlers that should only trigger after a period of inactivity
-- **Cancellable delays** – Any scenario where you might need to cancel a pending action (e.g., cancelling a respawn if
-  the player manually spawns)
+- **Cancellable delays** – Any scenario where you might need to cancel a pending action (e.g., cancelling a respawn if the player manually spawns)
 
-While `mod.Wait()` is still useful for simple, linear delays in async functions, the `Timers` module is the recommended
-approach for most timing needs in Battlefield Portal experiences.
+While `mod.Wait()` is still useful for simple, linear delays in async functions, the `Timers` module is the recommended approach for most timing needs in Battlefield Portal experiences.
 
 ---
 
@@ -199,8 +165,7 @@ All methods are static. The class does not need to be instantiated.
 
 #### `Timers.LogLevel`
 
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Timers.setLogging()` to
-configure the minimum log level for timer callback error logging.
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Timers.setLogging()` to configure the minimum log level for timer callback error logging.
 
 Available log levels:
 
@@ -213,31 +178,25 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 #### Static Methods
 
-| Method                                                                                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Method | Description |
+| --- | --- |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the Timers module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. This allows you to monitor and debug timer callback failures without breaking your mod. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
-| `setTimeout(callback: () => Promise<void> \| void, ms: number): number`                                        | Schedules a one-time execution of `callback` after `ms` milliseconds delay. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a timer ID that can be used with `clearTimeout()`, `clearInterval()`, or `clear()`.                                                                                                                                                                                                                                                                              |
-| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): number`                  | Schedules repeated execution of `callback` every `ms` milliseconds. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a timer ID that can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. If `immediate` is `true`, the callback runs immediately before the first wait period. Defaults to `false`.                                                                                                                                                                           |
-| `clearTimeout(id: number \| undefined \| null): void`                                                          | Cancels a timeout or interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearInterval()`.                                                                                                                                                                                                                                                                                                                                          |
-| `clearInterval(id: number \| undefined \| null): void`                                                         | Cancels an interval or timeout identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearTimeout()`.                                                                                                                                                                                                                                                                                                                                          |
-| `clear(id: number \| undefined \| null): void`                                                                 | Generic function to cancel a timeout or interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. Since timer and interval IDs are indistinguishable under the hood, this function can be used for simplicity instead of `clearTimeout()` or `clearInterval()`.                                                                                                                                                                                                                                                 |
-| `getActiveTimerCount(): number`                                                                                | Returns the number of currently active timers (both timeouts and intervals). Useful for performance monitoring and debugging timer leaks.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `setTimeout(callback: () => Promise<void> \| void, ms: number): number` | Schedules a one-time execution of `callback` after `ms` milliseconds delay. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a timer ID that can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
+| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): number` | Schedules repeated execution of `callback` every `ms` milliseconds. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a timer ID that can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. If `immediate` is `true`, the callback runs immediately before the first wait period. Defaults to `false`. |
+| `clearTimeout(id: number \| undefined \| null): void` | Cancels a timeout or interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearInterval()`. |
+| `clearInterval(id: number \| undefined \| null): void` | Cancels an interval or timeout identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearTimeout()`. |
+| `clear(id: number \| undefined \| null): void` | Generic function to cancel a timeout or interval identified by `id`. Silently ignores `null`, `undefined`, or invalid IDs. Since timer and interval IDs are indistinguishable under the hood, this function can be used for simplicity instead of `clearTimeout()` or `clearInterval()`. |
+| `getActiveTimerCount(): number` | Returns the number of currently active timers (both timeouts and intervals). Useful for performance monitoring and debugging timer leaks. |
 
 ---
 
 ## Usage Patterns
 
-- **One-time delays** – Use `setTimeout()` for actions that should happen once after a delay (e.g., respawn timers,
-  delayed announcements, cleanup tasks).
-- **Periodic tasks** – Use `setInterval()` for recurring operations (e.g., health checks, scoreboard updates, periodic
-  spawns).
-- **Immediate intervals** – Use `setInterval()` with `immediate: true` when you need initialization logic that runs
-  right away, then repeats periodically.
-- **Timer cleanup** – Always clear timers when they're no longer needed (e.g., when a player leaves, when the game mode
-  ends) to prevent memory leaks and unexpected behavior. Use `clear()`, `clearTimeout()`, or `clearInterval()`—they all
-  work the same since timer IDs are indistinguishable.
-- **Performance monitoring** – Use `getActiveTimerCount()` to monitor the number of active timers and debug potential
-  timer leaks or performance issues.
+- **One-time delays** – Use `setTimeout()` for actions that should happen once after a delay (e.g., respawn timers, delayed announcements, cleanup tasks).
+- **Periodic tasks** – Use `setInterval()` for recurring operations (e.g., health checks, scoreboard updates, periodic spawns).
+- **Immediate intervals** – Use `setInterval()` with `immediate: true` when you need initialization logic that runs right away, then repeats periodically.
+- **Timer cleanup** – Always clear timers when they're no longer needed (e.g., when a player leaves, when the game mode ends) to prevent memory leaks and unexpected behavior. Use `clear()`, `clearTimeout()`, or `clearInterval()`—they all work the same since timer IDs are indistinguishable.
+- **Performance monitoring** – Use `getActiveTimerCount()` to monitor the number of active timers and debug potential timer leaks or performance issues.
 
 ### Example: Debounced Input Handler
 
@@ -331,8 +290,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 The `Timers` class implements timer functionality using Battlefield Portal's `mod.Wait()` API:
 
-1. **Timer ID Generation** – Each timer receives a unique, auto-incremented ID starting from 1. This ID is added to the
-   `_ACTIVE_IDS` set when the timer is created.
+1. **Timer ID Generation** – Each timer receives a unique, auto-incremented ID starting from 1. This ID is added to the `_ACTIVE_IDS` set when the timer is created.
 
 2. **setTimeout Implementation** – Creates an async function that:
     - Waits for the specified delay using `await mod.Wait(ms / 1_000)` (converts milliseconds to seconds)
@@ -349,60 +307,42 @@ The `Timers` class implements timer functionality using Battlefield Portal's `mo
     - Executes the callback in a try-catch to prevent errors from stopping the loop
     - Catches system errors (e.g., `mod.Wait()` failures) and cleans up the timer
 
-4. **Timer Cancellation** – `clearTimeout()`, `clearInterval()`, and `clear()` all remove the timer ID from the active
-   set. Since timer and interval IDs are indistinguishable under the hood, these functions can be used interchangeably.
-   The next time the timer checks `_ACTIVE_IDS.has(id)`, it will exit early, effectively canceling the timer.
+4. **Timer Cancellation** – `clearTimeout()`, `clearInterval()`, and `clear()` all remove the timer ID from the active set. Since timer and interval IDs are indistinguishable under the hood, these functions can be used interchangeably. The next time the timer checks `_ACTIVE_IDS.has(id)`, it will exit early, effectively canceling the timer.
 
-5. **Error Isolation** – Callback errors (both synchronous and asynchronous) are caught and logged (if logging is
-   configured via `Timers.setLogging()`) but don't prevent timers from continuing. This ensures that one failing
-   callback doesn't break other timers or your mod's execution.
+5. **Error Isolation** – Callback errors (both synchronous and asynchronous) are caught and logged (if logging is configured via `Timers.setLogging()`) but don't prevent timers from continuing. This ensures that one failing callback doesn't break other timers or your mod's execution.
 
-6. **Error Logging** – Callback errors are caught and logged using the `Logging` module. The logging configuration can
-   be set via `Timers.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides
-   visibility into timer failures without manual error handling.
+6. **Error Logging** – Callback errors are caught and logged using the `Logging` module. The logging configuration can be set via `Timers.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into timer failures without manual error handling.
 
 ---
 
 ## Known Limitations & Caveats
 
-- **Async Callbacks** – Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Async
-  callbacks are not awaited by the timer, meaning:
+- **Async Callbacks** – Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Async callbacks are not awaited by the timer, meaning:
     - The timer doesn't wait for async operations to complete before continuing
     - Errors or rejections from async callbacks are automatically caught and logged (if logging is configured)
     - If you need to await async operations, handle that inside your callback
 
-- **No Pause/Resume** – The current implementation does not support pausing and resuming timers. You must clear and
-  recreate timers if you need this functionality.
+- **No Pause/Resume** – The current implementation does not support pausing and resuming timers. You must clear and recreate timers if you need this functionality.
 
-- **Precision** – Timer precision depends on `mod.Wait()`'s precision, which may vary slightly based on game performance
-  and frame timing.
+- **Precision** – Timer precision depends on `mod.Wait()`'s precision, which may vary slightly based on game performance and frame timing.
 
-- **Memory Considerations** – While timer IDs are cleaned up automatically, you should still clear timers when they're
-  no longer needed to prevent callback references from being retained in memory.
+- **Memory Considerations** – While timer IDs are cleaned up automatically, you should still clear timers when they're no longer needed to prevent callback references from being retained in memory.
 
-- **Concurrent Execution** – Multiple timers can execute their callbacks concurrently. If you need sequential execution
-  or mutual exclusion, you'll need to implement that logic yourself.
+- **Concurrent Execution** – Multiple timers can execute their callbacks concurrently. If you need sequential execution or mutual exclusion, you'll need to implement that logic yourself.
 
-- **Timer ID Interchangeability** – Timer and interval IDs are indistinguishable under the hood. You can use
-  `clearTimeout()`, `clearInterval()`, or the generic `clear()` function interchangeably. The generic `clear()` function
-  is provided for simplicity.
+- **Timer ID Interchangeability** – Timer and interval IDs are indistinguishable under the hood. You can use `clearTimeout()`, `clearInterval()`, or the generic `clear()` function interchangeably. The generic `clear()` function is provided for simplicity.
 
 ---
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for
-  Portal.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are
-welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases
-help shape the roadmap (pause/resume functionality, timer pooling, additional timing utilities, etc.), so please share
-your experiences.
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (pause/resume functionality, timer pooling, additional timing utilities, etc.), so please share your experiences.
 
 ---

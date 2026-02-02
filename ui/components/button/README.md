@@ -1,11 +1,8 @@
 # UIButton Component
 
-The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled,
-pressed, hover, focused) with customizable colors and opacities for each state. Buttons automatically register
-themselves with the UI system so their `onClick` handlers are called when pressed.
+The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled, pressed, hover, focused) with customizable colors and opacities for each state. Buttons automatically register themselves with the UI system so their `onClick` handlers are called when pressed.
 
-> **Note** This component extends `UI.Element` and implements `UI.Button`. For information about the base `UI` namespace
-> functionality, see the [main UI documentation](../../README.md).
+> **Note** This component extends `UI.Element` and implements `UI.Button`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
 
@@ -29,8 +26,7 @@ const button = new UIButton({
 button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.GREEN);
 ```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks
-to work:
+**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work:
 
 ```ts
 import { UI } from 'bf6-portal-utils/ui';
@@ -44,33 +40,33 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 
 ## Constructor Parameters
 
-| Param                    | Type / Default                                       | Notes                                                                                                                                                     |
-| ------------------------ | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x`, `y`                 | `number = 0`                                         | Position relative to `anchor`. Mutually exclusive with `position`.                                                                                        |
-| `position`               | `UI.Position \| undefined`                           | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`.                                                                                  |
-| `width`, `height`        | `number = 0`                                         | Size in screen units. Mutually exclusive with `size`.                                                                                                     |
-| `size`                   | `UI.Size \| undefined`                               | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`.                                                                    |
-| `anchor`                 | `mod.UIAnchor = mod.UIAnchor.Center`                 | See `mod` namespace for enum values.                                                                                                                      |
-| `parent`                 | `UI.Parent \| undefined`                             | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed.                                               |
-| `visible`                | `boolean = true`                                     | Initial visibility.                                                                                                                                       |
-| `bgColor`                | `mod.Vector = UI.COLORS.WHITE`                       | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white).                  |
-| `bgAlpha`                | `number = 1`                                         | Button background opacity. Note: Alphas are multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.              |
-| `bgFill`                 | `mod.UIBgFill = mod.UIBgFill.Solid`                  | Button fill mode.                                                                                                                                         |
-| `depth`                  | `mod.UIDepth = mod.UIDepth.AboveGameUI`              | Z-order.                                                                                                                                                  |
-| `receiver`               | `mod.Player \| mod.Team \| undefined`                | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
-| `uiInputModeWhenVisible` | `boolean = false`                                    | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section).                |
-| `enabled`                | `boolean = true`                                     | Initial enabled state.                                                                                                                                    |
-| `baseColor`              | `mod.Vector = UI.COLORS.BF_GREY_2`                   | Base button color.                                                                                                                                        |
-| `baseAlpha`              | `number = 1`                                         | Base button opacity.                                                                                                                                      |
-| `disabledColor`          | `mod.Vector = UI.COLORS.BF_GREY_3`                   | Disabled state color.                                                                                                                                     |
-| `disabledAlpha`          | `number = 1`                                         | Disabled state opacity.                                                                                                                                   |
-| `pressedColor`           | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT`             | Pressed state color.                                                                                                                                      |
-| `pressedAlpha`           | `number = 1`                                         | Pressed state opacity.                                                                                                                                    |
-| `hoverColor`             | `mod.Vector = UI.COLORS.BF_GREY_1`                   | Hover state color.                                                                                                                                        |
-| `hoverAlpha`             | `number = 1`                                         | Hover state opacity.                                                                                                                                      |
-| `focusedColor`           | `mod.Vector = UI.COLORS.BF_GREY_1`                   | Focused state color.                                                                                                                                      |
-| `focusedAlpha`           | `number = 1`                                         | Focused state opacity.                                                                                                                                    |
-| `onClick`                | `(player: mod.Player) => Promise<void> \| undefined` | Click handler stored in the button instance.                                                                                                              |
+| Param | Type / Default | Notes |
+| --- | --- | --- |
+| `x`, `y` | `number = 0` | Position relative to `anchor`. Mutually exclusive with `position`. |
+| `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
+| `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
+| `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
+| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
+| `visible` | `boolean = true` | Initial visibility. |
+| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
+| `bgAlpha` | `number = 1` | Button background opacity. Note: Alphas are multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect. |
+| `bgFill` | `mod.UIBgFill = mod.UIBgFill.Solid` | Button fill mode. |
+| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
+| `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
+| `enabled` | `boolean = true` | Initial enabled state. |
+| `baseColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Base button color. |
+| `baseAlpha` | `number = 1` | Base button opacity. |
+| `disabledColor` | `mod.Vector = UI.COLORS.BF_GREY_3` | Disabled state color. |
+| `disabledAlpha` | `number = 1` | Disabled state opacity. |
+| `pressedColor` | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
+| `pressedAlpha` | `number = 1` | Pressed state opacity. |
+| `hoverColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Hover state color. |
+| `hoverAlpha` | `number = 1` | Hover state opacity. |
+| `focusedColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Focused state color. |
+| `focusedAlpha` | `number = 1` | Focused state opacity. |
+| `onClick` | `(player: mod.Player) => Promise<void> \| undefined` | Click handler stored in the button instance. |
 
 ---
 
@@ -88,8 +84,7 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 - **Lifecycle**: `delete()`, `deleted`
 - **Parent Management**: `parent`, `setParent()`
 
-For complete documentation of these properties, see the
-[main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Button-Specific
 
@@ -99,17 +94,14 @@ For complete documentation of these properties, see the
 
 - **`onClick: ((player: mod.Player) => Promise<void>) | undefined`** (getter/setter) – Click handler.
 
-- **`setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): UIButton`** – Sets click handler and
-  returns `this` for method chaining.
+- **`setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): UIButton`** – Sets click handler and returns `this` for method chaining.
 
 **Color & Alpha Getters/Setters** (all support method chaining):
 
 - **`baseColor`, `disabledColor`, `focusedColor`, `hoverColor`, `pressedColor: mod.Vector`** (getter/setter)
-- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setHoverColor(color)`,
-  `setPressedColor(color): UIButton`**
+- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setHoverColor(color)`, `setPressedColor(color): UIButton`**
 - **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `hoverAlpha`, `pressedAlpha: number`** (getter/setter)
-- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setHoverAlpha(alpha)`,
-  `setPressedAlpha(alpha): UIButton`**
+- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setHoverAlpha(alpha)`, `setPressedAlpha(alpha): UIButton`**
 
 - **`delete(): void`** – Overrides `Element.delete()` to clean up button registration before deleting the button.
 
@@ -140,17 +132,13 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
-- **Button Registration**: Buttons automatically register themselves with the UI system during construction using
-  `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
+- **Button Registration**: Buttons automatically register themselves with the UI system during construction using `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
 
-- **Color Multiplication**: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its
-  default (white) to get the expected color results.
+- **Color Multiplication**: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white) to get the expected color results.
 
-- **Alpha Multiplication**: Alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of
-  the `bgFill` effect.
+- **Alpha Multiplication**: Alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
 
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for
-  button clicks to work. See the Quick Start section above.
+- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
@@ -159,5 +147,4 @@ type Params = UI.ElementParams & {
 ## Further Reference
 
 - [Main UI Documentation](../../README.md) – For information about the base `UI` namespace and `Element` class
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations

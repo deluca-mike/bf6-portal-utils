@@ -2,14 +2,11 @@
 
 <ai>
 
-The `UIImageButton` component creates a button with an integrated image. It combines `UIButton` and `UIImage`
-functionality into a single element, wrapping both in a container and delegating properties appropriately. The image
-automatically updates its appearance when the button is enabled or disabled.
+The `UIImageButton` component creates a button with an integrated image. It combines `UIButton` and `UIImage` functionality into a single element, wrapping both in a container and delegating properties appropriately. The image automatically updates its appearance when the button is enabled or disabled.
 
 </ai>
 
-> **Note** This component extends `UIContentButton<UIImage>`. For information about the base `UI` namespace
-> functionality, see the [main UI documentation](../../README.md).
+> **Note** This component extends `UIContentButton<UIImage>`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
 
@@ -48,15 +45,15 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 
 ## Constructor Parameters
 
-| Param                                        | Type / Default                     | Notes                                           |
-| -------------------------------------------- | ---------------------------------- | ----------------------------------------------- |
+| Param | Type / Default | Notes |
+| --- | --- | --- |
 | All parameters from `UIButton.Params`, plus: |
-| `imageType`                                  | `mod.UIImageType`                  | **Required.** The type of image to display.     |
-| `imageColor`                                 | `mod.Vector = UI.COLORS.WHITE`     | Image color tint (used when button is enabled). |
-| `imageAlpha`                                 | `number = 0`                       | Image opacity (used when button is enabled).    |
-| `imageDisabledColor`                         | `mod.Vector = UI.COLORS.BF_GREY_2` | Image color when button is disabled.            |
-| `imageDisabledAlpha`                         | `number = 1`                       | Image opacity when button is disabled.          |
-| `padding`                                    | `number = 0`                       | Container padding.                              |
+| `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
+| `imageColor` | `mod.Vector = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
+| `imageAlpha` | `number = 0` | Image opacity (used when button is enabled). |
+| `imageDisabledColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
+| `imageDisabledAlpha` | `number = 1` | Image opacity when button is disabled. |
+| `padding` | `number = 0` | Container padding. |
 
 For a complete list of `UIButton.Params`, see the [UIButton documentation](../button/README.md).
 
@@ -76,8 +73,7 @@ For a complete list of `UIButton.Params`, see the [UIButton documentation](../bu
 - **Lifecycle**: `delete()`, `deleted`
 - **Parent Management**: `parent`, `setParent()`
 
-For complete documentation of these properties, see the
-[main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
@@ -94,8 +90,7 @@ All button properties are delegated from the internal `UIButton` instance:
 Image properties are delegated from the internal `UIImage` instance:
 
 - **`imageType: mod.UIImageType`** (getter/setter) – The type of image to display.
-- **`setImageType(imageType: mod.UIImageType): UIImageButton`** – Sets the image type and returns `this` for method
-  chaining.
+- **`setImageType(imageType: mod.UIImageType): UIImageButton`** – Sets the image type and returns `this` for method chaining.
 
 ### ImageButton-Specific
 
@@ -104,24 +99,19 @@ Image properties are delegated from the internal `UIImage` instance:
 - **`imageAlpha: number`** (getter/setter) – Image opacity (used when button is enabled).
 - **`setImageAlpha(alpha: number): UIImageButton`** – Sets image opacity and returns `this` for method chaining.
 - **`imageDisabledColor: mod.Vector`** (getter/setter) – Image color when button is disabled.
-- **`setImageDisabledColor(color: mod.Vector): UIImageButton`** – Sets disabled image color and returns `this` for
-  method chaining.
+- **`setImageDisabledColor(color: mod.Vector): UIImageButton`** – Sets disabled image color and returns `this` for method chaining.
 - **`imageDisabledAlpha: number`** (getter/setter) – Image opacity when button is disabled.
-- **`setImageDisabledAlpha(alpha: number): UIImageButton`** – Sets disabled image opacity and returns `this` for method
-  chaining.
+- **`setImageDisabledAlpha(alpha: number): UIImageButton`** – Sets disabled image opacity and returns `this` for method chaining.
 - **`padding: number`** (getter/setter) – Container padding.
 - **`setPadding(padding: number): UIImageButton`** – Sets padding and returns `this` for method chaining.
 
 ### Overrides
 
-- **`width: number`** (getter/setter) – Setting width also updates the button widget and image width, accounting for
-  padding.
+- **`width: number`** (getter/setter) – Setting width also updates the button widget and image width, accounting for padding.
 
-- **`height: number`** (getter/setter) – Setting height also updates the button widget and image height, accounting for
-  padding.
+- **`height: number`** (getter/setter) – Setting height also updates the button widget and image height, accounting for padding.
 
-- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and image size, accounting for
-  padding.
+- **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and image size, accounting for padding.
 
 - **`setSize(params: UI.Size): UIImageButton`** – Sets size for container, button, and image, returns `this`.
 
@@ -145,17 +135,13 @@ type Params = UIContentButton.Params &
 
 ## Usage Notes
 
-- **Automatic Image State Management**: When the button's `enabled` state changes, the image automatically switches
-  between `imageColor`/`imageAlpha` (enabled) and `imageDisabledColor`/`imageDisabledAlpha` (disabled).
+- **Automatic Image State Management**: When the button's `enabled` state changes, the image automatically switches between `imageColor`/`imageAlpha` (enabled) and `imageDisabledColor`/`imageDisabledAlpha` (disabled).
 
-- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and image size,
-  accounting for padding.
+- **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and image size, accounting for padding.
 
-- **Padding**: The component supports padding, which creates space between the button border and the image content. The
-  image size is automatically adjusted to account for padding.
+- **Padding**: The component supports padding, which creates space between the button border and the image content. The image size is automatically adjusted to account for padding.
 
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for
-  button clicks to work. See the Quick Start section above.
+- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
@@ -167,5 +153,4 @@ type Params = UIContentButton.Params &
 - [UIContentButton Documentation](../content-button/README.md) – For information about the base class
 - [UIButton Documentation](../button/README.md) – For information about button properties
 - [UIImage Documentation](../image/README.md) – For information about image properties
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type
-  declarations
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations
