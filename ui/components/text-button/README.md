@@ -22,7 +22,7 @@ import { UI } from 'bf6-portal-utils/ui';
 const button = new UITextButton({
     position: { x: 0, y: 0 },
     size: { width: 200, height: 50 },
-    message: mod.Message(mod.stringKeys.labels.clickMe), // 'Click Me'
+    message: mod.Message(mod.stringkeys.labels.clickMe), // 'Click Me'
     onClick: async (player: mod.Player) => {
         console.log(`Player ${mod.GetObjId(player)} clicked!`);
     },
@@ -31,7 +31,7 @@ const button = new UITextButton({
 
 // Update button and text properties
 button
-    .setMessage(mod.Message(mod.stringKeys.labels.updated)) // 'Updated'
+    .setMessage(mod.Message(mod.stringkeys.labels.updated)) // 'Updated'
     .setTextColor(UI.COLORS.WHITE)
     .setEnabled(false);
 

@@ -20,7 +20,7 @@ import { UI } from 'bf6-portal-utils/ui';
 
 // Create a text element
 const text = new UIText({
-    message: mod.Message(mod.stringKeys.labels.helloWorld), // 'Hello World'
+    message: mod.Message(mod.stringkeys.labels.helloWorld), // 'Hello World'
     position: { x: 0, y: 0 },
     textSize: 48,
     textColor: UI.COLORS.WHITE,
@@ -28,7 +28,7 @@ const text = new UIText({
 });
 
 // Update the message
-text.setMessage(mod.Message(mod.stringKeys.labels.updatedText)) // 'Updated Text'
+text.setMessage(mod.Message(mod.stringkeys.labels.updatedText)) // 'Updated Text'
     .setTextColor(UI.COLORS.BLUE)
     .setTextSize(36);
 ```
@@ -128,7 +128,7 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
-- **Message Opaqueness**: `mod.Message` is opaque and cannot be unpacked into a string. You can only create messages using `mod.Message()` with numbers, `mod.Player` types, or strings in `mod.stringKeys`.
+- **Message Opaqueness**: `mod.Message` is opaque and cannot be unpacked into a string. You can only create messages using `mod.Message()` with numbers, `mod.Player` types, or strings in `mod.stringkeys`.
 
 - **Padding**: Unlike the base `Element` class, `UIText` supports padding. This allows you to add space around the text content.
 

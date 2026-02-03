@@ -1,5 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
+// version: 1.3.1
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -164,7 +165,6 @@ namespace EventsTypes {
     }[SignatureKey];
 }
 
-// version: 1.3.0
 class EventsImplementation {
     private static readonly _logging = new Logging('Events');
 

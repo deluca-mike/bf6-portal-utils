@@ -136,11 +136,11 @@ button
 
 // Or update text content with chaining
 const text = new UIText({
-    message: mod.Message(mod.stringKeys.labels.hello), // 'Hello'
+    message: mod.Message(mod.stringkeys.labels.hello), // 'Hello'
     position: { x: 0, y: 0 },
 });
 
-text.setMessage(mod.Message(mod.stringKeys.labels.updated)) // 'Updated'
+text.setMessage(mod.Message(mod.stringkeys.labels.updated)) // 'Updated'
     .setPosition({ x: 10, y: 20 })
     .setBgColor(UI.COLORS.WHITE)
     .setBgAlpha(0.5)
@@ -164,7 +164,7 @@ const container2 = new UIContainer({ position: { x: 200, y: 0 }, size: { width: 
 
 // Create a text element as a child of container1
 const text = new UIText({
-    message: mod.Message(mod.stringKeys.labels.hello), // 'Hello'
+    message: mod.Message(mod.stringkeys.labels.hello), // 'Hello'
     parent: container1,
 });
 
@@ -548,7 +548,7 @@ const menu = new UIContainer({
             type: UITextButton,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
-            message: mod.Message(mod.stringKeys.labels.button1), // 'Button 1'
+            message: mod.Message(mod.stringkeys.labels.button1), // 'Button 1'
             onClick: async (p) => {
                 // Handle click
             },
@@ -557,7 +557,7 @@ const menu = new UIContainer({
             type: UITextButton,
             position: { x: 0, y: 60 },
             size: { width: 200, height: 50 },
-            message: mod.Message(mod.stringKeys.labels.button2), // 'Button 2'
+            message: mod.Message(mod.stringkeys.labels.button2), // 'Button 2'
             onClick: async (p) => {
                 // Handle click
             },

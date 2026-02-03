@@ -29,7 +29,7 @@ const container = new UIContainer({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringKeys.text.helloWorld), // 'Hello World'
+            message: mod.Message(mod.stringkeys.text.helloWorld), // 'Hello World'
             position: { x: 0, y: 0 },
             textSize: 48,
         } as UIContainer.ChildParams<UIText.Params>,
@@ -117,7 +117,7 @@ const container = new UIContainer({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringKeys.text.hello), // 'Hello'
+            message: mod.Message(mod.stringkeys.text.hello), // 'Hello'
             position: { x: 0, y: 0 },
         } as UIContainer.ChildParams<UIText.Params>,
     ],

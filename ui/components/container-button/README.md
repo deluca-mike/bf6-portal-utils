@@ -29,14 +29,14 @@ const button = new UIContainerButton({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringKeys.labels.click), // 'Click'
+            message: mod.Message(mod.stringkeys.labels.click), // 'Click'
             anchor: mod.UIAnchor.TopCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
         } as UIContainer.ChildParams<UIText.Params>,
         {
             type: UIText,
-            message: mod.Message(mod.stringKeys.labels.me), // 'Me'
+            message: mod.Message(mod.stringkeys.labels.me), // 'Me'
             anchor: mod.UIAnchor.BottomCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
