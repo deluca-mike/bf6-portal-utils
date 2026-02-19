@@ -1,4 +1,4 @@
-// version: 1.0.1
+// version: 1.0.2
 export class Logging {
     constructor(tag: string) {
         this._tag = tag;
@@ -63,9 +63,9 @@ export class Logging {
                     console.log(`<${this._tag}> Error in async logger:`, error);
                 });
             }
-        } catch {
+        } catch (error: unknown) {
             // Catch and log sync logger errors so the logging functionality can still run.
-            console.log(`<${this._tag}> Error in sync logger:`, text);
+            console.log(`<${this._tag}> Error in sync logger:`, error);
         }
     }
 
@@ -77,12 +77,12 @@ export class Logging {
      */
     public setLogging(
         log?: (text: string) => Promise<void> | void,
-        logLevel: Logging.LogLevel = Logging.LogLevel.Warning,
-        includeError: boolean = false
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
     ): void {
         this._logger = log;
-        this._logLevel = logLevel;
-        this._includeError = includeError;
+        this._logLevel = logLevel ?? Logging.LogLevel.Warning;
+        this._includeError = includeError ?? false;
     }
 }
 

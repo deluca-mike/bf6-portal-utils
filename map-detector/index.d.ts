@@ -1,4 +1,5 @@
 import { Logging } from '../logging/index.ts';
+import { Vectors } from '../vectors/index.ts';
 export declare namespace MapDetector {
     /**
      * Log levels for controlling logging verbosity.
@@ -15,9 +16,13 @@ export declare namespace MapDetector {
         logLevel?: Logging.LogLevel,
         includeError?: boolean
     ): void;
+    /**
+     * The maps supported by the MapDetector module.
+     */
     enum Map {
         Area22B = 'Area 22B',
         BlackwellFields = 'Blackwell Fields',
+        Contaminated = 'Contaminated',
         DefenseNexus = 'Defense Nexus',
         Downtown = 'Downtown',
         Eastwood = 'Eastwood',
@@ -36,9 +41,15 @@ export declare namespace MapDetector {
         SiegeOfCairo = 'Siege of Cairo',
     }
     /**
-     * @returns The current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined.
+     * Sets the coordinates of interest for a map.
+     * @param map - The map to set the coordinates of interest for.
+     * @param coordinates - The coordinates of interest to set for the map.
      */
-    function currentMap(): MapDetector.Map | undefined;
+    function setCoordinates(map: Map, coordinates: Vectors.Vector3): void;
+    /**
+     * @returns The current map as a `Map` enum value, or `undefined` if the map cannot be determined.
+     */
+    function currentMap(): Map | undefined;
     /**
      * @returns The current map as a `mod.Maps` enum value, or `undefined` if the map cannot be determined.
      */
@@ -49,11 +60,11 @@ export declare namespace MapDetector {
     function currentMapName(): string | undefined;
     /**
      * @param map - The map to check.
-     * @returns True if the current map is the given `MapDetector.Map` enum value.
+     * @returns True if the current map is the given `Map` enum value.
      */
-    function isCurrentMap(map: MapDetector.Map): boolean;
+    function isCurrentMap(map: Map): boolean;
     /**
-     * @param map - The map to check.
+     * @param map - The native map to check.
      * @returns True if the current map is the given `mod.Maps` enum value.
      */
     function isCurrentNativeMap(map: mod.Maps): boolean;

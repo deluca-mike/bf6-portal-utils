@@ -1,10 +1,16 @@
 # UIButton Component
 
-The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled, pressed, hover, focused) with customizable colors and opacities for each state. Buttons automatically register themselves with the UI system so their `onClick` handlers are called when pressed.
+<ai>
+
+The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled, pressed, hover, focused) with customizable colors and opacities for each state. Buttons automatically register themselves with the UI system so their `onClick` handlers are called when pressed. The `onClick` handler may be synchronous or asynchronous; while asynchronous handlers are generally preferred elsewhere (e.g. to avoid blocking event stacks), for `UIButton` the only handler running for the source event is this button's `onClick` (due to unique global button referencing), so synchronous callbacks—even long-running ones—are safe.
+
+</ai>
 
 > **Note** This component extends `UI.Element` and implements `UI.Button`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
 
 ---
+
+<ai>
 
 ## Quick Start
 
@@ -12,11 +18,11 @@ The `UIButton` component creates an interactive button widget. Buttons support m
 import { UIButton } from 'bf6-portal-utils/ui/components/button';
 import { UI } from 'bf6-portal-utils/ui';
 
-// Create a button with a click handler
+// Create a button with a click handler (sync or async)
 const button = new UIButton({
     position: { x: 0, y: 0 },
     size: { width: 200, height: 50 },
-    onClick: async (player: mod.Player) => {
+    onClick: (player: mod.Player) => {
         console.log(`Player ${mod.GetObjId(player)} clicked the button!`);
     },
     visible: true,
@@ -26,15 +32,7 @@ const button = new UIButton({
 button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.GREEN);
 ```
 
-**Important**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work:
-
-```ts
-import { UI } from 'bf6-portal-utils/ui';
-
-export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
-    UI.handleButtonEvent(player, widget, event);
-}
-```
+</ai>
 
 ---
 
@@ -66,7 +64,7 @@ export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWi
 | `hoverAlpha` | `number = 1` | Hover state opacity. |
 | `focusedColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Focused state color. |
 | `focusedAlpha` | `number = 1` | Focused state opacity. |
-| `onClick` | `(player: mod.Player) => Promise<void> \| undefined` | Click handler stored in the button instance. |
+| `onClick` | `(player: mod.Player) => void \| Promise<void> \| undefined` | Click handler (sync or async) stored in the button instance. |
 
 ---
 
@@ -92,9 +90,9 @@ For complete documentation of these properties, see the [main UI documentation](
 
 - **`setEnabled(enabled: boolean): UIButton`** – Sets enabled state and returns `this` for method chaining.
 
-- **`onClick: ((player: mod.Player) => Promise<void>) | undefined`** (getter/setter) – Click handler.
+- **`onClick: ((player: mod.Player) => void | Promise<void>) | undefined`** (getter/setter) – Click handler. May be synchronous or asynchronous.
 
-- **`setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): UIButton`** – Sets click handler and returns `this` for method chaining.
+- **`setOnClick(onClick: ((player: mod.Player) => void | Promise<void>) | undefined): UIButton`** – Sets click handler and returns `this` for method chaining.
 
 **Color & Alpha Getters/Setters** (all support method chaining):
 
@@ -124,7 +122,7 @@ type Params = UI.ElementParams & {
     hoverAlpha?: number; // Default: 1
     focusedColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_1
     focusedAlpha?: number; // Default: 1
-    onClick?: (player: mod.Player) => Promise<void>;
+    onClick?: (player: mod.Player) => void | Promise<void>;
 };
 ```
 
@@ -132,13 +130,13 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
+- **Sync vs async onClick**: The `onClick` handler may be synchronous or asynchronous. In other parts of the UI/event system, async handlers are often preferred so that long-running work does not block the event stack. For `UIButton`, the engine delivers the button event to a single handler identified by the button's unique global reference, so only this button's `onClick` runs for that event. Synchronous callbacks—including long-running ones—are therefore safe and will not block other button or event handlers.
+
 - **Button Registration**: Buttons automatically register themselves with the UI system during construction using `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
 
 - **Color Multiplication**: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white) to get the expected color results.
 
 - **Alpha Multiplication**: Alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
-
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 

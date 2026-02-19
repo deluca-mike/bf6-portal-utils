@@ -1,6 +1,7 @@
+import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 1.3.1
+// version: 1.4.0
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -218,22 +219,6 @@ class EventsImplementation {
     private constructor() {}
 
     /**
-     * Executes a handler function.
-     * @param handler - The handler function to execute.
-     * @param args - The arguments to pass to the handler function.
-     */
-    private static _executeHandler<T extends EventsTypes.TypeValue>(
-        handler: EventsTypes.AllHandlers,
-        args: EventsTypes.Parameters<EventsTypes.AllHandlers>
-    ): void {
-        Promise.resolve()
-            .then(() => (handler as EventsTypes.HandlerForType<T>)(...args))
-            .catch((error: unknown) => {
-                this._logging.log(`Error in handler ${handler.name}:`, Logging.LogLevel.Error, error);
-            });
-    }
-
-    /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
@@ -285,13 +270,12 @@ class EventsImplementation {
 
         if (!typeHandlers) return;
 
+        const typeName = (type as { name?: string }).name ?? 'unknown';
+
         // Execute each handler asynchronously and non-blocking.
         // Errors in one handler won't prevent other handlers from executing.
         for (const handler of typeHandlers) {
-            this._executeHandler(
-                handler as EventsTypes.AllHandlers,
-                args as EventsTypes.Parameters<EventsTypes.AllHandlers>
-            );
+            CallbackHandler.invoke(handler, args, typeName, this._logging, Logging.LogLevel.Error);
         }
     }
 
@@ -449,12 +433,12 @@ export function OnMCOMDestroyed(mcom: mod.MCOM): void {
 }
 
 export function OnPlayerDamaged(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    damagedPlayer: mod.Player,
+    damagingPlayer: mod.Player,
     damageType: mod.DamageType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void {
-    Events.OnPlayerDamaged.trigger(player, otherPlayer, damageType, weaponUnlock);
+    Events.OnPlayerDamaged.trigger(damagedPlayer, damagingPlayer, damageType, weapon);
 }
 
 export function OnPlayerDeployed(player: mod.Player): void {
@@ -462,25 +446,25 @@ export function OnPlayerDeployed(player: mod.Player): void {
 }
 
 export function OnPlayerDied(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    victim: mod.Player,
+    killer: mod.Player,
     deathType: mod.DeathType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void {
-    Events.OnPlayerDied.trigger(player, otherPlayer, deathType, weaponUnlock);
+    Events.OnPlayerDied.trigger(victim, killer, deathType, weapon);
 }
 
 export function OnPlayerEarnedKill(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    killer: mod.Player,
+    victim: mod.Player,
     deathType: mod.DeathType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void {
-    Events.OnPlayerEarnedKill.trigger(player, otherPlayer, deathType, weaponUnlock);
+    Events.OnPlayerEarnedKill.trigger(killer, victim, deathType, weapon);
 }
 
-export function OnPlayerEarnedKillAssist(player: mod.Player, otherPlayer: mod.Player): void {
-    Events.OnPlayerEarnedKillAssist.trigger(player, otherPlayer);
+export function OnPlayerEarnedKillAssist(assistingPlayer: mod.Player, victim: mod.Player): void {
+    Events.OnPlayerEarnedKillAssist.trigger(assistingPlayer, victim);
 }
 
 export function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void {
@@ -523,8 +507,8 @@ export function OnPlayerJoinGame(player: mod.Player): void {
     Events.OnPlayerJoinGame.trigger(player);
 }
 
-export function OnPlayerLeaveGame(number: number): void {
-    Events.OnPlayerLeaveGame.trigger(number);
+export function OnPlayerLeaveGame(playerId: number): void {
+    Events.OnPlayerLeaveGame.trigger(playerId);
 }
 
 export function OnPlayerSwitchTeam(player: mod.Player, team: mod.Team): void {
@@ -551,8 +535,8 @@ export function OnRayCastMissed(player: mod.Player): void {
     Events.OnRayCastMissed.trigger(player);
 }
 
-export function OnRevived(player: mod.Player, otherPlayer: mod.Player): void {
-    Events.OnRevived.trigger(player, otherPlayer);
+export function OnRevived(revivedPlayer: mod.Player, revivingPlayer: mod.Player): void {
+    Events.OnRevived.trigger(revivedPlayer, revivingPlayer);
 }
 
 export function OnRingOfFireZoneSizeChange(ringOfFire: mod.RingOfFire, number: number): void {

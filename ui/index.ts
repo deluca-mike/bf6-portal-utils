@@ -1,6 +1,8 @@
+import { CallbackHandler } from '../callback-handler/index.ts';
+import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 6.0.1
+// version: 7.0.0
 export namespace UI {
     /****** Logging ******/
 
@@ -108,7 +110,7 @@ export namespace UI {
      * The minimum interface for a button.
      */
     export interface Button {
-        onClick: ((player: mod.Player) => Promise<void>) | undefined;
+        onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
     }
 
     /****** Classes ******/
@@ -887,6 +889,25 @@ export namespace UI {
 
     const BUTTONS = new Map<string, Button>();
 
+    Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);
+
+    /**
+     * Handles a button event.
+     * @param player - The player who pressed the button.
+     * @param widget - The widget that was pressed.
+     * @param event - The button event.
+     */
+    function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
+        // NOTE: `event: mod.UIButtonEvent` is currently broken or undefined, so we're not using it for now.
+        const name = mod.GetUIWidgetName(widget);
+
+        const onClick = BUTTONS.get(name)?.onClick;
+
+        if (!onClick) return;
+
+        CallbackHandler.invoke(onClick, [player], `click handler for widget ${name}`, logging, LogLevel.Error);
+    }
+
     /**
      * Registers a button and returns a function to unregister it.
      * @param name - The name of the button.
@@ -1025,22 +1046,5 @@ export namespace UI {
         }
 
         return GlobalReceiver.instance;
-    }
-
-    /**
-     * Handles a button event. Must be called in the `OnPlayerUIButtonEvent` handler.
-     * @param player - The player who pressed the button.
-     * @param widget - The widget that was pressed.
-     * @param event - The button event.
-     */
-    export function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
-        // NOTE: `event: mod.UIButtonEvent` is currently broken or undefined, so we're not using it for now.
-        const name = mod.GetUIWidgetName(widget);
-
-        BUTTONS.get(name)
-            ?.onClick?.(player)
-            .catch((error: unknown) => {
-                logging.log(`Error in click handler for widget ${name}.`, LogLevel.Error, error);
-            });
     }
 }

@@ -5,6 +5,7 @@ import { UIButton } from '../button/index.ts';
  * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
  * @template TContentProps - Array of property names to delegate from the content element
+ * @version 6.1.1
  */
 export declare abstract class UIContentButton<TContent extends UI.Element, TContentProps extends readonly string[]>
     extends UI.Element
@@ -22,7 +23,7 @@ export declare abstract class UIContentButton<TContent extends UI.Element, TCont
     hoverAlpha: number;
     focusedColor: mod.Vector;
     focusedAlpha: number;
-    onClick: ((player: mod.Player) => Promise<void>) | undefined;
+    onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
     setBaseColor: (color: mod.Vector) => this;
     setBaseAlpha: (alpha: number) => this;
     setDisabledColor: (color: mod.Vector) => this;
@@ -33,7 +34,7 @@ export declare abstract class UIContentButton<TContent extends UI.Element, TCont
     setHoverAlpha: (alpha: number) => this;
     setFocusedColor: (color: mod.Vector) => this;
     setFocusedAlpha: (alpha: number) => this;
-    setOnClick: (onClick: ((player: mod.Player) => Promise<void>) | undefined) => this;
+    setOnClick: (onClick: ((player: mod.Player) => Promise<void> | void) | undefined) => this;
     /**
      * Creates a new content button.
      * @param params - The parameters for the content button.

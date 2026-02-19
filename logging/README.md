@@ -8,15 +8,6 @@ Key features include fail-safe error handling that prevents logging failures fro
 
 </ai>
 
-> **Note** The `Logging` class is self-contained and requires no additional modules or setup. All Battlefield Portal types referenced below come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-
 ---
 
 ## Quick Start
@@ -314,9 +305,9 @@ Support for error messages in the `mod.Message` type to allow displaying via log
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- See `FFASpawning`, `SolidUI`, and `UI` modules for examples of `Logging` integration within modules.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
+- See [`FFASpawnPoints`](../ffa-spawn-points/index.ts), [`SolidUI`](../solid-ui/index.ts), and [`UI`](../ui/index.ts) modules for examples of `Logging` integration within modules.
 
 ---
 

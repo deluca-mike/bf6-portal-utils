@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 6.0.1
+// version: 6.1.1
 export class UIButton extends UI.Element implements UI.Button {
     protected _enabled: boolean;
     protected _baseColor: mod.Vector;
@@ -13,7 +13,7 @@ export class UIButton extends UI.Element implements UI.Button {
     protected _hoverAlpha: number;
     protected _focusedColor: mod.Vector;
     protected _focusedAlpha: number;
-    protected _onClick: ((player: mod.Player) => Promise<void>) | undefined;
+    protected _onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
     protected _unregisterAsButton: () => void;
 
     /**
@@ -439,7 +439,7 @@ export class UIButton extends UI.Element implements UI.Button {
     /**
      * The click handler of the button.
      */
-    public get onClick(): ((player: mod.Player) => Promise<void>) | undefined {
+    public get onClick(): ((player: mod.Player) => Promise<void> | void) | undefined {
         return this._onClick;
     }
 
@@ -447,7 +447,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * Sets the click handler of the button.
      * @param onClick - The new click handler.
      */
-    public set onClick(onClick: ((player: mod.Player) => Promise<void>) | undefined) {
+    public set onClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined) {
         if (this._isDeletedCheck()) return;
 
         this._onClick = onClick;
@@ -458,7 +458,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param onClick - The new click handler.
      * @returns This element instance.
      */
-    public setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): this {
+    public setOnClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined): this {
         this.onClick = onClick;
         return this;
     }
@@ -480,6 +480,6 @@ export namespace UIButton {
         hoverAlpha?: number;
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
-        onClick?: (player: mod.Player) => Promise<void>;
+        onClick?: (player: mod.Player) => Promise<void> | void;
     };
 }

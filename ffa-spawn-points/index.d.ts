@@ -1,5 +1,5 @@
 import { Logging } from '../logging/index.ts';
-export declare namespace FFASpawning {
+export declare namespace FFASpawnPoints {
     /**
      * Log levels for controlling logging verbosity.
      */
@@ -22,23 +22,6 @@ export declare namespace FFASpawning {
      */
     type SpawnData = [x: number, y: number, z: number, orientation: number];
     /**
-     * Internal type representing a processed spawn point:
-     */
-    type Spawn = {
-        /**
-         * Index in the spawns array.
-         */
-        index: number;
-        /**
-         * Battlefield Portal spawn point object.
-         */
-        spawnPoint: mod.SpawnPoint;
-        /**
-         * World position.
-         */
-        location: mod.Vector;
-    };
-    /**
      * Optional overrides for spawn selection thresholds, delays, and candidate limits when calling `initialize()`:
      */
     type InitializeOptions = {
@@ -55,7 +38,7 @@ export declare namespace FFASpawning {
          */
         maximumInterestingDistance?: number;
         /**
-         * The amount to scale the midpoint between the `_minimumSafeDistance` and `_maximumInterestingDistance` to evaluate a fallback spawn.
+         * The amount to scale the midpoint between the `minimumSafeDistance` and `maximumInterestingDistance` to evaluate a fallback spawn.
          */
         safeOverInterestingFallbackFactor?: number;
         /**
@@ -72,39 +55,26 @@ export declare namespace FFASpawning {
         queueProcessingDelay?: number;
     };
     /**
-     * Class representing a soldier who spawning will be managed by this module.
+     * Initializes the spawning system. Should be called in the `OnGameModeStarted()` event.
+     * @param spawns - The spawn points to use.
+     * @param options - The options to use for overriding the defaults.
+     */
+    function initialize(spawns: SpawnData[], options?: InitializeOptions): void;
+    /**
+     * Enables the processing of the spawn queue.
+     */
+    function enableSpawnQueueProcessing(): void;
+    /**
+     * Disables the processing of the spawn queue.
+     */
+    function disableSpawnQueueProcessing(): void;
+    /**
+     * Class representing a soldier whose spawning will be managed by this module.
      */
     class Soldier {
         private static readonly _ALL_SOLDIERS;
-        private static readonly _PRIME_STEPS;
-        private static _spawns;
-        private static _maxSpawnCandidates;
-        private static _minimumSafeDistance;
-        private static _maximumInterestingDistance;
-        private static _safeOverInterestingFallbackFactor;
-        private static _spawnQueue;
-        private static _promptDelay;
-        private static _initialPromptDelay;
-        private static _queueProcessingDelay;
-        private static _queueProcessingEnabled;
-        private static _queueProcessingActive;
-        private static _getRotationVector;
-        private static _getBestSpawnPoint;
-        private static _getDistanceToClosestPlayer;
-        private static _processSpawnQueue;
+        private static _deleteSoldierIfNotValid;
         private static _getPosition;
-        /**
-         * Converts a mod.Vector to a string in the format `<x, y, z>`.
-         * @param vector - The mod.Vector to convert.
-         * @returns The string representation of the mod.Vector.
-         */
-        static getVectorString(vector: mod.Vector): string;
-        /**
-         * Initializes the spawning system. Should be called in the `OnGameModeStarted()` event.
-         * @param spawns - The spawn points to use.
-         * @param options - The options to use.
-         */
-        static initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions): void;
         /**
          * Starts the countdown before prompting the player to spawn or delay again.
          * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
@@ -118,25 +88,16 @@ export declare namespace FFASpawning {
          */
         static forceIntoQueue(player: mod.Player): void;
         /**
-         * Enables the processing of the spawn queue.
-         */
-        static enableSpawnQueueProcessing(): void;
-        /**
-         * Disables the processing of the spawn queue.
-         */
-        static disableSpawnQueueProcessing(): void;
-        /**
-         * Every player that should be handled by this spawning system should be instantiated as a `FFASpawning`,
+         * Every player that should be handled by this spawning system should be instantiated as a `Soldier`,
          * usually in the `OnPlayerJoinGame()` event.
-         * @param player - The player to instantiate the `FFASpawning` for.
+         * @param player - The player to instantiate the `Soldier` for.
          * @param showDebugPosition - Whether to show the debug position.
          */
         constructor(player: mod.Player, showDebugPosition?: boolean);
         private _player;
         private _playerId;
         private _isAISoldier;
-        private _delayCountdown;
-        private _delayCountdownInterval?;
+        private _delayCountdownClock?;
         private _promptUI?;
         private _countdownUI?;
         private _updatePositionInterval?;
@@ -156,8 +117,11 @@ export declare namespace FFASpawning {
          * @param delay - The delay to start the countdown for (in seconds). Defaults to the initial prompt delay.
          */
         startDelayForPrompt(delay?: number): void;
-        private _handleDelayCountdown;
+        /**
+         * Deletes the `Soldier` instance if the player is no longer valid.
+         * @returns Whether the `Soldier` instance was deleted.
+         */
+        deleteIfNotValid(): boolean;
         private _addToQueue;
-        private _deleteIfNotValid;
     }
 }

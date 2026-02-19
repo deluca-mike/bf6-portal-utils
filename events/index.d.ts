@@ -225,12 +225,6 @@ declare class EventsImplementation {
     static readonly LogLevel: typeof Logging.LogLevel;
     private constructor();
     /**
-     * Executes a handler function.
-     * @param handler - The handler function to execute.
-     * @param args - The arguments to pass to the handler function.
-     */
-    private static _executeHandler;
-    /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
@@ -304,25 +298,25 @@ export declare function OnMCOMArmed(mcom: mod.MCOM): void;
 export declare function OnMCOMDefused(mcom: mod.MCOM): void;
 export declare function OnMCOMDestroyed(mcom: mod.MCOM): void;
 export declare function OnPlayerDamaged(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    damagedPlayer: mod.Player,
+    damagingPlayer: mod.Player,
     damageType: mod.DamageType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void;
 export declare function OnPlayerDeployed(player: mod.Player): void;
 export declare function OnPlayerDied(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    victim: mod.Player,
+    killer: mod.Player,
     deathType: mod.DeathType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void;
 export declare function OnPlayerEarnedKill(
-    player: mod.Player,
-    otherPlayer: mod.Player,
+    killer: mod.Player,
+    victim: mod.Player,
     deathType: mod.DeathType,
-    weaponUnlock: mod.WeaponUnlock
+    weapon: mod.WeaponUnlock
 ): void;
-export declare function OnPlayerEarnedKillAssist(player: mod.Player, otherPlayer: mod.Player): void;
+export declare function OnPlayerEarnedKillAssist(assistingPlayer: mod.Player, victim: mod.Player): void;
 export declare function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void;
 export declare function OnPlayerEnterCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void;
 export declare function OnPlayerEnterVehicle(player: mod.Player, vehicle: mod.Vehicle): void;
@@ -333,7 +327,7 @@ export declare function OnPlayerExitVehicle(player: mod.Player, vehicle: mod.Veh
 export declare function OnPlayerExitVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void;
 export declare function OnPlayerInteract(player: mod.Player, interactPoint: mod.InteractPoint): void;
 export declare function OnPlayerJoinGame(player: mod.Player): void;
-export declare function OnPlayerLeaveGame(number: number): void;
+export declare function OnPlayerLeaveGame(playerId: number): void;
 export declare function OnPlayerSwitchTeam(player: mod.Player, team: mod.Team): void;
 export declare function OnPlayerUIButtonEvent(
     player: mod.Player,
@@ -343,7 +337,7 @@ export declare function OnPlayerUIButtonEvent(
 export declare function OnPlayerUndeploy(player: mod.Player): void;
 export declare function OnRayCastHit(player: mod.Player, point: mod.Vector, normal: mod.Vector): void;
 export declare function OnRayCastMissed(player: mod.Player): void;
-export declare function OnRevived(player: mod.Player, otherPlayer: mod.Player): void;
+export declare function OnRevived(revivedPlayer: mod.Player, revivingPlayer: mod.Player): void;
 export declare function OnRingOfFireZoneSizeChange(ringOfFire: mod.RingOfFire, number: number): void;
 export declare function OnSpawnerSpawned(player: mod.Player, spawner: mod.Spawner): void;
 export declare function OnTimeLimitReached(): void;

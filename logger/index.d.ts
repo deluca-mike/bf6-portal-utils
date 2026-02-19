@@ -10,20 +10,6 @@ export declare class Logger {
      * Creates a new logger with specific options.
      * @param player - The player to to draw the logger for.
      * @param options - The options for the logger.
-     * @param options.staticRows - Whether to use static rows (`true`) or dynamic rows (`false`).
-     * @param options.truncate - Whether to truncate long messages with ellipses.
-     * @param options.parent - The parent container for the logger.
-     * @param options.anchor - The anchor for the logger.
-     * @param options.x - The x position of the logger.
-     * @param options.y - The y position of the logger.
-     * @param options.width - The width of the logger.
-     * @param options.height - The height of the logger.
-     * @param options.bgColor - The background color of the logger.
-     * @param options.bgAlpha - The background alpha of the logger.
-     * @param options.bgFill - The background fill of the logger.
-     * @param options.textColor - The text color of the logger.
-     * @param options.textScale - The text scale of the logger.
-     * @param options.visible - Whether to show the logger.
      */
     constructor(player: mod.Player, options?: Logger.Options);
     private _window;
@@ -91,20 +77,65 @@ export declare class Logger {
     private _getTextWidth;
 }
 export declare namespace Logger {
+    /**
+     * Options for the logger.
+     */
     interface Options {
+        /**
+         * Whether to use static rows (`true`) or dynamic rows (`false`).
+         */
         staticRows?: boolean;
+        /**
+         * Whether to truncate long messages with ellipses.
+         */
         truncate?: boolean;
+        /**
+         * The parent container for the logger.
+         */
         parent?: UI.Root | UIContainer;
+        /**
+         * The anchor for the logger.
+         */
         anchor?: mod.UIAnchor;
+        /**
+         * The x position of the logger.
+         */
         x?: number;
+        /**
+         * The y position of the logger.
+         */
         y?: number;
+        /**
+         * The width of the logger.
+         */
         width?: number;
+        /**
+         * The height of the logger.
+         */
         height?: number;
+        /**
+         * The background color of the logger.
+         */
         bgColor?: mod.Vector;
+        /**
+         * The background alpha of the logger.
+         */
         bgAlpha?: number;
+        /**
+         * The background fill of the logger.
+         */
         bgFill?: mod.UIBgFill;
+        /**
+         * The text color of the logger.
+         */
         textColor?: mod.Vector;
+        /**
+         * The text scale of the logger.
+         */
         textScale?: 'small' | 'medium' | 'large';
+        /**
+         * Whether to show the logger.
+         */
         visible?: boolean;
     }
 }

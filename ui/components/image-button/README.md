@@ -32,11 +32,6 @@ const button = new UIImageButton({
 
 // Update button and image properties
 button.setImageType(mod.UIImageType.CrownSolid).setImageColor(UI.COLORS.BLUE).setEnabled(false);
-
-// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
-export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
-    UI.handleButtonEvent(player, widget, event);
-}
 ```
 
 </ai>
@@ -140,8 +135,6 @@ type Params = UIContentButton.Params &
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and image size, accounting for padding.
 
 - **Padding**: The component supports padding, which creates space between the button border and the image content. The image size is automatically adjusted to account for padding.
-
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 

@@ -1,5 +1,5 @@
 {
-    "ffaSpawning": {
+    "ffaSpawnPoints": {
         "countdown": "Spawning available in {} seconds...",
         "buttons": {
             "spawn": "Spawn now",

@@ -31,11 +31,6 @@ const button = new UIGadgetImageButton({
 
 // Update button properties
 button.setEnabled(false).setBaseColor(UI.COLORS.BLUE);
-
-// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
-export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
-    UI.handleButtonEvent(player, widget, event);
-}
 ```
 
 </ai>
@@ -125,8 +120,6 @@ type Params = UIButton.Params & UIGadgetImage.Params;
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and gadget image size, accounting for padding.
 
 - **Padding**: The component supports padding, which creates space between the button border and the gadget image. The gadget image size is automatically adjusted to account for padding.
-
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 

@@ -2,7 +2,7 @@
 
 <ai>
 
-This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only be implemented and exported once per entire project. This module implements all event handlers once, automatically hooking into every Battlefield Portal event, and exposes subscription APIs that allow you to subscribe and unsubscribe to any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
+This TypeScript `Events` namespace provides a centralized event subscription system for Battlefield Portal experience developers. In Battlefield Portal, each event handler function (like `OnPlayerDeployed`, `OngoingPlayer`, etc.) can only be implemented and exported once per entire project. This module implements all event handlers once, automatically hooking into every Battlefield Portal event, and exposes an API that allows you to subscribe to and unsubscribe from any event from multiple places in your codebase. This keeps your code clean, modular, and maintainable.
 
 </ai>
 
@@ -11,19 +11,11 @@ You can use **two styles of API**:
 - **Event-channel style (recommended)** – Each event is exposed as a channel object (e.g. `Events.OnPlayerDied`, `Events.OngoingInteractPoint`) with `subscribe`, `unsubscribe`, `trigger`, and `handlerCount` functions. This style typically has **better full IntelliSense compatibility** and is **more readable**, since the event name and method are colocated (e.g. `Events.OnPlayerDied.subscribe(handler)`).
 - **Object style** – Pass the event type as the first argument (e.g. `Events.subscribe(Events.Type.OnPlayerDeployed, handler)`). Useful when you need to pass an event type by value (e.g. dynamic dispatch, iteration).
 
-The module provides full type safety through TypeScript generics, ensuring that event handlers match the correct signature for each event type. Handlers can be synchronous or asynchronous (returning `void` or `Promise<void>`), and errors in one handler won't prevent other handlers from executing. All handlers are executed asynchronously and non-blocking, ensuring optimal performance.
-
-> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vehicle`, `mod.AreaTrigger`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
+The module provides full type safety through TypeScript generics, ensuring that event handlers match the correct signature for each event type. Handlers can be synchronous or asynchronous (returning `void` or `Promise<void>`). Synchronous handlers run synchronously when the event fires (so short, simple handlers execute immediately instead of being queued as a microtask). The module uses `CallbackHandler` to invoke each handler so that no handler—synchronous or asynchronous—can throw and prevent the rest from running; errors are caught and logged. Asynchronous handlers are preferred for any non-trivial work, but short synchronous handlers are safe.
 
 <ai>
 
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **No duplicate event handlers** – Do not implement or export any Battlefield Portal event handler functions in your codebase. This module handles all event hooking automatically.
+> **Note** Do not implement or export any Battlefield Portal event handler functions in your codebase. This module handles all event hooking automatically and it owns all those hooks.
 
 </ai>
 
@@ -102,11 +94,11 @@ Events.OnGameModeEnding.subscribe(() => {
 
 - **Type Safety** – TypeScript ensures that your handler function signature matches the event type. For example, `OnPlayerDeployed` handlers must accept a single `mod.Player` parameter. The event-channel style (`Events.OnPlayerDeployed.subscribe(...)`) typically gives the best IntelliSense (parameter types and completion) because the event is known at the call site.
 
-- **Synchronous and Asynchronous Handlers** – Handlers can be synchronous (returning `void`) or asynchronous (returning `Promise<void>`). Both are fully supported.
+- **Synchronous and Asynchronous Handlers** – Handlers can be synchronous (returning `void`) or asynchronous (returning `Promise<void>`). Synchronous handlers are run synchronously when the event is triggered (immediately, in the same turn), so short/simple logic runs without being queued as a microtask. Asynchronous handlers are preferred for anything that may take time or perform I/O.
 
-- **Error Isolation** – Errors thrown in one handler are caught and do not prevent other handlers from executing. This ensures that a bug in one subscription doesn't break your entire event system. Handler errors are automatically logged using the configured logger (if logging is enabled via `Events.setLogging()`).
+- **Error Isolation** – Each handler is invoked via `CallbackHandler`, so errors (sync or async) in one handler are caught and logged and do not prevent other handlers from executing. A bug in one subscription cannot break the rest of the event system.
 
-- **Non-Blocking Execution** – All handlers are executed asynchronously and non-blocking. The event system will not wait for handlers to complete before continuing execution.
+- **Execution** – Synchronous handlers run to completion before the next handler is invoked; the trigger does not wait for asynchronous handlers' promises to settle. Long-running synchronous handlers will block other handlers and the caller; keep sync work short or use async handlers.
 
 - **Configurable Error Logging** – Handler errors are automatically logged using the `Logging` module. Use `Events.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into handler failures without requiring manual error handling in every handler.
 
@@ -535,11 +527,7 @@ The `Events` module uses a centralized subscription system:
 
 3. **Handler Storage** – Subscribed handlers are stored in a `Map<Type, Set<AllHandlers>>`, allowing multiple handlers per event type.
 
-4. **Handler Execution** – When an event is triggered, all subscribed handlers are executed asynchronously using `Promise.resolve()`. This ensures:
-    - Both sync and async handlers work correctly
-    - Execution is non-blocking
-    - Errors in one handler don't affect others
-    - Handler errors are automatically caught and logged (if logging is configured via `Events.setLogging()`)
+4. **Handler Execution** – When an event is triggered, each subscribed handler is invoked via `CallbackHandler.invoke()` in sequence. Synchronous handlers run immediately (before the next handler); asynchronous handlers are invoked and their promises are not awaited, so they run without blocking. `CallbackHandler` catches any thrown or rejected errors so that one failing handler does not prevent the rest from running; errors are logged if logging is configured via `Events.setLogging()`. This design allows short synchronous handlers to run immediately instead of being queued as a microtask, while still isolating failures. Asynchronous handlers are preferred for non-trivial work.
 
 5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into handler failures without manual error handling.
 
@@ -559,7 +547,7 @@ The `Events` module uses a centralized subscription system:
 
 - **No Return Values** – Event handlers cannot return values to the caller. All handlers return `void` or `Promise<void>`. If you need to collect results, use shared state or callbacks.
 
-- **Non-Blocking Nature** – Because handlers execute asynchronously and non-blocking, you cannot rely on handlers completing before other code executes. Use promises or callbacks if you need to wait for handler completion.
+- **Completion and Ordering** – Synchronous handlers complete before the trigger returns; asynchronous handlers are not awaited, so you cannot rely on async handlers finishing before other code runs. Long-running synchronous handlers block other handlers and the caller—prefer async handlers for non-trivial work. Use promises or callbacks if you need to wait for handler completion.
 
 </ai>
 
@@ -567,9 +555,8 @@ The `Events` module uses a centralized subscription system:
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- Battlefield Builder docs – For information about available events and their parameters.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 
