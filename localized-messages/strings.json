@@ -1,0 +1,12 @@
+{
+    "localizedMessages": {
+        "undefinedStringKey": "<LM: UNDEF_STR>",
+        "undefinedStringKey1": "<LM: UNDEF_STR> {}",
+        "undefinedStringKey2": "<LM: UNDEF_STR> {} {}",
+        "undefinedStringKey3": "<LM: UNDEF_STR> {} {} {}",
+        "localeNotFound": "<LM: LOCALE_NF>",
+        "localeNotFound1": "<LM: LOCALE_NF> {}",
+        "localeNotFound2": "<LM: LOCALE_NF> {} {}",
+        "localeNotFound3": "<LM: LOCALE_NF> {} {} {}"
+    }
+}
