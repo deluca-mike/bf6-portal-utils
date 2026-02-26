@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version: 2.1.1
+// version: 2.2.0
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -564,6 +564,14 @@ export namespace SolidUI {
 
         currentCleanupList = previousCleanupList;
 
+        // Now that we are back in the parent's context, register this instance to be deleted if the parent scope is
+        // destroyed. Because of the monkey-patch above, calling `delete()` will also clean up all local effects.
+        const instanceWithDelete = instance as { delete?: () => void };
+
+        if (typeof instanceWithDelete.delete === 'function') {
+            onCleanup(() => instanceWithDelete.delete!());
+        }
+
         return instance;
     }
 
@@ -599,10 +607,21 @@ export namespace SolidUI {
                         // This allows the row to update its own properties without re-running the list effect.
                         const [item, setItem] = createSignal(list[i]);
 
-                        // Save control method to our tracker
-                        rows.push({ setItem, dispose });
+                        // Capture the UI element returned by the render function.
+                        const uiElement = render(item, i);
 
-                        render(item, i);
+                        // Enhance the dispose function to ALSO delete the UI element.
+                        const rowDispose = () => {
+                            dispose(); // Kills reactive effects.
+
+                            // Safely call `delete()` if the returned element supports it.
+                            if (uiElement && typeof (uiElement as any).delete === 'function') {
+                                (uiElement as any).delete();
+                            }
+                        };
+
+                        // Save control method to our tracker
+                        rows.push({ setItem, dispose: rowDispose });
                     });
                 }
 

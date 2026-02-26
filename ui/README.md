@@ -2,33 +2,26 @@
 
 <ai>
 
-This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing strongly typed helpers, convenient defaults, ergonomic getters/setters, and automatic management of various UI mechanics for building complex HUDs, panels, and interactive buttons.
+This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing strongly typed helpers, convenient defaults, ergonomic getters/setters, and automatic management of various UI mechanics for building complex HUDs, panels, and interactive buttons. The module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button events are dispatched automatically and you must use the `Events` module for all other game event subscription.
+
+> **Note** You **must** use the `Events` module as your only mechanism to subscribe to game events. Do not implement or export any Battlefield Portal event handler functions (`OnPlayerUIButtonEvent`, `OnPlayerDeployed`, etc.) in your code. The `Events` module owns those hooks and this module relies on it; only one implementation of each event handler can exist per project. See the [Events module — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
 
 </ai>
-
-> **Note** The `UI` namespace depends on the `mod` namespace (available in the `bf6-portal-mod-types` package). All types referenced below (`mod.UIWidget`, `mod.Vector`, `mod.UIAnchor`, etc.) are documented in that package.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **Button handler** – Register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler.
-4. **Component imports** – UI components are now organized in subdirectories. Import them individually from their respective paths (e.g., `import { UIContainer } from 'bf6-portal-utils/ui/components/container'`).
 
 ---
 
 ## Quick Start
 
 1. Install the package: `npm install -D bf6-portal-utils`
-2. Import the module in your code:
+2. Import the modules needed in your code:
     ```ts
     import { UI } from 'bf6-portal-utils/ui';
+    import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+    import { Events } from 'bf6-portal-utils/events';
     ```
-3. Register the shared button handler once in your `OnPlayerUIButtonEvent` event.
-4. Build UI elements using the `UI` namespace.
-5. Use the returned objects to show/hide, reposition, mutate text/buttons, define onClick behavior, etc.
+3. Use the `Events` module for all event subscription; do not export any Portal event handlers.
+4. Build UI elements using the UI classes and constants from the `UI` namespace.
+5. Use the returned objects to show/hide, reposition, mutate text/buttons, define onClick behavior (sync or async), etc.
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
@@ -36,13 +29,15 @@ This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an 
 ### Example
 
 ```ts
+import { Events } from 'bf6-portal-utils/events';
 import { UI } from 'bf6-portal-utils/ui';
 import { UIContainer } from 'bf6-portal-utils/ui/components/container';
 import { UITextButton } from 'bf6-portal-utils/ui/components/text-button';
 
 let testMenu: UIContainer | undefined;
 
-export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
+// The UI module subscribes to OnPlayerUIButtonEvent via Events automatically. Use Events for your game logic.
+Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
     if (!testMenu) {
         // Can include children upon construction of the container.
         testMenu = new UIContainer({
@@ -60,8 +55,8 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     anchor: mod.UIAnchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
-                    onClick: async (player: mod.Player): Promise<void> => {
-                        // Do something
+                    onClick: (player: mod.Player) => {
+                        // Do something (sync or async; CallbackHandler catches errors)
                     },
                     message: mod.Message(mod.stringkeys.ui.buttons.option1),
                     textSize: 36,
@@ -74,8 +69,8 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
                     anchor: mod.UIAnchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
-                    onClick: async (player: mod.Player): Promise<void> => {
-                        // Do something
+                    onClick: (player: mod.Player) => {
+                        // Do something (sync or async; CallbackHandler catches errors)
                     },
                     message: mod.Message(mod.stringkeys.ui.buttons.option2),
                     textSize: 36,
@@ -92,7 +87,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
             anchor: mod.UIAnchor.BottomCenter,
             bgColor: UI.COLORS.GREY_25,
             baseColor: UI.COLORS.BLACK,
-            onClick: async (player: mod.Player): Promise<void> => {
+            onClick: (player: mod.Player) => {
                 testMenu?.hide();
             },
             message: mod.Message(mod.stringkeys.ui.buttons.close),
@@ -102,11 +97,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     }
 
     testMenu?.show();
-}
-
-export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
-    UI.handleButtonEvent(player, widget, event);
-}
+});
 ```
 
 ### Method Chaining Example
@@ -120,8 +111,8 @@ import { UIText } from 'bf6-portal-utils/ui/components/text';
 const button = new UIButton({
     position: { x: 100, y: 200 },
     size: { width: 200, height: 50 },
-    onClick: async (player) => {
-        // Handle click
+    onClick: (player) => {
+        // Handle click (sync or async; errors are caught and logged by CallbackHandler)
     },
 });
 
@@ -387,7 +378,7 @@ container
 
 ### `UI.registerButton(name: string, button: Button): () => void`
 
-Registers a button with the UI system so that its `onClick` function is called when the button is pressed. Components that behave like buttons should call this function during construction to register themselves.
+Registers a button with the UI system so that its `onClick` function is called when the button is pressed. Components that behave like buttons should call this function during construction to register themselves. Button events are received automatically—the UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, looks up the registered button by widget name, and invokes its `onClick` (sync or async) using `CallbackHandler`, which catches and logs exceptions. Do not implement or export `OnPlayerUIButtonEvent` in your code.
 
 **Parameters:**
 
@@ -399,10 +390,6 @@ Registers a button with the UI system so that its `onClick` function is called w
 - A function that can be called to unregister the button. This is a convenience method for cleanup.
 
 **Note:** If a button with the same name is already registered, a warning is logged and an empty unregister function is returned. Button registration is typically handled automatically by button components during construction.
-
-### `UI.handleButtonEvent(player, widget, event)`
-
-Utility callback meant to be used in the `OnPlayerUIButtonEvent` handler for global subscriptions. Ignores `event` (the Battlefield Portal `mod.UIButtonEvent` is currently unreliable) and resolves the registered `onClick` handler from the button registry. Note: This function does not return a Promise; it handles errors internally.
 
 ---
 
@@ -455,7 +442,7 @@ if (element instanceof UIContainer) {
 
 Interface that defines button-like behavior. Components that behave like buttons should implement this interface and register themselves using `UI.registerButton()`.
 
-- `onClick: ((player: mod.Player) => Promise<void>) | undefined` – The click handler function that is called when the button is pressed. Can be `undefined` if the button doesn't have a click handler.
+- `onClick: ((player: mod.Player) => void | Promise<void>) | undefined` – The click handler function that is called when the button is pressed. May be synchronous or asynchronous. The UI module invokes it via `CallbackHandler`, which catches sync throws and async promise rejections and logs them (if logging is configured) so a failing handler does not break the UI. Can be `undefined` if the button doesn't have a click handler.
 
 ### `UI.Parent` (interface)
 
@@ -603,7 +590,7 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
 
 ## Event Wiring & Lifecycle
 
-- Register `UI.handleButtonEvent` once per mod to dispatch button presses.
+- The UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button presses are dispatched automatically.
 - Use the returned `Element` helpers to hide/show instead of calling `mod.SetUIWidgetVisible` manually.
 - All properties support both normal setter syntax (e.g., `element.bgAlpha = 0.8;`) and method chaining (e.g., `element.setBgAlpha(0.8).show()`). Method chaining is useful when you want to apply multiple changes in sequence.
 - Always call `delete()` when removing widgets to prevent stale references inside Battlefield Portal. The element will automatically be removed from its parent's `children` array. For containers, `delete()` recursively deletes all children before deleting the container itself.
@@ -635,9 +622,9 @@ Support for auto-renaming a UIWidget when it moves from one parent to another, i
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- Battlefield Builder docs – For runtime UI limitations (widget limits, anchor behavior, etc.).
+- [Events module](../events/README.md) – Used to automatically subscribe to game events and wire the system to them.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

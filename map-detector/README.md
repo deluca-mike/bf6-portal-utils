@@ -6,18 +6,6 @@ This TypeScript `MapDetector` class enables Battlefield Portal experience develo
 
 </ai>
 
-The detector captures the HQ coordinates as soon as the class loads (before any runtime modifications can occur) and uses these coordinates to identify which map is currently active. The module uses the `Logging` module for internal logging, allowing you to monitor map detection behavior and debug issues.
-
-> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.Maps`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **Spatial data assumption** – This utility assumes that the spatial data loaded with the map has not changed the location of Team 1's HQ. If custom spatial modifications have moved the HQ, detection may fail.
-
 ---
 
 ## Quick Start
@@ -36,8 +24,14 @@ The detector captures the HQ coordinates as soon as the class loads (before any 
 
 ```ts
 import { MapDetector } from 'bf6-portal-utils/map-detector';
+import { Events } from 'bf6-portal-utils/events';
 
-export async function OnGameModeStarted(): Promise<void> {
+// If your experience uses custom spatial data that moves HQ1 on certain maps, set the
+// expected HQ1 coordinates for each affected map here (after imports, not in an event handler).
+MapDetector.setCoordinates(MapDetector.Map.Downtown, { x: -1044, y: 122, z: 220 });
+MapDetector.setCoordinates(MapDetector.Map.Eastwood, { x: -195, y: 231, z: -41 });
+
+Events.OnGameModeStarted.subscribe(() => {
     // Optional: Configure logging for map detection debugging
     MapDetector.setLogging((text) => console.log(text), MapDetector.LogLevel.Warning);
 
@@ -48,26 +42,14 @@ export async function OnGameModeStarted(): Promise<void> {
         // Handle Downtown-specific logic
     }
 
-    // Get the current map as a mod.Maps enum (native API)
-    const nativeMap = MapDetector.currentNativeMap();
-
-    if (nativeMap == mod.Maps.Granite_MainStreet) {
-        // Handle using native enum
+    if (map == MapDetector.Map.Eastwood) {
+        // Handle Eastwood-specific logic
     }
 
     // Get the current map as a string
     const mapName = MapDetector.currentMapName();
     console.log(`Current map: ${mapName}`);
-
-    // Check if current map matches a specific map
-    if (MapDetector.isCurrentMap(MapDetector.Map.Eastwood)) {
-        // Eastwood-specific setup
-    }
-
-    // Get HQ coordinates for debugging
-    const hq = MapDetector.getHQCoordinates(2);
-    console.log(`HQ position: <${hq.x}, ${hq.y}, ${hq.z}>`);
-}
+});
 ```
 
 </ai>
@@ -93,13 +75,12 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-### `class MapDetector`
-
 #### Static Methods
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. This allows you to monitor and debug map detection behavior. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
+| `setCoordinates(map: MapDetector.Map, coordinates: Vectors.Vector3): void` | Sets the expected HQ1 coordinates used for detecting the given map. Call this for **each map** where your experience uses custom spatial data that moves Team 1's HQ—at the **top of your file** (after imports), not in an event handler, so coordinates are set before any detection runs. Only the **integer parts** of the coordinates are used for matching (decimals are ignored); this is sufficient because map HQ positions differ significantly. |
 | `currentMap(): MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined. |
 | `currentNativeMap(): mod.Maps \| undefined` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
 | `currentMapName(): string \| undefined` | Returns the current map as a string (e.g., `"Downtown"`), or `undefined` if the map cannot be determined. |
@@ -112,10 +93,11 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 ## Supported Maps
 
-The `MapDetector` class supports detection of the following maps via the `MapDetector.Map` enum:
+The `MapDetector` namespace supports detection of the following maps via the `MapDetector.Map` enum:
 
-- Area 22B (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
+- Area 22B
 - Blackwell Fields
+- **Contaminated** (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
 - Defense Nexus
 - Downtown
 - Eastwood
@@ -129,9 +111,15 @@ The `MapDetector` class supports detection of the following maps via the `MapDet
 - New Sobek City
 - Operation Firestorm
 - Portal Sandbox
-- Redline Storage (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
+- Redline Storage
 - Saints Quarter
 - Siege of Cairo
+
+---
+
+## Custom map spatial layouts
+
+If your experience uses **custom spatial data** that moves Team 1's HQ from its default position on one or more maps, detection would otherwise fail. Call **`MapDetector.setCoordinates(map, coordinates)`** for **each map** where HQ1 has a non-default position. Do this **at the top of your file** (after imports), **not** inside an event handler—your code does not know the current map until the detector runs, so you must pre-configure every map whose layout you have changed. Pass the (x, y, z) position of HQ1 for that layout; only the **integer parts** of the coordinates are used when matching (decimal parts are ignored). That is sufficient because HQ positions differ widely between maps, so integer comparison is enough to distinguish them.
 
 ---
 
@@ -139,17 +127,17 @@ The `MapDetector` class supports detection of the following maps via the `MapDet
 
 ### Missing Maps in Native Enum
 
-The maps **"Area 22B"** and **"Redline Storage"** are not available in the native `mod.Maps` enum due to an oversight in the Battlefield Portal API. As a result:
+The map **"Contaminated"** is not available in the native `mod.Maps` enum (it is missing from the Battlefield Portal API). As a result:
 
-- `MapDetector.currentNativeMap` will return `undefined` for these maps (they are not present in `mod.Maps`).
-- `MapDetector.isCurrentNativeMap()` will always return `false` for these maps when checking against any `mod.Maps` value.
-- `MapDetector.currenMap` and `MapDetector.isCurrentMap` **will behave correctly for these maps**.
+- `MapDetector.currentNativeMap()` will return `undefined` for Contaminated.
+- `MapDetector.isCurrentNativeMap()` will always return `false` for Contaminated when checking against any `mod.Maps` value.
+- `MapDetector.currentMap()` and `MapDetector.isCurrentMap()` **behave correctly for Contaminated**.
 
-Therefore, use `MapDetector.Map` enum values and the `isCurrentMap()` method when working with these maps (or preferably, for all maps).
+Use `MapDetector.Map` enum values and `isCurrentMap()` when working with Contaminated (or for consistency, for all maps).
 
 ### Detection Method
 
-The detector identifies maps primarily by the X-coordinate of Team 1's HQ, with Y-coordinate used for disambiguation in two cases (Mirak Valley vs New Sobek City). If custom spatial data or modifications have moved the HQ from its default position, detection will fail and all getters will return `undefined`.
+The detector identifies maps by comparing the **integer parts** of Team 1's HQ position (x, y, z) to the known coordinates for each map; decimal parts are ignored. If custom spatial data has moved HQ1 on certain maps, call `setCoordinates()` at the top of your file for each affected map with the new HQ1 position so detection continues to work.
 
 </ai>
 
@@ -159,19 +147,18 @@ The detector identifies maps primarily by the X-coordinate of Team 1's HQ, with 
 
 The `MapDetector` uses a coordinate-based detection system:
 
-1. **Coordinate Matching** – The detector compares the Team 1's HQ X-coordinate (and Y-coordinate when needed) against known map HQ positions.
-2. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native `mod.Maps` enum where available.
+1. **Coordinate Matching** – The detector reads Team 1's HQ position and compares only the **integer parts** of x, y, and z to the known coordinates for each map (decimal parts are ignored). This is sufficient because HQ positions differ significantly between maps. You can override the stored coordinates for any map via `setCoordinates()` when using custom spatial layouts that move the HQ—call it at the top of your file for each affected map.
+2. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native `mod.Maps` enum where available (some maps, e.g. Contaminated, are not in the native enum).
 3. **Error Logging** – When map detection fails or HQ coordinate retrieval encounters errors, warnings and errors are logged using the configured logger (if logging is enabled via `MapDetector.setLogging()`). This provides visibility into detection issues without affecting functionality.
 
-The detection is fast and requires no additional setup, making it suitable for use in any event handler or game logic.
+The detection is fast and requires no additional setup for default spatial data; for custom layouts, call `setCoordinates()` at the top of your file for each map where your experience has a non-default HQ1 position.
 
 ---
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- Battlefield Builder docs – For information about spatial data and HQ positioning.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

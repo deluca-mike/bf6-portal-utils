@@ -7,18 +7,9 @@ This TypeScript `Logger` class removes the biggest Battlefield Portal debugging 
 - **Dynamic mode** behaves like a scrolling console, always appending at the bottom and pushing older rows upward.
 - **Static mode** lets you target a specific row index (e.g., keep player position on row 10 while other diagnostics fill lines 0‑9).
 
+> **Note** Since the `Logger` namespace depends on the `UI` module, which depends on the `Events` module **you must use the `Events` module as your only mechanism to subscribe to game events**—do not implement or export any Battlefield Portal event handler functions in your own code. Because only one implementation of each Portal event can exist per project (the `Events` module owns those hooks), your mod must subscribe via `Events` only. See the [Events module — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
+
 </ai>
-
-> **Note** The `Logger` depends on the shared `UI` helper (containers, text widgets, etc.) which is also maintained in this repository. Keep that namespace/class above the logger in your mod file. All Battlefield Portal types referenced below (`mod.Player`, `mod.UIWidget`, vectors, anchors, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining and strings.json merging.
-3. **UI dependency** – The `Logger` depends on the `UI` namespace (which is also maintained in this repository).
-4. **One-time setup per player** – Instantiate the logger in your deployment hooks (e.g., `OnPlayerDeployed`) and keep a reference for future logs.
 
 ---
 
@@ -179,9 +170,9 @@ In no particular order, planned upcoming work and improvements include:
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- [`ui/README.md`](../ui/README.md) – Documentation for the UI helper module required by this system.
+- [UI module](../ui/README.md) – Documentation for the UI helper module required by this system.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

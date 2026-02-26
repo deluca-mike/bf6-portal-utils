@@ -1,10 +1,12 @@
+import { CallbackHandler } from '../callback-handler/index.ts';
+import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version 2.0.1
+// version 3.0.0
 export class MultiClickDetector {
     private static _logging = new Logging('MCD');
 
-    private static _detectors = new Map<number, Set<MultiClickDetector>>();
+    private static _detectors = new Map<number, { enabled: boolean; detectors: Set<MultiClickDetector> }>();
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
@@ -20,34 +22,48 @@ export class MultiClickDetector {
         this._logging.setLogging(log, logLevel, includeError);
     }
 
-    /**
-     * Handles the ongoing player event for a player so it needs to be called in the `OngoingPlayer` event handler.
-     * @param player - The player to handle the ongoing player event for.
-     */
-    public static handleOngoingPlayer(player: mod.Player): void {
-        const detectors = MultiClickDetector._detectors.get(mod.GetObjId(player));
+    static {
+        Events.OngoingPlayer.subscribe(MultiClickDetector._handleOngoingPlayer);
+        Events.OnPlayerDeployed.subscribe(MultiClickDetector._handlePlayerDeployed);
+        Events.OnPlayerUndeploy.subscribe(MultiClickDetector._handlePlayerUndeployed);
+        Events.OnPlayerLeaveGame.subscribe(MultiClickDetector._handlePlayerLeaveGame);
+    }
 
-        if (!detectors) return;
+    private static _handleOngoingPlayer(player: mod.Player): void {
+        const playerState = MultiClickDetector._detectors.get(mod.GetObjId(player));
 
-        for (const detector of detectors) {
+        if (!playerState) return;
+
+        if (!playerState.enabled) return;
+
+        for (const detector of playerState.detectors) {
             detector._handleOngoing();
         }
     }
 
-    /**
-     * Prunes multi-click detectors associated to invalid players.
-     * This can be called periodically or called in the `OnPlayerLeaveGame` event handler, to clean up.
-     */
-    public static pruneInvalidPlayers(): void {
-        for (const [playerId, detectors] of MultiClickDetector._detectors.entries()) {
-            const player = detectors.values().next().value?._player;
+    private static _handlePlayerDeployed(player: mod.Player): void {
+        const playerState = MultiClickDetector._detectors.get(mod.GetObjId(player));
 
-            if (player && mod.IsPlayerValid(player)) continue; // Valid player, skip.
+        if (!playerState) return;
 
-            // Clear the Set to release references to detector instances before deleting the Map entry.
-            detectors.clear();
-            MultiClickDetector._detectors.delete(playerId);
-        }
+        playerState.enabled = true;
+    }
+
+    private static _handlePlayerUndeployed(player: mod.Player): void {
+        const playerState = MultiClickDetector._detectors.get(mod.GetObjId(player));
+
+        if (!playerState) return;
+
+        playerState.enabled = false;
+    }
+
+    private static _handlePlayerLeaveGame(playerId: number): void {
+        MultiClickDetector._detectors.delete(playerId);
+
+        MultiClickDetector._logging.log(
+            `Player ${playerId} left the game: multi-click detectors cleaned up.`,
+            Logging.LogLevel.Warning
+        );
     }
 
     /**
@@ -55,21 +71,18 @@ export class MultiClickDetector {
      * @param player - The player to detect multi-click sequences for.
      * @param callback - The callback to call when a multi-click sequence is detected.
      * @param options - The options for the multi-click detector.
-     * @param options.soldierState - The soldier state boolean to use for the multi-click detector.
-     * @param options.windowMs - The window in milliseconds for a valid multi-click sequence.
-     * @param options.requiredClicks - The number of clicks required to trigger a multi-click sequence.
      */
     public constructor(player: mod.Player, callback: () => Promise<void> | void, options?: MultiClickDetector.Options) {
-        const playerId = mod.GetObjId(player);
+        this._playerId = mod.GetObjId(player);
 
         this._player = player;
         this._callback = callback;
 
-        if (!MultiClickDetector._detectors.has(playerId)) {
-            MultiClickDetector._detectors.set(playerId, new Set());
+        if (!MultiClickDetector._detectors.has(this._playerId)) {
+            MultiClickDetector._detectors.set(this._playerId, { enabled: false, detectors: new Set() });
         }
 
-        MultiClickDetector._detectors.get(playerId)!.add(this);
+        MultiClickDetector._detectors.get(this._playerId)!.detectors.add(this);
 
         if (!options) return;
 
@@ -79,6 +92,10 @@ export class MultiClickDetector {
     }
 
     private _player: mod.Player;
+
+    private _playerId: number;
+
+    private _enabled = true;
 
     private _lastState = false;
 
@@ -95,6 +112,8 @@ export class MultiClickDetector {
     private _requiredClicks = 3; // Number of clicks required to trigger a multi-click sequence.
 
     private _handleOngoing(): void {
+        if (!this._enabled) return;
+
         const currentState = mod.GetSoldierState(this._player, this._soldierState);
 
         if (currentState === this._lastState) return; // Fast exit for the vast majority of ticks.
@@ -121,30 +140,42 @@ export class MultiClickDetector {
 
         this._clickCount = 0; // Reset for next unique sequence.
 
-        try {
-            const result = this._callback();
+        CallbackHandler.invokeNoArgs(
+            this._callback,
+            `player ${this._playerId}`,
+            MultiClickDetector._logging,
+            Logging.LogLevel.Error
+        );
 
-            if (result instanceof Promise) {
-                result.catch((error: unknown) => {
-                    // Catch and log async callback errors to prevent unhandled promise rejections.
-                    MultiClickDetector._logging.log(
-                        'Error in async callback:',
-                        MultiClickDetector.LogLevel.Error,
-                        error
-                    );
-                });
-            }
-        } catch (error: unknown) {
-            // Catch and log sync callback errors so the multi-click detector functionality can still run.
-            MultiClickDetector._logging.log('Error in sync callback:', MultiClickDetector.LogLevel.Error, error);
+        if (MultiClickDetector._logging.willLog(Logging.LogLevel.Info)) {
+            MultiClickDetector._logging.log(
+                `Player ${this._playerId} performed multi-click sequence.`,
+                Logging.LogLevel.Info
+            );
         }
+    }
+
+    public enable(): void {
+        this._enabled = true;
+    }
+
+    public disable(): void {
+        this._enabled = false;
     }
 
     /**
      * Destroys the multi-click detector.
      */
     public destroy(): void {
-        MultiClickDetector._detectors.get(mod.GetObjId(this._player))?.delete(this);
+        const playerState = MultiClickDetector._detectors.get(this._playerId);
+
+        if (!playerState) return;
+
+        playerState.detectors.delete(this);
+
+        if (playerState.detectors.size === 0) {
+            MultiClickDetector._detectors.delete(this._playerId);
+        }
     }
 }
 

@@ -1,26 +1,17 @@
-import { Timers } from '../timers/index.ts';
+import { CallbackHandler } from '../callback-handler/index.ts';
+import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
+import { Timers } from '../timers/index.ts';
+import { Vectors } from '../vectors/index.ts';
 
-// version: 1.1.1
-export class Raycast {
-    private static _logging = new Logging('Raycast');
+// version: 2.0.0
+export namespace Raycast {
+    const logging = new Logging('Raycast');
 
-    private static _nextRayId: number = 0;
-
-    private static _state: Map<number, Raycast.PlayerState> = new Map();
-
-    private static readonly _DISTANCE_EPSILON = 0.5; // 0.5 meters
-
-    private static readonly _DEFAULT_TTL_MS = 2_000; // 2 Seconds
-
-    private static readonly _PRUNE_INTERVAL_MS = 5_000; // 5 Seconds
-
-    static {
-        // Automatically prunes all player states every _PRUNE_INTERVAL_MS.
-        Timers.setInterval(() => this.pruneAllStates(), this._PRUNE_INTERVAL_MS);
-    }
-
-    private constructor() {}
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
+    export const LogLevel = Logging.LogLevel;
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
@@ -28,26 +19,72 @@ export class Raycast {
      * @param logLevel - The minimum log level to use.
      * @param includeError - Whether to include the runtime error in the log.
      */
-    public static setLogging(
+    export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeError?: boolean
     ): void {
-        this._logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeError);
     }
 
-    public static cast(
-        player: mod.Player,
-        start: Raycast.Vector3,
-        end: Raycast.Vector3,
-        callbacks: Raycast.Callbacks<Raycast.Vector3>
-    ): void;
+    /**
+     * A re-export of the `Vectors.Vector3` type.
+     */
+    export type Vector3 = Vectors.Vector3;
 
-    public static cast(
+    /**
+     * A callback function type for ray hits.
+     */
+    export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
+
+    /**
+     * A callback function type for ray misses.
+     */
+    export type MissCallback = () => Promise<void> | void;
+
+    /**
+     * A callback object type for the `cast()` method. Must have Hit (Miss optional) or Miss (Hit optional).
+     */
+    export type Callbacks<T extends mod.Vector | Vector3> =
+        | { onHit: HitCallback<T>; onMiss?: MissCallback }
+        | { onHit?: HitCallback<T>; onMiss: MissCallback };
+
+    type PendingRay = {
+        start: Vector3;
+        end: Vector3;
+        totalDistance: number;
+        timestamp: number;
+        nativeVectorReturn: boolean;
+        onHit?: HitCallback<mod.Vector | Vector3>;
+        onMiss?: MissCallback;
+    };
+
+    type PlayerState = {
+        pendingMisses: number;
+        rays: Map<number, PendingRay>;
+    };
+
+    let nextRayId: number = 0;
+
+    const states: Map<number, PlayerState> = new Map();
+
+    const DISTANCE_EPSILON = 0.5; // 0.5 meters
+    const DEFAULT_TTL_MS = 2_000; // 2 Seconds
+    const PRUNE_INTERVAL_MS = 5_000; // 5 Seconds
+
+    // Automatically prunes all player states every PRUNE_INTERVAL_MS.
+    Timers.setInterval(pruneAllStates, PRUNE_INTERVAL_MS);
+
+    Events.OnRayCastHit.subscribe(handleHit);
+    Events.OnRayCastMissed.subscribe(handleMiss);
+
+    export function cast(player: mod.Player, start: Vector3, end: Vector3, callbacks: Callbacks<Vector3>): void;
+
+    export function cast(
         player: mod.Player,
         start: mod.Vector,
         end: mod.Vector,
-        callbacks: Raycast.Callbacks<mod.Vector>
+        callbacks: Callbacks<mod.Vector>
     ): void;
 
     /**
@@ -70,52 +107,52 @@ export class Raycast {
      *   - `onHit`: The callback to be called when the ray hits a target.
      *   - `onMiss`: The callback to be called when the ray misses a target.
      */
-    public static cast(
+    export function cast<T extends mod.Vector | Vector3>(
         player: mod.Player,
-        start: Raycast.Vector3 | mod.Vector,
-        end: Raycast.Vector3 | mod.Vector,
-        callbacks: Raycast.Callbacks<mod.Vector | Raycast.Vector3>
+        start: T,
+        end: T,
+        callbacks: Callbacks<T>
     ): void {
         // Don't even fire the ray if someone ignores type safety (Optional, but good practice).
         if (typeof callbacks?.onHit !== 'function' && typeof callbacks?.onMiss !== 'function') return;
 
         const playerId = mod.GetObjId(player);
 
-        if (!this._state.has(playerId)) {
-            this._state.set(playerId, { pendingMisses: 0, rays: new Map() });
+        if (!states.has(playerId)) {
+            states.set(playerId, { pendingMisses: 0, rays: new Map() });
         }
 
-        const state = this._state.get(playerId)!;
+        const state = states.get(playerId)!;
 
-        this._prunePlayerState(state); // Lazy Cleanup: Remove expired rays before adding new ones.
+        prunePlayerState(state); // Lazy Cleanup: Remove expired rays before adding new ones.
 
-        const nativeVectorReturn = !this._isVector3(start);
+        const nativeVectorReturn = !Vectors.isVector3(start);
 
-        let startVector3: Raycast.Vector3;
-        let endVector3: Raycast.Vector3;
+        let startVector3: Vector3;
+        let endVector3: Vector3;
         let startVector: mod.Vector;
         let endVector: mod.Vector;
 
         // We check 'start' to decide the mode.
         if (nativeVectorReturn) {
-            startVector3 = this._parseModVector(start as mod.Vector);
-            endVector3 = this._parseModVector(end as mod.Vector);
+            startVector3 = Vectors.toVector3(start as mod.Vector);
+            endVector3 = Vectors.toVector3(end as mod.Vector);
             startVector = start as mod.Vector;
             endVector = end as mod.Vector;
         } else {
-            startVector3 = start as Raycast.Vector3;
-            endVector3 = end as Raycast.Vector3;
-            startVector = mod.CreateVector(startVector3.x, startVector3.y, startVector3.z);
-            endVector = mod.CreateVector(endVector3.x, endVector3.y, endVector3.z);
+            startVector3 = start as Vector3;
+            endVector3 = end as Vector3;
+            startVector = Vectors.toVector(startVector3);
+            endVector = Vectors.toVector(endVector3);
         }
 
-        state.rays.set(this._nextRayId++, {
+        state.rays.set(nextRayId++, {
             start: startVector3,
             end: endVector3,
-            totalDistance: this._distance(startVector3, endVector3), // Pre-compute length for faster math later.
+            totalDistance: Vectors.distance(startVector3, endVector3), // Pre-compute length for faster math later.
             timestamp: Date.now(),
             nativeVectorReturn,
-            onHit: callbacks.onHit,
+            onHit: callbacks.onHit as HitCallback<mod.Vector | Vector3>,
             onMiss: callbacks.onMiss,
         });
 
@@ -129,35 +166,25 @@ export class Raycast {
      * @param eventPoint - The point where the ray hit a target.
      * @param eventNormal - The normal of the surface where the ray hit the target.
      */
-    public static handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void {
-        const state = this._state.get(mod.GetObjId(eventPlayer));
+    function handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void {
+        const state = states.get(mod.GetObjId(eventPlayer));
 
         if (!state || state.rays.size === 0) return;
 
-        const point = this._parseModVector(eventPoint);
-        const ray = this._popBestRay(point, state.rays);
+        const point = Vectors.toVector3(eventPoint);
+        const ray = popBestRay(point, state.rays);
 
         if (!ray) return;
 
-        if (ray.onHit) {
-            try {
-                const result = ray.nativeVectorReturn
-                    ? (ray.onHit as Raycast.HitCallback<mod.Vector>)(eventPoint, eventNormal)
-                    : (ray.onHit as Raycast.HitCallback<Raycast.Vector3>)(point, this._parseModVector(eventNormal));
+        CallbackHandler.invoke(
+            ray.nativeVectorReturn ? (ray.onHit as HitCallback<mod.Vector>) : (ray.onHit as HitCallback<Vector3>),
+            ray.nativeVectorReturn ? [eventPoint, eventNormal] : [point, Vectors.toVector3(eventNormal)],
+            'onHit',
+            logging,
+            LogLevel.Error
+        );
 
-                if (result instanceof Promise) {
-                    result.catch((error: unknown) => {
-                        // Catch and log async hit callback errors to prevent unhandled promise rejections.
-                        Raycast._logging.log('Error in async hit callback:', Raycast.LogLevel.Error, error);
-                    });
-                }
-            } catch (error: unknown) {
-                // Catch and log sync hit callback errors so the raycast functionality can still run.
-                Raycast._logging.log('Error in sync hit callback:', Raycast.LogLevel.Error, error);
-            }
-        }
-
-        this._resolvePendingMisses(state);
+        resolvePendingMisses(state);
     }
 
     /**
@@ -166,29 +193,29 @@ export class Raycast {
      * the number of active rays. If not, the miss is stored as a pending miss and wil be attributed later.
      * @param eventPlayer - The player the ray was assigned to.
      */
-    public static handleMiss(eventPlayer: mod.Player): void {
-        const state = this._state.get(mod.GetObjId(eventPlayer));
+    function handleMiss(eventPlayer: mod.Player): void {
+        const state = states.get(mod.GetObjId(eventPlayer));
 
         if (!state || state.rays.size === 0) return;
 
         state.pendingMisses++;
-        this._resolvePendingMisses(state);
+        resolvePendingMisses(state);
     }
 
     /**
      * Used when a player leaves to clean up memory leaks by pruning all player states, like a Garbage Collector.
      * You can hook this into the global `OnPlayerLeaveGame` event, but it will already be called automatically every
-     * `_PRUNE_INTERVAL_MS`.
+     * `PRUNE_INTERVAL_MS`.
      */
-    public static pruneAllStates(): void {
+    export function pruneAllStates(): void {
         // We can iterate the map keys (playerIds)
-        for (const [playerId, state] of this._state.entries()) {
-            this._prunePlayerState(state);
+        for (const [playerId, state] of states.entries()) {
+            prunePlayerState(state);
 
             // If the player is gone, their state will eventually be empty.
             // If empty, delete the player entry entirely.
             if (state.rays.size === 0 && state.pendingMisses === 0) {
-                this._state.delete(playerId);
+                states.delete(playerId);
             }
         }
     }
@@ -197,14 +224,14 @@ export class Raycast {
      * Prunes a single player's state. Used during 'cast' to keep the active player's logic clean.
      * @param state - The player state to prune.
      */
-    private static _prunePlayerState(state: Raycast.PlayerState) {
+    export function prunePlayerState(state: PlayerState) {
         const now = Date.now();
         let stateChanged = false;
 
         for (const [rayId, ray] of state.rays.entries()) {
-            if (now - ray.timestamp <= this._DEFAULT_TTL_MS) continue;
+            if (now - ray.timestamp <= DEFAULT_TTL_MS) continue;
 
-            this._handleMissCallback(ray);
+            handleMissCallback(ray);
 
             if (state.pendingMisses > 0) {
                 state.pendingMisses--;
@@ -216,7 +243,7 @@ export class Raycast {
 
         // If we removed rays, the ratio of Rays:Misses has changed. Check if this unblocked the remaining queue.
         if (stateChanged) {
-            this._resolvePendingMisses(state);
+            resolvePendingMisses(state);
         }
     }
 
@@ -225,7 +252,7 @@ export class Raycast {
      * If so, all active rays are considered misses.
      * @param state - The player state to resolve pending misses for.
      */
-    private static _resolvePendingMisses(state: Raycast.PlayerState) {
+    function resolvePendingMisses(state: PlayerState) {
         // If we have no rays, we cannot have pending misses, so clear the pending misses to prevent "orphan" miss
         // events from poisoning the next raycast.
         if (state.rays.size === 0) {
@@ -237,33 +264,18 @@ export class Raycast {
         if (state.pendingMisses < state.rays.size) return;
 
         for (const ray of state.rays.values()) {
-            this._handleMissCallback(ray);
+            handleMissCallback(ray);
         }
 
         state.rays.clear();
         state.pendingMisses = 0;
     }
 
-    private static _handleMissCallback(ray: Raycast.PendingRay): void {
-        try {
-            const result = ray.onMiss?.();
-
-            if (result instanceof Promise) {
-                result.catch((error: unknown) => {
-                    // Catch and log async miss callback errors to prevent unhandled promise rejections.
-                    Raycast._logging.log('Error in async miss callback:', Raycast.LogLevel.Error, error);
-                });
-            }
-        } catch (error: unknown) {
-            // Catch and log sync miss callback errors so the raycast functionality can still run.
-            Raycast._logging.log('Error in sync miss callback:', Raycast.LogLevel.Error, error);
-        }
+    function handleMissCallback(ray: PendingRay): void {
+        CallbackHandler.invokeNoArgs(ray.onMiss, 'onMiss', logging, LogLevel.Error);
     }
 
-    private static _popBestRay(
-        point: Raycast.Vector3,
-        activeRays: Map<number, Raycast.PendingRay>
-    ): Raycast.PendingRay | null {
+    function popBestRay(point: Vector3, activeRays: Map<number, PendingRay>): PendingRay | null {
         let bestRayKey: number | null = null;
         let lowestError = Number.MAX_SAFE_INTEGER;
 
@@ -271,16 +283,16 @@ export class Raycast {
 
         // Linear scan is unavoidable but very fast for small N.
         for (const [key, ray] of activeRays) {
-            if (now - ray.timestamp > this._DEFAULT_TTL_MS) continue;
+            if (now - ray.timestamp > DEFAULT_TTL_MS) continue;
 
-            const d1 = this._distance(ray.start, point);
-            const d2 = this._distance(point, ray.end);
+            const d1 = Vectors.distance(ray.start, point);
+            const d2 = Vectors.distance(point, ray.end);
 
             // If Dist(Start->Hit) + Dist(Hit->End) ~= TotalLength, point is on line segment.
             // Calculate error |(d1 + d2) - TotalLength| (a perfect hit has an error of 0.0).
             const error = Math.abs(d1 + d2 - ray.totalDistance);
 
-            if (error > this._DISTANCE_EPSILON || error > lowestError) continue;
+            if (error > DISTANCE_EPSILON || error > lowestError) continue;
 
             lowestError = error;
             bestRayKey = key;
@@ -293,71 +305,4 @@ export class Raycast {
 
         return bestRay;
     }
-
-    private static _distance(a: Raycast.Vector3, b: Raycast.Vector3): number {
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const dz = a.z - b.z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-
-    private static _parseModVector(v: mod.Vector): Raycast.Vector3 {
-        return {
-            x: mod.XComponentOf(v),
-            y: mod.YComponentOf(v),
-            z: mod.ZComponentOf(v),
-        };
-    }
-
-    private static _isVector3(v: unknown): v is Raycast.Vector3 {
-        return typeof v === 'object' && v !== null && 'x' in v && 'y' in v && 'z' in v;
-    }
-}
-
-export namespace Raycast {
-    /**
-     * A simple transparent 3D vector interface.
-     */
-    export interface Vector3 {
-        x: number;
-        y: number;
-        z: number;
-    }
-
-    /**
-     * A callback function type for ray hits.
-     */
-    export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
-
-    /**
-     * A callback function type for ray misses.
-     */
-    export type MissCallback = () => Promise<void> | void;
-
-    /**
-     * A callback object type for the `cast()` method. Must have Hit (Miss optional) or Miss (Hit optional).
-     */
-    export type Callbacks<T extends mod.Vector | Vector3> =
-        | { onHit: HitCallback<T>; onMiss?: MissCallback }
-        | { onHit?: HitCallback<T>; onMiss: MissCallback };
-
-    export interface PendingRay {
-        start: Vector3;
-        end: Vector3;
-        totalDistance: number;
-        timestamp: number;
-        nativeVectorReturn: boolean;
-        onHit?: HitCallback<mod.Vector | Vector3>;
-        onMiss?: MissCallback;
-    }
-
-    export interface PlayerState {
-        pendingMisses: number;
-        rays: Map<number, PendingRay>;
-    }
-
-    /**
-     * A re-export of the `Logging.LogLevel` enum.
-     */
-    export const LogLevel = Logging.LogLevel;
 }

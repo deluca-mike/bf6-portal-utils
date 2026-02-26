@@ -2,22 +2,13 @@
 
 <ai>
 
-This TypeScript `Timers` class provides `setTimeout` and `setInterval` functionality for Battlefield Portal experiences which run in a QuickJS runtime, which does not natively include these standard JavaScript timing functions. The module uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs, and provides error handling to ensure robust timer execution.
-
-</ai>
+This TypeScript `Timers` namespace provides `setTimeout` and `setInterval` functionality for Battlefield Portal experiences which run in a QuickJS runtime, which does not natively include these standard JavaScript timing functions. The module uses Battlefield Portal's `mod.Wait()` API internally to implement timer behavior, tracks active timers with unique IDs, and provides error handling to ensure robust timer execution.
 
 **Why use Timers instead of `mod.Wait()`?** The `Timers` module offers significant advantages: timers can be cancelled with `clearTimeout()`/`clearInterval()`, multiple timers can run concurrently without blocking, automatic error handling prevents timer failures from crashing your mod, and the familiar JavaScript API makes code more readable and maintainable. Ideal for periodic tasks, delayed actions, debouncing, and any scenario where you need cancellable or recurring delays. See the [Comparing Timers to mod.Wait()](#comparing-timers-to-modwait) section below for a detailed comparison.
 
+</ai>
+
 Key features include automatic timer ID management, graceful error handling that prevents timer failures from crashing your mod, support for immediate interval execution, and configurable logging for debugging timer behavior. The module uses the `Logging` module for internal logging, allowing you to monitor callback errors and debug timer behavior.
-
-> **Note** The `Timers` class is self-contained and requires no additional modules or setup. All Battlefield Portal types referenced below (`mod.Wait`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
 
 ---
 
@@ -130,7 +121,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ## Comparing Timers to mod.Wait()
 
-While `mod.Wait()` is the underlying API used by this module, the `Timers` class provides significant advantages that make it a better choice for most timing scenarios:
+While `mod.Wait()` is the underlying API used by this module, the `Timers` namespace provides significant advantages that make it a better choice for most timing scenarios:
 
 ### Key Advantages
 
@@ -159,9 +150,9 @@ While `mod.Wait()` is still useful for simple, linear delays in async functions,
 
 ## API Reference
 
-### `class Timers`
+### `namespace Timers`
 
-All methods are static. The class does not need to be instantiated.
+The namespace is not instantiated; all members are static.
 
 #### `Timers.LogLevel`
 
@@ -288,7 +279,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ## How It Works
 
-The `Timers` class implements timer functionality using Battlefield Portal's `mod.Wait()` API:
+The `Timers` namespace implements timer functionality using Battlefield Portal's `mod.Wait()` API:
 
 1. **Timer ID Generation** – Each timer receives a unique, auto-incremented ID starting from 1. This ID is added to the `_ACTIVE_IDS` set when the timer is created.
 

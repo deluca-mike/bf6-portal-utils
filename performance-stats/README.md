@@ -1,24 +1,14 @@
 # Performance Stats Module
 
-<ai>
-
 This TypeScript `PerformanceStats` class enables Battlefield Portal experience developers to monitor and track the estimated runtime tick rate of the server their experience is running on. The utility provides real-time performance metrics that can help identify when the server is under stress or when script callbacks are being deprioritized by the game engine.
 
 The system uses a sampling approach to calculate tick rate by counting ticks over a configurable time window, providing a "virtual rate" metric that reflects the actual performance of your script's execution environment.
 
+<ai>
+
 It is not recommended to use this module in its current state as it lacks core functionality to return meaningful metrics.
 
 </ai>
-
-> **Note** All Battlefield Portal types referenced below (`mod.Player`, `mod.Wait`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **OngoingGlobal event** – The `trackTick()` method should be called in your `OngoingGlobal()` event handler to accurately track tick rate.
 
 ---
 

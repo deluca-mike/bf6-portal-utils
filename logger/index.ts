@@ -2,7 +2,7 @@ import { UI } from '../ui/index.ts';
 import { UIContainer } from '../ui/components/container/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 3.1.1
+// version: 3.1.2
 export class Logger {
     private static readonly _PADDING: number = 10;
 
@@ -65,20 +65,6 @@ export class Logger {
      * Creates a new logger with specific options.
      * @param player - The player to to draw the logger for.
      * @param options - The options for the logger.
-     * @param options.staticRows - Whether to use static rows (`true`) or dynamic rows (`false`).
-     * @param options.truncate - Whether to truncate long messages with ellipses.
-     * @param options.parent - The parent container for the logger.
-     * @param options.anchor - The anchor for the logger.
-     * @param options.x - The x position of the logger.
-     * @param options.y - The y position of the logger.
-     * @param options.width - The width of the logger.
-     * @param options.height - The height of the logger.
-     * @param options.bgColor - The background color of the logger.
-     * @param options.bgAlpha - The background alpha of the logger.
-     * @param options.bgFill - The background fill of the logger.
-     * @param options.textColor - The text color of the logger.
-     * @param options.textScale - The text scale of the logger.
-     * @param options.visible - Whether to show the logger.
      */
     constructor(player: mod.Player, options?: Logger.Options) {
         this._width = options?.width ?? 400;
@@ -233,11 +219,12 @@ export class Logger {
     }
 
     private _logNextParts(parts: string[]): void {
-        const remaining = this._fillRow(this._prepareNextRow(), parts);
+        let remaining: string[] | null = parts;
 
-        if (!remaining) return;
-
-        this._logNextParts(remaining);
+        while (remaining !== null) {
+            const row = this._prepareNextRow();
+            remaining = this._fillRow(row, remaining);
+        }
     }
 
     private _fillRow(row: UIContainer, parts: string[]): string[] | null {
@@ -281,6 +268,7 @@ export class Logger {
     }
 
     private _prepareNextRow(): UIContainer {
+        // _rows keys are always 0.._maxRows-1 (no gaps), so Object.values order matches key order and index === rowIndex.
         Object.values(this._rows).forEach((row, index) => {
             if (!row) return;
 
@@ -348,20 +336,65 @@ export class Logger {
 }
 
 export namespace Logger {
+    /**
+     * Options for the logger.
+     */
     export interface Options {
+        /**
+         * Whether to use static rows (`true`) or dynamic rows (`false`).
+         */
         staticRows?: boolean;
+        /**
+         * Whether to truncate long messages with ellipses.
+         */
         truncate?: boolean;
+        /**
+         * The parent container for the logger.
+         */
         parent?: UI.Root | UIContainer;
+        /**
+         * The anchor for the logger.
+         */
         anchor?: mod.UIAnchor;
+        /**
+         * The x position of the logger.
+         */
         x?: number;
+        /**
+         * The y position of the logger.
+         */
         y?: number;
+        /**
+         * The width of the logger.
+         */
         width?: number;
+        /**
+         * The height of the logger.
+         */
         height?: number;
+        /**
+         * The background color of the logger.
+         */
         bgColor?: mod.Vector;
+        /**
+         * The background alpha of the logger.
+         */
         bgAlpha?: number;
+        /**
+         * The background fill of the logger.
+         */
         bgFill?: mod.UIBgFill;
+        /**
+         * The text color of the logger.
+         */
         textColor?: mod.Vector;
+        /**
+         * The text scale of the logger.
+         */
         textScale?: 'small' | 'medium' | 'large';
+        /**
+         * Whether to show the logger.
+         */
         visible?: boolean;
     }
 }

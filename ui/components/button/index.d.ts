@@ -11,7 +11,7 @@ export declare class UIButton extends UI.Element implements UI.Button {
     protected _hoverAlpha: number;
     protected _focusedColor: mod.Vector;
     protected _focusedAlpha: number;
-    protected _onClick: ((player: mod.Player) => Promise<void>) | undefined;
+    protected _onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
     protected _unregisterAsButton: () => void;
     /**
      * Creates a new button.
@@ -192,18 +192,18 @@ export declare class UIButton extends UI.Element implements UI.Button {
     /**
      * The click handler of the button.
      */
-    get onClick(): ((player: mod.Player) => Promise<void>) | undefined;
+    get onClick(): ((player: mod.Player) => Promise<void> | void) | undefined;
     /**
      * Sets the click handler of the button.
      * @param onClick - The new click handler.
      */
-    set onClick(onClick: ((player: mod.Player) => Promise<void>) | undefined);
+    set onClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined);
     /**
      * Sets the click handler of the button. Useful for chaining operations.
      * @param onClick - The new click handler.
      * @returns This element instance.
      */
-    setOnClick(onClick: ((player: mod.Player) => Promise<void>) | undefined): this;
+    setOnClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined): this;
 }
 export declare namespace UIButton {
     /**
@@ -221,6 +221,6 @@ export declare namespace UIButton {
         hoverAlpha?: number;
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
-        onClick?: (player: mod.Player) => Promise<void>;
+        onClick?: (player: mod.Player) => Promise<void> | void;
     };
 }

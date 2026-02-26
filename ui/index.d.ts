@@ -106,7 +106,7 @@ export declare namespace UI {
      * The minimum interface for a button.
      */
     export interface Button {
-        onClick: ((player: mod.Player) => Promise<void>) | undefined;
+        onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
     }
     /****** Classes ******/
     abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
@@ -567,12 +567,5 @@ export declare namespace UI {
         parent: Parent,
         receiverParam?: mod.Player | mod.Team
     ): GlobalReceiver | TeamReceiver | PlayerReceiver;
-    /**
-     * Handles a button event. Must be called in the `OnPlayerUIButtonEvent` handler.
-     * @param player - The player who pressed the button.
-     * @param widget - The widget that was pressed.
-     * @param event - The button event.
-     */
-    export function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void;
     export {};
 }

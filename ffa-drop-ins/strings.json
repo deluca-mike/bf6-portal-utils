@@ -1,0 +1,12 @@
+{
+    "ffaDropIns": {
+        "countdown": "Spawning available in {} seconds...",
+        "buttons": {
+            "spawn": "Drop-in spawn now",
+            "delay": "Ask again in {} seconds"
+        },
+        "debug": {
+            "position": "XYZ (x100): <{}, {}, {}>"
+        }
+    }
+}

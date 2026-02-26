@@ -48,11 +48,6 @@ const button = new UIContainerButton({
 // Access the inner container
 const innerContainer = button.innerContainer;
 console.log(innerContainer.children.length); // 2
-
-// You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work
-export async function OnPlayerUIButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent) {
-    UI.handleButtonEvent(player, widget, event);
-}
 ```
 
 </ai>
@@ -142,8 +137,6 @@ type Params = UIButton.Params & UIContainer.Params;
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (outer container, button, and inner container), ensuring they stay in sync.
 
 - **Padding**: The component supports padding, which creates space between the button border and the inner container. The inner container's size is automatically adjusted to account for padding.
-
-- **Event Handler Required**: You must register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler for button clicks to work. See the Quick Start section above.
 
 - **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 

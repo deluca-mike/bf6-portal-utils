@@ -13,27 +13,20 @@ export declare class MultiClickDetector {
         logLevel?: Logging.LogLevel,
         includeError?: boolean
     ): void;
-    /**
-     * Handles the ongoing player event for a player so it needs to be called in the `OngoingPlayer` event handler.
-     * @param player - The player to handle the ongoing player event for.
-     */
-    static handleOngoingPlayer(player: mod.Player): void;
-    /**
-     * Prunes multi-click detectors associated to invalid players.
-     * This can be called periodically or called in the `OnPlayerLeaveGame` event handler, to clean up.
-     */
-    static pruneInvalidPlayers(): void;
+    private static _handleOngoingPlayer;
+    private static _handlePlayerDeployed;
+    private static _handlePlayerUndeployed;
+    private static _handlePlayerLeaveGame;
     /**
      * Creates a new multi-click detector with specific options.
      * @param player - The player to detect multi-click sequences for.
      * @param callback - The callback to call when a multi-click sequence is detected.
      * @param options - The options for the multi-click detector.
-     * @param options.soldierState - The soldier state boolean to use for the multi-click detector.
-     * @param options.windowMs - The window in milliseconds for a valid multi-click sequence.
-     * @param options.requiredClicks - The number of clicks required to trigger a multi-click sequence.
      */
     constructor(player: mod.Player, callback: () => Promise<void> | void, options?: MultiClickDetector.Options);
     private _player;
+    private _playerId;
+    private _enabled;
     private _lastState;
     private _clickCount;
     private _sequenceStartTime;
@@ -42,6 +35,8 @@ export declare class MultiClickDetector {
     private _window;
     private _requiredClicks;
     private _handleOngoing;
+    enable(): void;
+    disable(): void;
     /**
      * Destroys the multi-click detector.
      */

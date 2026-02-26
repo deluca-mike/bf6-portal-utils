@@ -1,22 +1,14 @@
-# FFA Spawning Module
+# FFA Spawn Points Module
 
 <ai>
 
-This TypeScript `FFASpawning.Soldier` class enables Free For All (FFA) spawning for custom Battlefield Portal experiences by short-circuiting the normal deploy process in favor of a custom UI prompt. The system asks players if they would like to spawn now or be asked again after a delay, allowing players to adjust their loadout and settings at the deploy screen without being locked out.
+This TypeScript `FFASpawnPoints` namespace enables Free For All (FFA) spawning for custom Battlefield Portal experiences by short-circuiting the normal deploy process in favor of a custom UI prompt with developer-curated fixed spawn points. The system asks players if they would like to spawn now or be asked again after a delay, allowing players to adjust their loadout and settings at the deploy screen without being locked out.
 
-The spawning system uses an intelligent algorithm to find safe spawn points that are appropriately distanced from other players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times.
+The spawning system uses an intelligent algorithm to find safe spawn points that are appropriately distanced from other players, reducing the chance of spawning directly into combat while maintaining reasonable spawn times. You call `FFASpawnPoints.initialize()` to set up spawn points, `FFASpawnPoints.enableSpawnQueueProcessing()` / `disableSpawnQueueProcessing()` to control queue processing, and create `FFASpawnPoints.Soldier` instances per player.
+
+> **Note** The `FFASpawnPoints` namespace depends on the `UI` and `Events` namespaces (both in this repository) and the `mod` namespace (available in the `bf6-portal-mod-types` package). Internally it uses `Timers`, `Clocks`, and `Vectors` from this repository. **You must use the `Events` module as your only mechanism to subscribe to game events**—do not implement or export any Battlefield Portal event handler functions in your own code. `FFASpawnPoints` subscribes to `Events.OnPlayerLeaveGame` to clear per-player state and avoid resource leaks when a player leaves; the `UI` module uses `Events` to register the button handler. Because only one implementation of each Portal event can exist per project (the `Events` module owns those hooks), your mod must subscribe via `Events` only. See the [Events module — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
 
 </ai>
-
-> **Note** The `FFASpawning` namespace depends on the `UI` namespace (which is also maintained in this repository) and the `mod` namespace (available in the `bf6-portal-mod-types` package). Internally, it uses `Timers` for cancellable interval management and `SolidUI` (a SolidJS variant for BF6 Portal) for reactive UI components.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining and strings.json merging.
-3. **Button handler** – Register `UI.handleButtonEvent` in your `OnPlayerUIButtonEvent` event handler.
 
 ---
 
@@ -25,14 +17,14 @@ The spawning system uses an intelligent algorithm to find safe spawn points that
 1. Install the package: `npm install -D bf6-portal-utils`
 2. Import the modules you need in your code:
     ```ts
-    import { FFASpawning } from 'bf6-portal-utils/ffa-spawning';
-    import { UI } from 'bf6-portal-utils/ui';
+    import { FFASpawnPoints } from 'bf6-portal-utils/ffa-spawn-points';
+    import { Events } from 'bf6-portal-utils/events';
     ```
-3. Register the button handler in your `OnPlayerUIButtonEvent` event.
-4. Call `FFASpawning.Soldier.initialize()` in `OnGameModeStarted()` with your spawn point data (optional `InitializeOptions` to override defaults for spawn distances, delays, and candidate limits).
-5. Enable spawn queue processing when ready (typically in `OnGameModeStarted()`).
-6. Create `FFASpawning.Soldier` instances for each player in `OnPlayerJoinGame()`.
-7. Call `FFASpawning.Soldier.startDelayForPrompt()` in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` to start the spawn prompt flow.
+3. Use the `Events` module for all event subscription; do not export any Portal event handlers.
+4. Call `FFASpawnPoints.initialize()` in a handler subscribed to `Events.OnGameModeStarted` with your spawn point data (optional `InitializeOptions` to override defaults for spawn distances, delays, and candidate limits).
+5. Call `FFASpawnPoints.enableSpawnQueueProcessing()` when ready (typically in the same handler subscribed to `Events.OnGameModeStarted`).
+6. Create `FFASpawnPoints.Soldier` instances for each player in a handler subscribed to `Events.OnPlayerJoinGame`.
+7. Call `FFASpawnPoints.Soldier.startDelayForPrompt(player)` in handlers subscribed to `Events.OnPlayerJoinGame` and `Events.OnPlayerUndeploy` to start the spawn prompt flow.
 8. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code and merge all `strings.json` files).
 
 <ai>
@@ -40,11 +32,11 @@ The spawning system uses an intelligent algorithm to find safe spawn points that
 ### Example
 
 ```ts
-import { FFASpawning } from 'bf6-portal-utils/ffa-spawning';
-import { UI } from 'bf6-portal-utils/ui';
+import { FFASpawnPoints } from 'bf6-portal-utils/ffa-spawn-points';
+import { Events } from 'bf6-portal-utils/events';
 
 // Define your spawn points
-const SPAWN_POINTS: FFASpawning.SpawnData[] = [
+const SPAWN_POINTS: FFASpawnPoints.SpawnData[] = [
     [100, 0, 200, 0], // x = 100, y = 0, z = 200, orientation = 0 (North)
     [-100, 0, 200, 90], // x = -100, y = 0, z = 200, orientation = 90 (East)
     [0, 0, -200, 180], // x = 0, y = 0, z = -200, orientation = 180 (South)
@@ -52,9 +44,9 @@ const SPAWN_POINTS: FFASpawning.SpawnData[] = [
     // ... more spawn points
 ];
 
-export async function OnGameModeStarted(): Promise<void> {
+Events.OnGameModeStarted.subscribe(() => {
     // Initialize the spawning system
-    FFASpawning.Soldier.initialize(SPAWN_POINTS, {
+    FFASpawnPoints.initialize(SPAWN_POINTS, {
         minimumSafeDistance: 20, // Optional override (default 20)
         maximumInterestingDistance: 40, // Optional override (default 40)
         safeOverInterestingFallbackFactor: 1.5, // Optional override (default 1.5)
@@ -65,34 +57,25 @@ export async function OnGameModeStarted(): Promise<void> {
     });
 
     // Enable spawn queue processing
-    FFASpawning.Soldier.enableSpawnQueueProcessing();
+    FFASpawnPoints.enableSpawnQueueProcessing();
 
     // Optional: Configure logging for spawn system debugging
-    FFASpawning.setLogging((text) => console.log(text), FFASpawning.LogLevel.Info);
-}
+    FFASpawnPoints.setLogging((text) => console.log(text), FFASpawnPoints.LogLevel.Info);
+});
 
-export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
-    // Create a FFASpawning.Soldier instance for each player
+Events.OnPlayerJoinGame.subscribe((eventPlayer: mod.Player) => {
+    // Create a FFASpawnPoints.Soldier instance for each player
     // Pass `true` as the second parameter to enable debug position display (useful for finding spawn points).
-    const soldier = new FFASpawning.Soldier(eventPlayer, false);
+    const soldier = new FFASpawnPoints.Soldier(eventPlayer, false);
 
     // Start the delay countdown for the player.
     soldier.startDelayForPrompt();
-}
+});
 
-export async function OnPlayerUndeploy(eventPlayer: mod.Player): Promise<void> {
+Events.OnPlayerUndeploy.subscribe((eventPlayer: mod.Player) => {
     // Start the delay countdown when a player undeploys (is ready to deploy again).
-    FFASpawning.Soldier.startDelayForPrompt(eventPlayer);
-}
-
-export async function OnPlayerUIButtonEvent(
-    player: mod.Player,
-    widget: mod.UIWidget,
-    event: mod.UIButtonEvent
-): Promise<void> {
-    // Required: Handle button clicks for the spawn UI
-    await UI.handleButtonEvent(player, widget, event);
-}
+    FFASpawnPoints.Soldier.startDelayForPrompt(eventPlayer);
+});
 ```
 
 </ai>
@@ -108,13 +91,13 @@ Then build your mod using the bundler (see [bf6-portal-bundler](https://www.npmj
 - **AI Handling** – AI soldiers automatically skip the countdown and prompt, spawning immediately when added to the queue.
 - **Smart Spawning** – The system uses a prime walking algorithm to find spawn points that are safely distanced from other players.
 - **HQ Disabling** – The system automatically disables both team HQs during initialization to prevent default team-based spawning.
-- **Configurable Logging** – The system uses the `Logging` module for internal logging. Use `FFASpawning.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into spawn system behavior, including spawn point selection, queue processing, and warnings.
+- **Configurable Logging** – The system uses the `Logging` module for internal logging. Use `FFASpawnPoints.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into spawn system behavior, including spawn point selection, queue processing, and warnings.
 
 ---
 
 ## Spawn Point Selection Algorithm
 
-The `_getBestSpawnPoint()` method uses a **Prime Walking Algorithm** to efficiently search for suitable spawn locations:
+The internal `getBestSpawnPoint()` uses a **Prime Walking Algorithm** to efficiently search for suitable spawn locations:
 
 1. **Random Start** – Selects a random starting index in the spawn points array.
 2. **Prime Step Size** – Uses a randomly selected prime number (from `PRIME_STEPS`) as the step size to walk through the array. This ensures good distribution and avoids clustering.
@@ -155,7 +138,7 @@ To convert back to the actual world coordinates, divide the displayed value by 1
 ```ts
 export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
     // Enable debug position display for development/testing for the first joining player (usually the admin).
-    const soldier = new FFASpawning.Soldier(eventPlayer, mod.GetObjId(eventPlayer) === 0);
+    const soldier = new FFASpawnPoints.Soldier(eventPlayer, mod.GetObjId(eventPlayer) === 0);
 
     soldier.startDelayForPrompt();
 }
@@ -167,13 +150,13 @@ export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
 
 ## API Reference
 
-### `namespace FFASpawning`
+### `namespace FFASpawnPoints`
 
-The `FFASpawning` namespace contains the `Soldier` class and related types.
+The `FFASpawnPoints` namespace contains the `Soldier` class, namespace-level functions for initialization and queue processing, and related types.
 
-#### `FFASpawning.LogLevel`
+#### `FFASpawnPoints.LogLevel`
 
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `FFASpawning.setLogging()` to configure the minimum log level for spawn system logging.
+An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `FFASpawnPoints.setLogging()` to configure the minimum log level for spawn system logging.
 
 Available log levels:
 
@@ -184,9 +167,9 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `FFASpawning.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+#### `FFASpawnPoints.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
 
-Configures logging for the FFASpawning module. The spawn system logs various events including spawn point selection, queue processing, and warnings. This allows you to monitor and debug spawn behavior.
+Configures logging for the FFASpawnPoints module. The spawn system logs various events including spawn point selection, queue processing, and warnings. This allows you to monitor and debug spawn behavior.
 
 **Parameters:**
 
@@ -197,55 +180,60 @@ Configures logging for the FFASpawning module. The spawn system logs various eve
 **Example:**
 
 ```ts
-import { FFASpawning } from 'bf6-portal-utils/ffa-spawning';
+import { FFASpawnPoints } from 'bf6-portal-utils/ffa-spawn-points';
 
 // Configure logging with console.log, minimum level of Info, and include error details
-FFASpawning.setLogging(
+FFASpawnPoints.setLogging(
     (text) => console.log(text),
-    FFASpawning.LogLevel.Info,
+    FFASpawnPoints.LogLevel.Info,
     true // includeError
 );
 ```
 
 **Note:** Logging is fail-safe and will not affect spawn system functionality if the logger fails. For more information on the logging functionality, see the [`Logging` module documentation](../logging/README.md).
 
-### `class FFASpawning.Soldier`
+#### Namespace Functions
+
+| Function | Description |
+| --- | --- |
+| `initialize(spawns: FFASpawnPoints.SpawnData[], options?: FFASpawnPoints.InitializeOptions): void` | Should be called in a handler subscribed to `Events.OnGameModeStarted`. Disables both team HQs and sets up the spawn point system. Optional `options` let you override defaults for spawn distances, delays, and candidate limits. Idempotent: logs a warning and returns if already initialized. |
+| `enableSpawnQueueProcessing(): void` | Enables processing of the spawn queue. Call when you want spawning to begin (typically in a handler subscribed to `Events.OnGameModeStarted`). Starts processing immediately if the queue is not already being processed. |
+| `disableSpawnQueueProcessing(): void` | Disables processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions. |
+
+### `class FFASpawnPoints.Soldier`
 
 #### Static Methods
 
 | Method | Description |
 | --- | --- |
-| `initialize(spawns: FFASpawning.SpawnData[], options?: FFASpawning.InitializeOptions)` | Should be called in the `OnGameModeStarted()` event. Disables both team HQs and sets up the spawn point system. Optional `options` let you override defaults for spawn distances, delays, and candidate limits. |
-| `startDelayForPrompt(player: mod.Player)` | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately. |
-| `forceIntoQueue(player: mod.Player)` | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning. |
-| `enableSpawnQueueProcessing()` | Enables the processing of the spawn queue. Should be called when you want spawning to begin (typically in `OnGameModeStarted()` or `OnRoundStart()`). |
-| `disableSpawnQueueProcessing()` | Disables the processing of the spawn queue. Useful for pausing spawning during intermissions or round transitions. |
-| `getVectorString(vector: mod.Vector): string` | Utility method that formats a vector as a string for logging purposes. Returns a string in the format `<x, y, z>` with 2 decimal places. |
+| `startDelayForPrompt(player: mod.Player): void` | Starts the countdown before prompting the player to spawn or delay again. Usually called in handlers subscribed to `Events.OnPlayerJoinGame` and `Events.OnPlayerUndeploy`. AI soldiers will skip the countdown and spawn immediately. |
+| `forceIntoQueue(player: mod.Player): void` | Forces a player to be added to the spawn queue, skipping the countdown and prompt. Useful for programmatic spawning. |
 
 #### Constructor
 
 | Signature | Description |
 | --- | --- |
-| `constructor(player: mod.Player, showDebugPosition?: boolean)` | Every player that should be handled by this spawning system should be instantiated as a `FFASpawning.Soldier`, usually in the `OnPlayerJoinGame()` event. Creates the UI elements for human players (AI soldiers skip UI creation). When `showDebugPosition` is `true`, displays the player's X, Y, and Z coordinates (scaled by 100 and truncated) at the bottom center of the screen, updating every second. |
+| `constructor(player: mod.Player, showDebugPosition?: boolean)` | Every player that should be handled by this spawning system should be instantiated as a `FFASpawnPoints.Soldier`, usually in a handler subscribed to `Events.OnPlayerJoinGame`. Creates the UI elements for human players (AI soldiers skip UI creation). When `showDebugPosition` is `true`, displays the player's X, Y, and Z coordinates (scaled by 100 and truncated) at the bottom center of the screen, updating every second. |
 
 #### Instance Properties
 
-| Property   | Type         | Description                                                     |
-| ---------- | ------------ | --------------------------------------------------------------- |
-| `player`   | `mod.Player` | The player associated with this `FFASpawning.Soldier` instance. |
-| `playerId` | `number`     | The unique ID of the player associated with this instance.      |
+| Property   | Type         | Description                                                        |
+| ---------- | ------------ | ------------------------------------------------------------------ |
+| `player`   | `mod.Player` | The player associated with this `FFASpawnPoints.Soldier` instance. |
+| `playerId` | `number`     | The unique ID of the player associated with this instance.         |
 
 #### Instance Methods
 
 | Method | Description |
 | --- | --- |
-| `startDelayForPrompt()` | Starts the countdown before prompting the player to spawn or delay again. Usually called in `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events. AI soldiers will skip the countdown and spawn immediately. |
+| `startDelayForPrompt(delay?: number): void` | Starts the countdown before prompting the player to spawn or delay again. Usually called in handlers subscribed to `Events.OnPlayerJoinGame` and `Events.OnPlayerUndeploy`. AI soldiers skip the countdown and are added to the queue immediately. Optional `delay` defaults to the initial prompt delay. |
+| `deleteIfNotValid(): boolean` | Deletes the Soldier instance if the player is no longer valid (e.g. left the game). Returns `true` if the instance was deleted. Cleans up UI, timers, and removes the soldier from the internal registry. |
 
 ---
 
 ## Configuration & Defaults
 
-The following values control spawning behavior. Most can be overridden via the optional `options` argument on `initialize()`.
+The following values control spawning behavior. Most can be overridden via the optional `options` argument on `FFASpawnPoints.initialize()`.
 
 | Setting | Type | Default | How to change | Description |
 | --- | --- | --- | --- | --- |
@@ -261,9 +249,9 @@ The following values control spawning behavior. Most can be overridden via the o
 
 ## Types & Interfaces
 
-All types are defined inside the `FFASpawning` namespace in [`index.ts`](index.ts).
+All types are defined inside the `FFASpawnPoints` namespace in [`index.ts`](index.ts).
 
-### `FFASpawning.LogLevel`
+### `FFASpawnPoints.LogLevel`
 
 An enum re-exported from the `Logging` module for controlling logging verbosity. See the [`Logging` module documentation](../logging/README.md) for details.
 
@@ -274,7 +262,7 @@ Available log levels:
 - `Warning` (2) – Warning messages. Default minimum log level.
 - `Error` (3) – Error messages. Least verbose.
 
-### `FFASpawning.SpawnData`
+### `FFASpawnPoints.SpawnData`
 
 Type for defining spawn point data when initializing the system:
 
@@ -284,7 +272,7 @@ Type for defining spawn point data when initializing the system:
 type SpawnData = [x: number, y: number, z: number, orientation: number];
 ```
 
-### `FFASpawning.Spawn`
+### `FFASpawnPoints.Spawn`
 
 Internal type representing a processed spawn point:
 
@@ -296,7 +284,7 @@ type Spawn = {
 };
 ```
 
-### `FFASpawning.InitializeOptions`
+### `FFASpawnPoints.InitializeOptions`
 
 Optional overrides for spawn selection thresholds, delays, and candidate limits when calling `initialize()`:
 
@@ -318,13 +306,13 @@ type InitializeOptions = {
 
 <ai>
 
-### Required Event Handlers
+### Required event subscription (via Events only)
 
-1. **`OnGameModeStarted()`** – Call `FFASpawning.Soldier.initialize()` with your spawn points and `FFASpawning.Soldier.enableSpawnQueueProcessing()` to start the system.
-2. **`OnPlayerJoinGame()`** – Create a new `FFASpawning.Soldier` instance for each player.
-3. **`OnPlayerJoinGame()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to begin the spawn flow for new players.
-4. **`OnPlayerUndeploy()`** – Call `FFASpawning.Soldier.startDelayForPrompt()` to restart the spawn flow when players die or undeploy.
-5. **`OnPlayerUIButtonEvent()`** – Register `UI.handleButtonEvent()` to handle button presses from the spawn UI.
+You must **not** implement or export any Battlefield Portal event handler functions. Subscribe to game events only through the `Events` module:
+
+1. **`Events.OnGameModeStarted`** – In your subscriber, call `FFASpawnPoints.initialize()` with your spawn points and `FFASpawnPoints.enableSpawnQueueProcessing()` to start the system.
+2. **`Events.OnPlayerJoinGame`** – In your subscriber, create a new `FFASpawnPoints.Soldier` instance for each player and call `soldier.startDelayForPrompt()` to begin the spawn flow.
+3. **`Events.OnPlayerUndeploy`** – In your subscriber, call `FFASpawnPoints.Soldier.startDelayForPrompt(player)` to restart the spawn flow when players die or undeploy.
 
 </ai>
 
@@ -350,7 +338,8 @@ This module includes a `strings.json` file that will be automatically merged by 
 
 ## Known Limitations & Caveats
 
-- **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe spawn point is found within `maxSpawnCandidates` iterations. Consider adjusting `maxSpawnCandidates` via the `initialize()` options or adding more spawn points to mitigate this.
+- **Events module required** – Since `FFASpawnPoints` relies on `Events` and `UI`, you **must** use the [Events module](../events/README.md) for all game event subscription and **must not** implement or export any Battlefield Portal event handler functions in your code. If you export your own `OnPlayerJoinGame`, `OnGameModeStarted`, etc., they will conflict and cause undefined behavior. See [Events — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
+- **Rare Spawn Overlaps** – In rare cases, especially with many players and few spawn points, players may spawn on top of each other if no safe spawn point is found within `maxSpawnCandidates` iterations. Consider adjusting `maxSpawnCandidates` via the `FFASpawnPoints.initialize()` options or adding more spawn points to mitigate this.
 - **UI Input Mode** – The system delegates automatic `mod.EnableUIInputMode()` management to the `UI` module. Be careful not to conflict with other UI systems that do not use the `UI` module that also control input mode.
 - **HQ Disabling** – The system automatically disables both team HQs during initialization. If you need team-based spawning elsewhere, you'll need to re-enable HQs manually (but you really should not be mixing this with other systems unless you know what you are doing).
 - **Spawn Point Cleanup** – Spawn points created during initialization are not automatically cleaned up. This is typically fine as they persist for the duration of the match.
@@ -361,9 +350,11 @@ This module includes a `strings.json` file that will be automatically merged by 
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- [`ui/README.md`](../ui/README.md) – Documentation for the UI helper module required by this system.
+- [Events module](../events/README.md) – Used to automatically subscribe to game events and wire the system to them.
+- [FFADropIns module](../ffa-drop-ins/README.md) – Similar FFA spawning with a curated area of drop-in spawn points for skydive/parachute spawns.
+- [UI module](../ui/README.md) – Documentation for the UI helper module required by this system.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

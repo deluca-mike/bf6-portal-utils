@@ -1,15 +1,13 @@
-import { Timers } from '../timers/index.ts';
+import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
+import { Timers } from '../timers/index.ts';
+import { Vectors } from '../vectors/index.ts';
 
-// version: 1.0.1
+// version: 1.0.2
 export class ScavengerDrop {
     private static _logging = new Logging('SCAV');
 
     private static _nextDropId: number = 1;
-
-    private static _getVectorString(vector: mod.Vector): string {
-        return `<${mod.XComponentOf(vector).toFixed(2)}, ${mod.YComponentOf(vector).toFixed(2)}, ${mod.ZComponentOf(vector).toFixed(2)}>`;
-    }
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
@@ -31,8 +29,6 @@ export class ScavengerDrop {
      * @param body - The body of the player that the scavenger drop is on.
      * @param onScavenge - The callback to invoke when a scavenger is found.
      * @param options - The options for the scavenger drop.
-     * @param options.duration - The duration of the scavenger drop in milliseconds. Defaults to 37 seconds.
-     * @param options.checkInterval - The interval at which to check for scavengers in milliseconds. Defaults to 0.2 seconds.
      */
     public constructor(
         body: mod.Player,
@@ -44,12 +40,16 @@ export class ScavengerDrop {
         const checkInterval = options?.checkInterval ?? 200; // 0.2 seconds between checks.
 
         this._id = ScavengerDrop._nextDropId++;
-        this._intervalId = Timers.setInterval(() => this._check(position, onScavenge), checkInterval);
-        this._endTimeoutId = Timers.setTimeout(() => this._expire(), duration);
+
+        const check = () => this._check(position, onScavenge);
+        this._intervalId = Timers.setInterval(check, checkInterval);
+
+        const expire = () => this._expire();
+        this._endTimeoutId = Timers.setTimeout(expire, duration);
 
         if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
             ScavengerDrop._logging.log(
-                `Drop ${this._id} created on P-${mod.GetObjId(body)}'s body at ${ScavengerDrop._getVectorString(position)}.`,
+                `Drop ${this._id} created on P-${mod.GetObjId(body)}'s body at ${Vectors.getVectorString(position)}.`,
                 ScavengerDrop.LogLevel.Debug
             );
         }
@@ -62,6 +62,11 @@ export class ScavengerDrop {
     private _intervalId: number;
 
     private _endTimeoutId: number;
+
+    private clearTimers(): void {
+        Timers.clear(this._intervalId);
+        Timers.clear(this._endTimeoutId);
+    }
 
     private _check(position: mod.Vector, onScavenge: (player: mod.Player) => Promise<void> | void): void {
         if (--this._checkTickDown > 0) return; // Skip
@@ -84,30 +89,15 @@ export class ScavengerDrop {
             return;
         }
 
-        Timers.clearInterval(this._intervalId);
-        Timers.clearInterval(this._endTimeoutId);
+        this.clearTimers();
 
-        try {
-            const result = onScavenge(closestScavenger);
-
-            if (result instanceof Promise) {
-                result.catch((error: unknown) => {
-                    // Catch and log async callback errors to prevent unhandled promise rejections.
-                    ScavengerDrop._logging.log(
-                        `Error in async callback (drop ${this._id}).`,
-                        ScavengerDrop.LogLevel.Error,
-                        error
-                    );
-                });
-            }
-        } catch (error: unknown) {
-            // Catch and log sync callback errors so the scavenger drop functionality can still run.
-            ScavengerDrop._logging.log(
-                `Error in sync callback (Drop ${this._id}).`,
-                ScavengerDrop.LogLevel.Error,
-                error
-            );
-        }
+        CallbackHandler.invoke(
+            onScavenge,
+            [closestScavenger],
+            `drop ${this._id}`,
+            ScavengerDrop._logging,
+            Logging.LogLevel.Error
+        );
 
         if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Info)) {
             ScavengerDrop._logging.log(
@@ -118,7 +108,7 @@ export class ScavengerDrop {
     }
 
     private _expire(): void {
-        Timers.clearInterval(this._intervalId);
+        this.clearTimers();
 
         if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
             ScavengerDrop._logging.log(`Drop ${this._id} expired.`, ScavengerDrop.LogLevel.Debug);
@@ -129,8 +119,7 @@ export class ScavengerDrop {
      * Stops the scavenger drop.
      */
     public stop(): void {
-        Timers.clearInterval(this._intervalId);
-        Timers.clearInterval(this._endTimeoutId);
+        this.clearTimers();
 
         if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
             ScavengerDrop._logging.log(`Drop ${this._id} stopped.`, ScavengerDrop.LogLevel.Debug);

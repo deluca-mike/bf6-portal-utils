@@ -10,15 +10,6 @@ Key features include adaptive check frequency that increases as players get clos
 
 </ai>
 
-> **Note** The `ScavengerDrop` class requires the `Timers` and `Logging` modules from this package. All Battlefield Portal types referenced below (`mod.ClosestPlayerTo`, `mod.Resupply`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-
 ---
 
 ## Quick Start
@@ -51,8 +42,12 @@ export function OnPlayerDied(
     // Create a scavenger drop that triggers when a player gets within 2 meters
     // Callbacks can be synchronous or asynchronous (return void or Promise<void>)
     new ScavengerDrop(victim, (scavenger: mod.Player) => {
-        // Resupply the scavenger's ammo
-        mod.Resupply(scavenger, mod.ResupplyTypes.AmmoCrate);
+        // Resupply the scavenger's primary weapon magazine ammo
+        mod.SetInventoryMagazineAmmo(
+            scavenger,
+            mod.InventorySlots.PrimaryWeapon,
+            mod.GetInventoryMagazineAmmo(scavenger, mod.InventorySlots.PrimaryWeapon) + 30
+        );
 
         // Display a message to the scavenger
         mod.DisplayHighlightedWorldLogMessage(mod.Message(mod.stringkeys.scavengerLog), scavenger); // 'Scavenged ammo'
@@ -248,10 +243,9 @@ The `ScavengerDrop` class implements scavenger detection using Battlefield Porta
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- [`Timers` module documentation](../timers/README.md) – The timing module used internally by `ScavengerDrop`.
-- [`Logging` module documentation](../logging/README.md) – The logging module used internally by `ScavengerDrop`.
+- [Timers module](../timers/README.md) – The timing module used internally.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

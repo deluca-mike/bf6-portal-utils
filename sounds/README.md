@@ -2,21 +2,11 @@
 
 <ai>
 
-This TypeScript `Sounds` class abstracts away and handles the nuance, oddities, and pitfalls that come with playing sounds at runtime in Battlefield Portal experiences. The module provides efficient sound object management through automatic pooling and reuse, handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional), manages sound durations automatically, and provides manual control when needed.
-
-</ai>
+This TypeScript `Sounds` namespace abstracts away and handles the nuance, oddities, and pitfalls that come with playing sounds at runtime in Battlefield Portal experiences. The module provides efficient sound object management through automatic pooling and reuse, handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional with optional target filtering), manages sound durations automatically, and provides manual control when needed.
 
 Key features include automatic sound object reuse to minimize spawn overhead, intelligent availability tracking to prevent sound conflicts, automatic stopping after specified durations, and support for infinite-duration sounds (e.g., looping assets).
 
-> **Note** The `Sounds` class is self-contained and requires no additional modules or setup. All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, `mod.RuntimeSpawn_Common`, `mod.SFX`, etc.) come from [`mod/index.d.ts`](../mod/index.d.ts); check that file for exact signatures.
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **SFX Assets** – You'll need `mod.RuntimeSpawn_Common` references to your sound effect assets (typically obtained from the Battlefield Portal asset browser or via `mod.GetRuntimeSpawnCommon`).
+</ai>
 
 ---
 
@@ -121,29 +111,26 @@ export async function OnPlayerDied(
 - **Availability Management** – Sound objects are tracked in two sets: `available` (ready for reuse) and `active` (currently in use). When a sound is played, its object is reserved from `available` or created and added to `active`. When the sound stops (automatically or manually), the object is moved back to `available` for reuse.
 - **Automatic Duration Management** – Sounds with a non-zero duration automatically stop after the specified duration using the `Timers` module. When stopped, the sound object is automatically returned to the `available` set. You can also stop sounds manually by calling the returned stop function.
 - **Infinite Duration Support** – Setting `duration` to `0` creates a sound that plays indefinitely until manually stopped. No automatic stop timer is scheduled for infinite-duration sounds. This is useful for looping ambient sounds.
-- **2D vs 3D Playback** – 2D sounds are heard equally by all (or targeted) players regardless of position. 3D sounds are positional and attenuate with distance from the source location. 2D sounds can target a specific `Player`, `Squad`, `Team`, or `undefined` (all players).
+- **2D vs 3D Playback** – 2D sounds are heard equally by all (or targeted) players regardless of position. 3D sounds are positional and attenuate with distance from the source location. Both 2D and 3D support an optional `target` (`Player`, `Squad`, `Team`, or `undefined`): 2D targets who hears the sound; 3D restricts who can hear the sound at that location (all players in range vs. only the specified player/squad/team in range).
 
 ---
 
 ## API Reference
 
-### `class Sounds`
+### `namespace Sounds`
+
+The namespace is not instantiated; all members are static or types.
 
 #### Static Methods
 
 | Method | Description |
 | --- | --- |
 | `play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): () => void` | Plays a 2D sound that can be heard by all players (or a specific player, squad, or team via the `target` parameter). Returns a stop function that can be called to stop the sound manually. Default duration is `3000` milliseconds. |
-| `play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): () => void` | Plays a 3D positional sound at the specified world position. The sound attenuates with distance based on `attenuationRange`. Returns a stop function that can be called to stop the sound manually. Default duration is `10000` milliseconds. |
+| `play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): () => void` | Plays a 3D positional sound at the specified world position. The sound attenuates with distance based on `attenuationRange`. Optional `target` restricts which players in range hear the sound (default `undefined` = all players in range). Returns a stop function that can be called to stop the sound manually. Default duration is `10000` milliseconds. |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: Sounds.LogLevel, includeError?: boolean): void` | Configures logging for the Sounds module. Sound playback events and errors are automatically logged using the configured logger. This allows you to monitor and debug sound behavior. Pass `undefined` for `log` to disable logging. Default log level is `Info`, default `includeError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
 | `preload(sfxAsset: mod.RuntimeSpawn_Common): void` | Creates a sound object for the given asset if one doesn't already exist. This helps the game client load the sound asset into memory so it can play quicker when needed. Only needed once per asset, if at all. |
-
-#### Static Properties
-
-| Property | Type | Description |
-| --- | --- | --- |
-| `objectCount` | `number` | Returns the total number of `SoundObject`s created across all assets. Useful for monitoring resource usage. |
-| `objectCountsForAsset(sfxAsset: mod.RuntimeSpawn_Common): Sounds.ObjectCounts` | `Sounds.ObjectCounts` | Returns the number of `available` and `active` `SoundObject`s for the given sound asset. Useful for monitoring per-asset resource usage. |
+| `objectCount(): number` | Returns the total number of sound objects created across all assets. Useful for monitoring resource usage. |
+| `objectCountsForAsset(sfxAsset: mod.RuntimeSpawn_Common): Sounds.ObjectCounts` | Returns the number of `available` and `active` sound objects for the given sound asset. Useful for monitoring per-asset resource usage. |
 
 ---
 
@@ -164,7 +151,7 @@ The following values control sound behavior. Most can be overridden via the opti
 
 ## Types & Interfaces
 
-All types are defined inside the `Sounds` namespace in [`sounds.ts`](sounds.ts).
+All types are defined inside the `Sounds` namespace in [`index.ts`](index.ts). Internal types (e.g. pooled sound objects) are not exported.
 
 ### Return Value
 
@@ -198,6 +185,7 @@ Optional parameters for 3D positional sound playback:
 type Params3D = {
     amplitude?: number; // Volume level (default: 1)
     attenuationRange?: number; // Maximum hearing distance in meters (default: 10)
+    target?: mod.Player | mod.Squad | mod.Team; // If specified, only this player/squad/team in range hears the sound. If undefined, all players in range hear the sound.
     duration?: number; // Duration in milliseconds (default: 10000). Use 0 for infinite duration.
 };
 ```
@@ -215,28 +203,6 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-### `Sounds.SoundObject`
-
-Internal type representing a pooled sound object (exposed for reference):
-
-```ts
-type SoundObject = {
-    sfx: mod.SFX; // The underlying Battlefield Portal sound object
-    objectPool: ObjectPool; // Reference to the pool this object belongs to
-};
-```
-
-### `Sounds.ObjectPool`
-
-Internal type representing a pool of sound objects for a specific asset (exposed for reference):
-
-```ts
-type ObjectPool = {
-    available: Set<SoundObject>; // Sound objects ready for reuse
-    active: Set<SoundObject>; // Sound objects currently in use
-};
-```
-
 ### `Sounds.ObjectCounts`
 
 Returned by `objectCountsForAsset()` to provide visibility into pool usage:
@@ -252,28 +218,26 @@ type ObjectCounts = {
 
 ## How It Works
 
-The `Sounds` class uses a pooling and reuse system to efficiently manage sound playback:
+The `Sounds` namespace uses a pooling and reuse system to efficiently manage sound playback:
 
-1. **Sound Object Pooling** – For each unique sound asset (`mod.RuntimeSpawn_Common`), the system maintains an `ObjectPool` containing two `Set`s: `available` (ready for reuse) and `active` (currently in use). These objects are created on-demand and reused across multiple play requests.
+1. **Sound Object Pooling** – For each unique sound asset (`mod.RuntimeSpawn_Common`), the system maintains a pool containing two sets: `available` (ready for reuse) and `active` (currently in use). These objects are created on-demand and reused across multiple play requests.
 
-2. **Reservation and Creation** – When a sound needs to be played, `_reserveSoundObject()` is called:
+2. **Reservation and Creation** – When a sound needs to be played, the system reserves a sound object:
     - First, it checks the `available` set for an existing sound object that can be reused
     - If an available object is found, it's removed from `available`, added to `active`, and returned
-    - If no available object exists, a new `SoundObject` is created (by spawning the asset at the origin `(0, 0, 0)`) and added to the `active` set. The spawn location doesn't matter for sound objects; only the `PlaySound` call determines where/how the sound is heard.
+    - If no available object exists, a new sound object is created (by spawning the asset at the origin `(0, 0, 0)`) and added to the `active` set. The spawn location doesn't matter for sound objects; only the `PlaySound` call determines where/how the sound is heard.
 
-3. **Automatic Duration Management** – When a sound is played with a duration > 0, the system schedules an automatic stop using `Timers.setTimeout(duration)`. When the timer fires or the sound is stopped manually, `_stopAndMakeAvailable()` is called, which:
-    - Stops the sound using `mod.StopSound()`
-    - Removes the sound object from the `active` set
-    - Adds the sound object back to the `available` set for reuse
+3. **Automatic Duration Management** – When a sound is played with a duration > 0, the system schedules an automatic stop using `Timers.setTimeout(duration)`. When the timer fires or the sound is stopped manually, the sound object is stopped with `mod.StopSound()`, removed from `active`, and returned to `available` for reuse.
 
 4. **Infinite Duration** – When `duration` is `0`, no automatic stop timer is scheduled. The sound object remains in the `active` set until manually stopped via the returned stop function. Once stopped, it's moved back to `available` for reuse.
 
-5. **2D vs 3D Selection** – The system automatically calls the appropriate `mod.PlaySound` overload based on the parameters provided:
+5. **2D vs 3D and target** – The system calls the appropriate `mod.PlaySound` overload based on the parameters provided:
     - `play2D()` with no `target` → `mod.PlaySound(sfx, amplitude)`
     - `play2D()` with `target` as `Player` → `mod.PlaySound(sfx, amplitude, player)`
     - `play2D()` with `target` as `Squad` → `mod.PlaySound(sfx, amplitude, squad)`
     - `play2D()` with `target` as `Team` → `mod.PlaySound(sfx, amplitude, team)`
-    - `play3D()` → `mod.PlaySound(sfx, amplitude, position, attenuationRange)`
+    - `play3D()` with no `target` → `mod.PlaySound(sfx, amplitude, position, attenuationRange)`
+    - `play3D()` with `target` as `Player` / `Squad` / `Team` → `mod.PlaySound(sfx, amplitude, position, attenuationRange, target)` so only that player/squad/team in range hears the sound
 
 6. **Logging** – The module uses the `Logging` module for internal logging. Sound playback events, object creation, pool management, and errors are logged according to the configured log level. Use `Sounds.setLogging()` to configure a logger function, minimum log level, and whether to include error details.
 
@@ -281,7 +245,7 @@ The `Sounds` class uses a pooling and reuse system to efficiently manage sound p
 
 ## Known Limitations & Caveats
 
-- **Sound Object Growth** – The system creates new sound objects when none are available, but never destroys them. In long-running matches with many unique sounds, this can lead to gradual memory growth. Consider using `objectCount` and `objectCountForAsset()` to monitor usage.
+- **Sound Object Growth** – The system creates new sound objects when none are available, but never destroys them. In long-running matches with many unique sounds, this can lead to gradual memory growth. Consider using `objectCount()` and `objectCountsForAsset()` to monitor usage.
 
 - **Availability Search Performance** – The system uses `Set.values().next().value` to get an available sound object, which is efficient for Set operations. With many sound objects per asset, this remains performant. However, if you're playing many long-duration sounds simultaneously, you may see gradual growth in the number of sound objects. See Future Work for planned improvements.
 
@@ -317,9 +281,9 @@ The following improvements are planned for future versions:
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package mods for Portal.
-- Battlefield Builder docs – For information about sound assets, runtime spawn commons, and audio limitations.
+- [Timers module](../timers/README.md) – The timing module used internally.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
 
 ---
 

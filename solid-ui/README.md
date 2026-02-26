@@ -6,18 +6,9 @@ This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlef
 
 `SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the `Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
 
+> **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It assumes that UI objects have getters and setters for properties that need to be reactive.
+
 </ai>
-
-> **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It assumes that UI objects have getters and setters for properties that need to be reactive. All Battlefield Portal types referenced below (`mod.Player`, `mod.Vector`, etc.) come from [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types).
-
----
-
-## Prerequisites
-
-1. **Package installation** – Install `bf6-portal-utils` as a dev dependency in your project.
-2. **Bundler** – Use the [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) package to bundle your mod. The bundler automatically handles code inlining.
-3. **UI Module** – While `SolidUI` is decoupled from the `UI` module, all examples and use cases assume you're using [`UI`](../ui/README.md) classes.
-4. **Button handler** – If using `UI.Button` or `UI.TextButton`, register `UI.handleButtonEvent` once in your `OnPlayerUIButtonEvent` event handler.
 
 ---
 
@@ -30,9 +21,9 @@ This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlef
     import { UI } from 'bf6-portal-utils/ui';
     ```
 3. Create reactive signals with `SolidUI.createSignal()`
-4. Use `SolidUI.h()` to create UI components with reactive properties
-5. Pass accessor functions (signals) as property values to make them reactive
-6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod
+4. Use `SolidUI.h()` to create UI components with reactive properties.
+5. Pass accessor functions (signals) as property values to make them reactive.
+6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
 
