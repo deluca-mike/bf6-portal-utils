@@ -1,6 +1,6 @@
 {
     "name": "bf6-portal-utils",
-    "version": "8.0.0",
+    "version": "8.1.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
     "engines": {
