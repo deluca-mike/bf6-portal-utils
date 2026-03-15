@@ -2,9 +2,13 @@
 
 <ai>
 
-This TypeScript `Sounds` namespace abstracts away and handles the nuance, oddities, and pitfalls that come with playing sounds at runtime in Battlefield Portal experiences. The module provides efficient sound object management through automatic pooling and reuse, handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional with optional target filtering), manages sound durations automatically, and provides manual control when needed.
+This TypeScript `Sounds` namespace wraps Battlefield Portal’s SFX workflow: it spawns `mod.SFX` objects, plays them in 2D or 3D with optional per-player, per-squad, or per-team routing, and supports timed playback, stepped fades, and cleanup. The module builds on the [`Timers`](../timers/README.md) module for delays and fades (Portal’s runtime has no native `setTimeout`), and uses the [`Logging`](../logging/README.md) module for optional play logging.
 
-Key features include automatic sound object reuse to minimize spawn overhead, intelligent availability tracking to prevent sound conflicts, automatic stopping after specified durations, and support for infinite-duration sounds (e.g., looping assets).
+Use **`Sound2D`** for non-positional audio and **`Sound3D`** for world-positioned audio with attenuation. For fire-and-forget clips, call **`Sound2D.play()`** or **`Sound3D.play()`**, which return a **`stop`** function—keep it and call it when playback should end if you did not pass a finite **`duration`** (or a fade that ends with **`stopOnComplete`**) so the instance can **`dispose()`** and unspawn the SFX. For long-lived or manually controlled sounds, construct **`new Sound2D(...)`** or **`new Sound3D(...)`** and call **`play()`**, **`stop()`**, **`fade()`**, and **`dispose()`** as needed.
+
+> **Resource leaks.** Each sound instance wraps a spawned **`mod.SFX`**. That object is only **`UnspawnObject`**’d when **`dispose()`** runs (directly or via the one-shot **`stop`** callback). If you **never** call **`dispose()`** on an instance you created, **never** call the **`stop`** function returned from **`Sound2D.play`** / **`Sound3D.play`**, and for a one-shot you **omit** **`duration`** and **do not** supply **`fadeOptions`** that imply a bounded end (e.g. **`stopOnComplete: true`** with a completing fade), the underlying SFX **stays spawned**—a **resource leak** for the rest of the match (or until the experience ends). Always tie cleanup to player leave, UI teardown, game phase changes, or a fixed **`duration`**.
+
+> **Choosing `RuntimeSpawn_Common` SFX values.** In **`bf6-portal-mod-types`**, entries under **`mod.RuntimeSpawn_Common`** that are sound effects all use the **`SFX_`** prefix. For this module, pick names that match the playback mode: **`Sound3D`** expects assets whose names end with **`_SimpleLoop3D`** or **`_OneShot3D`**; **`Sound2D`** expects names ending with **`_SimpleLoop2D`** or **`_OneShot2D`**. Using the wrong variant can yield incorrect or silent behavior in-game.
 
 </ai>
 
@@ -13,92 +17,68 @@ Key features include automatic sound object reuse to minimize spawn overhead, in
 ## Quick Start
 
 1. Install the package: `npm install -D bf6-portal-utils`
-2. Import the module in your code:
+2. Import the namespace in your code:
     ```ts
     import { Sounds } from 'bf6-portal-utils/sounds';
     ```
-3. Optionally set up logging for debugging (recommended during development).
-4. Call `Sounds.play2D()` or `Sounds.play3D()` to play sounds as needed.
+3. Use a **`mod.RuntimeSpawn_Common`** SFX asset: names start with **`SFX_`**; use **`_SimpleLoop2D`** / **`_OneShot2D`** with **`Sound2D`** and **`_SimpleLoop3D`** / **`_OneShot3D`** with **`Sound3D`** (see callout above).
+4. Either call **`Sounds.Sound2D.play()`** / **`Sounds.Sound3D.play()`** for one-shots (and retain the returned **`stop`** function), or **`new Sounds.Sound2D()`** / **`new Sounds.Sound3D()`** for instance-based control.
 5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
 
-### Example
+### Example: one-shot with fixed duration
 
 ```ts
 import { Sounds } from 'bf6-portal-utils/sounds';
 
-// Define your sound assets (obtain these from your Battlefield Portal experience's asset browser)
-const SOUND_ALPHA_2D = mod.RuntimeSpawn_Common.SFX_UI_EOR_RankUp_Extra_OneShot2D;
-const SOUND_BULLET_3D = mod.RuntimeSpawn_Common.SFX_Projectiles_Flybys_Bullet_Crack_Sniper_Close_OneShot3D;
-const SOUND_LOOP_2D = mod.RuntimeSpawn_Common.SFX_UI_EOR_Counting_SimpleLoop2D;
-const SOUND_LOOP_3D = mod.RuntimeSpawn_Common.SFX_GameModes_BR_Mission_DemoCrew_Alarm_Close_SimpleLoop3D;
+// In your mod: `sfxAsset` is a `mod.RuntimeSpawn_Common` 3D SFX (e.g. ..._OneShot3D); `worldPosition` is `mod.Vector`.
+// Optional: Info-level logs when sounds play (see Sounds.setLogging)
+Sounds.setLogging((text) => console.log(text), Sounds.LogLevel.Info);
 
-const playerUndeployedLoops: Map<number, () => void> = new Map();
+const stopExplosion = Sounds.Sound3D.play(sfxAsset, worldPosition, {
+    duration: 3_000,
+    amplitude: 1.0,
+    attenuationRange: 25,
+});
 
-export async function OnGameModeStarted(): Promise<void> {
-    // Optional: Set up logging for debugging
-    Sounds.setLogging((text) => console.log(text), Sounds.LogLevel.Info);
+// If you need to cut it short (also cancels the internal auto-dispose timer):
+// stopExplosion();
+```
 
-    // Optional: Preload some sounds to reduce first-play latency (minimal, if any)
-    Sounds.preload(SOUND_ALPHA_2D);
-    Sounds.preload(SOUND_BULLET_3D);
-    Sounds.preload(SOUND_LOOP_2D);
+### Example: looping / indefinite one-shot (must call `stop`)
 
-    // Play an infinite-duration looping sound at each HQ.
-    const hqPosition1 = mod.GetObjectPosition(mod.GetHQ(1));
-    const hqPosition2 = mod.GetObjectPosition(mod.GetHQ(2));
+```ts
+import { Sounds } from 'bf6-portal-utils/sounds';
 
-    const ambientSound1 = Sounds.play3D(SOUND_LOOP_3D, hqPosition1, {
-        amplitude: 3,
-        attenuationRange: 100, // Sound can be heard up to 100 meters away
-        duration: 0, // 0 = infinite duration
-    });
+// In your mod: `sfxAsset` is a 2D SFX (e.g. ..._SimpleLoop2D); `somePlayer` is `mod.Player`.
+// Omit `duration` for indefinite playback. You MUST keep and call `stop` to unspawn the SFX.
+const stopAlarm = Sounds.Sound2D.play(sfxAsset, {
+    target: somePlayer,
+    amplitude: 0.8,
+});
 
-    const ambientSound2 = Sounds.play3D(SOUND_LOOP_3D, hqPosition2, {
-        amplitude: 3,
-        attenuationRange: 100, // Sound can be heard up to 100 meters away
-        duration: 0, // 0 = infinite duration
-    });
-}
+// Later (e.g. when leaving deploy screen or ending the objective)
+stopAlarm();
+```
 
-export async function OnPlayerJoinGame(eventPlayer: mod.Player): Promise<void> {
-    // Play a 2D sound for all players
-    Sounds.play2D(SOUND_ALPHA_2D, { amplitude: 0.8, duration: 2000 });
-}
+### Example: instance-based playback
 
-export function OnPlayerUndeploy(eventPlayer: mod.Player): void {
-    // Play a 2D sound loop for a specific player
-    const stopSound = Sounds.play2D(SOUND_LOOP_2D, {
-        target: eventPlayer,
-        amplitude: 1,
-        duration: 0,
-    });
+```ts
+import { Sounds } from 'bf6-portal-utils/sounds';
 
-    // Save the stop function so it can be called once the player leaves the deploy screen.
-    playerUndeployedLoops.set(mod.GetObjId(eventPlayer), stopSound);
-}
+// In your mod: `sfxAsset` is a 3D SFX enum value; `poiPosition` is `mod.Vector`.
+const ambience = new Sounds.Sound3D(sfxAsset, poiPosition, {
+    amplitude: 0.5,
+    attenuationRange: 15,
+});
 
-export function OnPlayerDeployed(eventPlayer: mod.Player): void {
-    // Stop the looping sound if it exists for the player.
-    playerUndeployedLoops.get(mod.GetObjId(eventPlayer))?.();
-}
+// Start playback, then fade out over 4s (fade calls `stop()` when amplitude hits 0).
+ambience.play().fade({ duration: 4_000 });
 
-export async function OnPlayerDied(
-    victim: mod.Player,
-    killer: mod.Player,
-    deathType: mod.DeathType,
-    weapon: mod.WeaponUnlock
-): Promise<void> {
-    const victimPosition = mod.GetSoldierState(victim, mod.SoldierStateVector.GetPosition);
-
-    // Play a 3D positional sound at the victim's location
-    Sounds.play3D(SOUND_BULLET_3D, victimPosition, {
-        amplitude: 1.5,
-        attenuationRange: 50, // Sound can be heard up to 50 meters away
-        duration: 5000,
-    });
-}
+// `stop()` does not unspawn the SFX. When this instance is no longer needed (e.g. player left, objective ended), call
+// `ambience.dispose()`. This is not shown here because it must run after you are done with playback, not immediately
+// after `play()` / `fade()`.
 ```
 
 </ai>
@@ -107,11 +87,14 @@ export async function OnPlayerDied(
 
 ## Core Concepts
 
-- **Sound Object Pooling** – The system maintains a pool of reusable sound objects (`mod.SFX`) for each sound asset, organized into `available` and `active` sets. When a sound needs to be played, the system reserves an available sound object from the pool or creates a new one if none are available. This minimizes spawn overhead and improves performance.
-- **Availability Management** – Sound objects are tracked in two sets: `available` (ready for reuse) and `active` (currently in use). When a sound is played, its object is reserved from `available` or created and added to `active`. When the sound stops (automatically or manually), the object is moved back to `available` for reuse.
-- **Automatic Duration Management** – Sounds with a non-zero duration automatically stop after the specified duration using the `Timers` module. When stopped, the sound object is automatically returned to the `available` set. You can also stop sounds manually by calling the returned stop function.
-- **Infinite Duration Support** – Setting `duration` to `0` creates a sound that plays indefinitely until manually stopped. No automatic stop timer is scheduled for infinite-duration sounds. This is useful for looping ambient sounds.
-- **2D vs 3D Playback** – 2D sounds are heard equally by all (or targeted) players regardless of position. 3D sounds are positional and attenuate with distance from the source location. Both 2D and 3D support an optional `target` (`Player`, `Squad`, `Team`, or `undefined`): 2D targets who hears the sound; 3D restricts who can hear the sound at that location (all players in range vs. only the specified player/squad/team in range).
+- **SFX spawn assets** – Use **`mod.RuntimeSpawn_Common`** entries prefixed with **`SFX_`**. Match the suffix to the class: **`_SimpleLoop2D`** / **`_OneShot2D`** for **`Sound2D`**; **`_SimpleLoop3D`** / **`_OneShot3D`** for **`Sound3D`**.
+- **2D vs 3D** – `Sound2D` spawns the SFX at the origin with zero rotation (positional args required by `SpawnObject`); playback uses `PlaySound` without a world position. `Sound3D` spawns at a real world position and uses that position and an **attenuation range** (meters, default **10**) for distance falloff.
+- **Audience routing** – Optional **`target`** in constructor options: `mod.Player`, `mod.Squad`, or `mod.Team`. If omitted, **all players** hear the sound (subject to 3D attenuation for `Sound3D`).
+- **Amplitude** – Default **1.0**. While playing, updates go through `mod.SetSoundAmplitude`. The **`fade()`** helper steps amplitude down (or up) over time using **`Timers.setTimeout`**.
+- **Playback timing** – **`play(duration?)`**: if **`duration` is `undefined`**, no auto-**`stop`** is scheduled (infinite until you **`stop()`** or **`dispose()`**). If **`duration` is any number (including `0`)**, a timer calls **`stop()`** after that many milliseconds (`0` is effectively immediate).
+- **One-shot helpers** – **`Sound2D.play`** / **`Sound3D.play`** take **`OneShotOptions2D`** / **`OneShotOptions3D`** (see [Types](#types)). They return **`() => void`** that clears the internal auto-dispose timer (if any), **`stop()`**s, and **`dispose()`**s. If **`duration`** is omitted **and** the fade does not imply a bounded end, **no** auto-dispose runs—you **must** call the returned function or you **leak** the SFX spawn (see note at top).
+- **Cleanup** – **`stop()`** stops playback but **does not** **`UnspawnObject`** the SFX. **`dispose()`** unspawns the underlying `mod.SFX` once (and **`stop()`**s first if still playing). It is safe to call **`stop()`** on an already stopped sound (no-op). Calling the one-shot **`stop`** multiple times is safe after the first full teardown. Instance owners **must** call **`dispose()`** when the instance is no longer needed (construction always spawns).
+- **Logging** – **`Sounds.setLogging()`** configures the shared logger; play paths can emit **Info**-level messages when enabled (see implementation for details).
 
 ---
 
@@ -119,176 +102,131 @@ export async function OnPlayerDied(
 
 ### `namespace Sounds`
 
-The namespace is not instantiated; all members are static or types.
+The namespace is not instantiated; exported members are types, classes, and **`setLogging`**.
 
-#### Static Methods
+#### `Sounds.LogLevel`
+
+Re-exported from the **`Logging`** module for use with **`Sounds.setLogging()`**. See the [`Logging` module documentation](../logging/README.md) for levels (`Debug`, `Info`, `Warning`, `Error`).
+
+#### Static methods
 
 | Method | Description |
 | --- | --- |
-| `play2D(sfxAsset: mod.RuntimeSpawn_Common, params?: Sounds.Params2D): () => void` | Plays a 2D sound that can be heard by all players (or a specific player, squad, or team via the `target` parameter). Returns a stop function that can be called to stop the sound manually. Default duration is `3000` milliseconds. |
-| `play3D(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, params?: Sounds.Params3D): () => void` | Plays a 3D positional sound at the specified world position. The sound attenuates with distance based on `attenuationRange`. Optional `target` restricts which players in range hear the sound (default `undefined` = all players in range). Returns a stop function that can be called to stop the sound manually. Default duration is `10000` milliseconds. |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: Sounds.LogLevel, includeError?: boolean): void` | Configures logging for the Sounds module. Sound playback events and errors are automatically logged using the configured logger. This allows you to monitor and debug sound behavior. Pass `undefined` for `log` to disable logging. Default log level is `Info`, default `includeError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
-| `preload(sfxAsset: mod.RuntimeSpawn_Common): void` | Creates a sound object for the given asset if one doesn't already exist. This helps the game client load the sound asset into memory so it can play quicker when needed. Only needed once per asset, if at all. |
-| `objectCount(): number` | Returns the total number of sound objects created across all assets. Useful for monitoring resource usage. |
-| `objectCountsForAsset(sfxAsset: mod.RuntimeSpawn_Common): Sounds.ObjectCounts` | Returns the number of `available` and `active` sound objects for the given sound asset. Useful for monitoring per-asset resource usage. |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the Sounds module. Pass **`undefined`** for **`log`** to disable. Default minimum level and **`includeError`** follow the same pattern as other utils modules; see [`Logging`](../logging/README.md). |
+
+#### Classes
+
+##### `Sounds.Sound2D`
+
+| Member | Description |
+| --- | --- |
+| `static play(sfxAsset, options?): () => void` | Creates a 2D sound, plays it according to **`OneShotOptions2D`**, and returns **`stop`**. Call **`stop`** to end playback, cancel the internal auto-dispose timeout (if scheduled), and **`dispose()`** the instance. |
+| `constructor(sfxAsset, options?)` | Creates a 2D sound instance; spawns the SFX immediately. Options: **`Options2D`** (`amplitude`, `target`). |
+| `play(duration?: number): this` | Starts or restarts playback; optional **`duration`** in ms (see Core Concepts). |
+| `stop(): this` | Stops playback and clears stop/fade timers. |
+| `fade(options?: Sounds.FadeOptions): this` | Steps amplitude toward **`targetAmplitude`** (default **0**) over **`duration`** ms (default **2000**), after optional **`delay`**. Non-positive **`steps`** in options are treated as **1**. If **`stopOnComplete`** (default **`true`** when target amplitude is **0**), **`stop()`** runs when the fade finishes. No-op if not playing. |
+| `cancelStop()` / `cancelFade(): this` | Clears the auto-stop or fade timeout chain. |
+| `dispose(): void` | If playing, cancels timers and **`stop()`**s. Then **`UnspawnObject`** the SFX once if not already disposed (also runs when not playing). |
+| `disposed`, `playing`, `sfxAsset`, `amplitude`, `target` | Getters; **`amplitude`** has a setter and **`setAmplitude`** for chaining. |
+
+##### `Sounds.Sound3D`
+
+Same instance API as **`Sound2D`**, plus:
+
+| Member | Description |
+| --- | --- |
+| `static play(sfxAsset, position, options?): () => void` | One-shot 3D playback; options are **`OneShotOptions3D`** (includes **`attenuationRange`**). |
+| `constructor(sfxAsset, position, options?)` | **`position`** is the world location for spawn and **`PlaySound`**. **`attenuationRange`** defaults to **10** meters if omitted. |
+| `location` | Getter for the world position vector. |
+| `attenuationRange` | Getter/setter; **`setAttenuationRange`** for chaining. |
 
 ---
 
-## Configuration & Defaults
+## Types
 
-The following values control sound behavior. Most can be overridden via the optional `params` arguments on `play2D()` and `play3D()`.
+### `Sounds.FadeOptions`
 
-| Setting | Type | Default | How to change | Description |
-| --- | --- | --- | --- | --- |
-| `DEFAULT_2D_DURATION` | `number` | `3000` | Edit constant | Default duration (milliseconds) for 2D sounds when not specified in `params.duration`. |
-| `DEFAULT_3D_DURATION` | `number` | `10000` | Edit constant | Default duration (milliseconds) for 3D sounds when not specified in `params.duration`. |
-| `amplitude` (2D) | `number` | `1` | `params.amplitude` | Volume level for 2D sounds (typically 0.0 to 1.0, but can exceed 1.0 for amplification). |
-| `amplitude` (3D) | `number` | `1` | `params.amplitude` | Volume level for 3D sounds (typically 0.0 to 1.0, but can exceed 1.0 for amplification). |
-| `attenuationRange` | `number` | `10` | `params.attenuationRange` | Maximum distance (meters) at which a 3D sound can be heard. Sounds fade out as distance increases. |
-| `duration` | `number` | See defaults above | `params.duration` | How long the sound plays before automatically stopping. Set to `0` for infinite duration (useful for looping assets). |
+| Property | Default | Description |
+| --- | --- | --- |
+| `delay` | `0` | Ms before the first amplitude step. |
+| `duration` | `2000` | Total fade duration in ms. |
+| `targetAmplitude` | `0` | Amplitude at end of fade. |
+| `steps` | `10` | Number of steps; values **≤ 0** are clamped to **1**. |
+| `stopOnComplete` | `true` if `targetAmplitude === 0`, else `false` | Whether **`stop()`** runs when the fade completes. |
+
+### `Sounds.Options2D`
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `amplitude` | `1` | Playback amplitude. |
+| `target` | _(all players)_ | Optional **`mod.Player`**, **`mod.Squad`**, or **`mod.Team`**; only that audience hears the sound. |
+
+### `Sounds.OneShotOptions2D`
+
+Used with **`Sound2D.play()`**. Combines **`Options2D`** with one-shot-only fields:
+
+| Property | Description |
+| --- | --- |
+| `duration` | Optional ms cap on playback. **Omit** for indefinite duration (you **must** call the returned **`stop`** or the SFX is **not** unspawned). **`0`** schedules an immediate **`stop`**. |
+| `fadeOptions` | Optional **`Sounds.FadeOptions`**. When the fade completes with **`stopOnComplete`**, teardown time is bounded and an auto-dispose timer may run (together with **`duration`** when both apply). |
+
+### `Sounds.Options3D`
+
+**`Options2D`** plus:
+
+| Property           | Default | Description                     |
+| ------------------ | ------- | ------------------------------- |
+| `attenuationRange` | `10`    | Distance attenuation in meters. |
+
+### `Sounds.OneShotOptions3D`
+
+Used with **`Sound3D.play()`**. Same shape as **`OneShotOptions2D`**, including **`Options3D`** fields (**`attenuationRange`** optional on the static **`play`** options object; same rules as **`Options3D`**).
 
 ---
 
-## Types & Interfaces
+## Usage Patterns
 
-All types are defined inside the `Sounds` namespace in [`index.ts`](index.ts). Internal types (e.g. pooled sound objects) are not exported.
-
-### Return Value
-
-Both `play2D()` and `play3D()` return a stop function that can be called to stop the sound manually:
-
-```ts
-const stopSound = Sounds.play2D(mySoundAsset, { duration: 10000 });
-// ... later ...
-stopSound(); // Stops the sound manually. Safe to call multiple times, but only the first time will do anything.
-```
-
-### `Sounds.Params2D`
-
-Optional parameters for 2D sound playback:
-
-```ts
-type Params2D = {
-    amplitude?: number; // Volume level (default: 1)
-    target?: mod.Player | mod.Squad | mod.Team; // If specified, only this player/squad/team hears the sound. If undefined, all players hear the sound.
-    duration?: number; // Duration in milliseconds (default: 3000). Use 0 for infinite duration.
-};
-```
-
-**Note:** The `target` parameter can be a `Player`, `Squad`, `Team`, or `undefined` (all players).
-
-### `Sounds.Params3D`
-
-Optional parameters for 3D positional sound playback:
-
-```ts
-type Params3D = {
-    amplitude?: number; // Volume level (default: 1)
-    attenuationRange?: number; // Maximum hearing distance in meters (default: 10)
-    target?: mod.Player | mod.Squad | mod.Team; // If specified, only this player/squad/team in range hears the sound. If undefined, all players in range hear the sound.
-    duration?: number; // Duration in milliseconds (default: 10000). Use 0 for infinite duration.
-};
-```
-
-### `Sounds.LogLevel`
-
-An enum re-exported from the `Logging` module for controlling logging verbosity. Use this with `Sounds.setLogging()` to configure the minimum log level for sound playback event logging.
-
-Available log levels:
-
-- `Debug` (0) – Debug-level messages. Most verbose. Includes object creation, pool management, and availability checks.
-- `Info` (1) – Informational messages. Default minimum log level. Includes sound playback events.
-- `Warning` (2) – Warning messages. Includes attempts to stop already-stopped sounds.
-- `Error` (3) – Error messages. Least verbose.
-
-For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
-
-### `Sounds.ObjectCounts`
-
-Returned by `objectCountsForAsset()` to provide visibility into pool usage:
-
-```ts
-type ObjectCounts = {
-    available: number; // Number of available sound objects
-    active: number; // Number of active sound objects
-};
-```
+- **Short cues** – Use **`play(asset, pos?, { duration: N })`** so the instance disposes shortly after **`N`** ms (plus a small internal buffer).
+- **Deploy screen / UI loops** – Use indefinite **`play`** and store **`stop`**; call it when the player leaves the screen or you hide the UI.
+- **World ambience** – Hold a **`Sound3D`** instance, **`play()`** without duration, **`fade()`** or **`dispose()`** when the area unloads.
+- **Per-player feedback** – Pass **`target: player`** (or squad/team) in options so only that audience hears the clip.
 
 ---
 
 ## How It Works
 
-The `Sounds` namespace uses a pooling and reuse system to efficiently manage sound playback:
-
-1. **Sound Object Pooling** – For each unique sound asset (`mod.RuntimeSpawn_Common`), the system maintains a pool containing two sets: `available` (ready for reuse) and `active` (currently in use). These objects are created on-demand and reused across multiple play requests.
-
-2. **Reservation and Creation** – When a sound needs to be played, the system reserves a sound object:
-    - First, it checks the `available` set for an existing sound object that can be reused
-    - If an available object is found, it's removed from `available`, added to `active`, and returned
-    - If no available object exists, a new sound object is created (by spawning the asset at the origin `(0, 0, 0)`) and added to the `active` set. The spawn location doesn't matter for sound objects; only the `PlaySound` call determines where/how the sound is heard.
-
-3. **Automatic Duration Management** – When a sound is played with a duration > 0, the system schedules an automatic stop using `Timers.setTimeout(duration)`. When the timer fires or the sound is stopped manually, the sound object is stopped with `mod.StopSound()`, removed from `active`, and returned to `available` for reuse.
-
-4. **Infinite Duration** – When `duration` is `0`, no automatic stop timer is scheduled. The sound object remains in the `active` set until manually stopped via the returned stop function. Once stopped, it's moved back to `available` for reuse.
-
-5. **2D vs 3D and target** – The system calls the appropriate `mod.PlaySound` overload based on the parameters provided:
-    - `play2D()` with no `target` → `mod.PlaySound(sfx, amplitude)`
-    - `play2D()` with `target` as `Player` → `mod.PlaySound(sfx, amplitude, player)`
-    - `play2D()` with `target` as `Squad` → `mod.PlaySound(sfx, amplitude, squad)`
-    - `play2D()` with `target` as `Team` → `mod.PlaySound(sfx, amplitude, team)`
-    - `play3D()` with no `target` → `mod.PlaySound(sfx, amplitude, position, attenuationRange)`
-    - `play3D()` with `target` as `Player` / `Squad` / `Team` → `mod.PlaySound(sfx, amplitude, position, attenuationRange, target)` so only that player/squad/team in range hears the sound
-
-6. **Logging** – The module uses the `Logging` module for internal logging. Sound playback events, object creation, pool management, and errors are logged according to the configured log level. Use `Sounds.setLogging()` to configure a logger function, minimum log level, and whether to include error details.
+1. **Construction** – Each sound calls **`mod.SpawnObject`** with the given **`RuntimeSpawn_Common`** asset. **`Sound2D`** uses **`Vectors.ZERO_VECTOR`** for position/orientation as required; **`Sound3D`** uses your **`position`** and zero rotation for spawn.
+2. **Play** – Delegates to the appropriate **`mod.PlaySound`** overload (global vs player/squad/team), using the current **`amplitude`** and, for 3D, **`position`** and **`attenuationRange`**.
+3. **Timed stop** – **`Timers.setTimeout`** invokes **`stop()`** when **`duration`** is provided to **`play()`** or computed for one-shots.
+4. **Fade** – Schedules a chain of timeouts: each step adjusts **`amplitude`** (and thus **`SetSoundAmplitude`** while playing) until the target step count is reached.
+5. **One-shot teardown** – When a finite end time is known (from **`duration`** and/or a completing fade with **`stopOnComplete`**), an extra timeout runs **`stop`** + **`dispose`** after a short buffer (**100** ms) so **`StopSound`** / fade completion can settle. The returned **`stop`** clears that timeout first to avoid redundant work.
+6. **Dispose** – **`mod.UnspawnObject`** on the SFX object; guarded so it runs once.
 
 ---
 
 ## Known Limitations & Caveats
 
-- **Sound Object Growth** – The system creates new sound objects when none are available, but never destroys them. In long-running matches with many unique sounds, this can lead to gradual memory growth. Consider using `objectCount()` and `objectCountsForAsset()` to monitor usage.
-
-- **Availability Search Performance** – The system uses `Set.values().next().value` to get an available sound object, which is efficient for Set operations. With many sound objects per asset, this remains performant. However, if you're playing many long-duration sounds simultaneously, you may see gradual growth in the number of sound objects. See Future Work for planned improvements.
-
-<ai>
-
-- **Infinite Duration Objects** – Sound objects with infinite duration (`duration: 0`) remain in the `active` set until manually stopped. **Important:** For infinite-duration sounds, you must keep a reference to the returned stop function so you can call it when needed. Without this reference, the sound will play indefinitely (whether or not it's actually making sound, as it might not be a looping asset) and the underlying `SoundObject` cannot be freed or reused, effectively leaking resources. While the resource cost is small, this can accumulate over time if many infinite-duration sounds are started without proper cleanup.
-
-- **Concurrent Playback** – The system allows multiple instances of sounds to play simultaneously for a given location or target. If you need to prevent overlapping sounds, you'll need to implement that logic yourself.
-
-</ai>
-
----
-
-## Future Work
-
-The following improvements are planned for future versions:
-
-- A purge function or dispose function for old sound objects.
-
-- Overall object limiter.
-
-- Per-asset object limiter.
-
-- Perhaps an aggressive reuse of sound objects if limit reached.
-
-- Smart object despawner.
-
-- Exposing functionality to stop all playing sounds (perhaps with optional filters such as by asset, duration type, etc.) to provide a fallback mechanism for cases where references to infinite-duration sound stop functions have been lost.
-
-- Track the sounds playing for any target or globally and allow them to be stopped.
+- **Resource leaks** – Failure to **`dispose()`** instance sounds, or to call the one-shot **`stop`** when **`duration`** is omitted and no completing fade with **`stopOnComplete`** bounds playback, leaves the **`mod.SFX`** spawned until the match ends. See the callout in the [introduction](#sounds-module).
+- **Indefinite one-shots** – If you omit **`duration`** and there is no bound from **`fadeOptions`**, you **must** call the returned **`stop`** function (or the spawned object is not torn down by this module).
+- **`duration: 0`** – Treated as a real timeout of zero ms (immediate **`stop`**), not “infinite.”
+- **Timer precision** – Delays use the shared **`Timers`** module (built on **`mod.Wait`**), so sub-second behavior is subject to the same precision as elsewhere in your mod.
+- **No built-in preload** – This module does not wrap a preload API; spawn/play cost happens on construction / **`play`** as with raw Portal usage.
+- **Logging volume** – **`Info`** play logs can be chatty; use **`willLog`**-appropriate levels in production if you enable logging.
 
 ---
 
 ## Further Reference
 
-- [Timers module](../timers/README.md) – The timing module used internally.
-- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
-- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.
+- [`Logging` module](../logging/README.md) – Shared logging configuration.
+- [`Timers` module](../timers/README.md) – Used for playback timeouts and fade steps.
+- [`Vectors` module](../vectors/README.md) – Zero vector and vector string helpers used internally.
+- [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – **`RuntimeSpawn_Common`**, **`PlaySound`**, **`SFX`**, and related declarations.
+- [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – Bundler for Portal experiences.
 
 ---
 
 ## Feedback & Support
 
-This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (performance optimizations, additional playback modes, better resource management, etc.), so please share your experiences.
+This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap, so please share your experiences.
 
 ---

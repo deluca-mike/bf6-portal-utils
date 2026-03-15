@@ -3,10 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIWeaponImage } from '../weapon-image/index.ts';
 
-const WEAPON_IMAGE_BUTTON_CONTENT_PROPERTIES: readonly string[] = ['weapon', 'weaponPackage'] as const;
-
-// version: 1.0.1
-export class UIWeaponImageButton extends UIContentButton<UIWeaponImage, typeof WEAPON_IMAGE_BUTTON_CONTENT_PROPERTIES> {
+// version: 1.0.2
+export class UIWeaponImageButton extends UIContentButton<UIWeaponImage> {
     // UIWeaponImage properties (delegated via delegateProperties)
     declare public weapon: mod.Weapons;
     declare public weaponPackage: mod.WeaponPackage;
@@ -33,7 +31,7 @@ export class UIWeaponImageButton extends UIContentButton<UIWeaponImage, typeof W
             return new UIWeaponImage(weaponImageParams);
         };
 
-        super(params, createContent, WEAPON_IMAGE_BUTTON_CONTENT_PROPERTIES);
+        super(params, createContent, ['weapon', 'weaponPackage'] as readonly string[]);
     }
 }
 

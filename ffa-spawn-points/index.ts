@@ -9,7 +9,7 @@ import { UIContainer } from '../ui/components/container/index.ts';
 import { UITextButton } from '../ui/components/text-button/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 6.0.0
+// version: 6.1.0
 export namespace FFASpawnPoints {
     const logging = new Logging('FSP');
 
@@ -379,7 +379,7 @@ export namespace FFASpawnPoints {
                 message: mod.Message(mod.stringkeys.ffaSpawnPoints.buttons.spawn),
                 textSize: 30,
                 textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                onClick: (player: mod.Player) => this._addToQueue(),
+                onClickUp: (player: mod.Player) => this._addToQueue(),
             });
 
             new UITextButton({
@@ -401,7 +401,7 @@ export namespace FFASpawnPoints {
                 message: mod.Message(mod.stringkeys.ffaSpawnPoints.buttons.delay, promptDelay),
                 textSize: 30,
                 textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                onClick: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
+                onClickUp: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
             });
 
             this._countdownUI = new UIText({

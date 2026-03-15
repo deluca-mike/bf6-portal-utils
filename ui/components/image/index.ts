@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.1
+// version: 2.0.0
 export class UIImage extends UI.Element {
     protected _imageType: mod.UIImageType;
     protected _imageColor: mod.Vector;
@@ -34,9 +34,8 @@ export class UIImage extends UI.Element {
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
         };
 
-        const imageType = params.imageType;
         const imageColor = params.imageColor ?? UI.COLORS.WHITE;
-        const imageAlpha = params.imageAlpha ?? 0;
+        const imageAlpha = params.imageAlpha ?? 1;
 
         const args: [
             string, // name
@@ -64,7 +63,7 @@ export class UIImage extends UI.Element {
             elementParams.bgColor,
             elementParams.bgAlpha,
             elementParams.bgFill,
-            imageType,
+            params.imageType,
             imageColor,
             imageAlpha,
             elementParams.depth,
@@ -78,7 +77,7 @@ export class UIImage extends UI.Element {
 
         super(elementParams);
 
-        this._imageType = imageType;
+        this._imageType = params.imageType;
         this._imageColor = imageColor;
         this._imageAlpha = imageAlpha;
     }

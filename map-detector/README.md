@@ -97,12 +97,14 @@ The `MapDetector` namespace supports detection of the following maps via the `Ma
 
 - Area 22B
 - Blackwell Fields
-- **Contaminated** (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
+- Complex 3
+- Contaminated
 - Defense Nexus
 - Downtown
 - Eastwood
 - Empire State
 - Golf Course
+- Hagental Base
 - Iberian Offensive
 - Liberation Peak
 - Manhattan Bridge
@@ -124,16 +126,6 @@ If your experience uses **custom spatial data** that moves Team 1's HQ from its 
 ---
 
 ## Known Limitations
-
-### Missing Maps in Native Enum
-
-The map **"Contaminated"** is not available in the native `mod.Maps` enum (it is missing from the Battlefield Portal API). As a result:
-
-- `MapDetector.currentNativeMap()` will return `undefined` for Contaminated.
-- `MapDetector.isCurrentNativeMap()` will always return `false` for Contaminated when checking against any `mod.Maps` value.
-- `MapDetector.currentMap()` and `MapDetector.isCurrentMap()` **behave correctly for Contaminated**.
-
-Use `MapDetector.Map` enum values and `isCurrentMap()` when working with Contaminated (or for consistency, for all maps).
 
 ### Detection Method
 

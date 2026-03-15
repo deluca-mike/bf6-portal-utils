@@ -3,10 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIGadgetImage } from '../gadget-image/index.ts';
 
-const GADGET_IMAGE_BUTTON_CONTENT_PROPERTIES: readonly string[] = ['gadget'] as const;
-
-// version: 1.0.1
-export class UIGadgetImageButton extends UIContentButton<UIGadgetImage, typeof GADGET_IMAGE_BUTTON_CONTENT_PROPERTIES> {
+// version: 1.0.2
+export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
     // UIGadgetImage properties (delegated via delegateProperties)
     declare public gadget: mod.Gadgets;
 
@@ -30,7 +28,7 @@ export class UIGadgetImageButton extends UIContentButton<UIGadgetImage, typeof G
             return new UIGadgetImage(gadgetImageParams);
         };
 
-        super(params, createContent, GADGET_IMAGE_BUTTON_CONTENT_PROPERTIES);
+        super(params, createContent, ['gadget'] as readonly string[]);
     }
 }
 

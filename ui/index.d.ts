@@ -16,6 +16,30 @@ export declare namespace UI {
         includeError?: boolean
     ): void;
     /****** Types ******/
+    /**
+     * The type of a button handler.
+     */
+    export type ButtonHandler = (player: mod.Player) => Promise<void> | void;
+    /**
+     * The minimum interface for a button.
+     */
+    export type Button = {
+        onClickDown?: ButtonHandler;
+        onClickUp?: ButtonHandler;
+        onFocusIn?: ButtonHandler;
+        onFocusOut?: ButtonHandler;
+    };
+    /**
+     * The parent of an element.
+     */
+    export type Parent = {
+        name: string;
+        uiWidget: mod.UIWidget;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        children: Element[];
+        attachChild(child: Element): void;
+        detachChild(child: Element): void;
+    };
     type BaseParams = {
         anchor?: mod.UIAnchor;
         parent?: Parent;
@@ -90,24 +114,6 @@ export declare namespace UI {
         receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
         uiInputModeWhenVisible: boolean;
     };
-    /****** Interfaces ******/
-    /**
-     * The parent of an element.
-     */
-    export interface Parent {
-        name: string;
-        uiWidget: mod.UIWidget;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
-        children: Element[];
-        attachChild(child: Element): void;
-        detachChild(child: Element): void;
-    }
-    /**
-     * The minimum interface for a button.
-     */
-    export interface Button {
-        onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
-    }
     /****** Classes ******/
     abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
         protected _id: string;
@@ -147,6 +153,9 @@ export declare namespace UI {
         static readonly instance: GlobalReceiver;
         private constructor();
     }
+    /**
+     * The team receiver. This is the receiver for a single team.
+     */
     export class TeamReceiver extends Receiver<mod.Team> {
         private static _instances;
         private constructor();

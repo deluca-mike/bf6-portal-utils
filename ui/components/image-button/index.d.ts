@@ -1,7 +1,6 @@
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
-declare const IMAGE_BUTTON_CONTENT_PROPERTIES: readonly string[];
-export declare class UIImageButton extends UIContentButton<UIImage, typeof IMAGE_BUTTON_CONTENT_PROPERTIES> {
+export declare class UIImageButton extends UIContentButton<UIImage> {
     imageType: mod.UIImageType;
     setImageType: (imageType: mod.UIImageType) => this;
     protected _imageDisabledColor: mod.Vector;
@@ -95,4 +94,3 @@ export declare namespace UIImageButton {
             imageDisabledAlpha?: number;
         };
 }
-export {};

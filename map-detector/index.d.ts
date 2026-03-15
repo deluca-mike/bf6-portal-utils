@@ -22,6 +22,7 @@ export declare namespace MapDetector {
     enum Map {
         Area22B = 'Area 22B',
         BlackwellFields = 'Blackwell Fields',
+        Complex3 = 'Complex 3',
         Contaminated = 'Contaminated',
         DefenseNexus = 'Defense Nexus',
         Downtown = 'Downtown',
@@ -39,6 +40,7 @@ export declare namespace MapDetector {
         RedlineStorage = 'Redline Storage',
         SaintsQuarter = 'Saints Quarter',
         SiegeOfCairo = 'Siege of Cairo',
+        HagentalBase = 'Hagental Base',
     }
     /**
      * Sets the coordinates of interest for a map.

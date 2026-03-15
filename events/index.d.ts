@@ -50,16 +50,23 @@ declare namespace EventsTypes {
         readonly OnPlayerEnterCapturePoint: typeof OnPlayerEnterCapturePoint;
         readonly OnPlayerEnterVehicle: typeof OnPlayerEnterVehicle;
         readonly OnPlayerEnterVehicleSeat: typeof OnPlayerEnterVehicleSeat;
+        readonly OnPlayerEnterVL7Cloud: typeof OnPlayerEnterVL7Cloud;
         readonly OnPlayerExitAreaTrigger: typeof OnPlayerExitAreaTrigger;
         readonly OnPlayerExitCapturePoint: typeof OnPlayerExitCapturePoint;
         readonly OnPlayerExitVehicle: typeof OnPlayerExitVehicle;
         readonly OnPlayerExitVehicleSeat: typeof OnPlayerExitVehicleSeat;
+        readonly OnPlayerExitVL7Cloud: typeof OnPlayerExitVL7Cloud;
         readonly OnPlayerInteract: typeof OnPlayerInteract;
         readonly OnPlayerJoinGame: typeof OnPlayerJoinGame;
         readonly OnPlayerLeaveGame: typeof OnPlayerLeaveGame;
         readonly OnPlayerSwitchTeam: typeof OnPlayerSwitchTeam;
         readonly OnPlayerUIButtonEvent: typeof OnPlayerUIButtonEvent;
         readonly OnPlayerUndeploy: typeof OnPlayerUndeploy;
+        readonly OnPortalGadgetAimStart: typeof OnPortalGadgetAimStart;
+        readonly OnPortalGadgetAimStop: typeof OnPortalGadgetAimStop;
+        readonly OnPortalGadgetFireStart: typeof OnPortalGadgetFireStart;
+        readonly OnPortalGadgetFireStop: typeof OnPortalGadgetFireStop;
+        readonly OnPortalGadgetLaserToggle: typeof OnPortalGadgetLaserToggle;
         readonly OnRayCastHit: typeof OnRayCastHit;
         readonly OnRayCastMissed: typeof OnRayCastMissed;
         readonly OnRevived: typeof OnRevived;
@@ -90,7 +97,7 @@ declare namespace EventsTypes {
      * exposes this interface with `subscribe`, `unsubscribe`, and `trigger` typed to that event's payload.
      * @template K - Event name; handler and trigger args are inferred from the corresponding trigger function.
      */
-    export type EventChannel<K extends SignatureKey> = {
+    export type Channel<K extends SignatureKey> = {
         /**
          * Subscribe a handler for this event. The handler receives the same arguments as this event's trigger.
          * @param handler - Callback invoked when the event is triggered; args match the event's payload.
@@ -117,10 +124,10 @@ declare namespace EventsTypes {
      * Map of each event name to its typed channel (`subscribe`, `unsubscribe`, `trigger`, `handlerCount`).
      * Merged onto the Events namespace so you get e.g. `Events.OngoingInteractPoint.subscribe(handler)`.
      */
-    export type EventChannelsMap = {
-        [K in SignatureKey]: K extends SignatureKey ? EventChannel<K> : never;
+    export type ChannelsMap = {
+        [K in SignatureKey]: K extends SignatureKey ? Channel<K> : never;
     };
-    type EventTypeName<T extends TypeValue> = {
+    type TypeName<T extends TypeValue> = {
         [K in SignatureKey]: Signature[K] extends T ? K : never;
     }[SignatureKey];
     /**
@@ -128,8 +135,8 @@ declare namespace EventsTypes {
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
      */
     export type HandlerForType<T extends TypeValue> =
-        EventTypeName<T> extends SignatureKey
-            ? Signature[EventTypeName<T>] extends (...args: infer P) => void
+        TypeName<T> extends SignatureKey
+            ? Signature[TypeName<T>] extends (...args: infer P) => void
                 ? (...args: P) => void | Promise<void>
                 : never
             : never;
@@ -137,7 +144,7 @@ declare namespace EventsTypes {
      * Get the parameter tuple for a specific event type.
      */
     export type EventParameters<T extends TypeValue> =
-        EventTypeName<T> extends SignatureKey ? Parameters<Signature[EventTypeName<T>]> : never;
+        TypeName<T> extends SignatureKey ? Parameters<Signature[TypeName<T>]> : never;
     /**
      * Create a union of all possible handler types.
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
@@ -147,11 +154,17 @@ declare namespace EventsTypes {
             ? (...args: P) => void | Promise<void>
             : never;
     }[SignatureKey];
+    export type State = {
+        logTimeout?: number;
+        incompleteTriggers: number;
+        handlers: Set<EventsTypes.AllHandlers>;
+    };
     export {};
 }
 declare class EventsImplementation {
+    private static readonly _LOG_TIMEOUT_MS;
     private static readonly _logging;
-    private static readonly _handlers;
+    private static readonly _states;
     /**
      * The event types.
      */
@@ -200,16 +213,23 @@ declare class EventsImplementation {
         readonly OnPlayerEnterCapturePoint: typeof OnPlayerEnterCapturePoint;
         readonly OnPlayerEnterVehicle: typeof OnPlayerEnterVehicle;
         readonly OnPlayerEnterVehicleSeat: typeof OnPlayerEnterVehicleSeat;
+        readonly OnPlayerEnterVL7Cloud: typeof OnPlayerEnterVL7Cloud;
         readonly OnPlayerExitAreaTrigger: typeof OnPlayerExitAreaTrigger;
         readonly OnPlayerExitCapturePoint: typeof OnPlayerExitCapturePoint;
         readonly OnPlayerExitVehicle: typeof OnPlayerExitVehicle;
         readonly OnPlayerExitVehicleSeat: typeof OnPlayerExitVehicleSeat;
+        readonly OnPlayerExitVL7Cloud: typeof OnPlayerExitVL7Cloud;
         readonly OnPlayerInteract: typeof OnPlayerInteract;
         readonly OnPlayerJoinGame: typeof OnPlayerJoinGame;
         readonly OnPlayerLeaveGame: typeof OnPlayerLeaveGame;
         readonly OnPlayerSwitchTeam: typeof OnPlayerSwitchTeam;
         readonly OnPlayerUIButtonEvent: typeof OnPlayerUIButtonEvent;
         readonly OnPlayerUndeploy: typeof OnPlayerUndeploy;
+        readonly OnPortalGadgetAimStart: typeof OnPortalGadgetAimStart;
+        readonly OnPortalGadgetAimStop: typeof OnPortalGadgetAimStop;
+        readonly OnPortalGadgetFireStart: typeof OnPortalGadgetFireStart;
+        readonly OnPortalGadgetFireStop: typeof OnPortalGadgetFireStop;
+        readonly OnPortalGadgetLaserToggle: typeof OnPortalGadgetLaserToggle;
         readonly OnRayCastHit: typeof OnRayCastHit;
         readonly OnRayCastMissed: typeof OnRayCastMissed;
         readonly OnRevived: typeof OnRevived;
@@ -224,6 +244,7 @@ declare class EventsImplementation {
      */
     static readonly LogLevel: typeof Logging.LogLevel;
     private constructor();
+    private static getSate;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
@@ -261,7 +282,7 @@ declare class EventsImplementation {
      */
     static handlerCount<T extends EventsTypes.TypeValue>(type: T): number;
 }
-export declare const Events: typeof EventsImplementation & EventsTypes.EventChannelsMap;
+export declare const Events: typeof EventsImplementation & EventsTypes.ChannelsMap;
 export declare function OngoingGlobal(): void;
 export declare function OngoingAreaTrigger(areaTrigger: mod.AreaTrigger): void;
 export declare function OngoingCapturePoint(capturePoint: mod.CapturePoint): void;
@@ -321,10 +342,12 @@ export declare function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger
 export declare function OnPlayerEnterCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void;
 export declare function OnPlayerEnterVehicle(player: mod.Player, vehicle: mod.Vehicle): void;
 export declare function OnPlayerEnterVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void;
+export declare function OnPlayerEnterVL7Cloud(player: mod.Player, cloud: mod.VL7Cloud): void;
 export declare function OnPlayerExitAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void;
 export declare function OnPlayerExitCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void;
 export declare function OnPlayerExitVehicle(player: mod.Player, vehicle: mod.Vehicle): void;
 export declare function OnPlayerExitVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void;
+export declare function OnPlayerExitVL7Cloud(player: mod.Player, cloud: mod.VL7Cloud): void;
 export declare function OnPlayerInteract(player: mod.Player, interactPoint: mod.InteractPoint): void;
 export declare function OnPlayerJoinGame(player: mod.Player): void;
 export declare function OnPlayerLeaveGame(playerId: number): void;
@@ -335,6 +358,11 @@ export declare function OnPlayerUIButtonEvent(
     uiButtonEvent: mod.UIButtonEvent
 ): void;
 export declare function OnPlayerUndeploy(player: mod.Player): void;
+export declare function OnPortalGadgetAimStart(player: mod.Player): void;
+export declare function OnPortalGadgetAimStop(player: mod.Player): void;
+export declare function OnPortalGadgetFireStart(player: mod.Player): void;
+export declare function OnPortalGadgetFireStop(player: mod.Player): void;
+export declare function OnPortalGadgetLaserToggle(player: mod.Player, toggle: boolean): void;
 export declare function OnRayCastHit(player: mod.Player, point: mod.Vector, normal: mod.Vector): void;
 export declare function OnRayCastMissed(player: mod.Player): void;
 export declare function OnRevived(revivedPlayer: mod.Player, revivingPlayer: mod.Player): void;

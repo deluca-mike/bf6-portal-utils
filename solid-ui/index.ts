@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version: 2.2.0
+// version: 2.3.0
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -383,9 +383,9 @@ export namespace SolidUI {
                     observer.dependencies.add(getStoreSubscribers(target, key).add(observer));
                 }
 
-                // If the value is an object, we must wrap it in a Proxy too (Lazy Proxying) so we can track its
-                // internal properties.
-                return typeof value === 'object' && value !== null ? new Proxy(value, handler) : value;
+                // If the value is a plain object or array, we must wrap it in a Proxy too (Lazy Proxying) so we can
+                // track its internal properties. Leave classes and host objects alone.
+                return isPlainObject(value) || Array.isArray(value) ? new Proxy(value as object, handler) : value;
             },
             set(target, key, value, receiver) {
                 const oldValue = Reflect.get(target, key, receiver);
@@ -395,6 +395,17 @@ export namespace SolidUI {
                 const result = Reflect.set(target, key, value, receiver);
 
                 schedule(getStoreSubscribers(target, key)); // Notify subscribers of this specific key.
+
+                return result;
+            },
+            deleteProperty(target, key) {
+                const hasKey = Reflect.has(target, key);
+                const result = Reflect.deleteProperty(target, key);
+
+                // Only trigger an update if the key actually existed and was deleted
+                if (hasKey && result) {
+                    schedule(getStoreSubscribers(target, key));
+                }
 
                 return result;
             },

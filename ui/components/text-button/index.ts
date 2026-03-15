@@ -3,10 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIText } from '../text/index.ts';
 
-const TEXT_BUTTON_CONTENT_PROPERTIES: readonly string[] = ['message', 'textSize', 'textAnchor'] as const;
-
-// version: 6.0.1
-export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
+// version: 6.0.2
+export class UITextButton extends UIContentButton<UIText> {
     // UIText properties (delegated via delegateProperties)
     declare public message: mod.Message;
     declare public textAnchor: mod.UIAnchor;
@@ -42,7 +40,7 @@ export class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CON
             return new UIText(textParams);
         };
 
-        super(params, createContent, TEXT_BUTTON_CONTENT_PROPERTIES);
+        super(params, createContent, ['message', 'textSize', 'textAnchor'] as readonly string[]);
 
         this._textDisabledColor = params.textDisabledColor ?? UI.COLORS.BF_GREY_2;
         this._textDisabledAlpha = params.textDisabledAlpha ?? 1;

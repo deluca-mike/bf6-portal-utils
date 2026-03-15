@@ -1,7 +1,7 @@
 import { Logging } from '../logging/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 3.2.0
+// version 3.3.0
 export namespace MapDetector {
     const logging = new Logging('MD');
 
@@ -30,6 +30,7 @@ export namespace MapDetector {
     export enum Map {
         Area22B = 'Area 22B',
         BlackwellFields = 'Blackwell Fields',
+        Complex3 = 'Complex 3',
         Contaminated = 'Contaminated',
         DefenseNexus = 'Defense Nexus',
         Downtown = 'Downtown',
@@ -47,6 +48,7 @@ export namespace MapDetector {
         RedlineStorage = 'Redline Storage',
         SaintsQuarter = 'Saints Quarter',
         SiegeOfCairo = 'Siege of Cairo',
+        HagentalBase = 'Hagental Base',
     }
 
     type MapData = {
@@ -63,7 +65,14 @@ export namespace MapDetector {
             coordinates: { x: -164.96, y: 76.32, z: -322.58 },
             nativeMap: mod.Maps.Badlands,
         },
-        [Map.Contaminated]: { coordinates: { x: -143.92, y: 323.12, z: 7.12 }, nativeMap: undefined },
+        [Map.Complex3]: {
+            coordinates: { x: 715.27, y: 201.02, z: -343.87 },
+            nativeMap: mod.Maps.Granite_Underground,
+        },
+        [Map.Contaminated]: {
+            coordinates: { x: -143.92, y: 323.12, z: 7.12 },
+            nativeMap: mod.Maps.Contaminated,
+        },
         [Map.DefenseNexus]: {
             coordinates: { x: -274.12, y: 138.65, z: 309.02 },
             nativeMap: mod.Maps.Granite_TechCampus,
@@ -83,6 +92,10 @@ export namespace MapDetector {
         [Map.GolfCourse]: {
             coordinates: { x: -299.32, y: 191.91, z: -664.38 },
             nativeMap: mod.Maps.Granite_ClubHouse,
+        },
+        [Map.HagentalBase]: {
+            coordinates: { x: -103.03, y: 66.02, z: 13.21 },
+            nativeMap: mod.Maps.Subsurface,
         },
         [Map.IberianOffensive]: {
             coordinates: { x: 849.16, y: 78.37, z: 116.74 },
