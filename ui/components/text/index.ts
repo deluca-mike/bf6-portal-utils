@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 6.0.1
+// version: 6.0.2
 export class UIText extends UI.Element {
     protected _message: mod.Message;
     protected _textSize: number;
@@ -38,7 +38,6 @@ export class UIText extends UI.Element {
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
         };
 
-        const message = params.message;
         const textSize = params.textSize ?? 36;
         const textColor = params.textColor ?? UI.COLORS.BLACK;
         const textAlpha = params.textAlpha ?? 1;
@@ -72,7 +71,7 @@ export class UIText extends UI.Element {
             elementParams.bgColor,
             elementParams.bgAlpha,
             elementParams.bgFill,
-            message,
+            params.message,
             textSize,
             textColor,
             textAlpha,
@@ -88,7 +87,7 @@ export class UIText extends UI.Element {
 
         super(elementParams);
 
-        this._message = message;
+        this._message = params.message;
         this._textSize = textSize;
         this._textColor = textColor;
         this._textAlpha = textAlpha;

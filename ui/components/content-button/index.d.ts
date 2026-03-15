@@ -4,12 +4,9 @@ import { UIButton } from '../button/index.ts';
  * Base class for buttons that contain content elements (Text, Image, etc.).
  * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @template TContentProps - Array of property names to delegate from the content element
- * @version 6.1.1
+ * @version 7.0.0
  */
-export declare abstract class UIContentButton<TContent extends UI.Element, TContentProps extends readonly string[]>
-    extends UI.Element
-{
+export declare abstract class UIContentButton<TContent extends UI.Element> extends UI.Element {
     protected _padding: number;
     protected _button: UIButton;
     protected _content: TContent;
@@ -23,7 +20,10 @@ export declare abstract class UIContentButton<TContent extends UI.Element, TCont
     hoverAlpha: number;
     focusedColor: mod.Vector;
     focusedAlpha: number;
-    onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
+    onClickDown?: UI.ButtonHandler;
+    onClickUp?: UI.ButtonHandler;
+    onFocusIn?: UI.ButtonHandler;
+    onFocusOut?: UI.ButtonHandler;
     setBaseColor: (color: mod.Vector) => this;
     setBaseAlpha: (alpha: number) => this;
     setDisabledColor: (color: mod.Vector) => this;
@@ -34,7 +34,10 @@ export declare abstract class UIContentButton<TContent extends UI.Element, TCont
     setHoverAlpha: (alpha: number) => this;
     setFocusedColor: (color: mod.Vector) => this;
     setFocusedAlpha: (alpha: number) => this;
-    setOnClick: (onClick: ((player: mod.Player) => Promise<void> | void) | undefined) => this;
+    setOnClickDown: (onClickDown?: UI.ButtonHandler) => this;
+    setOnClickUp: (onClickUp?: UI.ButtonHandler) => this;
+    setOnFocusIn: (onFocusIn?: UI.ButtonHandler) => this;
+    setOnFocusOut: (onFocusOut?: UI.ButtonHandler) => this;
     /**
      * Creates a new content button.
      * @param params - The parameters for the content button.
@@ -44,7 +47,7 @@ export declare abstract class UIContentButton<TContent extends UI.Element, TCont
     protected constructor(
         params: UIContentButton.Params,
         createContent: (parent: UI.Parent, width: number, height: number) => TContent,
-        contentProperties: TContentProps
+        contentProperties: readonly string[]
     );
     /**
      * @inheritdoc

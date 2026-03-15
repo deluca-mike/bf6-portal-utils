@@ -22,12 +22,35 @@ export namespace ModExtensions {
      * Camera types.
      */
     export enum CameraType {
+        /**
+         * First person camera.
+         */
         FirstPerson = 'FirstPerson',
+        /**
+         * Third person camera.
+         */
         ThirdPerson = 'ThirdPerson',
+        /**
+         * Top down camera.
+         */
         TopDown = 'TopDown',
+        /**
+         * Isometric camera (similar to `FirstPerson`, but scaled/distorted differently).
+         */
         Isometric = 'Isometric',
+        /**
+         * Fixed camera.
+         * Currently, this is camera is locked to the target's position the moment it is set, and cannot be moved.
+         */
         Fixed = 'Fixed',
+        /**
+         * Free camera (allows free roam in space).
+         * Currently there is no yaw control, so it is awkward to use.
+         */
         Free = 'Free',
+        /**
+         * Default camera. It is unclear if and how it is different from `FirstPerson`.
+         */
         Default = 'DEFAULT',
     }
 

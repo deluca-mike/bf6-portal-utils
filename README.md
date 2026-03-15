@@ -22,6 +22,8 @@ This repository is organized into focused modules, each addressing specific deve
 
 - **[Map Detector Module](./map-detector/)** – Detects the current map by analyzing the coordinates of Team 1's Headquarters (HQ), providing a reliable alternative to the broken `mod.IsCurrentMap` API. Supports detection of all available maps with fast, coordinate-based identification.
 
+- **[Mod Extensions Module](./mod-extensions/)** – Provides typed helpers for undocumented APIs on the runtime `mod` namespace. Use it for camera control (per-player or global), event type comparisons (damage type, death type, weapon), and runtime string lookup without manually casting `mod`.
+
 - **[Multi-Click Detector Module](./multi-click-detector/)** – Detects when a player has rapidly triggered a soldier state multiple times in quick succession. By default monitors the interact state, enabling custom UI triggers and special actions without relying on in-world physical interaction points. Supports configurable soldier states, time windows, and click counts for flexible multi-click detection.
 
 - **[Performance Stats Module](./performance-stats/)** – Monitors and tracks the estimated runtime tick rate of the server, providing real-time performance metrics that help identify when the server is under stress or when script callbacks are being deprioritized by the game engine.

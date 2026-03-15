@@ -3,10 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIContainer } from '../container/index.ts';
 import { UIButton } from '../button/index.ts';
 
-const CONTAINER_BUTTON_CONTENT_PROPERTIES: readonly string[] = [] as const;
-
-// version: 1.0.1
-export class UIContainerButton extends UIContentButton<UIContainer, typeof CONTAINER_BUTTON_CONTENT_PROPERTIES> {
+// version: 1.0.2
+export class UIContainerButton extends UIContentButton<UIContainer> {
     /**
      * Creates a new container button.
      * @param params - The parameters for the container button.
@@ -24,7 +22,7 @@ export class UIContainerButton extends UIContentButton<UIContainer, typeof CONTA
             return new UIContainer(containerParams);
         };
 
-        super(params, createContent, CONTAINER_BUTTON_CONTENT_PROPERTIES);
+        super(params, createContent, [] as readonly string[]);
     }
 
     /**

@@ -5,12 +5,9 @@ import { UIButton } from '../button/index.ts';
  * Base class for buttons that contain content elements (Text, Image, etc.).
  * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @template TContentProps - Array of property names to delegate from the content element
- * @version 6.1.1
+ * @version 7.0.0
  */
-export abstract class UIContentButton<TContent extends UI.Element, TContentProps extends readonly string[]>
-    extends UI.Element
-{
+export abstract class UIContentButton<TContent extends UI.Element> extends UI.Element {
     protected _padding: number;
 
     protected _button: UIButton;
@@ -28,7 +25,10 @@ export abstract class UIContentButton<TContent extends UI.Element, TContentProps
     declare public hoverAlpha: number;
     declare public focusedColor: mod.Vector;
     declare public focusedAlpha: number;
-    declare public onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
+    declare public onClickDown?: UI.ButtonHandler;
+    declare public onClickUp?: UI.ButtonHandler;
+    declare public onFocusIn?: UI.ButtonHandler;
+    declare public onFocusOut?: UI.ButtonHandler;
 
     // UIButton setter methods (delegated via delegateProperties).
     declare public setBaseColor: (color: mod.Vector) => this;
@@ -41,7 +41,10 @@ export abstract class UIContentButton<TContent extends UI.Element, TContentProps
     declare public setHoverAlpha: (alpha: number) => this;
     declare public setFocusedColor: (color: mod.Vector) => this;
     declare public setFocusedAlpha: (alpha: number) => this;
-    declare public setOnClick: (onClick: ((player: mod.Player) => Promise<void> | void) | undefined) => this;
+    declare public setOnClickDown: (onClickDown?: UI.ButtonHandler) => this;
+    declare public setOnClickUp: (onClickUp?: UI.ButtonHandler) => this;
+    declare public setOnFocusIn: (onFocusIn?: UI.ButtonHandler) => this;
+    declare public setOnFocusOut: (onFocusOut?: UI.ButtonHandler) => this;
 
     /**
      * Creates a new content button.
@@ -52,7 +55,7 @@ export abstract class UIContentButton<TContent extends UI.Element, TContentProps
     protected constructor(
         params: UIContentButton.Params,
         createContent: (parent: UI.Parent, width: number, height: number) => TContent,
-        contentProperties: TContentProps
+        contentProperties: readonly string[]
     ) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
@@ -146,7 +149,10 @@ export abstract class UIContentButton<TContent extends UI.Element, TContentProps
             focusedColor: params.focusedColor,
             focusedAlpha: params.focusedAlpha,
             depth,
-            onClick: params.onClick,
+            onClickDown: params.onClickDown,
+            onClickUp: params.onClickUp,
+            onFocusIn: params.onFocusIn,
+            onFocusOut: params.onFocusOut,
         };
 
         this._button = new UIButton(buttonParams);
@@ -171,7 +177,10 @@ export abstract class UIContentButton<TContent extends UI.Element, TContentProps
             'focusedColor',
             'hoverAlpha',
             'hoverColor',
-            'onClick',
+            'onClickDown',
+            'onClickUp',
+            'onFocusIn',
+            'onFocusOut',
         ]);
 
         // Delegate content properties.

@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.1
+// version: 1.0.2
 export class UIGadgetImage extends UI.Element {
     protected _gadget: mod.Gadgets;
 
@@ -32,8 +32,6 @@ export class UIGadgetImage extends UI.Element {
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
         };
 
-        const gadget = params.gadget;
-
         const args: [
             string, // name
             mod.Vector, // position
@@ -46,7 +44,7 @@ export class UIGadgetImage extends UI.Element {
             mod.CreateVector(x, y, 0),
             mod.CreateVector(width, height, 0),
             elementParams.anchor,
-            gadget,
+            params.gadget,
             parent.uiWidget,
         ];
 
@@ -58,7 +56,7 @@ export class UIGadgetImage extends UI.Element {
 
         super(elementParams);
 
-        this._gadget = gadget;
+        this._gadget = params.gadget;
 
         // `mod.AddUIGadgetImage` lacks the ability to define starting invisibility, so we have to set it manually.
         if (!elementParams.visible) {
