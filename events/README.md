@@ -269,14 +269,22 @@ Events.Type.OnPlayerDeployed(somePlayer);
 Available event types include:
 
 - `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
-- `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`, `OnAIParachuteRunning`, `OnAIParachuteSucceeded`, `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
+- `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`
+- `OnAIParachuteRunning`, `OnAIParachuteSucceeded`
+- `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
 - `OnCapturePointCaptured`, `OnCapturePointCapturing`, `OnCapturePointLost`
 - `OnGameModeEnding`, `OnGameModeStarted`
-- `OnMandown`
+- `OnPlayerJoinGame`, `OnPlayerLeaveGame`
+- `OnPlayerDeployed`, `OnPlayerUndeploy`
+- `OnMandown`, `OnRevived`, `OnPlayerDamaged`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`, `OnPlayerInteract`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`
+- `OnPlayerEnterAreaTrigger`, `OnPlayerExitAreaTrigger`
+- `OnPlayerEnterCapturePoint`, `OnPlayerExitCapturePoint`
+- `OnPlayerEnterVehicle`, `OnPlayerExitVehicle`
+- `OnPlayerEnterVehicleSeat`, `OnPlayerExitVehicleSeat`
+- `OnPlayerEnterVL7Cloud`, `OnPlayerExitVL7Cloud`
+- `OnPortalGadgetAimStart`, `OnPortalGadgetAimStop`, `OnPortalGadgetFireStart`, `OnPortalGadgetFireStop`, `OnPortalGadgetLaserToggle`
 - `OnMCOMArmed`, `OnMCOMDefused`, `OnMCOMDestroyed`
-- `OnPlayerDamaged`, `OnPlayerDeployed`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`, `OnPlayerEnterAreaTrigger`, `OnPlayerEnterCapturePoint`, `OnPlayerEnterVehicle`, `OnPlayerEnterVehicleSeat`, `OnPlayerExitAreaTrigger`, `OnPlayerExitCapturePoint`, `OnPlayerExitVehicle`, `OnPlayerExitVehicleSeat`, `OnPlayerInteract`, `OnPlayerJoinGame`, `OnPlayerLeaveGame`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`, `OnPlayerUndeploy`
 - `OnRayCastHit`, `OnRayCastMissed`
-- `OnRevived`
 - `OnRingOfFireZoneSizeChange`
 - `OnSpawnerSpawned`
 - `OnTimeLimitReached`
@@ -535,9 +543,24 @@ The `Events` module uses a centralized subscription system:
 
 ---
 
+## Tick Budget and Incomplete Triggers
+
+Previously, Battlefield Portal servers applied a safety cap on every block of synchronous work (~50ms). So, if the entire block of synchronous work for an event handler exceeded that cap, the server silently ended that JavaScript thread and execution stopped mid-flow. While this "watchdog" had been removed, since there is a possibility of it returning, this module tracks incomplete event triggers and logs a warning if there are any.
+
+To surface this, the Events module:
+
+- **Counts incomplete triggers** – Each time a trigger runs, it increments a per-event counter before invoking handlers and decrements it after the handler loop. If the execution is aborted in between, the counter is left positive.
+- **Logs periodically** – When there are incomplete triggers and no log timeout is currently scheduled, the module schedules a one-shot timeout (e.g. 10 seconds). When that fires, it logs a warning with the number of incomplete triggers for that event type in the last interval, then resets the counter so the next period can be measured separately.
+
+You’ll see these warnings only if logging is configured with `Events.setLogging()` and the minimum log level includes `Warning`. If you see frequent incomplete-trigger warnings for an event (especially high-frequency ones like `OngoingPlayer` or `OngoingGlobal`), consider reducing the amount of synchronous work in those handlers, subscribing fewer handlers, or moving heavy work into asynchronous handlers so it can be spread across ticks.
+
+---
+
 <ai>
 
 ## Known Limitations & Caveats
+
+- **Tick Budget (~50ms)** – The server may abort the JavaScript process for a game tick if total work exceeds its per-tick cap, leading to incomplete event executions. The module logs how many triggers did not complete per event type over a rolling window; see [Tick Budget and Incomplete Triggers](#tick-budget-and-incomplete-triggers) for details and mitigation.
 
 - **Single Event Hook Requirement** – You must not implement or export any Battlefield Portal event handler functions in your own code. If you do, they will conflict with this module's implementations and cause undefined behavior.
 

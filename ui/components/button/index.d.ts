@@ -11,7 +11,10 @@ export declare class UIButton extends UI.Element implements UI.Button {
     protected _hoverAlpha: number;
     protected _focusedColor: mod.Vector;
     protected _focusedAlpha: number;
-    protected _onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
+    protected _onClickDown?: UI.ButtonHandler;
+    protected _onClickUp?: UI.ButtonHandler;
+    protected _onFocusIn?: UI.ButtonHandler;
+    protected _onFocusOut?: UI.ButtonHandler;
     protected _unregisterAsButton: () => void;
     /**
      * Creates a new button.
@@ -190,20 +193,65 @@ export declare class UIButton extends UI.Element implements UI.Button {
      */
     setFocusedAlpha(alpha: number): this;
     /**
-     * The click handler of the button.
+     * The click down handler of the button.
      */
-    get onClick(): ((player: mod.Player) => Promise<void> | void) | undefined;
+    get onClickDown(): UI.ButtonHandler | undefined;
     /**
-     * Sets the click handler of the button.
-     * @param onClick - The new click handler.
+     * Sets the click down handler of the button.
+     * @param onClickDown - The new click down handler.
      */
-    set onClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined);
+    set onClickDown(onClickDown: UI.ButtonHandler | undefined);
     /**
      * Sets the click handler of the button. Useful for chaining operations.
      * @param onClick - The new click handler.
      * @returns This element instance.
      */
-    setOnClick(onClick: ((player: mod.Player) => Promise<void> | void) | undefined): this;
+    setOnClickDown(onClickDown?: UI.ButtonHandler): this;
+    /**
+     * The click up handler of the button.
+     */
+    get onClickUp(): UI.ButtonHandler | undefined;
+    /**
+     * Sets the click up handler of the button.
+     * @param onClickUp - The new click up handler.
+     */
+    set onClickUp(onClickUp: UI.ButtonHandler | undefined);
+    /**
+     * Sets the click handler of the button. Useful for chaining operations.
+     * @param onClickUp - The new click up handler.
+     * @returns This element instance.
+     */
+    setOnClickUp(onClickUp?: UI.ButtonHandler): this;
+    /**
+     * The focus in handler of the button.
+     */
+    get onFocusIn(): UI.ButtonHandler | undefined;
+    /**
+     * Sets the focus in handler of the button.
+     * @param onFocusIn - The new focus in handler.
+     */
+    set onFocusIn(onFocusIn: UI.ButtonHandler | undefined);
+    /**
+     * Sets the focus in handler of the button. Useful for chaining operations.
+     * @param onFocusIn - The new focus in handler.
+     * @returns This element instance.
+     */
+    setOnFocusIn(onFocusIn?: UI.ButtonHandler): this;
+    /**
+     * The focus out handler of the button.
+     */
+    get onFocusOut(): UI.ButtonHandler | undefined;
+    /**
+     * Sets the focus out handler of the button.
+     * @param onFocusOut - The new focus out handler.
+     */
+    set onFocusOut(onFocusOut: UI.ButtonHandler | undefined);
+    /**
+     * Sets the focus out handler of the button. Useful for chaining operations.
+     * @param onFocusOut - The new focus out handler.
+     * @returns This element instance.
+     */
+    setOnFocusOut(onFocusOut?: UI.ButtonHandler): this;
 }
 export declare namespace UIButton {
     /**
@@ -221,6 +269,9 @@ export declare namespace UIButton {
         hoverAlpha?: number;
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
-        onClick?: (player: mod.Player) => Promise<void> | void;
+        onClickDown?: UI.ButtonHandler;
+        onClickUp?: UI.ButtonHandler;
+        onFocusIn?: UI.ButtonHandler;
+        onFocusOut?: UI.ButtonHandler;
     };
 }

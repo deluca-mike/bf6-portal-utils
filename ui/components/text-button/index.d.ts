@@ -1,8 +1,7 @@
 import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIText } from '../text/index.ts';
-declare const TEXT_BUTTON_CONTENT_PROPERTIES: readonly string[];
-export declare class UITextButton extends UIContentButton<UIText, typeof TEXT_BUTTON_CONTENT_PROPERTIES> {
+export declare class UITextButton extends UIContentButton<UIText> {
     message: mod.Message;
     textAnchor: mod.UIAnchor;
     textSize: number;
@@ -100,4 +99,3 @@ export declare namespace UITextButton {
             textDisabledAlpha?: number;
         };
 }
-export {};

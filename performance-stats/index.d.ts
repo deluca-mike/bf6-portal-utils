@@ -1,52 +1,42 @@
-export declare class PerformanceStats {
-    private stressThreshold;
-    private deprioritizedThreshold;
-    private sampleRateSeconds;
-    private tickBucket;
-    private isStarted;
-    private cachedTickRate;
-    private log?;
-    /**
-     * Creates a new PerformanceStats instance.
-     * @param options - The options for the PerformanceStats instance.
-     */
-    constructor(options?: PerformanceStats.Options);
-    /**
-     * @returns The current tick rate.
-     */
-    get tickRate(): number;
-    /**
-     * This should be called once every tick, so it is best to be called in the `OngoingGlobal()` event handler.
-     */
-    trackTick(): void;
-    /**
-     * This starts the performance tracking heartbeat, which is a loop that tracks the performance of the script. It can be called once, any time.
-     * If called multiple times, it will only start one loop.
-     */
-    startHeartbeat(): void;
-    private heartbeat;
-    private analyzeHealth;
-}
+import { Logging } from '../logging/index.ts';
 export declare namespace PerformanceStats {
     /**
-     * The options for the PerformanceStats instance.
+     * A re-export of the `Logging.LogLevel` enum.
      */
-    type Options = {
-        /**
-         * The logging function to use.
-         */
-        log?: (text: string) => void;
-        /**
-         * The stress threshold.
-         */
-        stressThreshold?: number;
-        /**
-         * The deprioritized threshold.
-         */
-        deprioritizedThreshold?: number;
-        /**
-         * The sample rate in seconds.
-         */
-        sampleRateSeconds?: number;
-    };
+    const LogLevel: typeof Logging.LogLevel;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeError - Whether to include the runtime error in the log.
+     */
+    function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeError?: boolean
+    ): void;
+    /**
+     * @returns The smoothed tick rate. Good/stable for UI display.
+     */
+    function getSmoothedTickRate(): number;
+    /**
+     * @returns The smoothed lag time. Good/stable for UI display.
+     */
+    function getSmoothedTimeoutLagMs(): number;
+    /**
+     * Returns the value that is somewhat analogous to SFT when above 33m.
+     * @returns The raw delta time between the last two ticks. Good for compute scaling.
+     */
+    function getSpotDeltaMs(): number;
+    /**
+     * Returns the value that is analogous to STR.
+     * @returns The tick rate. Good for compute scaling.
+     */
+    function getSpotTickRate(): number;
+    /**
+     * @returns A normalized health factor from 0.0 to 1.0. Good for compute scaling.
+     * 1.0 = Perfect 30Hz performance.
+     * < 1.0 = Engine is bogged down, scale your compute back.
+     */
+    function getSpotHealthFactor(): number;
 }

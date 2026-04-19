@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 7.0.0
+// version: 8.0.0
 export namespace UI {
     /****** Logging ******/
 
@@ -28,6 +28,35 @@ export namespace UI {
     }
 
     /****** Types ******/
+
+    /**
+     * The type of a button handler.
+     */
+    export type ButtonHandler = (player: mod.Player) => Promise<void> | void;
+
+    /**
+     * The minimum interface for a button.
+     */
+    export type Button = {
+        onClickDown?: ButtonHandler;
+        onClickUp?: ButtonHandler;
+        onFocusIn?: ButtonHandler;
+        onFocusOut?: ButtonHandler;
+        // onHoverIn?: ButtonHandler; // Disabled as this is not supported on consoles.
+        // onHoverOut?: ButtonHandler; // Disabled as this is not supported on consoles.
+    };
+
+    /**
+     * The parent of an element.
+     */
+    export type Parent = {
+        name: string;
+        uiWidget: mod.UIWidget;
+        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        children: Element[];
+        attachChild(child: Element): void;
+        detachChild(child: Element): void;
+    };
 
     type BaseParams = {
         anchor?: mod.UIAnchor;
@@ -91,27 +120,6 @@ export namespace UI {
         receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
         uiInputModeWhenVisible: boolean;
     };
-
-    /****** Interfaces ******/
-
-    /**
-     * The parent of an element.
-     */
-    export interface Parent {
-        name: string;
-        uiWidget: mod.UIWidget;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
-        children: Element[];
-        attachChild(child: Element): void;
-        detachChild(child: Element): void;
-    }
-
-    /**
-     * The minimum interface for a button.
-     */
-    export interface Button {
-        onClick: ((player: mod.Player) => Promise<void> | void) | undefined;
-    }
 
     /****** Classes ******/
 
@@ -202,6 +210,9 @@ export namespace UI {
         }
     }
 
+    /**
+     * The team receiver. This is the receiver for a single team.
+     */
     export class TeamReceiver extends Receiver<mod.Team> {
         private static _instances = new Map<number, TeamReceiver>();
 
@@ -887,9 +898,40 @@ export namespace UI {
 
     /****** Button Registry ******/
 
+    type HandlerData = {
+        handler?: ButtonHandler;
+        name: string;
+    };
+
     const BUTTONS = new Map<string, Button>();
 
-    Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);
+    function getButtonHandler(button: Button, event: mod.UIButtonEvent): HandlerData {
+        if (mod.Equals(event, mod.UIButtonEvent.ButtonDown)) {
+            return { handler: button.onClickDown, name: 'onClickDown' };
+        }
+
+        if (mod.Equals(event, mod.UIButtonEvent.ButtonUp)) {
+            return { handler: button.onClickUp, name: 'onClickUp' };
+        }
+
+        if (mod.Equals(event, mod.UIButtonEvent.FocusIn)) {
+            return { handler: button.onFocusIn, name: 'onFocusIn' };
+        }
+
+        if (mod.Equals(event, mod.UIButtonEvent.FocusOut)) {
+            return { handler: button.onFocusOut, name: 'onFocusOut' };
+        }
+
+        if (mod.Equals(event, mod.UIButtonEvent.HoverIn)) {
+            return { handler: undefined, name: 'onHoverIn' };
+        }
+
+        if (mod.Equals(event, mod.UIButtonEvent.HoverOut)) {
+            return { handler: undefined, name: 'onHoverOut' };
+        }
+
+        return { handler: undefined, name: 'default' };
+    }
 
     /**
      * Handles a button event.
@@ -898,14 +940,22 @@ export namespace UI {
      * @param event - The button event.
      */
     function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
-        // NOTE: `event: mod.UIButtonEvent` is currently broken or undefined, so we're not using it for now.
         const name = mod.GetUIWidgetName(widget);
+        const button = BUTTONS.get(name);
 
-        const onClick = BUTTONS.get(name)?.onClick;
+        if (!button) {
+            logging.log(`Button ${name} not found.`, LogLevel.Warning);
+            return;
+        }
 
-        if (!onClick) return;
+        const { handler, name: handlerName } = getButtonHandler(button, event);
 
-        CallbackHandler.invoke(onClick, [player], `click handler for widget ${name}`, logging, LogLevel.Error);
+        if (!handler) {
+            logging.log(`Button ${name} has no ${handlerName} handler.`, LogLevel.Warning);
+            return;
+        }
+
+        CallbackHandler.invoke(handler, [player], `button handler for widget ${name}`, logging, LogLevel.Error);
     }
 
     /**
@@ -926,6 +976,8 @@ export namespace UI {
             BUTTONS.delete(name);
         };
     }
+
+    Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);
 
     /****** Utils ******/
 

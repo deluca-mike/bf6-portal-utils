@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.1
+// version: 1.0.2
 export class UIWeaponImage extends UI.Element {
     protected _weapon: mod.Weapons;
     protected _weaponPackage: mod.WeaponPackage;
@@ -33,7 +33,6 @@ export class UIWeaponImage extends UI.Element {
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
         };
 
-        const weapon = params.weapon;
         const weaponPackage = params.weaponPackage ?? mod.CreateNewWeaponPackage();
 
         const args: [
@@ -49,7 +48,7 @@ export class UIWeaponImage extends UI.Element {
             mod.CreateVector(x, y, 0),
             mod.CreateVector(width, height, 0),
             elementParams.anchor,
-            weapon,
+            params.weapon,
             parent.uiWidget,
             weaponPackage,
         ];
@@ -62,7 +61,7 @@ export class UIWeaponImage extends UI.Element {
 
         super(elementParams);
 
-        this._weapon = weapon;
+        this._weapon = params.weapon;
         this._weaponPackage = weaponPackage;
 
         // `mod.AddUIWeaponImage` lacks the ability to define starting invisibility, so we have to set it manually.

@@ -2,10 +2,8 @@ import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
 
-const IMAGE_BUTTON_CONTENT_PROPERTIES: readonly string[] = ['imageType'] as const;
-
-// version: 1.0.1
-export class UIImageButton extends UIContentButton<UIImage, typeof IMAGE_BUTTON_CONTENT_PROPERTIES> {
+// version: 1.0.2
+export class UIImageButton extends UIContentButton<UIImage> {
     // UIImage properties (delegated via delegateProperties)
     declare public imageType: mod.UIImageType;
 
@@ -35,7 +33,7 @@ export class UIImageButton extends UIContentButton<UIImage, typeof IMAGE_BUTTON_
             return new UIImage(imageParams);
         };
 
-        super(params, createContent, IMAGE_BUTTON_CONTENT_PROPERTIES);
+        super(params, createContent, ['imageType'] as readonly string[]);
 
         this._imageDisabledColor = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
         this._imageDisabledAlpha = params.imageDisabledAlpha ?? 1;

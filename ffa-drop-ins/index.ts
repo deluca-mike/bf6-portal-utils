@@ -9,7 +9,7 @@ import { UIContainer } from '../ui/components/container/index.ts';
 import { UITextButton } from '../ui/components/text-button/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 1.0.0
+// version: 1.1.0
 export namespace FFADropIns {
     const logging = new Logging('FDI');
 
@@ -386,7 +386,7 @@ export namespace FFADropIns {
                 message: mod.Message(mod.stringkeys.ffaDropIns.buttons.spawn),
                 textSize: 30,
                 textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                onClick: (player: mod.Player) => this._addToQueue(),
+                onClickUp: (player: mod.Player) => this._addToQueue(),
             });
 
             new UITextButton({
@@ -408,7 +408,7 @@ export namespace FFADropIns {
                 message: mod.Message(mod.stringkeys.ffaDropIns.buttons.delay, promptDelay),
                 textSize: 30,
                 textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                onClick: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
+                onClickUp: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
             });
 
             this._countdownUI = new UIText({

@@ -1,7 +1,8 @@
 import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
+import { Timers } from '../timers/index.ts';
 
-// version: 1.4.0
+// version: 1.5.0
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -53,16 +54,23 @@ namespace EventsTypes {
         OnPlayerEnterCapturePoint,
         OnPlayerEnterVehicle,
         OnPlayerEnterVehicleSeat,
+        OnPlayerEnterVL7Cloud,
         OnPlayerExitAreaTrigger,
         OnPlayerExitCapturePoint,
         OnPlayerExitVehicle,
         OnPlayerExitVehicleSeat,
+        OnPlayerExitVL7Cloud,
         OnPlayerInteract,
         OnPlayerJoinGame,
         OnPlayerLeaveGame,
         OnPlayerSwitchTeam,
         OnPlayerUIButtonEvent,
         OnPlayerUndeploy,
+        OnPortalGadgetAimStart,
+        OnPortalGadgetAimStop,
+        OnPortalGadgetFireStart,
+        OnPortalGadgetFireStop,
+        OnPortalGadgetLaserToggle,
         OnRayCastHit,
         OnRayCastMissed,
         OnRevived,
@@ -98,7 +106,7 @@ namespace EventsTypes {
      * exposes this interface with `subscribe`, `unsubscribe`, and `trigger` typed to that event's payload.
      * @template K - Event name; handler and trigger args are inferred from the corresponding trigger function.
      */
-    export type EventChannel<K extends SignatureKey> = {
+    export type Channel<K extends SignatureKey> = {
         /**
          * Subscribe a handler for this event. The handler receives the same arguments as this event's trigger.
          * @param handler - Callback invoked when the event is triggered; args match the event's payload.
@@ -129,12 +137,12 @@ namespace EventsTypes {
      * Map of each event name to its typed channel (`subscribe`, `unsubscribe`, `trigger`, `handlerCount`).
      * Merged onto the Events namespace so you get e.g. `Events.OngoingInteractPoint.subscribe(handler)`.
      */
-    export type EventChannelsMap = {
-        [K in SignatureKey]: K extends SignatureKey ? EventChannel<K> : never;
+    export type ChannelsMap = {
+        [K in SignatureKey]: K extends SignatureKey ? Channel<K> : never;
     };
 
     // Get the event key (name) from a trigger function value.
-    type EventTypeName<T extends TypeValue> = {
+    type TypeName<T extends TypeValue> = {
         [K in SignatureKey]: Signature[K] extends T ? K : never;
     }[SignatureKey];
 
@@ -143,8 +151,8 @@ namespace EventsTypes {
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
      */
     export type HandlerForType<T extends TypeValue> =
-        EventTypeName<T> extends SignatureKey
-            ? Signature[EventTypeName<T>] extends (...args: infer P) => void
+        TypeName<T> extends SignatureKey
+            ? Signature[TypeName<T>] extends (...args: infer P) => void
                 ? (...args: P) => void | Promise<void>
                 : never
             : never;
@@ -153,7 +161,7 @@ namespace EventsTypes {
      * Get the parameter tuple for a specific event type.
      */
     export type EventParameters<T extends TypeValue> =
-        EventTypeName<T> extends SignatureKey ? Parameters<Signature[EventTypeName<T>]> : never;
+        TypeName<T> extends SignatureKey ? Parameters<Signature[TypeName<T>]> : never;
 
     /**
      * Create a union of all possible handler types.
@@ -164,12 +172,20 @@ namespace EventsTypes {
             ? (...args: P) => void | Promise<void>
             : never;
     }[SignatureKey];
+
+    export type State = {
+        logTimeout?: number;
+        incompleteTriggers: number;
+        handlers: Set<EventsTypes.AllHandlers>;
+    };
 }
 
 class EventsImplementation {
+    private static readonly _LOG_TIMEOUT_MS = 10_000;
+
     private static readonly _logging = new Logging('Events');
 
-    private static readonly _handlers = new Map<EventsTypes.TypeValue, Set<EventsTypes.AllHandlers>>();
+    private static readonly _states = new Map<EventsTypes.TypeValue, EventsTypes.State>();
 
     /**
      * The event types.
@@ -191,7 +207,7 @@ class EventsImplementation {
             (
                 EventsImplementation as unknown as Record<
                     EventsTypes.SignatureKey,
-                    EventsTypes.EventChannel<EventsTypes.SignatureKey>
+                    EventsTypes.Channel<EventsTypes.SignatureKey>
                 >
             )[key] = {
                 subscribe(handler: EventsTypes.AllHandlers): () => void {
@@ -206,7 +222,7 @@ class EventsImplementation {
                         handler as EventsTypes.HandlerForType<typeof typeValue>
                     );
                 },
-                trigger(...args: Parameters<EventsTypes.AllHandlers>): void {
+                trigger(...args: EventsTypes.Parameters<EventsTypes.AllHandlers>): void {
                     EventsImplementation.trigger(typeValue, ...(args as EventsTypes.EventParameters<typeof typeValue>));
                 },
                 handlerCount(): number {
@@ -217,6 +233,21 @@ class EventsImplementation {
     }
 
     private constructor() {}
+
+    private static getSate(type: EventsTypes.TypeValue): EventsTypes.State {
+        const state = EventsImplementation._states.get(type);
+
+        if (state) return state;
+
+        const createdState: EventsTypes.State = {
+            incompleteTriggers: 0,
+            handlers: new Set<EventsTypes.AllHandlers>(),
+        };
+
+        EventsImplementation._states.set(type, createdState);
+
+        return createdState;
+    }
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
@@ -229,7 +260,7 @@ class EventsImplementation {
         logLevel?: Logging.LogLevel,
         includeError?: boolean
     ): void {
-        this._logging.setLogging(log, logLevel, includeError);
+        EventsImplementation._logging.setLogging(log, logLevel, includeError);
     }
 
     /**
@@ -242,13 +273,11 @@ class EventsImplementation {
         type: T,
         handler: EventsTypes.HandlerForType<T>
     ): () => void {
-        if (!this._handlers.has(type)) {
-            this._handlers.set(type, new Set());
-        }
+        const state = EventsImplementation.getSate(type);
 
-        this._handlers.get(type)!.add(handler as EventsTypes.AllHandlers);
+        state.handlers.add(handler as EventsTypes.AllHandlers);
 
-        return () => this.unsubscribe(type, handler);
+        return () => EventsImplementation.unsubscribe(type, handler);
     }
 
     /**
@@ -257,7 +286,9 @@ class EventsImplementation {
      * @param handler - The handler function that was subscribed.
      */
     public static unsubscribe<T extends EventsTypes.TypeValue>(type: T, handler: EventsTypes.HandlerForType<T>): void {
-        this._handlers.get(type)?.delete(handler as EventsTypes.AllHandlers);
+        const state = EventsImplementation.getSate(type);
+
+        state.handlers.delete(handler as EventsTypes.AllHandlers);
     }
 
     /**
@@ -266,17 +297,37 @@ class EventsImplementation {
      * @param args - The arguments to pass to the handler function.
      */
     public static trigger<T extends EventsTypes.TypeValue>(type: T, ...args: EventsTypes.EventParameters<T>): void {
-        const typeHandlers = this._handlers.get(type);
-
-        if (!typeHandlers) return;
+        const state = EventsImplementation.getSate(type);
 
         const typeName = (type as { name?: string }).name ?? 'unknown';
 
+        // Incomplete-trigger accounting: Portal servers previously aborted the JS thread for a block of synchronous
+        // work after ~50ms, so a trigger can be started (increment below) but never reach the decrement. We schedule a
+        // one-shot timeout to log how many such incomplete triggers occurred in the last _LOG_TIMEOUT_MS window in
+        // order to avoid spamming the log, especially for high-frequency triggers like any of the Ongoing events.
+        if (state.incompleteTriggers > 0 && !state.logTimeout) {
+            state.logTimeout = Timers.setTimeout(() => {
+                state.logTimeout = undefined;
+
+                EventsImplementation._logging.log(
+                    `${state.incompleteTriggers} incomplete triggers for ${typeName} in last ${EventsImplementation._LOG_TIMEOUT_MS}ms.`,
+                    Logging.LogLevel.Warning
+                );
+
+                state.incompleteTriggers = 0;
+            }, EventsImplementation._LOG_TIMEOUT_MS);
+        }
+
+        ++state.incompleteTriggers;
+
         // Execute each handler asynchronously and non-blocking.
         // Errors in one handler won't prevent other handlers from executing.
-        for (const handler of typeHandlers) {
-            CallbackHandler.invoke(handler, args, typeName, this._logging, Logging.LogLevel.Error);
+        for (const handler of state.handlers) {
+            CallbackHandler.invoke(handler, args, typeName, EventsImplementation._logging, Logging.LogLevel.Error);
         }
+
+        // Decrement runs synchronously after the loop; the only way it is skipped is tick abort (50ms cap).
+        --state.incompleteTriggers;
     }
 
     /**
@@ -285,11 +336,11 @@ class EventsImplementation {
      * @returns Count of subscribed handlers (0 if none).
      */
     public static handlerCount<T extends EventsTypes.TypeValue>(type: T): number {
-        return this._handlers.get(type)?.size ?? 0;
+        return EventsImplementation.getSate(type).handlers.size;
     }
 }
 
-export const Events = EventsImplementation as typeof EventsImplementation & EventsTypes.EventChannelsMap;
+export const Events = EventsImplementation as typeof EventsImplementation & EventsTypes.ChannelsMap;
 
 /* eslint-disable jsdoc/require-jsdoc */
 export function OngoingGlobal(): void {
@@ -483,6 +534,10 @@ export function OnPlayerEnterVehicleSeat(player: mod.Player, vehicle: mod.Vehicl
     Events.OnPlayerEnterVehicleSeat.trigger(player, vehicle, seat);
 }
 
+export function OnPlayerEnterVL7Cloud(player: mod.Player, cloud: mod.VL7Cloud): void {
+    Events.OnPlayerEnterVL7Cloud.trigger(player, cloud);
+}
+
 export function OnPlayerExitAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void {
     Events.OnPlayerExitAreaTrigger.trigger(player, areaTrigger);
 }
@@ -497,6 +552,10 @@ export function OnPlayerExitVehicle(player: mod.Player, vehicle: mod.Vehicle): v
 
 export function OnPlayerExitVehicleSeat(player: mod.Player, vehicle: mod.Vehicle, seat: mod.Object): void {
     Events.OnPlayerExitVehicleSeat.trigger(player, vehicle, seat);
+}
+
+export function OnPlayerExitVL7Cloud(player: mod.Player, cloud: mod.VL7Cloud): void {
+    Events.OnPlayerExitVL7Cloud.trigger(player, cloud);
 }
 
 export function OnPlayerInteract(player: mod.Player, interactPoint: mod.InteractPoint): void {
@@ -525,6 +584,26 @@ export function OnPlayerUIButtonEvent(
 
 export function OnPlayerUndeploy(player: mod.Player): void {
     Events.OnPlayerUndeploy.trigger(player);
+}
+
+export function OnPortalGadgetAimStart(player: mod.Player): void {
+    Events.OnPortalGadgetAimStart.trigger(player);
+}
+
+export function OnPortalGadgetAimStop(player: mod.Player): void {
+    Events.OnPortalGadgetAimStop.trigger(player);
+}
+
+export function OnPortalGadgetFireStart(player: mod.Player): void {
+    Events.OnPortalGadgetFireStart.trigger(player);
+}
+
+export function OnPortalGadgetFireStop(player: mod.Player): void {
+    Events.OnPortalGadgetFireStop.trigger(player);
+}
+
+export function OnPortalGadgetLaserToggle(player: mod.Player, toggle: boolean): void {
+    Events.OnPortalGadgetLaserToggle.trigger(player, toggle);
 }
 
 export function OnRayCastHit(player: mod.Player, point: mod.Vector, normal: mod.Vector): void {

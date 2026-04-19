@@ -6,6 +6,8 @@ This repository hosts and maintains custom libraries, tools, examples, and docum
 
 This repository is organized into focused modules, each addressing specific development needs:
 
+- **[Benchmarker Module](./benchmarker/)** – Lightweight helpers for quickly benchmarking pure JavaScript work in the QuickJS runtime. Lets you compare implementations and estimate safe per-tick budgets by running functions many times and measuring total elapsed milliseconds, or by finding how many iterations fit within a target time window.
+
 - **[Callback Handler Module](./callback-handler/)** – A small utility for safely invoking callbacks (sync or async). Catches synchronous throws and asynchronous promise rejections, logs them via a passed-in `Logging` instance, and does not rethrow—so a failing callback cannot kill the calling logic. Used internally by Timers, Events, UI, Raycast, and Clocks; use it in your own modules when invoking optional or user-provided callbacks.
 
 - **[Clocks Module](./clocks/)** – Provides **CountUpClock** (stopwatch) and **CountDownClock** (timer) classes for match timers, round timers, or bomb fuse countdowns. Both are efficient and drift-resistant, with callbacks for `onSecond`, `onMinute`, and `onComplete`. Time is tracked at whole-second boundaries to minimize drift; callback errors are caught and logged so they cannot break the clock.
@@ -22,9 +24,11 @@ This repository is organized into focused modules, each addressing specific deve
 
 - **[Map Detector Module](./map-detector/)** – Detects the current map by analyzing the coordinates of Team 1's Headquarters (HQ), providing a reliable alternative to the broken `mod.IsCurrentMap` API. Supports detection of all available maps with fast, coordinate-based identification.
 
+- **[Mod Extensions Module](./mod-extensions/)** – Typed helpers for undocumented runtime `mod` APIs and common tasks: event type comparisons (damage, death, gadget, weapon) and runtime string lookup, without manually casting `mod`.
+
 - **[Multi-Click Detector Module](./multi-click-detector/)** – Detects when a player has rapidly triggered a soldier state multiple times in quick succession. By default monitors the interact state, enabling custom UI triggers and special actions without relying on in-world physical interaction points. Supports configurable soldier states, time windows, and click counts for flexible multi-click detection.
 
-- **[Performance Stats Module](./performance-stats/)** – Monitors and tracks the estimated runtime tick rate of the server, providing real-time performance metrics that help identify when the server is under stress or when script callbacks are being deprioritized by the game engine.
+- **[Performance Stats Module](./performance-stats/)** – Tracks server tick rate and script microtask lag and exposes getters for real-time compute scaling and for displaying smoothed metrics in a UI. Logs warnings when lag spikes or tick rate drops, so you can surface performance issues without custom polling.
 
 - **[Player Undeploy Fixer Module](./player-undeploy-fixer/)** – Automatically subscribes to `OnPlayerDied`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` via the Events module. If a player who died does not undeploy within a fixed time window (e.g. stuck AI in limbo), the fixer triggers `Events.OnPlayerUndeploy.trigger(player)` so subscribers run correctly. No setup required beyond importing the module.
 
