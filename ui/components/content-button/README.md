@@ -25,7 +25,7 @@ This class is not meant to be instantiated directly. Instead, use concrete imple
 The class automatically:
 
 - Creates and manages the internal button and content elements
-- Delegates button properties (colors, alphas, `onClick`, etc.) to the instance
+- Delegates button properties (colors, alphas, `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`, etc.) to the instance
 - Delegates content properties (specified via the `contentProperties` parameter) to the instance
 - Manages padding and size synchronization between all three layers
 - Handles cleanup when deleted
@@ -79,9 +79,9 @@ For complete documentation of these properties, see the [main UI documentation](
 All button properties are automatically delegated from the internal `UIButton` instance:
 
 - **Button State**: `enabled`, `setEnabled()`
-- **Click Handler**: `onClick`, `setOnClick()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `hoverColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `hoverAlpha`, `focusedAlpha` (with setter methods)
+- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 
 ### Delegated from Content Element

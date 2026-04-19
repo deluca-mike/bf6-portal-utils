@@ -21,8 +21,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     declare public disabledAlpha: number;
     declare public pressedColor: mod.Vector;
     declare public pressedAlpha: number;
-    declare public hoverColor: mod.Vector;
-    declare public hoverAlpha: number;
     declare public focusedColor: mod.Vector;
     declare public focusedAlpha: number;
     declare public onClickDown?: UI.ButtonHandler;
@@ -37,8 +35,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     declare public setDisabledAlpha: (alpha: number) => this;
     declare public setPressedColor: (color: mod.Vector) => this;
     declare public setPressedAlpha: (alpha: number) => this;
-    declare public setHoverColor: (color: mod.Vector) => this;
-    declare public setHoverAlpha: (alpha: number) => this;
     declare public setFocusedColor: (color: mod.Vector) => this;
     declare public setFocusedAlpha: (alpha: number) => this;
     declare public setOnClickDown: (onClickDown?: UI.ButtonHandler) => this;
@@ -144,8 +140,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
             disabledAlpha: params.disabledAlpha,
             pressedColor: params.pressedColor,
             pressedAlpha: params.pressedAlpha,
-            hoverColor: params.hoverColor,
-            hoverAlpha: params.hoverAlpha,
             focusedColor: params.focusedColor,
             focusedAlpha: params.focusedAlpha,
             depth,
@@ -175,8 +169,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
             'pressedAlpha',
             'focusedAlpha',
             'focusedColor',
-            'hoverAlpha',
-            'hoverColor',
             'onClickDown',
             'onClickUp',
             'onFocusIn',

@@ -9,8 +9,6 @@ export class UIButton extends UI.Element implements UI.Button {
     protected _disabledAlpha: number;
     protected _pressedColor: mod.Vector;
     protected _pressedAlpha: number;
-    protected _hoverColor: mod.Vector;
-    protected _hoverAlpha: number;
     protected _focusedColor: mod.Vector;
     protected _focusedAlpha: number;
     protected _onClickDown?: UI.ButtonHandler;
@@ -56,8 +54,6 @@ export class UIButton extends UI.Element implements UI.Button {
         const disabledAlpha = params.disabledAlpha ?? 1;
         const pressedColor = params.pressedColor ?? UI.COLORS.BF_GREEN_BRIGHT;
         const pressedAlpha = params.pressedAlpha ?? 1;
-        const hoverColor = params.hoverColor ?? UI.COLORS.BF_GREY_1;
-        const hoverAlpha = params.hoverAlpha ?? 1;
         const focusedColor = params.focusedColor ?? UI.COLORS.BF_GREY_1;
         const focusedAlpha = params.focusedAlpha ?? 1;
 
@@ -102,8 +98,8 @@ export class UIButton extends UI.Element implements UI.Button {
             disabledAlpha,
             pressedColor,
             pressedAlpha,
-            hoverColor,
-            hoverAlpha,
+            focusedColor,
+            focusedAlpha,
             focusedColor,
             focusedAlpha,
             elementParams.depth,
@@ -124,8 +120,6 @@ export class UIButton extends UI.Element implements UI.Button {
         this._disabledAlpha = disabledAlpha;
         this._pressedColor = pressedColor;
         this._pressedAlpha = pressedAlpha;
-        this._hoverColor = hoverColor;
-        this._hoverAlpha = hoverAlpha;
         this._focusedColor = focusedColor;
         this._focusedAlpha = focusedAlpha;
 
@@ -350,60 +344,6 @@ export class UIButton extends UI.Element implements UI.Button {
     }
 
     /**
-     * The hover color of the button.
-     */
-    public get hoverColor(): mod.Vector {
-        return this._hoverColor;
-    }
-
-    /**
-     * Sets the hover color of the button.
-     * @param color - The new hover color.
-     */
-    public set hoverColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonColorHover(this._uiWidget, (this._hoverColor = color));
-    }
-
-    /**
-     * Sets the hover color of the button. Useful for chaining operations.
-     * @param color - The new hover color.
-     * @returns This element instance.
-     */
-    public setHoverColor(color: mod.Vector): this {
-        this.hoverColor = color;
-        return this;
-    }
-
-    /**
-     * The hover alpha of the button.
-     */
-    public get hoverAlpha(): number {
-        return this._hoverAlpha;
-    }
-
-    /**
-     * Sets the hover alpha of the button.
-     * @param alpha - The new hover alpha.
-     */
-    public set hoverAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonAlphaHover(this._uiWidget, (this._hoverAlpha = alpha));
-    }
-
-    /**
-     * Sets the hover alpha of the button. Useful for chaining operations.
-     * @param alpha - The new hover alpha.
-     * @returns This element instance.
-     */
-    public setHoverAlpha(alpha: number): this {
-        this.hoverAlpha = alpha;
-        return this;
-    }
-
-    /**
      * The focused color of the button.
      */
     public get focusedColor(): mod.Vector {
@@ -471,6 +411,12 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onClickDown(onClickDown: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
+        if (onClickDown && !this._onClickDown) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, true);
+        } else if (!onClickDown && this._onClickDown) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, false);
+        }
+
         this._onClickDown = onClickDown;
     }
 
@@ -497,6 +443,12 @@ export class UIButton extends UI.Element implements UI.Button {
      */
     public set onClickUp(onClickUp: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
+
+        if (onClickUp && !this._onClickUp) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, true);
+        } else if (!onClickUp && this._onClickUp) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, false);
+        }
 
         this._onClickUp = onClickUp;
     }
@@ -525,6 +477,12 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onFocusIn(onFocusIn: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
+        if (onFocusIn && !this._onFocusIn) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, true);
+        } else if (!onFocusIn && this._onFocusIn) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, false);
+        }
+
         this._onFocusIn = onFocusIn;
     }
 
@@ -552,6 +510,12 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onFocusOut(onFocusOut: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
+        if (onFocusOut && !this._onFocusOut) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, true);
+        } else if (!onFocusOut && this._onFocusOut) {
+            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, false);
+        }
+
         this._onFocusOut = onFocusOut;
     }
 
@@ -578,8 +542,6 @@ export namespace UIButton {
         disabledAlpha?: number;
         pressedColor?: mod.Vector;
         pressedAlpha?: number;
-        hoverColor?: mod.Vector;
-        hoverAlpha?: number;
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
         onClickDown?: UI.ButtonHandler;

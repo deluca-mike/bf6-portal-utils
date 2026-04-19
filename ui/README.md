@@ -21,7 +21,7 @@ This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an 
     ```
 3. Use the `Events` module for all event subscription; do not export any Portal event handlers.
 4. Build UI elements using the UI classes and constants from the `UI` namespace.
-5. Use the returned objects to show/hide, reposition, mutate text/buttons, define onClick behavior (sync or async), etc.
+5. Use the returned objects to show/hide, reposition, mutate text/buttons, define button handlers (`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`; sync or async), etc.
 6. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
@@ -55,8 +55,8 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
                     anchor: mod.UIAnchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
-                    onClick: (player: mod.Player) => {
-                        // Do something (sync or async; CallbackHandler catches errors)
+                    onClickUp: (player: mod.Player) => {
+                        // Do something on release (sync or async; CallbackHandler catches errors)
                     },
                     message: mod.Message(mod.stringkeys.ui.buttons.option1),
                     textSize: 36,
@@ -69,8 +69,8 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
                     anchor: mod.UIAnchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
-                    onClick: (player: mod.Player) => {
-                        // Do something (sync or async; CallbackHandler catches errors)
+                    onClickUp: (player: mod.Player) => {
+                        // Do something on release (sync or async; CallbackHandler catches errors)
                     },
                     message: mod.Message(mod.stringkeys.ui.buttons.option2),
                     textSize: 36,
@@ -87,7 +87,7 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
             anchor: mod.UIAnchor.BottomCenter,
             bgColor: UI.COLORS.GREY_25,
             baseColor: UI.COLORS.BLACK,
-            onClick: (player: mod.Player) => {
+            onClickUp: (player: mod.Player) => {
                 testMenu?.hide();
             },
             message: mod.Message(mod.stringkeys.ui.buttons.close),
@@ -111,8 +111,8 @@ import { UIText } from 'bf6-portal-utils/ui/components/text';
 const button = new UIButton({
     position: { x: 100, y: 200 },
     size: { width: 200, height: 50 },
-    onClick: (player) => {
-        // Handle click (sync or async; errors are caught and logged by CallbackHandler)
+    onClickUp: (player) => {
+        // Handle release (sync or async; errors are caught and logged by CallbackHandler)
     },
 });
 
@@ -187,7 +187,7 @@ console.log(container2.children.length); // 0 (automatically removed)
 - **`UI.Root` class** – The root node wrapping `mod.GetUIRoot()`. Has a private constructor with a single instance available as `UI.ROOT_NODE`. All elements default to this parent unless you supply `parent` in params.
 - **`UI.Element` base class** – Abstract base class that all created elements extend. Provides getters/setters for common properties (position, size, visibility, colors, etc.) with method chaining support. All property values are stored internally for fast retrieval without relying on `mod` namespace calls. Elements automatically manage parent-child relationships when created, moved, or deleted. Includes direct properties for `x`, `y`, `width`, `height`, and `uiInputModeWhenVisible`. Elements have a protected `_deleted` member and `_isDeletedCheck()` method that blocks and warns on any setter operations when the element is deleted. Elements also have a protected `_logging` member that provides access to the UI namespace's logging instance for use in custom components.
 - **Component organization** – All UI component classes (e.g., `UIContainer`, `UIText`, `UIButton`, `UITextButton`) have been moved to their own subdirectories under `ui/components/`. Each component can be individually imported from its respective path, allowing for better code organization and independent versioning.
-- **`UI.Button` interface** – Interface that defines button-like behavior. Components that behave like buttons can implement this interface and register themselves using `UI.registerButton()` so their `onClick` functions are called when the button is pressed.
+- **`UI.Button` interface** – Interface that defines button-like behavior. Components that behave like buttons can implement this interface and register themselves using `UI.registerButton()` so their handlers (`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`) are invoked when the matching `mod.UIButtonEvent` fires for that widget.
 - **Default colors** – `UI.COLORS` wraps common `mod.CreateVector(r, g, b)` presets so you rarely need to build vectors yourself. It includes BF palette colors.
 - **Receiver routing** – All elements can specify a `receiver` property (`mod.Player | mod.Team`) in their constructor parameters to display UI to a specific audience. When omitted, elements automatically adopt their parent's receiver (or use global if parent is `UI.ROOT_NODE`). The `receiver` property (type `GlobalReceiver | TeamReceiver | PlayerReceiver`) is available as a read-only property on `Node` (inherited by `Element`). To get the native receiver (`mod.Player | mod.Team | undefined`), access `receiver.nativeReceiver`. Console warnings are displayed if an element's receiver is incompatible with its parent's receiver.
 - **Method chaining** – All setter methods (e.g., `setPosition()`, `setSize()`, `setX()`, `setY()`, `show()`, `hide()`) return the instance, allowing you to chain multiple operations: `container.setPosition({ x: 10, y: 20 }).setSize({ width: 100, height: 50 }).show()`.
@@ -378,7 +378,7 @@ container
 
 ### `UI.registerButton(name: string, button: Button): () => void`
 
-Registers a button with the UI system so that its `onClick` function is called when the button is pressed. Components that behave like buttons should call this function during construction to register themselves. Button events are received automatically—the UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, looks up the registered button by widget name, and invokes its `onClick` (sync or async) using `CallbackHandler`, which catches and logs exceptions. Do not implement or export `OnPlayerUIButtonEvent` in your code.
+Registers a button with the UI system so that per-event handlers on the `Button` instance are invoked for the corresponding engine events. Components that behave like buttons should call this function during construction to register themselves. Button events are received automatically—the UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, looks up the registered button by widget name, and dispatches to `onClickDown`, `onClickUp`, `onFocusIn`, or `onFocusOut` when that handler is defined (sync or async) using `CallbackHandler`, which catches and logs exceptions. `UIButton` enables each `mod.UIButtonEvent` type when you supply the matching handler in constructor params. Do not implement or export `OnPlayerUIButtonEvent` in your code.
 
 **Parameters:**
 
@@ -442,7 +442,16 @@ if (element instanceof UIContainer) {
 
 Interface that defines button-like behavior. Components that behave like buttons should implement this interface and register themselves using `UI.registerButton()`.
 
-- `onClick: ((player: mod.Player) => void | Promise<void>) | undefined` – The click handler function that is called when the button is pressed. May be synchronous or asynchronous. The UI module invokes it via `CallbackHandler`, which catches sync throws and async promise rejections and logs them (if logging is configured) so a failing handler does not break the UI. Can be `undefined` if the button doesn't have a click handler.
+Each property is optional and corresponds to a `mod.UIButtonEvent` (`ButtonDown`, `ButtonUp`, `FocusIn`, `FocusOut`). Handlers may be synchronous or asynchronous; the UI module invokes them via `CallbackHandler`, which catches sync throws and async promise rejections and logs them (if logging is configured) so a failing handler does not break the UI.
+
+- `onClickDown?: UI.ButtonHandler` – Invoked when the button receives a press (`mod.UIButtonEvent.ButtonDown`).
+- `onClickUp?: UI.ButtonHandler` – Invoked when the button receives a release (`mod.UIButtonEvent.ButtonUp`). This is the usual place for “activate on click” behavior (equivalent to the old single `onClick` callback).
+- `onFocusIn?: UI.ButtonHandler` – Invoked when the button gains focus (`mod.UIButtonEvent.FocusIn`).
+- `onFocusOut?: UI.ButtonHandler` – Invoked when the button loses focus (`mod.UIButtonEvent.FocusOut`).
+
+### Hover in/out (`HoverIn` / `HoverOut`)
+
+Battlefield Portal’s UI supports **hover in** and **hover out** button events (`mod.UIButtonEvent.HoverIn` / `HoverOut`), but **this module does not expose handlers for them** on `UI.Button`. Hover only tracks pointer movement over a widget; players using a **controller** navigate UI without generating those events the way a **mouse** does, so hover-driven logic would not run for everyone. For behavior that must work across input devices, use **`onFocusIn` / `onFocusOut`** (focus follows navigation) or **`onClickDown` / `onClickUp`**.
 
 ### `UI.Parent` (interface)
 
@@ -536,8 +545,8 @@ const menu = new UIContainer({
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
             message: mod.Message(mod.stringkeys.labels.button1), // 'Button 1'
-            onClick: async (p) => {
-                // Handle click
+            onClickUp: async (p) => {
+                // Handle release / activation
             },
         } as UIContainer.ChildParams<UITextButton.Params>,
         {
@@ -545,8 +554,8 @@ const menu = new UIContainer({
             position: { x: 0, y: 60 },
             size: { width: 200, height: 50 },
             message: mod.Message(mod.stringkeys.labels.button2), // 'Button 2'
-            onClick: async (p) => {
-                // Handle click
+            onClickUp: async (p) => {
+                // Handle release / activation
             },
         } as UIContainer.ChildParams<UITextButton.Params>,
     ],
@@ -590,7 +599,7 @@ menu.uiInputModeWhenVisible = true; // Re-enable automatic management
 
 ## Event Wiring & Lifecycle
 
-- The UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button presses are dispatched automatically.
+- The UI module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button UI events (press, release, focus in/out) are dispatched automatically to the handlers on `UI.Button`; see `UI.Button` and component docs for `onClickDown`, `onClickUp`, `onFocusIn`, and `onFocusOut`.
 - Use the returned `Element` helpers to hide/show instead of calling `mod.SetUIWidgetVisible` manually.
 - All properties support both normal setter syntax (e.g., `element.bgAlpha = 0.8;`) and method chaining (e.g., `element.setBgAlpha(0.8).show()`). Method chaining is useful when you want to apply multiple changes in sequence.
 - Always call `delete()` when removing widgets to prevent stale references inside Battlefield Portal. The element will automatically be removed from its parent's `children` array. For containers, `delete()` recursively deletes all children before deleting the container itself.

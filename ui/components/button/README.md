@@ -2,7 +2,7 @@
 
 <ai>
 
-The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled, pressed, hover, focused) with customizable colors and opacities for each state. Buttons automatically register themselves with the UI system so their `onClick` handlers are called when pressed. The `onClick` handler may be synchronous or asynchronous; while asynchronous handlers are generally preferred elsewhere (e.g. to avoid blocking event stacks), for `UIButton` the only handler running for the source event is this button's `onClick` (due to unique global button referencing), so synchronous callbacks—even long-running ones—are safe.
+The `UIButton` component creates an interactive button widget. Buttons support multiple visual states (base, disabled, pressed, focused) with customizable colors and opacities for each state. Buttons automatically register themselves with the UI system. Instead of a single `onClick` callback, you attach optional handlers for **click down** (`onClickDown`), **click up** (`onClickUp`), **focus in** (`onFocusIn`), and **focus out** (`onFocusOut`), which map to `mod.UIButtonEvent` `ButtonDown`, `ButtonUp`, `FocusIn`, and `FocusOut`. Handlers may be synchronous or asynchronous; while asynchronous handlers are generally preferred elsewhere (e.g. to avoid blocking event stacks), for `UIButton` the only handler running for a given engine event is this button’s handler for that event (due to unique global button referencing), so synchronous callbacks—even long-running ones—are safe.
 
 </ai>
 
@@ -10,20 +10,20 @@ The `UIButton` component creates an interactive button widget. Buttons support m
 
 ---
 
-<ai>
-
 ## Quick Start
+
+<ai>
 
 ```ts
 import { UIButton } from 'bf6-portal-utils/ui/components/button';
 import { UI } from 'bf6-portal-utils/ui';
 
-// Create a button with a click handler (sync or async)
+// Typical “activate on release” behavior uses onClickUp
 const button = new UIButton({
     position: { x: 0, y: 0 },
     size: { width: 200, height: 50 },
-    onClick: (player: mod.Player) => {
-        console.log(`Player ${mod.GetObjId(player)} clicked the button!`);
+    onClickUp: (player: mod.Player) => {
+        console.log(`Player ${mod.GetObjId(player)} released the button!`);
     },
     visible: true,
 });
@@ -60,11 +60,12 @@ button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.
 | `disabledAlpha` | `number = 1` | Disabled state opacity. |
 | `pressedColor` | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
 | `pressedAlpha` | `number = 1` | Pressed state opacity. |
-| `hoverColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Hover state color. |
-| `hoverAlpha` | `number = 1` | Hover state opacity. |
 | `focusedColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Focused state color. |
 | `focusedAlpha` | `number = 1` | Focused state opacity. |
-| `onClick` | `(player: mod.Player) => void \| Promise<void> \| undefined` | Click handler (sync or async) stored in the button instance. |
+| `onClickDown` | `UI.ButtonHandler \| undefined` | Invoked on press (`ButtonDown`). When provided, enables that event on the widget. |
+| `onClickUp` | `UI.ButtonHandler \| undefined` | Invoked on release (`ButtonUp`). When provided, enables that event on the widget. Usual place for “activate on click” behavior. |
+| `onFocusIn` | `UI.ButtonHandler \| undefined` | Invoked when the button gains focus (`FocusIn`). When provided, enables that event on the widget. |
+| `onFocusOut` | `UI.ButtonHandler \| undefined` | Invoked when the button loses focus (`FocusOut`). When provided, enables that event on the widget. |
 
 ---
 
@@ -90,16 +91,16 @@ For complete documentation of these properties, see the [main UI documentation](
 
 - **`setEnabled(enabled: boolean): UIButton`** – Sets enabled state and returns `this` for method chaining.
 
-- **`onClick: ((player: mod.Player) => void | Promise<void>) | undefined`** (getter/setter) – Click handler. May be synchronous or asynchronous.
+- **`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut: UI.ButtonHandler | undefined`** (getter/setter) – Per-event handlers. May be synchronous or asynchronous.
 
-- **`setOnClick(onClick: ((player: mod.Player) => void | Promise<void>) | undefined): UIButton`** – Sets click handler and returns `this` for method chaining.
+- **`setOnClickDown`, `setOnClickUp`, `setOnFocusIn`, `setOnFocusOut(handler?: UI.ButtonHandler): UIButton`** – Set the corresponding handler and return `this` for method chaining.
 
 **Color & Alpha Getters/Setters** (all support method chaining):
 
-- **`baseColor`, `disabledColor`, `focusedColor`, `hoverColor`, `pressedColor: mod.Vector`** (getter/setter)
-- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setHoverColor(color)`, `setPressedColor(color): UIButton`**
-- **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `hoverAlpha`, `pressedAlpha: number`** (getter/setter)
-- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setHoverAlpha(alpha)`, `setPressedAlpha(alpha): UIButton`**
+- **`baseColor`, `disabledColor`, `focusedColor`, `pressedColor: mod.Vector`** (getter/setter)
+- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setPressedColor(color): UIButton`**
+- **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `pressedAlpha: number`** (getter/setter)
+- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setPressedAlpha(alpha): UIButton`**
 
 - **`delete(): void`** – Overrides `Element.delete()` to clean up button registration before deleting the button.
 
@@ -111,26 +112,33 @@ For complete documentation of these properties, see the [main UI documentation](
 
 ```ts
 type Params = UI.ElementParams & {
-    enabled?: boolean; // Default: true
-    baseColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_2
-    baseAlpha?: number; // Default: 1
-    disabledColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_3
-    disabledAlpha?: number; // Default: 1
-    pressedColor?: mod.Vector; // Default: UI.COLORS.BF_GREEN_BRIGHT
-    pressedAlpha?: number; // Default: 1
-    hoverColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_1
-    hoverAlpha?: number; // Default: 1
-    focusedColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_1
-    focusedAlpha?: number; // Default: 1
-    onClick?: (player: mod.Player) => void | Promise<void>;
+    enabled?: boolean;
+    baseColor?: mod.Vector;
+    baseAlpha?: number;
+    disabledColor?: mod.Vector;
+    disabledAlpha?: number;
+    pressedColor?: mod.Vector;
+    pressedAlpha?: number;
+    focusedColor?: mod.Vector;
+    focusedAlpha?: number;
+    onClickDown?: UI.ButtonHandler;
+    onClickUp?: UI.ButtonHandler;
+    onFocusIn?: UI.ButtonHandler;
+    onFocusOut?: UI.ButtonHandler;
 };
 ```
 
 ---
 
+## Hover in/out (`HoverIn` / `HoverOut`)
+
+Battlefield Portal supports **hover in** and **hover out** button events (`mod.UIButtonEvent.HoverIn` / `HoverOut`), but **`UIButton` does not expose `onHoverIn` / `onHoverOut` callbacks**. Hover is tied to pointer movement over the widget; players on **controller** cannot trigger hover the same way **mouse** users do, so hover-specific handlers would be unreliable for large parts of your audience. Use **`onFocusIn` / `onFocusOut`** when you need “entered / left” semantics that work with UI navigation, or **`onClickDown` / `onClickUp`** for activation.
+
+---
+
 ## Usage Notes
 
-- **Sync vs async onClick**: The `onClick` handler may be synchronous or asynchronous. In other parts of the UI/event system, async handlers are often preferred so that long-running work does not block the event stack. For `UIButton`, the engine delivers the button event to a single handler identified by the button's unique global reference, so only this button's `onClick` runs for that event. Synchronous callbacks—including long-running ones—are therefore safe and will not block other button or event handlers.
+- **Sync vs async handlers**: Each handler may be synchronous or asynchronous. In other parts of the UI/event system, async handlers are often preferred so that long-running work does not block the event stack. For `UIButton`, the engine delivers each UI button event to a single handler identified by the button's unique global reference, so only this button's matching handler runs for that event. Synchronous callbacks—including long-running ones—are therefore safe and will not block other button or event handlers.
 
 - **Button Registration**: Buttons automatically register themselves with the UI system during construction using `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
 

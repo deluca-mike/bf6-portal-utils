@@ -42,8 +42,6 @@ export namespace UI {
         onClickUp?: ButtonHandler;
         onFocusIn?: ButtonHandler;
         onFocusOut?: ButtonHandler;
-        // onHoverIn?: ButtonHandler; // Disabled as this is not supported on consoles.
-        // onHoverOut?: ButtonHandler; // Disabled as this is not supported on consoles.
     };
 
     /**

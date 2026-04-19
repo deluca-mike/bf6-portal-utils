@@ -18,13 +18,13 @@ The `UITextButton` component creates a button with integrated text content. It c
 import { UITextButton } from 'bf6-portal-utils/ui/components/text-button';
 import { UI } from 'bf6-portal-utils/ui';
 
-// Create a text button with a click handler
+// Create a text button with a handler (e.g. onClickUp for activate-on-release)
 const button = new UITextButton({
     position: { x: 0, y: 0 },
     size: { width: 200, height: 50 },
     message: mod.Message(mod.stringkeys.labels.clickMe), // 'Click Me'
-    onClick: async (player: mod.Player) => {
-        console.log(`Player ${mod.GetObjId(player)} clicked!`);
+    onClickUp: async (player: mod.Player) => {
+        console.log(`Player ${mod.GetObjId(player)} released the button!`);
     },
     visible: true,
 });
@@ -79,9 +79,9 @@ For complete documentation of these properties, see the [main UI documentation](
 All button properties are delegated from the internal `UIButton` instance:
 
 - **Button State**: `enabled`, `setEnabled()`
-- **Click Handler**: `onClick`, `setOnClick()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `hoverColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `hoverAlpha`, `focusedAlpha` (with setter methods)
+- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Text

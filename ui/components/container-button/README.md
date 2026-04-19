@@ -23,8 +23,8 @@ import { UI } from 'bf6-portal-utils/ui';
 const button = new UIContainerButton({
     position: { x: 0, y: 0 },
     size: { width: 200, height: 100 },
-    onClick: async (player: mod.Player) => {
-        console.log(`Player ${mod.GetObjId(player)} clicked!`);
+    onClickUp: async (player: mod.Player) => {
+        console.log(`Player ${mod.GetObjId(player)} released the button!`);
     },
     childrenParams: [
         {
@@ -91,9 +91,9 @@ For complete documentation of these properties, see the [main UI documentation](
 All button properties are delegated from the internal `UIButton` instance:
 
 - **Button State**: `enabled`, `setEnabled()`
-- **Click Handler**: `onClick`, `setOnClick()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `hoverColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `hoverAlpha`, `focusedAlpha` (with setter methods)
+- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 
 ### ContainerButton-Specific
