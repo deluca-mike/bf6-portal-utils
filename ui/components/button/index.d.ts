@@ -7,8 +7,6 @@ export declare class UIButton extends UI.Element implements UI.Button {
     protected _disabledAlpha: number;
     protected _pressedColor: mod.Vector;
     protected _pressedAlpha: number;
-    protected _hoverColor: mod.Vector;
-    protected _hoverAlpha: number;
     protected _focusedColor: mod.Vector;
     protected _focusedAlpha: number;
     protected _onClickDown?: UI.ButtonHandler;
@@ -133,36 +131,6 @@ export declare class UIButton extends UI.Element implements UI.Button {
      */
     setPressedAlpha(alpha: number): this;
     /**
-     * The hover color of the button.
-     */
-    get hoverColor(): mod.Vector;
-    /**
-     * Sets the hover color of the button.
-     * @param color - The new hover color.
-     */
-    set hoverColor(color: mod.Vector);
-    /**
-     * Sets the hover color of the button. Useful for chaining operations.
-     * @param color - The new hover color.
-     * @returns This element instance.
-     */
-    setHoverColor(color: mod.Vector): this;
-    /**
-     * The hover alpha of the button.
-     */
-    get hoverAlpha(): number;
-    /**
-     * Sets the hover alpha of the button.
-     * @param alpha - The new hover alpha.
-     */
-    set hoverAlpha(alpha: number);
-    /**
-     * Sets the hover alpha of the button. Useful for chaining operations.
-     * @param alpha - The new hover alpha.
-     * @returns This element instance.
-     */
-    setHoverAlpha(alpha: number): this;
-    /**
      * The focused color of the button.
      */
     get focusedColor(): mod.Vector;
@@ -265,8 +233,6 @@ export declare namespace UIButton {
         disabledAlpha?: number;
         pressedColor?: mod.Vector;
         pressedAlpha?: number;
-        hoverColor?: mod.Vector;
-        hoverAlpha?: number;
         focusedColor?: mod.Vector;
         focusedAlpha?: number;
         onClickDown?: UI.ButtonHandler;

@@ -18,14 +18,14 @@ The `UIImageButton` component creates a button with an integrated image. It comb
 import { UIImageButton } from 'bf6-portal-utils/ui/components/image-button';
 import { UI } from 'bf6-portal-utils/ui';
 
-// Create an image button with a click handler
+// Create an image button with a handler (e.g. onClickUp)
 const button = new UIImageButton({
     position: { x: 0, y: 0 },
     size: { width: 64, height: 64 },
     imageType: mod.UIImageType.CrownOutline,
     imageColor: UI.COLORS.WHITE,
-    onClick: async (player: mod.Player) => {
-        console.log(`Player ${mod.GetObjId(player)} clicked!`);
+    onClickUp: async (player: mod.Player) => {
+        console.log(`Player ${mod.GetObjId(player)} released the button!`);
     },
     visible: true,
 });
@@ -75,9 +75,9 @@ For complete documentation of these properties, see the [main UI documentation](
 All button properties are delegated from the internal `UIButton` instance:
 
 - **Button State**: `enabled`, `setEnabled()`
-- **Click Handler**: `onClick`, `setOnClick()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `hoverColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `hoverAlpha`, `focusedAlpha` (with setter methods)
+- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Image

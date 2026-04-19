@@ -16,8 +16,6 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     disabledAlpha: number;
     pressedColor: mod.Vector;
     pressedAlpha: number;
-    hoverColor: mod.Vector;
-    hoverAlpha: number;
     focusedColor: mod.Vector;
     focusedAlpha: number;
     onClickDown?: UI.ButtonHandler;
@@ -30,8 +28,6 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     setDisabledAlpha: (alpha: number) => this;
     setPressedColor: (color: mod.Vector) => this;
     setPressedAlpha: (alpha: number) => this;
-    setHoverColor: (color: mod.Vector) => this;
-    setHoverAlpha: (alpha: number) => this;
     setFocusedColor: (color: mod.Vector) => this;
     setFocusedAlpha: (alpha: number) => this;
     setOnClickDown: (onClickDown?: UI.ButtonHandler) => this;

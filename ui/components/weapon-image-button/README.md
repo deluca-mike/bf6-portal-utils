@@ -12,6 +12,8 @@ The `UIWeaponImageButton` component creates a button with an integrated weapon i
 
 ## Quick Start
 
+<ai>
+
 ```ts
 import { UIWeaponImageButton } from 'bf6-portal-utils/ui/components/weapon-image-button';
 import { UI } from 'bf6-portal-utils/ui';
@@ -22,14 +24,14 @@ mod.AddAttachmentToWeaponPackage(mod.WeaponAttachments.Barrel_11_Extended, weapo
 mod.AddAttachmentToWeaponPackage(mod.WeaponAttachments.Magazine_25rnd_Magazine, weaponPackage);
 mod.AddAttachmentToWeaponPackage(mod.WeaponAttachments.Right_Laser_Light_Combo_Green, weaponPackage);
 
-// Create a weapon image button with a click handler
+// Create a weapon image button with a handler (e.g. onClickUp)
 const button = new UIWeaponImageButton({
     position: { x: 0, y: 0 },
     size: { width: 128, height: 64 },
     weapon: mod.Weapons.AssaultRifle_AK4D,
     weaponPackage: weaponPackage,
-    onClick: async (player: mod.Player) => {
-        console.log(`Player ${mod.GetObjId(player)} clicked the AK24 button!`);
+    onClickUp: async (player: mod.Player) => {
+        console.log(`Player ${mod.GetObjId(player)} activated the AK24 button!`);
     },
     visible: true,
 });
@@ -76,9 +78,9 @@ For complete documentation of these properties, see the [main UI documentation](
 All button properties are delegated from the internal `UIButton` instance:
 
 - **Button State**: `enabled`, `setEnabled()`
-- **Click Handler**: `onClick`, `setOnClick()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `hoverColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `hoverAlpha`, `focusedAlpha` (with setter methods)
+- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Weapon Image

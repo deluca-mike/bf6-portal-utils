@@ -682,7 +682,7 @@ SolidUI.h(MyButton, {
 **Important Notes:**
 
 - Properties that are functions are automatically made reactive
-- Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive and are always passed through as-is. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`
+- Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive and are always passed through as-is. This includes event handlers like `onClickUp`, `onFocusIn`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`
 - All reactive effects are automatically cleaned up when the UI element is deleted
 - You can mix static and reactive properties in the same props object
 
@@ -1273,7 +1273,7 @@ While `SolidUI` is decoupled from the `UI` module, it assumes that UI objects ha
 
 ### Accessor Function Detection
 
-`SolidUI.h()` treats any function value as an accessor. If you need to pass a function as a static value (not reactive), you'll need to work around this. Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive. This includes event handlers like `onClick`, `onHover`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`.
+`SolidUI.h()` treats any function value as an accessor. If you need to pass a function as a static value (not reactive), you'll need to work around this. Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive. This includes event handlers like `onClickUp`, `onFocusIn`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`.
 
 ### Store Updates
 
