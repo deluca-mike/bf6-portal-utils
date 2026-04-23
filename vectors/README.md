@@ -4,7 +4,7 @@
 
 The `Vectors` namespace provides a small set of helpers for working with 3D vectors in Battlefield Portal experiences. Because `mod.Vector` is opaque—you must use the functional `mod` API (`mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf`, `mod.CreateVector`, `mod.VectorAdd`, etc.) to read or build vectors—it can be clunky to write and reason about vector math. This module defines a transparent `Vector3` type (`{ x, y, z }`) and complementary functions so you can work with plain objects when convenient, and convert to or from `mod.Vector` only when calling Portal APIs.
 
-Key features include conversion between `Vector3` and `mod.Vector`, arithmetic (add, subtract, multiply, divide), distance, truncation, degree/radian and rotation helpers, string formatting for debugging, and a type guard `isVector3()`. The namespace is self-contained and has no dependencies on other `bf6-portal-utils` modules.
+Key features include conversion between `Vector3` and `mod.Vector`, arithmetic (add, subtract, multiply, divide), advanced operations (`cross`, `normalize`, `rotateAroundAxis`), distance, truncation, degree/radian and rotation helpers, string formatting for debugging, and a type guard `isVector3()`. The namespace is self-contained and has no dependencies on other `bf6-portal-utils` modules.
 
 </ai>
 
@@ -89,18 +89,21 @@ The namespace is not instantiated; all members are types, constants, or function
 
 All arithmetic functions take `Vector3` arguments and return a new `Vector3`; they do not mutate inputs.
 
-| Method                                               | Description                               |
-| ---------------------------------------------------- | ----------------------------------------- |
-| `add(vector: Vector3, other: Vector3): Vector3`      | Returns the sum of the two vectors.       |
-| `subtract(vector: Vector3, other: Vector3): Vector3` | Returns `vector - other`.                 |
-| `multiply(vector: Vector3, scalar: number): Vector3` | Returns the vector scaled by the scalar.  |
-| `divide(vector: Vector3, scalar: number): Vector3`   | Returns the vector divided by the scalar. |
+| Method | Description |
+| --- | --- |
+| `add(a: Vector3, b: Vector3): Vector3` | Returns the sum of the vectors. |
+| `subtract(a: Vector3, b: Vector3): Vector3` | Returns the difference of the vectors. |
+| `multiply(vector: Vector3, scalar: number): Vector3` | Multiplies the vector by the scalar. |
+| `divide(vector: Vector3, scalar: number): Vector3` | Divides the vector by the scalar. |
+| `cross(a: Vector3, b: Vector3): Vector3` | Returns the cross product of the vectors. |
+| `normalize(vector: Vector3): Vector3` | Returns the normalized vector. If the input is a zero-length vector, returns `{ x: 0, y: 0, z: 0 }`. |
 
 #### Utilities
 
 | Method | Description |
 | --- | --- |
 | `truncate(vector: Vector3, decimalPlaces?: number): Vector3` | Truncates each component to the given number of decimal places (default `2`). Returns a new `Vector3`. |
+| `rotateAroundAxis(vector: Vector3, axis: Vector3, angleRad: number): Vector3` | Rotates a vector around a unit axis by `angleRad` radians using Rodrigues' rotation formula. |
 | `degreesToRadians(degrees: number): number` | Converts degrees to radians: `(degrees * Math.PI) / 180`. |
 | `getRotationVector(orientation: number): mod.Vector` | Returns a rotation vector for the given compass orientation (degrees). Uses `mod.CreateVector(0, radians(180 - orientation), 0)`. |
 | `getRotationVector3(orientation: number): Vector3` | Same as `getRotationVector` but returns a `Vector3` with `x: 0`, `y: degreesToRadians(180 - orientation)`, `z: 0`. |
@@ -115,6 +118,7 @@ All arithmetic functions take `Vector3` arguments and return a new `Vector3`; th
 
 - **Transparent vs opaque** – `Vector3` is a plain object; you can read and write `x`, `y`, `z` directly. Portal’s `mod.Vector` is opaque: you must use `mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf` to read and `mod.CreateVector` (or `mod.VectorAdd`, etc.) to build. The module bridges the two with `toVector()` and `toVector3()`.
 - **Immutability** – All arithmetic and `truncate()` return new values; they do not mutate the input vectors.
+- **Advanced operations** – `cross()` computes a perpendicular vector, `normalize()` returns a unit-length direction vector (or zero vector for zero-length input), and `rotateAroundAxis()` rotates using Rodrigues' formula around a provided unit axis.
 - **Rotation** – `getRotationVector` and `getRotationVector3` interpret `orientation` as compass degrees and produce a rotation vector suitable for APIs that expect a rotation (e.g. vehicle spawner orientation). The conversion uses `180 - orientation` so that compass degrees match the expected convention.
 
 ---

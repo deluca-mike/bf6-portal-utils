@@ -37,18 +37,18 @@ export declare namespace Vectors {
     function toVector3(vector: mod.Vector): Vector3;
     /**
      * Adds the provided vectors.
-     * @param vector - The first vector.
-     * @param other - The second vector.
+     * @param a - The first vector.
+     * @param b - The second vector.
      * @returns The sum of the vectors.
      */
-    function add(vector: Vector3, other: Vector3): Vector3;
+    function add(a: Vector3, b: Vector3): Vector3;
     /**
      * Subtracts the provided vectors.
-     * @param vector - The first vector.
-     * @param other - The second vector.
+     * @param a - The first vector.
+     * @param b - The second vector.
      * @returns The difference of the vectors.
      */
-    function subtract(vector: Vector3, other: Vector3): Vector3;
+    function subtract(a: Vector3, b: Vector3): Vector3;
     /**
      * Multiplies the provided vector by the provided scalar.
      * @param vector - The vector to multiply.
@@ -64,12 +64,33 @@ export declare namespace Vectors {
      */
     function divide(vector: Vector3, scalar: number): Vector3;
     /**
+     * Returns the cross product of the provided vectors.
+     * @param a - The first vector.
+     * @param b - The second vector.
+     * @returns The cross product of the vectors.
+     */
+    function cross(a: Vector3, b: Vector3): Vector3;
+    /**
+     * Returns the normalized version of the provided vector.
+     * @param vector - The vector to normalize.
+     * @returns The normalized vector.
+     */
+    function normalize(vector: Vector3): Vector3;
+    /**
      * Truncates the provided vector to the provided number of decimal places.
      * @param vector - The vector to truncate.
      * @param decimalPlaces - The number of decimal places to truncate the vector to.
      * @returns The truncated vector.
      */
     function truncate(vector: Vector3, decimalPlaces?: number): Vector3;
+    /**
+     * Rotates a vector around a given unit axis by an angle in radians, using Rodrigues' rotation formula.
+     * @param vector - The vector to rotate.
+     * @param axis - The axis to rotate around.
+     * @param angleRad - The angle in radians to rotate the vector by.
+     * @returns The rotated vector.
+     */
+    function rotateAroundAxis(vector: Vector3, axis: Vector3, angleRad: number): Vector3;
     /**
      * Converts the provided degrees to radians.
      * @param degrees - The degrees to convert.

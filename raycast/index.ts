@@ -4,7 +4,7 @@ import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version: 2.0.0
+// version: 2.0.1
 export namespace Raycast {
     const logging = new Logging('Raycast');
 
@@ -176,13 +176,23 @@ export namespace Raycast {
 
         if (!ray) return;
 
-        CallbackHandler.invoke(
-            ray.nativeVectorReturn ? (ray.onHit as HitCallback<mod.Vector>) : (ray.onHit as HitCallback<Vector3>),
-            ray.nativeVectorReturn ? [eventPoint, eventNormal] : [point, Vectors.toVector3(eventNormal)],
-            'onHit',
-            logging,
-            LogLevel.Error
-        );
+        if (ray.nativeVectorReturn) {
+            CallbackHandler.invoke(
+                ray.onHit as HitCallback<mod.Vector>,
+                [eventPoint, eventNormal],
+                'onHit',
+                logging,
+                LogLevel.Error
+            );
+        } else {
+            CallbackHandler.invoke(
+                ray.onHit as HitCallback<Vector3>,
+                [point, Vectors.toVector3(eventNormal)],
+                'onHit',
+                logging,
+                LogLevel.Error
+            );
+        }
 
         resolvePendingMisses(state);
     }
