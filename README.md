@@ -32,6 +32,8 @@ This repository is organized into focused modules, each addressing specific deve
 
 - **[Player Undeploy Fixer Module](./player-undeploy-fixer/)** – Automatically subscribes to `OnPlayerDied`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` via the Events module. If a player who died does not undeploy within a fixed time window (e.g. stuck AI in limbo), the fixer triggers `Events.OnPlayerUndeploy.trigger(player)` so subscribers run correctly. No setup required beyond importing the module.
 
+- **[Portal Gadget Module](./portal-gadget/)** – Provides enriched Portal Gadget fire start/stop callbacks that include zoom state plus a lazy async target resolver. Handles the undocumented laser origin/angle differences between zoomed and hip states and abstracts asynchronous hit/miss attribution through the Raycast module.
+
 - **[Raycast Module](./raycast/)** – Abstracts Battlefield Portal's raycasting functionality with automatic hit/miss attribution to the correct rays. Handles attribution mechanics, manages time-to-live for rays, and provides a clean callback-based API to make it easier to perform mass obstacle detection, line of sight checks, and interactive object detection.
 
 - **[Scavenger Drop Module](./scavenger-drop/)** – Detects when a player scavenges a dead player's kit bag by monitoring proximity to dead bodies. Provides automatic detection with performance-optimized checking that scales frequency based on distance, configurable callbacks for custom actions (such as ammo resupply), and automatic cleanup when drops expire or are scavenged.

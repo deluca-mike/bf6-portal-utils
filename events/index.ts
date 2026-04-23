@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 1.5.0
+// version: 1.5.1
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -277,7 +277,9 @@ class EventsImplementation {
 
         state.handlers.add(handler as EventsTypes.AllHandlers);
 
-        return () => EventsImplementation.unsubscribe(type, handler);
+        const unsubscriber = () => EventsImplementation.unsubscribe(type, handler);
+
+        return unsubscriber;
     }
 
     /**
@@ -306,7 +308,7 @@ class EventsImplementation {
         // one-shot timeout to log how many such incomplete triggers occurred in the last _LOG_TIMEOUT_MS window in
         // order to avoid spamming the log, especially for high-frequency triggers like any of the Ongoing events.
         if (state.incompleteTriggers > 0 && !state.logTimeout) {
-            state.logTimeout = Timers.setTimeout(() => {
+            const processIncompleteTriggers = () => {
                 state.logTimeout = undefined;
 
                 EventsImplementation._logging.log(
@@ -315,7 +317,9 @@ class EventsImplementation {
                 );
 
                 state.incompleteTriggers = 0;
-            }, EventsImplementation._LOG_TIMEOUT_MS);
+            };
+
+            state.logTimeout = Timers.setTimeout(processIncompleteTriggers, EventsImplementation._LOG_TIMEOUT_MS);
         }
 
         ++state.incompleteTriggers;

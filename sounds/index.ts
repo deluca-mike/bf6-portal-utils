@@ -2,7 +2,7 @@ import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 5.0.0.
+// version 5.0.1
 export namespace Sounds {
     const logging = new Logging('Sounds');
 
@@ -83,7 +83,7 @@ export namespace Sounds {
 
             const earliestStopDuration = Math.min(playDuration, fadeStopDuration);
 
-            const stop = () => {
+            const stopAndCleanup = () => {
                 this.cancelStop();
                 this.cancelFade();
                 this.stop();
@@ -96,13 +96,15 @@ export namespace Sounds {
 
             const autoStopTimer =
                 earliestStopDuration < Number.MAX_SAFE_INTEGER
-                    ? Timers.setTimeout(stop, earliestStopDuration + ONE_SHOT_DISPOSE_BUFFER_TIME)
+                    ? Timers.setTimeout(stopAndCleanup, earliestStopDuration + ONE_SHOT_DISPOSE_BUFFER_TIME)
                     : undefined;
 
-            return () => {
+            const stop = () => {
                 Timers.clearTimeout(autoStopTimer);
-                stop();
+                stopAndCleanup();
             };
+
+            return stop;
         }
 
         public get disposed(): boolean {
@@ -149,9 +151,8 @@ export namespace Sounds {
             this._playing = true;
 
             if (duration !== undefined) {
-                this._stopTimer = Timers.setTimeout(() => {
-                    this.stop();
-                }, duration);
+                const stop = () => void this.stop();
+                this._stopTimer = Timers.setTimeout(stop, duration);
             }
 
             if (logging.willLog(LogLevel.Info)) {

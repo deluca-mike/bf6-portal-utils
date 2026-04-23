@@ -2,7 +2,7 @@ import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 2.0.0
+// version: 2.0.1
 export namespace PerformanceStats {
     const logging = new Logging('PS');
 
@@ -80,30 +80,34 @@ export namespace PerformanceStats {
         Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS);
     }
 
-    const unsubscribe = Events.OnGameModeStarted.subscribe(() => {
+    /**
+     * The per-tick tracker for scaling and counting.
+     * It's critical this is the first (or one of the first) things subscribed so it accurately captures the
+     * engine's tick cadence.
+     */
+    const trackTick = () => {
+        const now = Date.now();
+
+        // Update Spot Math for compute scaling.
+        lastTickDeltaMs = now - lastTickTime;
+        lastTickTime = now;
+
+        // Accumulate ticks for the window loop.
+        ++tickCount;
+    };
+
+    const startTrackingTicks = () => {
         unsubscribe();
 
-        /**
-         * The per-tick tracker for scaling and counting.
-         * It's critical this is the first (or one of the first) things subscribed so it accurately captures the engine's
-         * tick cadence.
-         */
-        Events.OngoingGlobal.subscribe(() => {
-            const now = Date.now();
-
-            // Update Spot Math for compute scaling.
-            lastTickDeltaMs = now - lastTickTime;
-            lastTickTime = now;
-
-            // Accumulate ticks for the window loop.
-            ++tickCount;
-        });
+        Events.OngoingGlobal.subscribe(trackTick);
 
         // Kick off the macro measurement loop.
         lastTimeoutCall = lastWindowTime = lastTickTime = Date.now();
 
         Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS);
-    });
+    };
+
+    const unsubscribe = Events.OnGameModeStarted.subscribe(startTrackingTicks);
 
     if (logging.willLog(LogLevel.Info)) {
         logging.log(`Monitoring started.`, LogLevel.Info);

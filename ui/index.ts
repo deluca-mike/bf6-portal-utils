@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 8.0.0
+// version: 8.0.1
 export namespace UI {
     /****** Logging ******/
 
@@ -970,9 +970,11 @@ export namespace UI {
 
         BUTTONS.set(name, button);
 
-        return () => {
+        const unregister = () => {
             BUTTONS.delete(name);
         };
+
+        return unregister;
     }
 
     Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);

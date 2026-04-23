@@ -1,4 +1,4 @@
-// version: 1.0.0
+// version: 1.1.0
 export namespace Vectors {
     /**
      * A simple transparent and mutable 3D vector.
@@ -53,29 +53,29 @@ export namespace Vectors {
 
     /**
      * Adds the provided vectors.
-     * @param vector - The first vector.
-     * @param other - The second vector.
+     * @param a - The first vector.
+     * @param b - The second vector.
      * @returns The sum of the vectors.
      */
-    export function add(vector: Vector3, other: Vector3): Vector3 {
+    export function add(a: Vector3, b: Vector3): Vector3 {
         return {
-            x: vector.x + other.x,
-            y: vector.y + other.y,
-            z: vector.z + other.z,
+            x: a.x + b.x,
+            y: a.y + b.y,
+            z: a.z + b.z,
         };
     }
 
     /**
      * Subtracts the provided vectors.
-     * @param vector - The first vector.
-     * @param other - The second vector.
+     * @param a - The first vector.
+     * @param b - The second vector.
      * @returns The difference of the vectors.
      */
-    export function subtract(vector: Vector3, other: Vector3): Vector3 {
+    export function subtract(a: Vector3, b: Vector3): Vector3 {
         return {
-            x: vector.x - other.x,
-            y: vector.y - other.y,
-            z: vector.z - other.z,
+            x: a.x - b.x,
+            y: a.y - b.y,
+            z: a.z - b.z,
         };
     }
 
@@ -108,6 +108,37 @@ export namespace Vectors {
     }
 
     /**
+     * Returns the cross product of the provided vectors.
+     * @param a - The first vector.
+     * @param b - The second vector.
+     * @returns The cross product of the vectors.
+     */
+    export function cross(a: Vector3, b: Vector3): Vector3 {
+        return {
+            x: a.y * b.z - a.z * b.y,
+            y: a.z * b.x - a.x * b.z,
+            z: a.x * b.y - a.y * b.x,
+        };
+    }
+
+    /**
+     * Returns the normalized version of the provided vector.
+     * @param vector - The vector to normalize.
+     * @returns The normalized vector.
+     */
+    export function normalize(vector: Vector3): Vector3 {
+        const length = Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+
+        if (length === 0) return { x: 0, y: 0, z: 0 };
+
+        return {
+            x: vector.x / length,
+            y: vector.y / length,
+            z: vector.z / length,
+        };
+    }
+
+    /**
      * Truncates the provided vector to the provided number of decimal places.
      * @param vector - The vector to truncate.
      * @param decimalPlaces - The number of decimal places to truncate the vector to.
@@ -119,6 +150,32 @@ export namespace Vectors {
             x: ~~(vector.x * scale) / scale,
             y: ~~(vector.y * scale) / scale,
             z: ~~(vector.z * scale) / scale,
+        };
+    }
+
+    /**
+     * Rotates a vector around a given unit axis by an angle in radians, using Rodrigues' rotation formula.
+     * @param vector - The vector to rotate.
+     * @param axis - The axis to rotate around.
+     * @param angleRad - The angle in radians to rotate the vector by.
+     * @returns The rotated vector.
+     */
+    export function rotateAroundAxis(vector: Vector3, axis: Vector3, angleRad: number): Vector3 {
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        // Dot product of axis and vector.
+        const dot = vector.x * axis.x + vector.y * axis.y + vector.z * axis.z;
+
+        // Cross product of axis and vector.
+        const crossX = axis.y * vector.z - axis.z * vector.y;
+        const crossY = axis.z * vector.x - axis.x * vector.z;
+        const crossZ = axis.x * vector.y - axis.y * vector.x;
+
+        return {
+            x: vector.x * cos + crossX * sin + axis.x * dot * (1 - cos),
+            y: vector.y * cos + crossY * sin + axis.y * dot * (1 - cos),
+            z: vector.z * cos + crossZ * sin + axis.z * dot * (1 - cos),
         };
     }
 
