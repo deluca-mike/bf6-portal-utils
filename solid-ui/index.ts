@@ -1,6 +1,6 @@
 import { Logging } from '../logging/index.ts';
 
-// version: 2.3.0
+// version: 2.3.1
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -109,6 +109,16 @@ export namespace SolidUI {
             const keysB = Object.keys(objB);
 
             if (keysA.length !== keysB.length) return false;
+
+            if (keysA.length === 0) {
+                // `mod` types are unique in that they are empty objects in the JS runtime,' but can be compared with
+                // `mod.Equals`. Unfortunately, `mod.Equals` will throw an error if the objects are `mod` types.
+                try {
+                    return mod.Equals(a, b);
+                } catch {
+                    return true;
+                }
+            }
 
             for (const key of keysA) {
                 // If b doesn't have the key, or values mismatch.
