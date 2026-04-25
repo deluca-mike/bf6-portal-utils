@@ -1,6 +1,7 @@
+import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 2.3.1
+// version: 2.4.0
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -30,7 +31,18 @@ export namespace SolidUI {
     class Subscriber {
         public dependencies = new Set<Set<Subscriber>>();
 
-        constructor(public fn: () => void) {
+        public isPending = false;
+
+        public deferTicks: number;
+
+        public isDisposed = false;
+
+        constructor(
+            public fn: () => void,
+            deferTicks: number = 0
+        ) {
+            this.deferTicks = Number.isFinite(deferTicks) ? Math.max(0, Math.floor(deferTicks)) : 0;
+
             // Effects run immediately on creation (synchronously) to establish initial dependencies.
             this.execute();
         }
@@ -47,6 +59,7 @@ export namespace SolidUI {
         }
 
         dispose() {
+            this.isDisposed = true;
             cleanup(this);
         }
     }
@@ -75,6 +88,46 @@ export namespace SolidUI {
     // Transform Params so every property can optionally be a Signal.
     type Reactive<T> = {
         [K in keyof T]?: T[K] | Accessor<T[K]>;
+    };
+
+    /**
+     * The options for an effect.
+     */
+    export type EffectOptions = {
+        /*
+         * The maximum number of ticks to defer the effect execution (a window between effect executions).
+         */
+        deferTicks?: number;
+    };
+
+    /**
+     * The options for a memo.
+     */
+    export type MemoOptions = {
+        /*
+         * The maximum number of ticks to defer the memo execution (a window between memo executions).
+         */
+        deferTicks?: number;
+    };
+
+    /**
+     * The options for a component.
+     */
+    export type ComponentOptions = {
+        /*
+         * The maximum number of ticks to defer the component property updates (a window between property updates).
+         */
+        deferTicks?: number;
+    };
+
+    /**
+     * The options for an index.
+     */
+    export type IndexOptions = {
+        /*
+         * The maximum number of ticks to defer the index updates (a window between index updates).
+         */
+        deferTicks?: number;
     };
 
     /****** Local Utils ******/
@@ -150,30 +203,88 @@ export namespace SolidUI {
         return false;
     }
 
+    /****** Tick Tracking ******/
+
+    /**
+     * Invariant: `currentTick` is a logical scheduler tick advanced by `Events.OngoingGlobal`, not an engine tick
+     * boundary API value (none is available).
+     *
+     * This means:
+     * - Tick-relative scheduling (`deferTicks`) and per-tick flush guards are scoped to this logical tick.
+     * - Correctness assumes the `Events.OngoingGlobal` callback executes consistently once per engine tick.
+     * - If other subscribers run before this callback in a given engine tick, they still observe the previous logical
+     *   tick until this callback executes.
+     *
+     * The scheduler is intentionally defined around this event-driven model instead of wall-clock time because runtime
+     * tick duration can vary significantly under lag.
+     */
+    let currentTick = 0;
+
+    Events.OngoingGlobal.subscribe(() => {
+        ++currentTick;
+        tickFlushCount = 0;
+        queueFlush();
+    });
+
     /****** Scheduling ******/
 
-    // Queue to hold effects that need to run.
-    const pendingEffects = new Set<Subscriber>();
-    let isFlushPending = false;
-    const MAX_FLUSH_CYCLES = 1_000;
+    const MAX_EXECUTIONS_PER_FLUSH = 1_000;
 
-    // The function that processes the queue.
+    // Protects against re-entrant deferTicks=0 storms that keep rescheduling microtask flushes.
+    const MAX_FLUSHES_PER_TICK = 1_000;
+
+    let isFlushPending = false;
+
+    let tickFlushCount = 0;
+
+    // Queue to hold effects that need to run.
+    const pendingEffectsMap = new Map<number, Set<Subscriber>>();
+
+    // Clears the pending effects for a given tick (without executing them).
+    function clearPendingEffects(pendingEffects: Set<Subscriber>): void {
+        // Un-brick all remaining subscribers so innocent UI elements don't permanently die.
+        for (const sub of pendingEffects) {
+            sub.isPending = false;
+        }
+
+        pendingEffects.clear(); // Not needed for GC, but proactive.
+    }
+
+    // The function that processes the current tick's queue.
     function flush(): void {
         isFlushPending = false;
-        let cycles = 0;
+
+        const pendingEffects = pendingEffectsMap.get(currentTick);
+
+        if (!pendingEffects) return;
+
+        pendingEffectsMap.delete(currentTick);
+
+        // If the number of flushes this tick is greater than the maximum allowed, clear the pending effects and log an
+        // error. This is a safeguard to prevent a tick from executing very long chains of effect executions that may
+        // create new effect executions, etc, holding up the next tick.
+        if (++tickFlushCount > MAX_FLUSHES_PER_TICK) {
+            clearPendingEffects(pendingEffects);
+            logging.log('Max flushes per tick exceeded.', LogLevel.Error);
+
+            return;
+        }
+
+        let executionCount = 0;
 
         for (const sub of pendingEffects) {
-            if (cycles++ > MAX_FLUSH_CYCLES) {
-                // Important: Clear the queue so the next frame isn't also broken.
-                pendingEffects.clear();
+            if (++executionCount > MAX_EXECUTIONS_PER_FLUSH) {
+                clearPendingEffects(pendingEffects);
+                logging.log('Max executions per flush exceeded.', LogLevel.Error);
 
-                logging.log(
-                    'SolidUI: Maximum reactive stack depth exceeded. You might have an infinite loop in an effect.',
-                    LogLevel.Error
-                );
+                break;
             }
 
             pendingEffects.delete(sub);
+
+            sub.isPending = false;
+
+            if (sub.isDisposed) continue;
 
             try {
                 sub.execute();
@@ -187,16 +298,35 @@ export namespace SolidUI {
     // Adds effects to the queue and schedules a flush if one isn't already pending.
     function schedule(subscribers: Set<Subscriber>): void {
         for (const sub of subscribers) {
-            pendingEffects.add(sub);
-        }
+            if (sub.isPending) continue;
 
+            const targetTick = currentTick + sub.deferTicks;
+
+            let subscriberSet = pendingEffectsMap.get(targetTick);
+
+            if (!subscriberSet) {
+                subscriberSet = new Set();
+                pendingEffectsMap.set(targetTick, subscriberSet);
+            }
+
+            subscriberSet.add(sub);
+
+            sub.isPending = true;
+
+            if (sub.deferTicks !== 0) continue;
+
+            queueFlush();
+        }
+    }
+
+    // Queues a flush.
+    function queueFlush(): void {
         if (isFlushPending) return;
 
         isFlushPending = true;
 
-        // "Promise.resolve().then" pushes the flush to the microtask queue.
-        // This ensures setting a signal returns execution to the game logic instantly, and the UI updates happen right
-        // after the game logic finishes.
+        // "Promise.resolve().then" pushes the flush to the microtask queue. This ensures setting a signal returns
+        // execution to the game logic instantly, and UI updates happen after the game logic finishes.
         Promise.resolve()
             .then(flush)
             .catch((error: unknown) => {
@@ -285,10 +415,11 @@ export namespace SolidUI {
      *   2. Tracks any Signal read during execution.
      *   3. Re-runs `fn` if any of those Signals change.
      * @param fn - The function to execute.
+     * @param options - The options for the effect.
      * @returns A "disposer" function that manually stops the effect and frees memory.
      */
-    export function createEffect(fn: () => void): () => void {
-        const effect = new Subscriber(fn);
+    export function createEffect(fn: () => void, options?: EffectOptions): () => void {
+        const effect = new Subscriber(fn, options?.deferTicks ?? 0);
         return () => effect.dispose();
     }
 
@@ -300,14 +431,15 @@ export namespace SolidUI {
      * @example
      * const fullName = createMemo(() => `${firstName()} ${lastName()}`);
      * @param fn - The function to memoize.
+     * @param options - The options for the memo.
      * @returns The {@link Accessor} for the memoized value.
      */
-    export function createMemo<T>(fn: () => T): Accessor<T> {
+    export function createMemo<T>(fn: () => T, options?: MemoOptions): Accessor<T> {
         const [s, set] = createSignal<T>(fn());
 
         // Memos must update immediately to be consistent,
         // but their downstream effects will still be batched by the signal's scheduler.
-        createEffect(() => set(fn()));
+        createEffect(() => set(fn()), { deferTicks: options?.deferTicks ?? 0 });
 
         return s;
     }
@@ -514,11 +646,13 @@ export namespace SolidUI {
      * The "HyperScript" factory function. Creates a UI Component and sets up reactivity.
      * @param component - Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component.
      * @param props - An object of properties. Values can be static OR reactive (Signals/Accessors).
+     * @param options - The options for the component reactivity.
      * @returns The created UI Instance.
      */
     export function h<P extends object, T>(
         component: Constructable<P, T> | FunctionalComponent<P, T>,
-        props: Reactive<P> = {}
+        props: Reactive<P> = {},
+        options?: ComponentOptions
     ): T {
         // If the component is a function, just call it passing the raw 'props' (Reactive<P>) so the function can access
         // the signals directly.
@@ -553,12 +687,13 @@ export namespace SolidUI {
         }
 
         const instance = new ClassConstructor(constructorParams as P);
+        const effectOptions: EffectOptions = { deferTicks: options?.deferTicks ?? 0 };
 
         // Setup reactive bindings.
         dynamicBindings.forEach(({ key, signal }) => {
             const dispose = createEffect(() => {
                 setProperty(instance, key as unknown as keyof T, signal());
-            });
+            }, effectOptions);
 
             onCleanup(dispose); // Register this effect's disposer to the cleanup list.
         });
@@ -604,62 +739,70 @@ export namespace SolidUI {
      * This avoids destroying/recreating widgets, which is crucial for performance and Z-order stability.
      * @param each - The array signal to iterate over.
      * @param render - A builder function receiving the item (as a Signal) and the index (static number).
+     * @param options - The options for the index.
      */
-    export function Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void {
+    export function Index<T>(
+        each: Accessor<T[]>,
+        render: (item: Accessor<T>, index: number) => unknown,
+        options?: IndexOptions
+    ): void {
         // Track the disposers and data setters for every active row.
         // We use this to update data without re-rendering, or kill rows on shrink.
         const rows: { setItem: Setter<T>; dispose: () => void }[] = [];
 
         // TODO: Can use cache and dirty checking to optimize this.
-        createEffect(() => {
-            const list = each();
-            const newLength = list.length;
-            const oldLength = rows.length;
+        createEffect(
+            () => {
+                const list = each();
+                const newLength = list.length;
+                const oldLength = rows.length;
 
-            // If new rows are needed, updated the existing rows and create new ones.
-            if (newLength > oldLength) {
-                for (let i = 0; i < oldLength; ++i) {
+                // If new rows are needed, updated the existing rows and create new ones.
+                if (newLength > oldLength) {
+                    for (let i = 0; i < oldLength; ++i) {
+                        rows[i].setItem(list[i]);
+                    }
+
+                    for (let i = oldLength; i < newLength; ++i) {
+                        createRoot((dispose) => {
+                            // Create a specific signal for this row's data.
+                            // This allows the row to update its own properties without re-running the list effect.
+                            const [item, setItem] = createSignal(list[i]);
+
+                            // Capture the UI element returned by the render function.
+                            const uiElement = render(item, i);
+
+                            // Enhance the dispose function to ALSO delete the UI element.
+                            const rowDispose = () => {
+                                dispose(); // Kills reactive effects.
+
+                                // Safely call `delete()` if the returned element supports it.
+                                if (uiElement && typeof (uiElement as any).delete === 'function') {
+                                    (uiElement as any).delete();
+                                }
+                            };
+
+                            // Save control method to our tracker
+                            rows.push({ setItem, dispose: rowDispose });
+                        });
+                    }
+
+                    return;
+                }
+
+                // If less rows are needed, dispose of the unnecessary ones.
+                if (newLength < oldLength) {
+                    for (let i = oldLength - 1; i >= newLength; --i) {
+                        rows.pop()?.dispose(); // Kills effects and deletes the widget (via onCleanup in `h`).
+                    }
+                }
+
+                // Update the remaining rows if the length is the same or after the shrink operation.
+                for (let i = 0; i < newLength; ++i) {
                     rows[i].setItem(list[i]);
                 }
-
-                for (let i = oldLength; i < newLength; ++i) {
-                    createRoot((dispose) => {
-                        // Create a specific signal for this row's data.
-                        // This allows the row to update its own properties without re-running the list effect.
-                        const [item, setItem] = createSignal(list[i]);
-
-                        // Capture the UI element returned by the render function.
-                        const uiElement = render(item, i);
-
-                        // Enhance the dispose function to ALSO delete the UI element.
-                        const rowDispose = () => {
-                            dispose(); // Kills reactive effects.
-
-                            // Safely call `delete()` if the returned element supports it.
-                            if (uiElement && typeof (uiElement as any).delete === 'function') {
-                                (uiElement as any).delete();
-                            }
-                        };
-
-                        // Save control method to our tracker
-                        rows.push({ setItem, dispose: rowDispose });
-                    });
-                }
-
-                return;
-            }
-
-            // If less rows are needed, dispose of the unnecessary ones.
-            if (newLength < oldLength) {
-                for (let i = oldLength - 1; i >= newLength; --i) {
-                    rows.pop()?.dispose(); // Kills effects and deletes the widget (via onCleanup in `h`).
-                }
-            }
-
-            // Update the remaining rows if the length is the same or after the shrink operation.
-            for (let i = 0; i < newLength; ++i) {
-                rows[i].setItem(list[i]);
-            }
-        });
+            },
+            { deferTicks: options?.deferTicks ?? 0 }
+        );
     }
 }

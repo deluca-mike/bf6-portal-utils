@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version 3.0.0
+// version 3.0.1
 export class MultiClickDetector {
     private static _logging = new Logging('MCD');
 
@@ -66,6 +66,18 @@ export class MultiClickDetector {
         );
     }
 
+    private static _isPlayerDeployed(player: mod.Player): boolean {
+        // Need to try/catch since certain soldier state checks error for players that are not deployed.
+        try {
+            return (
+                mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive) ||
+                mod.GetSoldierState(player, mod.SoldierStateBool.IsManDown)
+            );
+        } catch (error) {
+            return false;
+        }
+    }
+
     /**
      * Creates a new multi-click detector with specific options.
      * @param player - The player to detect multi-click sequences for.
@@ -79,7 +91,10 @@ export class MultiClickDetector {
         this._callback = callback;
 
         if (!MultiClickDetector._detectors.has(this._playerId)) {
-            MultiClickDetector._detectors.set(this._playerId, { enabled: false, detectors: new Set() });
+            MultiClickDetector._detectors.set(this._playerId, {
+                enabled: MultiClickDetector._isPlayerDeployed(player),
+                detectors: new Set(),
+            });
         }
 
         MultiClickDetector._detectors.get(this._playerId)!.detectors.add(this);
