@@ -17,6 +17,7 @@ export declare class MultiClickDetector {
     private static _handlePlayerDeployed;
     private static _handlePlayerUndeployed;
     private static _handlePlayerLeaveGame;
+    private static _isPlayerDeployed;
     /**
      * Creates a new multi-click detector with specific options.
      * @param player - The player to detect multi-click sequences for.

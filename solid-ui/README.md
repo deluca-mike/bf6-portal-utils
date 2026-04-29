@@ -4,7 +4,7 @@
 
 This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlefield Portal, inspired by [SolidJS](https://github.com/solidjs/solid). Unlike traditional frameworks that re-render entire components, `SolidUI` uses fine-grained reactivity to update only the specific UI properties that change, resulting in minimal overhead and maximum performance.
 
-`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. The module uses the `Logging` module for internal logging, allowing you to monitor effect errors and debug reactive system behavior.
+`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield 6 Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. Updates are driven by a logical tick counter (advanced on each `Events.OngoingGlobal` callback), a pending-effect map keyed by tick, and the microtask queue for immediate (`deferTicks: 0`) work. Optional **`deferTicks`** on effects, memos, `h()` bindings, and `Index()` coalesces re-runs to a future logical tick. The module uses the `Logging` module for internal logging, including scheduler safety limits (`MAX_EXECUTIONS_PER_FLUSH`, `MAX_FLUSHES_PER_TICK`).
 
 > **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It assumes that UI objects have getters and setters for properties that need to be reactive.
 
@@ -43,35 +43,48 @@ function createCounterUI(player: mod.Player): void {
     const [count, setCount] = SolidUI.createSignal(0);
 
     // Create a container with reactive visibility
-    const container = SolidUI.h(
-        UI.Container,
-        {
-            width: 200,
-            height: 100,
-            bgColor: UI.COLORS.BLACK,
-            bgAlpha: 0.8,
-            visible: true,
-        },
-        player
-    );
+    const container = SolidUI.h(UI.Container, {
+        receiver: player,
+        width: 200,
+        height: 300,
+        visible: true,
+    });
 
     // Create text that updates when count changes
     SolidUI.h(UI.Text, {
         parent: container,
+        anchor: mod.UIAnchor.TopCenter,
+        width: 200,
         message: () => mod.Message(mod.stringkeys.count, count()), // Accessor function
         textSize: 30,
-        textColor: UI.COLORS.WHITE,
+        textColor: UI.COLORS.BLACK,
     });
+
+    // Create text that coalesces count change updates every 30 ticks
+    SolidUI.h(
+        UI.Text,
+        {
+            parent: container,
+            anchor: mod.UIAnchor.Center,
+            width: 200,
+            message: () => mod.Message(mod.stringkeys.count, count()), // Accessor function
+            textSize: 30,
+            textColor: UI.COLORS.BLACK,
+        },
+        { deferTicks: 30 } // Coalesce updates every 30 ticks
+    );
 
     // Create a button that increments the count
     SolidUI.h(UI.TextButton, {
         parent: container,
-        y: 50,
-        width: 150,
-        height: 40,
+        anchor: mod.UIAnchor.BottomCenter,
+        width: 200,
         message: mod.Message(mod.stringkeys.increment),
+        textSize: 30,
+        textColor: UI.COLORS.BLACK,
         onClick: async () => {
-            setCount((c) => c + 1); // Update signal
+            setCount((c) => c + 1); // Update signal with function that receives the previous value
+            // setCount(count() + 1); // Alternative: update signal with the current value
         },
     });
 }
@@ -127,13 +140,27 @@ The reactive system automatically tracks which signals are used where:
 - If `count` changes, only that text element's message updates
 - Other properties and elements remain untouched
 
-### Asynchronous Updates
+### Asynchronous updates and logical ticks
 
-All reactive updates are batched and executed asynchronously via the microtask queue. This ensures:
+Signal and store writes update stored values immediately, then **schedule** subscribed effects:
 
-- Setting multiple signals doesn't cause multiple synchronous updates
-- Game logic execution isn't blocked by UI updates
-- Updates happen right after the current execution context finishes
+- **`deferTicks: 0` (default):** work is flushed on a **microtask** (`Promise.resolve().then`), so the current synchronous caller returns before UI effects run.
+- **`deferTicks > 0`:** the effect is queued for the logical tick `currentTick + deferTicks`. Multiple writes before that tick **coalesce** into at most one run per subscriber (`isPending`).
+
+The **`currentTick`** value is **not** an engine tick API; it is incremented once per `Events.OngoingGlobal` subscription callback. `deferTicks` and per-tick safety limits are defined relative to that logical tick. See the invariant comment in [`solid-ui/index.ts`](index.ts).
+
+### Deferred updates and deferTicks
+
+You can pass **`deferTicks`** through option objects on:
+
+- `createEffect(fn, { deferTicks })`
+- `createMemo(fn, { deferTicks })`
+- `SolidUI.h(component, props, { deferTicks })` (applies to reactive property bindings only)
+- `SolidUI.Index(each, render, { deferTicks })`
+
+Invalid values are sanitized to a non-negative integer: non-finite numbers become `0`; fractional values are floored.
+
+Use this to **throttle** expensive UI work (e.g. large lists, heavy memos) so rapid signal churn does not run an effect (which can be one or more `mod` UI widget calls) every microtask. Downstream updates still flow through signals as usual; memos keep an up-to-date cached value while their internal refresh effect may be deferred.
 
 ### Configurable Error Logging
 
@@ -162,7 +189,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 #### `SolidUI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
 
-Configures logging for the SolidUI module. Effect errors and flush errors are automatically caught and logged using the configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
+Configures logging for the SolidUI module. Effect errors, flush errors, and scheduler limit messages are automatically caught and logged using the configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
 
 **Parameters:**
 
@@ -234,7 +261,7 @@ setVisible(true); // Container becomes visible automatically
 
 </ai>
 
-### `SolidUI.createEffect(fn: () => void): () => void`
+### `SolidUI.createEffect(fn: () => void, options?: SolidUI.EffectOptions): () => void`
 
 Creates a side effect that runs immediately and re-runs whenever its dependencies change. This is the bridge between reactive state and the outside world (e.g., updating UI props, logs, timers).
 
@@ -242,11 +269,12 @@ Creates a side effect that runs immediately and re-runs whenever its dependencie
 
 1. Runs `fn` immediately (synchronously)
 2. Tracks any Signal read during execution
-3. Re-runs `fn` if any of those Signals change
+3. Re-runs `fn` if any of those Signals change (subject to `options.deferTicks`; see [Deferred updates and deferTicks](#deferred-updates-and-deferticks))
 
 **Parameters:**
 
 - `fn` – The function to execute. Any signals read inside this function will be tracked as dependencies.
+- `options` – Optional. See `SolidUI.EffectOptions` (`deferTicks`).
 
 **Returns:**
 
@@ -264,6 +292,9 @@ const dispose = SolidUI.createEffect(() => {
     console.log(`Count is now: ${count()}`);
 });
 
+// Optional: defer re-runs by 2 logical ticks (coalesces rapid writes)
+// SolidUI.createEffect(() => { ... }, { deferTicks: 2 });
+
 setCount(5); // Logs: "Count is now: 5"
 setCount(10); // Logs: "Count is now: 10"
 
@@ -275,7 +306,7 @@ dispose();
 
 </ai>
 
-### `SolidUI.createMemo<T>(fn: () => T): Accessor<T>`
+### `SolidUI.createMemo<T>(fn: () => T, options?: SolidUI.MemoOptions): Accessor<T>`
 
 Creates a "Computed Value" or "Derived Signal". Use this when a value depends on other signals. It is efficient because:
 
@@ -285,10 +316,13 @@ Creates a "Computed Value" or "Derived Signal". Use this when a value depends on
 **Parameters:**
 
 - `fn` – The function to memoize. Should read one or more signals and return a computed value.
+- `options` – Optional. See `SolidUI.MemoOptions` (`deferTicks` on the internal effect that refreshes the memo).
 
 **Returns:**
 
 An `Accessor<T>` for the memoized value.
+
+The **initial** value is computed synchronously when `createMemo` runs. If `options.deferTicks` is greater than `0`, subsequent recomputations (and updates to anything that reads the memo through reactive subscriptions) are deferred by that many logical ticks.
 
 <ai>
 
@@ -562,13 +596,10 @@ Registers a cleanup callback for the current reactive scope. If called inside a 
 **Example:**
 
 ```ts
-SolidUI.h(
-    UI.Container,
-    {
-        // ... props
-    },
-    player
-);
+SolidUI.h(UI.Container, {
+    receiver: player,
+    // ... props
+});
 
 // Inside the component setup (if using functional components):
 SolidUI.onCleanup(() => {
@@ -581,15 +612,15 @@ SolidUI.onCleanup(() => {
 
 </ai>
 
-### `SolidUI.h<P extends object, T>(component, props, receiver?): T`
+### `SolidUI.h<P extends object, T>(component, props?, options?: SolidUI.ComponentOptions): T`
 
 The "HyperScript" factory function. Creates a UI Component and sets up reactivity. This is the primary function for creating reactive UI elements.
 
 **Parameters:**
 
 - `component` – Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component function
-- `props` – An object of properties. Values can be static OR reactive (Signals/Accessors). If a value is a function, it's treated as an accessor and made reactive.
-- `receiver` – (Optional) The specific player or team this UI is for
+- `props` – An object of properties. Values can be static OR reactive (Signals/Accessors). If a value is a function, it's treated as an accessor and made reactive. Per [`UI`](../ui/README.md), pass `receiver` in `props` when the widget should target a specific player or team.
+- `options` – Optional. See `SolidUI.ComponentOptions`. `deferTicks` applies only to **reactive property bindings** (accessor-valued props), not to the initial constructor snapshot.
 
 **Returns:**
 
@@ -685,10 +716,28 @@ SolidUI.h(MyButton, {
 - Properties that match the pattern `on[A-Z]` (start with lowercase "on" followed by an uppercase letter) are never made reactive and are always passed through as-is. This includes event handlers like `onClickUp`, `onFocusIn`, `onDelete`, etc., but excludes properties like `onlyOnce`, `once`, or `online`
 - All reactive effects are automatically cleaned up when the UI element is deleted
 - You can mix static and reactive properties in the same props object
+- Optional third argument: `{ deferTicks }` defers updates for all reactive bindings on that component (see `ComponentOptions`)
+
+**Example — deferred property updates:**
+
+```ts
+// The `UI.Text` reactively bound properties (in this case, just `message`) will be respectively coalesced into a single
+// update 30 ticks after all dependant signals/memos (in this case, just the `score` signal) change, regardless of how
+// many times the signal/memo changes until the scheduled update.
+SolidUI.h(
+    UI.Text,
+    {
+        receiver: player,
+        parent: container,
+        message: () => mod.Message(mod.stringkeys.score, score()),
+    },
+    { deferTicks: 30 }
+);
+```
 
 </ai>
 
-### `SolidUI.Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void`
+### `SolidUI.Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown, options?: SolidUI.IndexOptions): void`
 
 A generic List Renderer optimized for Game UI. Different from `array.map()` in that `Index` renders components based on their array position, not their value.
 
@@ -700,6 +749,7 @@ A generic List Renderer optimized for Game UI. Different from `array.map()` in t
 - `render` – A builder function that receives:
     - `item`: An accessor function for the item at this index (reactive)
     - `index`: The static index number (not reactive)
+- `options` – Optional. See `SolidUI.IndexOptions` (`deferTicks` on the list effect).
 
 **Returns:**
 
@@ -721,7 +771,7 @@ const container = SolidUI.h(UI.Container, {
     height: 400,
 });
 
-// Render a list of items
+// Render a list of items (optional: `{ deferTicks: n }` defers list reconciliation)
 SolidUI.Index(
     items, // Accessor to the array
     (item, index) => {
@@ -734,6 +784,7 @@ SolidUI.Index(
             textSize: 24,
         });
     }
+    // , { deferTicks: 1 }
 );
 
 // Update the array
@@ -783,16 +834,13 @@ The simplest pattern: create signals and pass them as property values.
 function createBasicUI(player: mod.Player): void {
     const [count, setCount] = SolidUI.createSignal(0);
 
-    const container = SolidUI.h(
-        UI.Container,
-        {
-            width: 200,
-            height: 150,
-            bgColor: UI.COLORS.BLACK,
-            bgAlpha: 0.8,
-        },
-        player
-    );
+    const container = SolidUI.h(UI.Container, {
+        receiver: player,
+        width: 200,
+        height: 150,
+        bgColor: UI.COLORS.BLACK,
+        bgAlpha: 0.8,
+    });
 
     SolidUI.h(UI.Text, {
         parent: container,
@@ -827,19 +875,16 @@ Use signals to control visibility and other conditional properties.
 function createModalUI(player: mod.Player): void {
     const [isOpen, setIsOpen] = SolidUI.createSignal(false);
 
-    const modal = SolidUI.h(
-        UI.Container,
-        {
-            visible: isOpen, // Reactive visibility
-            uiInputModeWhenVisible: true, // Automatically manages input mode
-            width: 400,
-            height: 300,
-            bgColor: UI.COLORS.BLACK,
-            bgAlpha: 0.9,
-            bgFill: mod.UIBgFill.Blur,
-        },
-        player
-    );
+    const modal = SolidUI.h(UI.Container, {
+        receiver: player,
+        visible: isOpen, // Reactive visibility
+        uiInputModeWhenVisible: true, // Automatically manages input mode
+        width: 400,
+        height: 300,
+        bgColor: UI.COLORS.BLACK,
+        bgAlpha: 0.9,
+        bgFill: mod.UIBgFill.Blur,
+    });
 
     SolidUI.h(UI.TextButton, {
         parent: modal,
@@ -881,16 +926,13 @@ function createHealthBar(player: mod.Player): void {
         return UI.COLORS.GREEN;
     });
 
-    const container = SolidUI.h(
-        UI.Container,
-        {
-            width: 200,
-            height: 20,
-            bgColor: UI.COLORS.BF_GREY_3,
-            bgAlpha: 0.8,
-        },
-        player
-    );
+    const container = SolidUI.h(UI.Container, {
+        receiver: player,
+        width: 200,
+        height: 20,
+        bgColor: UI.COLORS.BF_GREY_3,
+        bgAlpha: 0.8,
+    });
 
     // Health bar (width based on percentage)
     SolidUI.h(UI.Container, {
@@ -946,17 +988,14 @@ function createGameUI(player: mod.Player): void {
     });
 
     // Menu container (only tracks ui.isMenuOpen)
-    const menu = SolidUI.h(
-        UI.Container,
-        {
-            visible: () => state.ui.isMenuOpen,
-            width: 400,
-            height: 500,
-            bgColor: UI.COLORS.BLACK,
-            bgAlpha: 0.9,
-        },
-        player
-    );
+    const menu = SolidUI.h(UI.Container, {
+        receiver: player,
+        visible: () => state.ui.isMenuOpen,
+        width: 400,
+        height: 500,
+        bgColor: UI.COLORS.BLACK,
+        bgAlpha: 0.9,
+    });
 
     // Score display (only tracks player.score)
     SolidUI.h(UI.Text, {
@@ -997,16 +1036,13 @@ type PlayerScore = {
 function createScoreboard(player: mod.Player): void {
     const [scores, setScores] = SolidUI.createSignal<PlayerScore[]>([]);
 
-    const container = SolidUI.h(
-        UI.Container,
-        {
-            width: 300,
-            height: 400,
-            bgColor: UI.COLORS.BLACK,
-            bgAlpha: 0.8,
-        },
-        player
-    );
+    const container = SolidUI.h(UI.Container, {
+        receiver: player,
+        width: 300,
+        height: 400,
+        bgColor: UI.COLORS.BLACK,
+        bgAlpha: 0.8,
+    });
 
     // Render the list
     SolidUI.Index(scores, (playerScore, index) => {
@@ -1053,22 +1089,19 @@ function createSpawnUI(player: mod.Player): void {
     const [delayCountdown, setDelayCountdown] = SolidUI.createSignal(-1);
 
     // Prompt container (visible when countdown reaches 0)
-    const promptUI = SolidUI.h(
-        UI.Container,
-        {
-            x: 0,
-            y: 0,
-            width: 440,
-            height: 140,
-            anchor: mod.UIAnchor.Center,
-            visible: () => delayCountdown() === 0,
-            uiInputModeWhenVisible: true, // Automatically manages input mode
-            bgColor: UI.COLORS.BF_GREY_4,
-            bgAlpha: 0.5,
-            bgFill: mod.UIBgFill.Blur,
-        },
-        player
-    );
+    const promptUI = SolidUI.h(UI.Container, {
+        receiver: player,
+        x: 0,
+        y: 0,
+        width: 440,
+        height: 140,
+        anchor: mod.UIAnchor.Center,
+        visible: () => delayCountdown() === 0,
+        uiInputModeWhenVisible: true, // Automatically manages input mode
+        bgColor: UI.COLORS.BF_GREY_4,
+        bgAlpha: 0.5,
+        bgFill: mod.UIBgFill.Blur,
+    });
 
     // Spawn button
     SolidUI.h(UI.TextButton, {
@@ -1087,21 +1120,18 @@ function createSpawnUI(player: mod.Player): void {
     });
 
     // Countdown text (visible when countdown > 0)
-    SolidUI.h(
-        UI.Text,
-        {
-            x: 0,
-            y: 60,
-            width: 400,
-            height: 50,
-            anchor: mod.UIAnchor.TopCenter,
-            message: () => mod.Message(`Spawning available in ${delayCountdown()} seconds...`),
-            textSize: 30,
-            textColor: UI.COLORS.BF_GREEN_BRIGHT,
-            visible: () => delayCountdown() > 0,
-        },
-        player
-    );
+    SolidUI.h(UI.Text, {
+        receiver: player,
+        x: 0,
+        y: 60,
+        width: 400,
+        height: 50,
+        anchor: mod.UIAnchor.TopCenter,
+        message: () => mod.Message(`Spawning available in ${delayCountdown()} seconds...`),
+        textSize: 30,
+        textColor: UI.COLORS.BF_GREEN_BRIGHT,
+        visible: () => delayCountdown() > 0,
+    });
 
     // Start the countdown (a timer calls `setDelayCountdown` every second, which automatically updates the UI).
     setDelayCountdown(10);
@@ -1133,6 +1163,50 @@ A function used to update the value of a Signal. You can pass either:
 
 ```ts
 type Setter<T> = (newValue: T | ((prev: T) => T)) => void;
+```
+
+### `SolidUI.EffectOptions`
+
+Options for `createEffect`. All fields are optional.
+
+```ts
+type EffectOptions = {
+    /** Logical ticks to defer re-runs after a dependency change (0 = next microtask flush for current tick). */
+    deferTicks?: number;
+};
+```
+
+### `SolidUI.MemoOptions`
+
+Options for `createMemo`. All fields are optional.
+
+```ts
+type MemoOptions = {
+    /** Logical ticks to defer the internal memo refresh effect. */
+    deferTicks?: number;
+};
+```
+
+### `SolidUI.ComponentOptions`
+
+Options for `SolidUI.h()` (class components only affect reactive bindings).
+
+```ts
+type ComponentOptions = {
+    /** Logical ticks to defer per-property binding effects. */
+    deferTicks?: number;
+};
+```
+
+### `SolidUI.IndexOptions`
+
+Options for `SolidUI.Index`.
+
+```ts
+type IndexOptions = {
+    /** Logical ticks to defer the list effect. */
+    deferTicks?: number;
+};
 ```
 
 ### `SolidUI.Context<T>`
@@ -1218,8 +1292,8 @@ SolidUI.h(MyButton, {
 1. **Signals** hold values and maintain a set of subscribers (effects)
 2. **Effects** track which signals they read during execution
 3. **When a signal changes**, it schedules all subscribed effects to run
-4. **Effects run asynchronously** via the microtask queue (non-blocking)
-5. **Property updates** are batched to minimize UI updates
+4. **Effects run asynchronously**: `deferTicks === 0` uses the microtask queue; `deferTicks > 0` queues work for a future logical tick via a macrotask (see [Deferred updates and deferTicks](#deferred-updates-and-deferticks))
+5. **Property updates** coalesce per subscriber while pending (`isPending`) to avoid redundant runs
 
 ### Dependency Tracking
 
@@ -1232,17 +1306,19 @@ The system uses a context stack to track dependencies:
 
 ### Update Scheduling
 
-All updates are scheduled asynchronously:
+1. Setting a signal (or a store property) **updates the value immediately**
+2. Each affected subscriber is placed in `pendingEffectsMap` at key `currentTick + deferTicks` (default `deferTicks` is `0`)
+3. For **`deferTicks === 0`**, a single microtask flush is queued (`Promise.resolve().then`) so game logic returns before effects run
+4. For **`deferTicks > 0`**, no microtask is queued for that subscriber; the next `Events.OngoingGlobal` tick advances `currentTick`, and when it matches the bucket key, that tick’s flush runs those effects
+5. **`Events.OngoingGlobal`** also queues a microtask flush so deferred work for the new tick can run in the same frame after the tick counter advances
+6. **`MAX_EXECUTIONS_PER_FLUSH`** caps how many subscribers run in one flush iteration; exceeding it clears the remaining set for that flush and logs `Max executions per flush exceeded.`
+7. **`MAX_FLUSHES_PER_TICK`** caps how many microtask flushes run per logical tick; exceeding it clears the current bucket and logs `Max flushes per tick exceeded.`
 
-1. Setting a signal immediately updates its value
-2. Subscribed effects are added to a pending queue
-3. A microtask is scheduled to flush the queue
-4. The flush runs all queued effects
-5. Effects update UI properties through the `UI` module's setters
+Constants are defined in [`solid-ui/index.ts`](index.ts) and are safety nets against runaway graphs or re-entrant `deferTicks: 0` storms.
 
 ### Error Logging
 
-Effect errors and flush errors are caught and logged using the `Logging` module. The logging configuration can be set via `SolidUI.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into reactive system failures without manual error handling. Errors in one effect won't prevent other effects from executing.
+Effect errors and flush errors are caught and logged using the `Logging` module. The logging configuration can be set via `SolidUI.setLogging()`, allowing you to control verbosity and error detail inclusion. Scheduler guardrails may also log **`Max executions per flush exceeded.`**, **`Max flushes per tick exceeded.`**, and **`Error in flush:`** (unexpected flush failure). This provides visibility into reactive system failures without manual error handling. Errors in one effect won't prevent other effects from executing.
 
 ### Component Lifecycle
 
@@ -1251,7 +1327,7 @@ When you call `SolidUI.h()`:
 1. A cleanup list is created for this component
 2. The UI element is instantiated with initial property values
 3. For each reactive property (accessor function):
-    - An effect is created that watches the accessor
+    - An effect is created that watches the accessor (optional `deferTicks` from `ComponentOptions`)
     - The effect updates the UI property when the accessor changes
     - The effect's disposer is registered for cleanup
 4. The component's `delete()` method is monkey-patched to run all cleanups
@@ -1304,6 +1380,10 @@ Effects and subscriptions are automatically cleaned up when UI elements are dele
 ### Async Updates
 
 All reactive updates are asynchronous. If you need synchronous updates (not recommended), you'll need to use the underlying `UI` module directly.
+
+### Scheduler limits and logical ticks
+
+`SolidUI` enforces `MAX_EXECUTIONS_PER_FLUSH` and `MAX_FLUSHES_PER_TICK` to stop pathological effect graphs. If you see those log lines, simplify effects, reduce synchronous churn, or increase `deferTicks` on hot paths. Remember that **`currentTick` is advanced in `Events.OngoingGlobal`**, not via a dedicated engine tick API; semantics are documented in [`solid-ui/index.ts`](index.ts).
 
 </ai>
 

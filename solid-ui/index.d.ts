@@ -35,6 +35,30 @@ export declare namespace SolidUI {
         [K in keyof T]?: T[K] | Accessor<T[K]>;
     };
     /**
+     * The options for an effect.
+     */
+    export type EffectOptions = {
+        deferTicks?: number;
+    };
+    /**
+     * The options for a memo.
+     */
+    export type MemoOptions = {
+        deferTicks?: number;
+    };
+    /**
+     * The options for a component.
+     */
+    export type ComponentOptions = {
+        deferTicks?: number;
+    };
+    /**
+     * The options for an index.
+     */
+    export type IndexOptions = {
+        deferTicks?: number;
+    };
+    /**
      * Executes a function without creating dependencies.
      * Any signals read inside `fn` will return their current value, but the surrounding Effect will not subscribe to
      * them.
@@ -65,9 +89,10 @@ export declare namespace SolidUI {
      *   2. Tracks any Signal read during execution.
      *   3. Re-runs `fn` if any of those Signals change.
      * @param fn - The function to execute.
+     * @param options - The options for the effect.
      * @returns A "disposer" function that manually stops the effect and frees memory.
      */
-    export function createEffect(fn: () => void): () => void;
+    export function createEffect(fn: () => void, options?: EffectOptions): () => void;
     /**
      * Creates a "Computed Value" or "Derived Signal".
      * Use this when a value depends on other signals. It is efficient because:
@@ -76,9 +101,10 @@ export declare namespace SolidUI {
      * @example
      * const fullName = createMemo(() => `${firstName()} ${lastName()}`);
      * @param fn - The function to memoize.
+     * @param options - The options for the memo.
      * @returns The {@link Accessor} for the memoized value.
      */
-    export function createMemo<T>(fn: () => T): Accessor<T>;
+    export function createMemo<T>(fn: () => T, options?: MemoOptions): Accessor<T>;
     /**
      * Creates a reactive scope that is detached from the parent.
      * Unlike Effects, a Root does not track dependencies and does not auto-dispose.
@@ -142,11 +168,13 @@ export declare namespace SolidUI {
      * The "HyperScript" factory function. Creates a UI Component and sets up reactivity.
      * @param component - Either a `UI` Class Constructor (e.g., `UI.Button`) or a Functional Component.
      * @param props - An object of properties. Values can be static OR reactive (Signals/Accessors).
+     * @param options - The options for the component reactivity.
      * @returns The created UI Instance.
      */
     export function h<P extends object, T>(
         component: Constructable<P, T> | FunctionalComponent<P, T>,
-        props?: Reactive<P>
+        props?: Reactive<P>,
+        options?: ComponentOptions
     ): T;
     /**
      * A generic List Renderer optimized for Game UI.
@@ -156,7 +184,12 @@ export declare namespace SolidUI {
      * This avoids destroying/recreating widgets, which is crucial for performance and Z-order stability.
      * @param each - The array signal to iterate over.
      * @param render - A builder function receiving the item (as a Signal) and the index (static number).
+     * @param options - The options for the index.
      */
-    export function Index<T>(each: Accessor<T[]>, render: (item: Accessor<T>, index: number) => unknown): void;
+    export function Index<T>(
+        each: Accessor<T[]>,
+        render: (item: Accessor<T>, index: number) => unknown,
+        options?: IndexOptions
+    ): void;
     export {};
 }
