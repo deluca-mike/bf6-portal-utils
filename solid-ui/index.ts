@@ -1,7 +1,7 @@
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 2.4.0
+// version: 2.4.1
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -16,14 +16,14 @@ export namespace SolidUI {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeRawError);
     }
 
     /****** Classes and Types ******/
@@ -673,17 +673,13 @@ export namespace SolidUI {
         const dynamicBindings: { key: keyof P; signal: Accessor<unknown> }[] = [];
 
         for (const [key, value] of Object.entries(props)) {
-            if (/^on[A-Z]/.test(key)) {
+            if (/^on[A-Z]/.test(key) || !isAccessor(value)) {
                 constructorParams[key] = value;
                 continue;
             }
 
-            if (isAccessor(value)) {
-                constructorParams[key] = value(); // Initial value.
-                dynamicBindings.push({ key: key as keyof P, signal: value });
-            } else {
-                constructorParams[key] = value;
-            }
+            constructorParams[key] = value(); // Initial value.
+            dynamicBindings.push({ key: key as keyof P, signal: value });
         }
 
         const instance = new ClassConstructor(constructorParams as P);

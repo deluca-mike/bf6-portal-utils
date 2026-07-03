@@ -67,18 +67,18 @@ Events.OnPlayerDied.subscribe(
 
 ## When Callbacks Fire (Lifecycle)
 
-Callbacks are driven by an internal **tick** that runs when the clock starts or resumes, once after `stop()` or `pause()` (to commit elapsed time), on a timer at whole-second boundaries while running, and when `addSeconds()` or `subtractSeconds()` is called. Each tick checks whether an integer second or minute boundary has been reached or crossed since the last reported value, and whether the clock has reached its completion condition.
+Callbacks are driven by an internal **tick** that runs when the clock starts or resumes, once after `stop()` or `pause()` (to commit elapsed time), on a timer at whole-second boundaries while running, when `addSeconds()` or `subtractSeconds()` is called, and when `reset()` is called while the clock is **running** (to report the snapped-to-start position). Each tick checks whether an integer second or minute boundary has been reached or crossed since the last reported value, and whether the clock has reached its completion condition.
 
 ### `onSecond(currentSeconds: number)`
 
 Fires every time the clock reaches or crosses an integer second boundary (see [Rounding](#rounding-count-up-vs-count-down)) for which it has not yet invoked `onSecond`. That can happen when:
 
 - Time elapses normally while the clock is running (one firing per whole second).
-- `start()` or `resume()` runs on a fresh or reset clock (first tick reports the current integer second).
+- `start()` or `resume()` runs on a fresh clock (first tick reports the current integer second).
 - `stop()` or `pause()` commits elapsed time and the resulting value crosses a second boundary not yet reported.
 - `addSeconds()` or `subtractSeconds()` adjusts time so that the integer second changes.
-
-`reset()` does not run a tick and does not fire callbacks; the next `start()` will run a tick and report the new initial value.
+- `reset()` while the clock is **running** clears elapsed time but keeps it running; the deferred tick reports the starting integer second (and minute if applicable), same idea as the first tick after `start()`.
+- `reset()` while the clock is **stopped** or **paused** does not run a tick or fire `onSecond` / `onMinute`; call `start()` to begin again from the initial value.
 
 ### `onMinute(currentMinutes: number)`
 
@@ -135,7 +135,7 @@ Enum re-exported from the `Logging` module. Use with `Clocks.setLogging()` to se
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?, logLevel?, includeError?): void` | Configures logging for the Clocks module (start, stop, completion, time adjustments). Pass `undefined` for `log` to disable. See [Logging](../logging/README.md). |
+| `setLogging(log?, logLevel?, includeRawError?): void` | Configures logging for the Clocks module (start, stop, completion, time adjustments). Pass `undefined` for `log` to disable. See [Logging](../logging/README.md). |
 
 #### Types
 
@@ -175,7 +175,7 @@ Stopwatch: starts at 0, counts up. Optional `timeLimitSeconds`; when reached, th
 | `stop(): this` | Stops the clock and commits elapsed time. One more tick may run (see [When Callbacks Fire](#when-callbacks-fire-lifecycle)). |
 | `resume(): this` | Same as `start()`. |
 | `pause(): this` | Same as `stop()`. |
-| `reset(): this` | Stops, clears completion, and sets elapsed time to 0. Does not fire callbacks. |
+| `reset(): this` | Clears the scheduled tick, completion state, and elapsed time. If **running**, stays running at elapsed 0 and runs a tick so `onSecond` / `onMinute` reflect the start (e.g. 0 for count-up, initial duration for count-down). If **stopped** or **paused**, stays stopped; no callbacks until `start()`. |
 | `addSeconds(seconds: number): this` | Adds time (increases displayed value). May trigger tick and callbacks. |
 | `subtractSeconds(seconds: number): this` | Subtracts time (decreases displayed value). May trigger tick and callbacks. |
 
@@ -209,7 +209,7 @@ Timer: starts at the given duration and counts down to 0. When remaining time re
 | `stop(): this` | Stops the clock and commits elapsed time. One more tick may run. |
 | `resume(): this` | Same as `start()`. |
 | `pause(): this` | Same as `stop()`. |
-| `reset(): this` | Stops, clears completion, and sets elapsed time to 0. Does not fire callbacks. |
+| `reset(): this` | Clears the scheduled tick, completion state, and elapsed time. If **running**, stays running with remaining time equal to `duration` and runs a tick so `onSecond` / `onMinute` reflect that starting position. If **stopped** or **paused**, stays stopped; no callbacks until `start()`. |
 | `addSeconds(seconds: number): this` | Adds time to the countdown (longer until complete). |
 | `subtractSeconds(seconds: number): this` | Subtracts time (sooner completion). |
 | `setDuration(durationSeconds: number): this` | Sets a new duration (in seconds). Does not start or tick the clock. |
@@ -221,7 +221,7 @@ Timer: starts at the given duration and counts down to 0. When remaining time re
 1. **Elapsed time** – While the clock is running, elapsed time is `accumulatedMs + (Date.now() - lastResumeTime)`. When stopped, the current run is added to `accumulatedMs` and the timer is cleared. So total elapsed time is preserved across start/stop/resume.
 2. **Count-up value** – `seconds` = elapsed seconds (capped by `timeLimit` for CountUpClock). **Count-down value** – `seconds` = `max(0, duration - elapsed)` (0 when complete).
 3. **Tick loop** – A single `_tick` run: (1) if complete, return; (2) if completion condition is met, mark complete, call `onComplete`, and do not schedule the next tick; (3) compute integer second/minute with the clock’s rounding; (4) if they changed, update last values and call `onSecond`/`onMinute`; (5) if still running, schedule the next `_tick` with `Timers.setTimeout` for `1000 - (elapsedMs % 1000)` ms so the next tick lands on a whole-second boundary. That alignment reduces drift over long runs.
-4. **Deferred tick** – Start, stop, and time adjustments schedule `_tick` via `Promise.resolve().then(...)` so the tick runs in a microtask. That avoids re-entrancy and ordering issues when you start/stop/adjust in the same synchronous block.
+4. **Deferred tick** – Start, stop, time adjustments, and `reset()` (when running) schedule `_tick` via `Promise.resolve().then(...)` so the tick runs in a microtask. That avoids re-entrancy and ordering issues when you start/stop/adjust/reset in the same synchronous block.
 5. **Callback errors** – Callbacks are invoked through `CallbackHandler`; sync and async errors are caught and logged and do not stop the clock.
 
 ---

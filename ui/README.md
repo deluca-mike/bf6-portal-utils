@@ -234,7 +234,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-### `UI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+### `UI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the UI module. When UI operations encounter issues (such as attempting to modify a deleted element or registering a duplicate button), they are automatically logged using the configured logger.
 
@@ -242,7 +242,7 @@ Configures logging for the UI module. When UI operations encounter issues (such 
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
+- `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -254,7 +254,7 @@ import { UIContainer } from 'bf6-portal-utils/ui/components/container';
 UI.setLogging(
     (text) => console.log(text),
     UI.LogLevel.Warning,
-    true // includeError
+    true // includeRawError
 );
 
 // If an element is modified after deletion, it will be logged automatically

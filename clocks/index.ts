@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 1.0.0
+// version: 1.1.0
 export namespace Clocks {
     const logging = new Logging('Clocks');
 
@@ -15,14 +15,14 @@ export namespace Clocks {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeRawError);
     }
 
     /**
@@ -264,15 +264,23 @@ export namespace Clocks {
 
         /**
          * Resets the clock.
+         * If the clock was running, it stays running and snaps to the starting time (elapsed 0), firing `onSecond`
+         * (and possibly `onMinute`) for that position. If it was stopped or paused, it remains stopped.
          * @returns The clock instance.
          */
         public reset(): this {
-            this.stop();
+            Timers.clear(this._timerId);
+            this._timerId = undefined;
 
             this._isComplete = false;
             this._accumulatedMs = 0;
             this._lastIntegerSecond = undefined;
             this._lastIntegerMinute = undefined;
+
+            if (this._isRunning) {
+                this._lastResumeTime = Date.now();
+                this._queueTick();
+            }
 
             return this;
         }

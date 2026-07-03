@@ -89,7 +89,7 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [Logging module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging module documentation](../logging/README.md). |
 | `getSmoothedTickRate(): number` | Returns the smoothed server tick rate (Hz). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSmoothedTimeoutLagMs(): number` | Returns the smoothed script lag (ms) over the 1s sampling window (how late the window callback ran vs the expected 1s). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSpotDeltaMs(): number` | Returns the raw delta time (ms) between the last two `OngoingGlobal` ticks (somewhat analogous to SFT when above ~33ms). Use for real-time compute scaling (e.g. scaling work per tick). |

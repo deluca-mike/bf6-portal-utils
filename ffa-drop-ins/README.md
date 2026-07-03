@@ -147,7 +147,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `FFADropIns.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+#### `FFADropIns.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the FFADropIns module. The spawn system logs initialization, queue processing, and warnings.
 
@@ -155,7 +155,7 @@ Configures logging for the FFADropIns module. The spawn system logs initializati
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
+- `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 

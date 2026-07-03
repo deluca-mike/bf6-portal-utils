@@ -1,7 +1,7 @@
 import { Logging } from '../logging/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 3.3.0
+// version 3.4.0
 export namespace MapDetector {
     const logging = new Logging('MD');
 
@@ -14,14 +14,14 @@ export namespace MapDetector {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeRawError);
     }
 
     /**
@@ -29,7 +29,9 @@ export namespace MapDetector {
      */
     export enum Map {
         Area22B = 'Area 22B',
+        Bellum1988sOperationMetro = "Bellum1988's Operation Metro",
         BlackwellFields = 'Blackwell Fields',
+        CairoBazaar = 'Cairo Bazaar',
         Complex3 = 'Complex 3',
         Contaminated = 'Contaminated',
         DefenseNexus = 'Defense Nexus',
@@ -37,6 +39,7 @@ export namespace MapDetector {
         Eastwood = 'Eastwood',
         EmpireState = 'Empire State',
         GolfCourse = 'Golf Course',
+        RailwaytoGolmud = 'Railway to Golmud',
         IberianOffensive = 'Iberian Offensive',
         LiberationPeak = 'Liberation Peak',
         ManhattanBridge = 'Manhattan Bridge',
@@ -58,87 +61,99 @@ export namespace MapDetector {
 
     const maps: Record<Map, MapData> = {
         [Map.Area22B]: {
-            coordinates: { x: 427.68, y: 177.51, z: -743.26 },
+            coordinates: { x: 427, y: 177, z: -743 },
             nativeMap: mod.Maps.Granite_MilitaryRnD,
         },
+        [Map.Bellum1988sOperationMetro]: {
+            coordinates: { x: -202, y: 217, z: 20 },
+            nativeMap: undefined,
+        },
         [Map.BlackwellFields]: {
-            coordinates: { x: -164.96, y: 76.32, z: -322.58 },
+            coordinates: { x: -164, y: 76, z: -322 },
             nativeMap: mod.Maps.Badlands,
         },
+        [Map.CairoBazaar]: {
+            coordinates: { x: -27, y: 64, z: 4 },
+            nativeMap: mod.Maps.Plaza,
+        },
         [Map.Complex3]: {
-            coordinates: { x: 715.27, y: 201.02, z: -343.87 },
+            coordinates: { x: 715, y: 201, z: -343 },
             nativeMap: mod.Maps.Granite_Underground,
         },
         [Map.Contaminated]: {
-            coordinates: { x: -143.92, y: 323.12, z: 7.12 },
+            coordinates: { x: -143, y: 323, z: 7 },
             nativeMap: mod.Maps.Contaminated,
         },
         [Map.DefenseNexus]: {
-            coordinates: { x: -274.12, y: 138.65, z: 309.02 },
+            coordinates: { x: -274, y: 138, z: 309 },
             nativeMap: mod.Maps.Granite_TechCampus,
         },
         [Map.Downtown]: {
-            coordinates: { x: -1044.5, y: 122.02, z: 220.17 },
+            coordinates: { x: -1044, y: 122, z: 220 },
             nativeMap: mod.Maps.Granite_MainStreet,
         },
         [Map.Eastwood]: {
-            coordinates: { x: -195.29, y: 231.54, z: -41.5 },
+            coordinates: { x: -195, y: 231, z: -41 },
             nativeMap: mod.Maps.Eastwood,
         },
         [Map.EmpireState]: {
-            coordinates: { x: -672.19, y: 53.79, z: -115.11 },
+            coordinates: { x: -672, y: 53, z: -115 },
             nativeMap: mod.Maps.Aftermath,
         },
         [Map.GolfCourse]: {
-            coordinates: { x: -299.32, y: 191.91, z: -664.38 },
+            coordinates: { x: -299, y: 191, z: -664 },
             nativeMap: mod.Maps.Granite_ClubHouse,
         },
         [Map.HagentalBase]: {
-            coordinates: { x: -103.03, y: 66.02, z: 13.21 },
+            coordinates: { x: -103, y: 66, z: 13 },
             nativeMap: mod.Maps.Subsurface,
         },
         [Map.IberianOffensive]: {
-            coordinates: { x: 849.16, y: 78.37, z: 116.74 },
+            coordinates: { x: 849, y: 78, z: 116 },
             nativeMap: mod.Maps.Battery,
         },
         [Map.LiberationPeak]: {
-            coordinates: { x: 94.71, y: 133.43, z: 77.46 },
+            coordinates: { x: 94, y: 133, z: 77 },
             nativeMap: mod.Maps.Capstone,
         },
         [Map.ManhattanBridge]: {
-            coordinates: { x: -323.32, y: 52.3, z: -440.95 },
+            coordinates: { x: -323, y: 52, z: -440 },
             nativeMap: mod.Maps.Dumbo,
         },
         [Map.Marina]: {
-            coordinates: { x: -1474.05, y: 103.09, z: -690.45 },
+            coordinates: { x: -1474, y: 103, z: -690 },
             nativeMap: mod.Maps.Granite_Marina,
         },
         [Map.MirakValley]: {
-            coordinates: { x: -99.78, y: 88.62, z: -253.42 },
+            coordinates: { x: -99, y: 88, z: -253 },
             nativeMap: mod.Maps.Tungsten,
         },
         [Map.NewSobekCity]: {
-            coordinates: { x: -99.78, y: 92.4, z: -124.58 },
+            coordinates: { x: -99, y: 92, z: -124 },
             nativeMap: mod.Maps.Outskirts,
         },
         [Map.OperationFirestorm]: {
-            coordinates: { x: -39.67, y: 124.69, z: -116.68 },
+            coordinates: { x: -39, y: 124, z: -116 },
             nativeMap: mod.Maps.Firestorm,
         },
         [Map.PortalSandbox]: {
-            coordinates: { x: -30.02, y: 32.4, z: -0.01 },
+            coordinates: { x: -30, y: 32, z: 0 },
             nativeMap: mod.Maps.Sand,
         },
+        [Map.RailwaytoGolmud]: {
+            coordinates: { x: -120, y: 728, z: 726 },
+            nativeMap: mod.Maps.GolmudRailway,
+        },
         [Map.RedlineStorage]: {
-            coordinates: { x: 566.77, y: 144.8, z: 356.16 },
+            coordinates: { x: 566, y: 144, z: 356 },
             nativeMap: mod.Maps.Granite_MilitaryStorage,
         },
         [Map.SaintsQuarter]: {
-            coordinates: { x: 293.13, y: 70.35, z: 134.51 },
+            coordinates: { x: 293, y: 70, z: 134 },
             nativeMap: mod.Maps.Limestone,
         },
         [Map.SiegeOfCairo]: {
-            coordinates: { x: -84.27, y: 64.38, z: -58.42 },
+            coordinates: { x: -84, y: 64, z: -58 },
             nativeMap: mod.Maps.Abbasid,
         },
     };
@@ -161,9 +176,14 @@ export namespace MapDetector {
         if (!coords) return;
 
         for (const map in maps) {
-            const { coordinates } = maps[map as Map];
+            const { coordinates, nativeMap } = maps[map as Map];
 
             if (coords.x != ~~coordinates.x || coords.y != ~~coordinates.y || coords.z != ~~coordinates.z) continue;
+
+            if (!nativeMap) {
+                logging.log(`Map ${map} is not available in the native mod.Maps enum.`, LogLevel.Warning);
+                continue;
+            }
 
             return map as Map;
         }

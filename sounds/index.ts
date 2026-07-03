@@ -2,7 +2,7 @@ import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 5.0.1
+// version 5.0.2
 export namespace Sounds {
     const logging = new Logging('Sounds');
 
@@ -15,14 +15,14 @@ export namespace Sounds {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeRawError);
     }
 
     const DEFAULT_AMPLITUDE: number = 1.0;

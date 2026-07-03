@@ -8,12 +8,12 @@ export declare namespace Clocks {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void;
     /**
      * Options for the clock.
@@ -118,6 +118,8 @@ export declare namespace Clocks {
         pause(): this;
         /**
          * Resets the clock.
+         * If the clock was running, it stays running and snaps to the starting time (elapsed 0), firing `onSecond`
+         * (and possibly `onMinute`) for that position. If it was stopped or paused, it remains stopped.
          * @returns The clock instance.
          */
         reset(): this;

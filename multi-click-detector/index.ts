@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version 3.0.1
+// version 3.0.2
 export class MultiClickDetector {
     private static _logging = new Logging('MCD');
 
@@ -12,14 +12,14 @@ export class MultiClickDetector {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     public static setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        this._logging.setLogging(log, logLevel, includeError);
+        this._logging.setLogging(log, logLevel, includeRawError);
     }
 
     static {

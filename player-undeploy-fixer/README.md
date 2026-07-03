@@ -71,7 +71,7 @@ See the [Logging module documentation](../logging/README.md) for details.
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the PlayerUndeployFixer module. When the fixer forces an undeploy, it logs a warning; when checking soldier state fails, it logs an error. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [Logging](../logging/README.md) module documentation. |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the PlayerUndeployFixer module. When the fixer forces an undeploy, it logs a warning; when checking soldier state fails, it logs an error. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
 
 ---
 

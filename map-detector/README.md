@@ -79,7 +79,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
 | `setCoordinates(map: MapDetector.Map, coordinates: Vectors.Vector3): void` | Sets the expected HQ1 coordinates used for detecting the given map. Call this for **each map** where your experience uses custom spatial data that moves Team 1's HQ—at the **top of your file** (after imports), not in an event handler, so coordinates are set before any detection runs. Only the **integer parts** of the coordinates are used for matching (decimals are ignored); this is sufficient because map HQ positions differ significantly. |
 | `currentMap(): MapDetector.Map \| undefined` | Returns the current map as a `MapDetector.Map` enum value, or `undefined` if the map cannot be determined. |
 | `currentNativeMap(): mod.Maps \| undefined` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `undefined` if the map cannot be determined or is not available in the native enum. |
@@ -96,7 +96,9 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 The `MapDetector` namespace supports detection of the following maps via the `MapDetector.Map` enum:
 
 - Area 22B
+- Bellum1988's Operation Metro (see [Missing Maps in Native Enum](#missing-maps-in-native-enum))
 - Blackwell Fields
+- Cairo Bazaar
 - Complex 3
 - Contaminated
 - Defense Nexus
@@ -113,6 +115,7 @@ The `MapDetector` namespace supports detection of the following maps via the `Ma
 - New Sobek City
 - Operation Firestorm
 - Portal Sandbox
+- Railway to Golmud
 - Redline Storage
 - Saints Quarter
 - Siege of Cairo
@@ -126,6 +129,16 @@ If your experience uses **custom spatial data** that moves Team 1's HQ from its 
 ---
 
 ## Known Limitations
+
+### Missing Maps in Native Enum
+
+The map **"Bellum1988's Operation Metro"** is not available in the native `mod.Maps` enum (it is missing from the Battlefield Portal API). As a result:
+
+- `MapDetector.currentNativeMap()` will return `undefined` for that map.
+- `MapDetector.isCurrentNativeMap()` will always return `false` for that map when checking against any `mod.Maps` value.
+- `MapDetector.currentMap()` and `MapDetector.isCurrentMap()` **behave correctly for that map**.
+
+Use `MapDetector.Map` enum values and `isCurrentMap()` when working with that map (or for consistency, for all maps).
 
 ### Detection Method
 

@@ -99,7 +99,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the MultiClickDetector module. Callback errors (sync and async) are caught and logged via `CallbackHandler`. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [Logging](../logging/README.md) module documentation. |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the MultiClickDetector module. Callback errors (sync and async) are caught and logged via `CallbackHandler`. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
 
 #### Constructor
 
