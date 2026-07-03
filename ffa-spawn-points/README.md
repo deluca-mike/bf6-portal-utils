@@ -167,7 +167,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `FFASpawnPoints.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+#### `FFASpawnPoints.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the FFASpawnPoints module. The spawn system logs various events including spawn point selection, queue processing, and warnings. This allows you to monitor and debug spawn behavior.
 
@@ -175,7 +175,7 @@ Configures logging for the FFASpawnPoints module. The spawn system logs various 
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
+- `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -186,7 +186,7 @@ import { FFASpawnPoints } from 'bf6-portal-utils/ffa-spawn-points';
 FFASpawnPoints.setLogging(
     (text) => console.log(text),
     FFASpawnPoints.LogLevel.Info,
-    true // includeError
+    true // includeRawError
 );
 ```
 

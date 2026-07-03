@@ -2,7 +2,7 @@ export declare class Logging {
     constructor(tag: string);
     private _tag;
     private _logLevel;
-    private _includeError;
+    private _includeRawError;
     private _logger?;
     /**
      * Safely converts an error of unknown type to a string.
@@ -20,21 +20,41 @@ export declare class Logging {
     willLog(logLevel: Logging.LogLevel): boolean;
     log(text: string, logLevel?: Logging.LogLevel, error?: unknown): void;
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to attempt to include the runtime error, if any, as a string in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
-    setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Logging.LogLevel, includeError?: boolean): void;
+    setLogging(
+        log?: (text: string, error?: unknown) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeRawError?: boolean
+    ): void;
 }
 export declare namespace Logging {
     /**
      * The log levels.
      */
     enum LogLevel {
+        /**
+         * Debug-level messages. Most verbose, typically used during development.
+         */
         Debug = 0,
+        /**
+         * Informational messages. General operational information.
+         */
         Info = 1,
+        /**
+         * Warning messages. Indicates potential issues or unexpected conditions.
+         */
         Warning = 2,
+        /**
+         * Error messages. Indicates errors that need attention. Least verbose.
+         */
         Error = 3,
     }
 }

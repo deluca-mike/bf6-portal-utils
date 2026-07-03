@@ -13,7 +13,7 @@ export default [
         languageOptions: {
             parser: tseslint.parser,
             parserOptions: {
-                ecmaVersion: 2022,
+                ecmaVersion: 2020,
                 sourceType: 'module',
                 project: './tsconfig.json',
             },

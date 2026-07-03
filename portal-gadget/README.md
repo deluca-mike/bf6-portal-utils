@@ -108,7 +108,7 @@ type Handler = (player: mod.Player, isZooming: boolean, getTarget: () => Promise
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the Portal Gadget module. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the Portal Gadget module. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
 | `onFireStart(handler: Handler): () => void` | Subscribes a handler for enriched fire-start events. Returns an unsubscribe function you should call during teardown. |
 | `onFireStop(handler: Handler): () => void` | Subscribes a handler for enriched fire-stop events. Returns an unsubscribe function you should call during teardown. |
 | `getLaserTarget(player: mod.Player): Promise<mod.Vector \| undefined>` | Computes and raycasts the player's current Portal Gadget laser and returns the target hit point, or `undefined` if no hit is detected. |

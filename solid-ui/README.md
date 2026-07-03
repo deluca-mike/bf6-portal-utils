@@ -187,7 +187,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `SolidUI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeError?: boolean): void`
+#### `SolidUI.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the SolidUI module. Effect errors, flush errors, and scheduler limit messages are automatically caught and logged using the configured logger. This allows you to monitor and debug reactive system failures without breaking your UI.
 
@@ -195,7 +195,7 @@ Configures logging for the SolidUI module. Effect errors, flush errors, and sche
 
 - `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
-- `includeError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
+- `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
 **Example:**
 
@@ -206,7 +206,7 @@ import { SolidUI } from 'bf6-portal-utils/solid-ui';
 SolidUI.setLogging(
     (text) => console.log(text),
     SolidUI.LogLevel.Error,
-    true // includeError
+    true // includeRawError
 );
 ```
 

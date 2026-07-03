@@ -1,4 +1,4 @@
-// version: 1.0.2
+// version: 1.1.0
 export class Logging {
     constructor(tag: string) {
         this._tag = tag;
@@ -8,9 +8,9 @@ export class Logging {
 
     private _logLevel: Logging.LogLevel = Logging.LogLevel.Info;
 
-    private _includeError: boolean = false;
+    private _includeRawError: boolean = false;
 
-    private _logger?: (text: string) => Promise<void> | void;
+    private _logger?: (text: string, error?: unknown) => Promise<void> | void;
 
     /**
      * Safely converts an error of unknown type to a string.
@@ -54,35 +54,39 @@ export class Logging {
         if (!this._logger || logLevel < this._logLevel) return;
 
         try {
-            const errorText = this._includeError && error ? ` - Error: ${this._safeErrorToString(error)}` : '';
-            const result = this._logger(`<${this._tag}> ${text}${errorText}`);
+            const errorText = this._includeRawError && error ? ` - Error: ${this._safeErrorToString(error)}` : '';
+            const result = this._logger(`<${this._tag}> ${text}${errorText}`, error);
 
             if (result instanceof Promise) {
-                result.catch((error) => {
+                result.catch((loggingError) => {
                     // Catch and log async logger errors to prevent unhandled promise rejections.
-                    console.log(`<${this._tag}> Error in async logger:`, error);
+                    console.log(`<${this._tag}> Error in async logger:`, loggingError);
                 });
             }
-        } catch (error: unknown) {
+        } catch (logError: unknown) {
             // Catch and log sync logger errors so the logging functionality can still run.
-            console.log(`<${this._tag}> Error in sync logger:`, error);
+            console.log(`<${this._tag}> Error in sync logger:`, logError);
         }
     }
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to attempt to include the runtime error, if any, as a string in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     public setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
         this._logger = log;
         this._logLevel = logLevel ?? Logging.LogLevel.Warning;
-        this._includeError = includeError ?? false;
+        this._includeRawError = includeRawError ?? false;
     }
 }
 
@@ -91,9 +95,21 @@ export namespace Logging {
      * The log levels.
      */
     export enum LogLevel {
+        /**
+         * Debug-level messages. Most verbose, typically used during development.
+         */
         Debug = 0,
+        /**
+         * Informational messages. General operational information.
+         */
         Info = 1,
+        /**
+         * Warning messages. Indicates potential issues or unexpected conditions.
+         */
         Warning = 2,
+        /**
+         * Error messages. Indicates errors that need attention. Least verbose.
+         */
         Error = 3,
     }
 }

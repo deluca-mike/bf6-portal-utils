@@ -9,19 +9,21 @@ export declare namespace MapDetector {
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
+     * @param includeRawError - Whether to include the runtime error in the log.
      */
     function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void;
     /**
      * The maps supported by the MapDetector module.
      */
     enum Map {
         Area22B = 'Area 22B',
+        Bellum1988sOperationMetro = "Bellum1988's Operation Metro",
         BlackwellFields = 'Blackwell Fields',
+        CairoBazaar = 'Cairo Bazaar',
         Complex3 = 'Complex 3',
         Contaminated = 'Contaminated',
         DefenseNexus = 'Defense Nexus',
@@ -29,6 +31,7 @@ export declare namespace MapDetector {
         Eastwood = 'Eastwood',
         EmpireState = 'Empire State',
         GolfCourse = 'Golf Course',
+        RailwaytoGolmud = 'Railway to Golmud',
         IberianOffensive = 'Iberian Offensive',
         LiberationPeak = 'Liberation Peak',
         ManhattanBridge = 'Manhattan Bridge',

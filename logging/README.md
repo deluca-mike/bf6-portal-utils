@@ -2,9 +2,9 @@
 
 <ai>
 
-This TypeScript `Logging` class provides a fail-safe logging abstraction for Battlefield Portal experience developers. It abstracts away the logic to log text and errors to an arbitrary logging method in a fail-safe way, with configurable log level filtering. The class can be used directly within a BF6 Portal experience or can be used within other modules to provide consistent, safe logging functionality.
+This TypeScript `Logging` class provides a fail-safe logging abstraction for Battlefield Portal experience developers. It abstracts away the logic to log text and errors to an arbitrary logging function in a fail-safe way, with configurable log level filtering. The class can be used directly within a BF6 Portal experience or can be used within other modules to provide consistent, safe logging functionality.
 
-Key features include fail-safe error handling that prevents logging failures from crashing your mod, configurable log level filtering to control verbosity, optional error message inclusion, support for both synchronous and asynchronous logger functions, and automatic error-to-string conversion that safely handles any error type.
+Key features include fail-safe error handling that prevents logging failures from crashing your mod, configurable log level filtering to control verbosity, optional error message inclusion in the formatted text, support for both synchronous and asynchronous logging functions, automatic error-to-string conversion for that suffix, and a **second callback argument** so your logging function receives the raw `error` value from `log()` (for example `instanceof Error` checks and `stack` access) independent of `includeRawError`.
 
 </ai>
 
@@ -32,7 +32,7 @@ import { Logging } from 'bf6-portal-utils/logging';
 const logging = new Logging('MyMod');
 
 export async function OnGameModeStarted(): Promise<void> {
-    // Set up logging with console.log, minimum log level of Warning, and include errors
+    // Set up logging with console.log, minimum log level of Warning, and include error messages in the text.
     logging.setLogging((text) => console.log(text), Logging.LogLevel.Warning, true);
 
     // Log an info message
@@ -63,28 +63,27 @@ import { Logging } from '../logging/index.ts';
 export namespace MyModule {
     const logging = new Logging('MyModule');
 
-    /**
-     * Re-export LogLevel enum for convenience for controlling logging verbosity.
-     */
+    // Re-export LogLevel enum for convenience for controlling logging verbosity.
     export const LogLevel = Logging.LogLevel;
 
-    /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
-     * @param logLevel - The minimum log level to use.
-     * @param includeError - Whether to include the runtime error in the log.
-     */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
-        includeError?: boolean
+        includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeError);
+        logging.setLogging(log, logLevel, includeRawError);
     }
 
     export function doSomething(): void {
-        // Use the logging internally
         logging.log('Doing something', Logging.LogLevel.Info);
+    }
+
+    export function trySomething(): void {
+        try {
+            somethingThatMightFail();
+        } catch (error: unknown) {
+            logging.log('Something failed', Logging.LogLevel.Error, error);
+        }
     }
 }
 
@@ -102,7 +101,7 @@ export namespace MyModule {
 
 - **Log Level Filtering** – Messages are only logged if their log level meets or exceeds the configured minimum log level. This allows you to control verbosity at runtime without modifying code.
 
-- **Error Handling** – Errors of any type can be passed to the `log()` method. The class safely converts errors to strings using multiple fallback strategies, ensuring that even malformed error objects can be logged.
+- **Error Handling** – Errors of any type can be passed to the `log()` method. The same value is forwarded as the logger callback’s optional second argument (`error?: unknown`), so your sink can inspect real `Error` instances (for example `stack`) or other thrown values. Separately, when `includeRawError` is true, a safe string form of the error is also appended to the first argument (the formatted line).
 
 - **Tagged Logging** – Each instance is created with a unique tag that prefixes all log messages, making it easy to identify the source of log entries in multi-module experiences.
 
@@ -124,9 +123,9 @@ export namespace MyModule {
 
 | Method | Description |
 | --- | --- |
-| `log(text: string, logLevel?: LogLevel, error?: unknown): void` | Logs a message with the specified log level and optional error. The message is only logged if a logger is attached and the log level meets the minimum threshold. If `includeError` is enabled and an error is provided, it will be appended to the message. Default log level is `Warning`. |
+| `log(text: string, logLevel?: LogLevel, error?: unknown): void` | Logs a message with the specified log level and optional error. The message is only logged if a logger is attached and the log level meets the minimum threshold. If `includeRawError` is enabled and an error is provided, it will be appended to the message. Default log level is `Warning`. |
 | `willLog(logLevel: LogLevel): boolean` | Checks if a message with the given log level would actually be logged. Use this to avoid building expensive log messages when logging is disabled or below the threshold. Returns `true` if logging will occur, `false` otherwise. |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Attaches a logger function and configures the minimum log level and error inclusion. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeError` is `false`. |
+| `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger function and configures the minimum log level and error suffix on the formatted text. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. The callback always receives the formatted message as the first argument; the second is the optional `error` passed to `log()` (same reference/value, not re-stringified by the class beyond the optional suffix in `text`). |
 
 ### `namespace Logging`
 
@@ -155,7 +154,7 @@ import { Logging } from 'bf6-portal-utils/logging';
 const logging = new Logging('MyMod');
 
 export async function OnGameModeStarted(): Promise<void> {
-    // Set up logging
+    // Set up logging (second callback arg is omitted when log() had no error)
     logging.setLogging((text) => console.log(text), Logging.LogLevel.Info);
 
     // Log messages at different levels
@@ -174,19 +173,23 @@ import { Logging } from 'bf6-portal-utils/logging';
 const logging = new Logging('MyMod');
 
 export async function OnGameModeStarted(): Promise<void> {
-    // Enable error inclusion
+    // includeRawError: append a safe string form to `text`; second arg is always the raw value from log()
     logging.setLogging(
-        (text) => console.log(text),
+        (text, err) => {
+            console.log(text);
+
+            if (err instanceof Error) {
+                console.log(err.stack ?? err);
+            }
+        },
         Logging.LogLevel.Warning,
-        true // includeError = true
+        true // also append " - Error: …" to `text`
     );
 
     try {
         riskyOperation();
     } catch (error) {
-        // Error will be appended to the log message
         logging.log('Operation failed', Logging.LogLevel.Error, error);
-        // Output: <MyMod> Operation failed - Error: [error message]
     }
 }
 ```
@@ -199,7 +202,7 @@ import { Logging } from 'bf6-portal-utils/logging';
 const logging = new Logging('MyMod');
 
 export async function OnGameModeStarted(): Promise<void> {
-    logging.setLogging((text) => console.log(text), Logging.LogLevel.Warning);
+    logging.setLogging((text) => console.log(text), Logging.LogLevel.Warning); // error param omitted when unused
 
     // Avoid expensive string building if logging won't occur
     if (logging.willLog(Logging.LogLevel.Debug)) {
@@ -216,9 +219,9 @@ import { Logging } from 'bf6-portal-utils/logging';
 
 const logging = new Logging('MyMod');
 
-async function asyncLogger(text: string): Promise<void> {
+async function asyncLogger(text: string, error?: unknown): Promise<void> {
     // Simulate async logging (e.g., sending to external service)
-    await someAsyncLoggingService.log(text);
+    await someAsyncLoggingService.log(text, error);
 }
 
 export async function OnGameModeStarted(): Promise<void> {
@@ -273,7 +276,9 @@ The `Logging` class implements fail-safe logging with the following mechanisms:
 
 4. **Tagged Messages** – All log messages are prefixed with `<tag>` where `tag` is the value provided to the constructor. This makes it easy to identify the source of log entries in multi-module experiences.
 
-5. **Optional Error Inclusion** – If `includeError` is enabled and an error is provided to `log()`, the error is converted to a string and appended to the message in the format ` - Error: [error string]`.
+5. **Optional Error Inclusion in Text** – If `includeRawError` is enabled and an error is provided to `log()`, `_safeErrorToString()` is used and the result is appended to the first callback argument in the format ` - Error: [error string]`.
+
+6. **Raw Error Forwarding** – Regardless of `includeRawError`, the logger is invoked as `logger(formattedText, error)` where `error` is the same optional third argument passed to `log()` (`undefined` if omitted). Your implementation can branch on `instanceof Error` to read `stack`, or handle non-`Error` throws (like Promise rejections) without losing the original value.
 
 ---
 
@@ -281,7 +286,9 @@ The `Logging` class implements fail-safe logging with the following mechanisms:
 
 ## Known Limitations & Caveats
 
-- **Error String Conversion Limitations** – While the class safely converts errors to strings, complex error objects may lose information in the conversion process. Only the error message (for `Error` instances) or the result of `String()` conversion is preserved. Also, while a logger like `console.log` can easily accept complex and log error objects or strings, other UI loggers (like the `Logger` module) may not, so consider `includeError = false` unless necessary.
+- **Error String Conversion vs Raw Value** – The suffix appended to `text` when `includeRawError` is true uses `_safeErrorToString()` only (message for `Error`, else `String()`, with fallbacks). Rich fields are not serialized there. Use the callback’s second argument when you need the original thrown value, `Error.stack`, or custom error types.
+
+- **Sinks That Only Accept Strings** – If your backend or UI logger cannot accept arbitrary `unknown` values, ignore the second parameter and rely on `text` only; set `includeRawError = true` if you need a short string summary on the line.
 
 - **Async Logger Timing** – If a logger function returns a `Promise`, the `log()` method does not await it. The promise is handled in a fire-and-forget manner to prevent blocking. This means you cannot rely on the log operation completing before your code continues.
 

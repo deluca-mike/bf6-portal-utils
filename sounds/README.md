@@ -112,7 +112,7 @@ Re-exported from the **`Logging`** module for use with **`Sounds.setLogging()`**
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeError?: boolean): void` | Configures logging for the Sounds module. Pass **`undefined`** for **`log`** to disable. Default minimum level and **`includeError`** follow the same pattern as other utils modules; see [`Logging`](../logging/README.md). |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the Sounds module. Pass **`undefined`** for **`log`** to disable. Default minimum level and **`includeRawError`** follow the same pattern as other utils modules; see [`Logging`](../logging/README.md). |
 
 #### Classes
 
