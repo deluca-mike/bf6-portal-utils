@@ -12,6 +12,7 @@ namespace EventsTypes {
     export const Type = {
         OngoingGlobal,
         OngoingAreaTrigger,
+        OngoingBomb,
         OngoingCapturePoint,
         OngoingEmplacementSpawner,
         OngoingHQ,
@@ -36,11 +37,15 @@ namespace EventsTypes {
         OnAIWaypointIdleFailed,
         OnAIWaypointIdleRunning,
         OnAIWaypointIdleSucceeded,
+        OnBombDropped,
+        OnBombPickedUp,
+        OnBombStateChanged,
         OnCapturePointCaptured,
         OnCapturePointCapturing,
         OnCapturePointLost,
         OnGameModeEnding,
         OnGameModeStarted,
+        OnGolmudTrainStopped,
         OnMandown,
         OnMCOMArmed,
         OnMCOMDefused,
@@ -355,6 +360,10 @@ export function OngoingAreaTrigger(areaTrigger: mod.AreaTrigger): void {
     Events.OngoingAreaTrigger.trigger(areaTrigger);
 }
 
+export function OngoingBomb(bomb: mod.Bomb): void {
+    Events.OngoingBomb.trigger(bomb);
+}
+
 export function OngoingCapturePoint(capturePoint: mod.CapturePoint): void {
     Events.OngoingCapturePoint.trigger(capturePoint);
 }
@@ -451,6 +460,18 @@ export function OnAIWaypointIdleSucceeded(player: mod.Player): void {
     Events.OnAIWaypointIdleSucceeded.trigger(player);
 }
 
+export function OnBombDropped(bomb: mod.Bomb): void {
+    Events.OnBombDropped.trigger(bomb);
+}
+
+export function OnBombPickedUp(bomb: mod.Bomb): void {
+    Events.OnBombPickedUp.trigger(bomb);
+}
+
+export function OnBombStateChanged(bomb: mod.Bomb): void {
+    Events.OnBombStateChanged.trigger(bomb);
+}
+
 export function OnCapturePointCaptured(capturePoint: mod.CapturePoint): void {
     Events.OnCapturePointCaptured.trigger(capturePoint);
 }
@@ -469,6 +490,10 @@ export function OnGameModeEnding(): void {
 
 export function OnGameModeStarted(): void {
     Events.OnGameModeStarted.trigger();
+}
+
+export function OnGolmudTrainStopped(): void {
+    Events.OnGolmudTrainStopped.trigger();
 }
 
 export function OnMandown(player: mod.Player, otherPlayer: mod.Player): void {
