@@ -8,6 +8,7 @@ declare namespace EventsTypes {
     export const Type: {
         readonly OngoingGlobal: typeof OngoingGlobal;
         readonly OngoingAreaTrigger: typeof OngoingAreaTrigger;
+        readonly OngoingBomb: typeof OngoingBomb;
         readonly OngoingCapturePoint: typeof OngoingCapturePoint;
         readonly OngoingEmplacementSpawner: typeof OngoingEmplacementSpawner;
         readonly OngoingHQ: typeof OngoingHQ;
@@ -32,11 +33,15 @@ declare namespace EventsTypes {
         readonly OnAIWaypointIdleFailed: typeof OnAIWaypointIdleFailed;
         readonly OnAIWaypointIdleRunning: typeof OnAIWaypointIdleRunning;
         readonly OnAIWaypointIdleSucceeded: typeof OnAIWaypointIdleSucceeded;
+        readonly OnBombDropped: typeof OnBombDropped;
+        readonly OnBombPickedUp: typeof OnBombPickedUp;
+        readonly OnBombStateChanged: typeof OnBombStateChanged;
         readonly OnCapturePointCaptured: typeof OnCapturePointCaptured;
         readonly OnCapturePointCapturing: typeof OnCapturePointCapturing;
         readonly OnCapturePointLost: typeof OnCapturePointLost;
         readonly OnGameModeEnding: typeof OnGameModeEnding;
         readonly OnGameModeStarted: typeof OnGameModeStarted;
+        readonly OnGolmudTrainStopped: typeof OnGolmudTrainStopped;
         readonly OnMandown: typeof OnMandown;
         readonly OnMCOMArmed: typeof OnMCOMArmed;
         readonly OnMCOMDefused: typeof OnMCOMDefused;
@@ -171,6 +176,7 @@ declare class EventsImplementation {
     static readonly Type: {
         readonly OngoingGlobal: typeof OngoingGlobal;
         readonly OngoingAreaTrigger: typeof OngoingAreaTrigger;
+        readonly OngoingBomb: typeof OngoingBomb;
         readonly OngoingCapturePoint: typeof OngoingCapturePoint;
         readonly OngoingEmplacementSpawner: typeof OngoingEmplacementSpawner;
         readonly OngoingHQ: typeof OngoingHQ;
@@ -195,11 +201,15 @@ declare class EventsImplementation {
         readonly OnAIWaypointIdleFailed: typeof OnAIWaypointIdleFailed;
         readonly OnAIWaypointIdleRunning: typeof OnAIWaypointIdleRunning;
         readonly OnAIWaypointIdleSucceeded: typeof OnAIWaypointIdleSucceeded;
+        readonly OnBombDropped: typeof OnBombDropped;
+        readonly OnBombPickedUp: typeof OnBombPickedUp;
+        readonly OnBombStateChanged: typeof OnBombStateChanged;
         readonly OnCapturePointCaptured: typeof OnCapturePointCaptured;
         readonly OnCapturePointCapturing: typeof OnCapturePointCapturing;
         readonly OnCapturePointLost: typeof OnCapturePointLost;
         readonly OnGameModeEnding: typeof OnGameModeEnding;
         readonly OnGameModeStarted: typeof OnGameModeStarted;
+        readonly OnGolmudTrainStopped: typeof OnGolmudTrainStopped;
         readonly OnMandown: typeof OnMandown;
         readonly OnMCOMArmed: typeof OnMCOMArmed;
         readonly OnMCOMDefused: typeof OnMCOMDefused;
@@ -285,6 +295,7 @@ declare class EventsImplementation {
 export declare const Events: typeof EventsImplementation & EventsTypes.ChannelsMap;
 export declare function OngoingGlobal(): void;
 export declare function OngoingAreaTrigger(areaTrigger: mod.AreaTrigger): void;
+export declare function OngoingBomb(bomb: mod.Bomb): void;
 export declare function OngoingCapturePoint(capturePoint: mod.CapturePoint): void;
 export declare function OngoingEmplacementSpawner(emplacementSpawner: mod.EmplacementSpawner): void;
 export declare function OngoingHQ(hq: mod.HQ): void;
@@ -309,11 +320,15 @@ export declare function OnAIParachuteSucceeded(player: mod.Player): void;
 export declare function OnAIWaypointIdleFailed(player: mod.Player): void;
 export declare function OnAIWaypointIdleRunning(player: mod.Player): void;
 export declare function OnAIWaypointIdleSucceeded(player: mod.Player): void;
+export declare function OnBombDropped(bomb: mod.Bomb): void;
+export declare function OnBombPickedUp(bomb: mod.Bomb): void;
+export declare function OnBombStateChanged(bomb: mod.Bomb): void;
 export declare function OnCapturePointCaptured(capturePoint: mod.CapturePoint): void;
 export declare function OnCapturePointCapturing(capturePoint: mod.CapturePoint): void;
 export declare function OnCapturePointLost(capturePoint: mod.CapturePoint): void;
 export declare function OnGameModeEnding(): void;
 export declare function OnGameModeStarted(): void;
+export declare function OnGolmudTrainStopped(): void;
 export declare function OnMandown(player: mod.Player, otherPlayer: mod.Player): void;
 export declare function OnMCOMArmed(mcom: mod.MCOM): void;
 export declare function OnMCOMDefused(mcom: mod.MCOM): void;
