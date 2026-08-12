@@ -1,13 +1,15 @@
 {
     "name": "bf6-portal-utils",
-    "version": "9.4.0",
+    "version": "10.0.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
     "engines": {
         "node": ">=24.0.0"
     },
     "scripts": {
-        "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}'",
+        "test": "vitest run --exclude '**/*memory.test.ts'",
+        "test:memory": "vitest run memory.test.ts",
+        "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}' --log-level warn",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "build:types": "tsc --project tsconfig.build.json && npm run prettier",
@@ -27,14 +29,16 @@
         "@types/node": "^25.3.0",
         "@typescript-eslint/eslint-plugin": "^8.56.0",
         "@typescript-eslint/parser": "^8.56.0",
-        "bf6-portal-mod-types": "^4.1.0",
+        "bf6-portal-mod-types": "^4.2.0",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-jsdoc": "^62.6.0",
         "eslint-plugin-prettier": "^5.5.5",
         "prettier": "^3.8.1",
+        "quickjs-emscripten": "^0.32.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.56.0"
+        "typescript-eslint": "^8.56.0",
+        "vitest": "^4.1.11"
     }
 }

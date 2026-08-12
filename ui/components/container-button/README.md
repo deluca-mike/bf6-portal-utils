@@ -29,14 +29,14 @@ const button = new UIContainerButton({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.labels.click), // 'Click'
+            label: mod.Message(mod.stringkeys.labels.click), // 'Click'
             anchor: mod.UIAnchor.TopCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
         } as UIContainer.ChildParams<UIText.Params>,
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.labels.me), // 'Me'
+            label: mod.Message(mod.stringkeys.labels.me), // 'Me'
             anchor: mod.UIAnchor.BottomCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
@@ -58,61 +58,48 @@ console.log(innerContainer.children.length); // 2
 
 | Param | Type / Default | Notes |
 | --- | --- | --- |
-| All parameters from `UIButton.Params`, plus: |
+| All parameters from `UIBaseButton.Params`, plus: |
 | All parameters from `UIContainer.Params`: |
 | `childrenParams` | `Array<UIContainer.ChildParams<any>>` | Nested elements automatically receive the inner container as `parent`. |
 | `padding` | `number = 0` | Container padding. |
 
 For complete parameter lists, see:
 
-- [UIButton Documentation](../button/README.md) – For button-specific parameters
+- [UIBaseButton Documentation](../base-button/README.md) – For button-specific parameters
 - [UIContainer Documentation](../container/README.md) – For container-specific parameters
 
 ---
 
 ## Properties & Methods
 
-### Inherited from `UI.Element`
+### Inherited from `UIBaseButton` / `UI.Element`
 
-`UIContainerButton` inherits all properties and methods from `UI.Element`, including:
+`UIContainerButton` inherits all properties from `UIBaseButton` and `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
+- **Background**: `bgColor`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`, `isValid`
+- **Parent Management**: `parent`
+- **Button State**: `enabled`
+- **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 
-For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
-
-### Delegated from Internal Button
-
-All button properties are delegated from the internal `UIButton` instance:
-
-- **Button State**: `enabled`, `setEnabled()`
-- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode) and [UIBaseButton documentation](../base-button/README.md).
 
 ### ContainerButton-Specific
 
 - **`innerContainer: UIContainer`** (getter) – The inner container that holds child elements. Use this to access and manage the container's children.
-
 - **`padding: number`** (getter/setter) – Container padding. The inner container's size is automatically adjusted to account for padding.
-
-- **`setPadding(padding: number): UIContainerButton`** – Sets padding and returns `this` for method chaining.
 
 ### Overrides
 
 - **`width: number`** (getter/setter) – Setting width also updates the button widget and inner container width, accounting for padding.
-
 - **`height: number`** (getter/setter) – Setting height also updates the button widget and inner container height, accounting for padding.
-
 - **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and inner container size, accounting for padding.
-
-- **`setSize(params: UI.Size): UIContainerButton`** – Sets size for container, button, and inner container, returns `this`.
 
 ---
 
@@ -121,7 +108,7 @@ All button properties are delegated from the internal `UIButton` instance:
 ### `UIContainerButton.Params`
 
 ```ts
-type Params = UIButton.Params & UIContainer.Params;
+type Params = UIBaseButton.Params & UIContainer.Params;
 ```
 
 ---
@@ -131,14 +118,9 @@ type Params = UIButton.Params & UIContainer.Params;
 ## Usage Notes
 
 - **Inner Container Access**: Use the `innerContainer` property to access the container that holds child elements. You can use this to manage children, check the children array, etc.
-
 - **Child Management**: Children added via `childrenParams` are automatically added to the inner container, not the button itself. Use `innerContainer.children` to access them.
-
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (outer container, button, and inner container), ensuring they stay in sync.
-
 - **Padding**: The component supports padding, which creates space between the button border and the inner container. The inner container's size is automatically adjusted to account for padding.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 </ai>
 

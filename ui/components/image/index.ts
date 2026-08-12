@@ -1,92 +1,76 @@
 import { UI } from '../../index.ts';
 
-// version: 2.0.0
+// version: 9.0.0
 export class UIImage extends UI.Element {
-    protected _imageType: mod.UIImageType;
-    protected _imageColor: mod.Vector;
-    protected _imageAlpha: number;
-
     /**
      * Creates a new image.
      * @param params - The parameters for the image.
      */
     public constructor(params: UIImage.Params) {
+        super(params);
+
+        if (!this._isValid) return;
+
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 0,
-            bgFill: params.bgFill ?? mod.UIBgFill.None,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const receiver = this._receiver!;
+        const name = this._name;
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 0;
+        const bgFill = params.bgFill ?? mod.UIBgFill.None;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const imageColor = params.imageColor ?? UI.COLORS.WHITE;
         const imageAlpha = params.imageAlpha ?? 1;
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.UIImageType, // imageType
-            mod.Vector, // imageColor
-            number, // imageAlpha
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            0,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            params.imageType,
-            imageColor,
-            imageAlpha,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIImage(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.imageType,
+                imageColor,
+                imageAlpha,
+                depth
+            );
         } else {
-            mod.AddUIImage(...args, receiver.nativeReceiver);
+            mod.AddUIImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.imageType,
+                imageColor,
+                imageAlpha,
+                depth,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
-
-        this._imageType = params.imageType;
-        this._imageColor = imageColor;
-        this._imageAlpha = imageAlpha;
+        this._bindNativeWidget(name);
     }
 
     /**
-     * The type of the image.
+     * The type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    public get imageType(): mod.UIImageType {
-        return this._imageType;
+    public get imageType(): mod.UIImageType | undefined {
+        return this._isValid ? mod.GetUIImageType(this._uiWidget) : undefined;
     }
 
     /**
@@ -94,26 +78,28 @@ export class UIImage extends UI.Element {
      * @param imageType - The new type of the image.
      */
     public set imageType(imageType: mod.UIImageType) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIImageType(this._uiWidget, (this._imageType = imageType));
+        this.setImageType(imageType);
     }
 
     /**
-     * Sets the type of the image. Useful for chaining operations.
+     * Sets the type of the image.
      * @param imageType - The new type of the image.
-     * @returns This element instance.
+     * @returns This image for chaining.
      */
     public setImageType(imageType: mod.UIImageType): this {
-        this.imageType = imageType;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIImageType(this._uiWidget, imageType);
+
         return this;
     }
 
     /**
-     * The alpha of the image.
+     * The alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
      */
-    public get imageAlpha(): number {
-        return this._imageAlpha;
+    public get imageAlpha(): number | undefined {
+        return this._isValid ? mod.GetUIImageAlpha(this._uiWidget) : undefined;
     }
 
     /**
@@ -121,26 +107,28 @@ export class UIImage extends UI.Element {
      * @param alpha - The new alpha of the image.
      */
     public set imageAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIImageAlpha(this._uiWidget, (this._imageAlpha = alpha));
+        this.setImageAlpha(alpha);
     }
 
     /**
-     * Sets the alpha of the image. Useful for chaining operations.
+     * Sets the alpha of the image.
      * @param alpha - The new alpha of the image.
-     * @returns This element instance.
+     * @returns This image for chaining.
      */
     public setImageAlpha(alpha: number): this {
-        this.imageAlpha = alpha;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIImageAlpha(this._uiWidget, alpha);
+
         return this;
     }
 
     /**
-     * The color of the image.
+     * The color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
      */
-    public get imageColor(): mod.Vector {
-        return this._imageColor;
+    public get imageColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUIImageColor(this._uiWidget) : undefined;
     }
 
     /**
@@ -148,18 +136,19 @@ export class UIImage extends UI.Element {
      * @param color - The new color of the image.
      */
     public set imageColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIImageColor(this._uiWidget, (this._imageColor = color));
+        this.setImageColor(color);
     }
 
     /**
-     * Sets the color of the image. Useful for chaining operations.
+     * Sets the color of the image.
      * @param color - The new color of the image.
-     * @returns This element instance.
+     * @returns This image for chaining.
      */
     public setImageColor(color: mod.Vector): this {
-        this.imageColor = color;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIImageColor(this._uiWidget, color);
+
         return this;
     }
 }

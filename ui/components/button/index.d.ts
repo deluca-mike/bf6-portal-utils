@@ -1,19 +1,5 @@
-import { UI } from '../../index.ts';
-export declare class UIButton extends UI.Element implements UI.Button {
-    protected _enabled: boolean;
-    protected _baseColor: mod.Vector;
-    protected _baseAlpha: number;
-    protected _disabledColor: mod.Vector;
-    protected _disabledAlpha: number;
-    protected _pressedColor: mod.Vector;
-    protected _pressedAlpha: number;
-    protected _focusedColor: mod.Vector;
-    protected _focusedAlpha: number;
-    protected _onClickDown?: UI.ButtonHandler;
-    protected _onClickUp?: UI.ButtonHandler;
-    protected _onFocusIn?: UI.ButtonHandler;
-    protected _onFocusOut?: UI.ButtonHandler;
-    protected _unregisterAsButton: () => void;
+import { UIBaseButton } from '../base-button/index.ts';
+export declare class UIButton extends UIBaseButton {
     /**
      * Creates a new button.
      * @param params - The parameters for the button.
@@ -22,222 +8,153 @@ export declare class UIButton extends UI.Element implements UI.Button {
      */
     constructor(params: UIButton.Params);
     /**
-     * @inheritdoc
+     * Whether the button is enabled, or undefined if deleted.
+     * @returns True if enabled, false if disabled, or undefined if deleted.
      */
-    delete(): void;
-    /**
-     * Whether the button is enabled.
-     */
-    get enabled(): boolean;
+    get enabled(): boolean | undefined;
     /**
      * Sets whether the button is enabled.
      * @param enabled - The new enabled state.
      */
     set enabled(enabled: boolean);
     /**
-     * Sets whether the button is enabled. Useful for chaining operations.
+     * Sets whether the button is enabled.
      * @param enabled - The new enabled state.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setEnabled(enabled: boolean): this;
     /**
-     * The base color of the button.
+     * The base color of the button, or undefined if deleted.
+     * @returns The base color vector, or undefined if deleted.
      */
-    get baseColor(): mod.Vector;
+    get baseColor(): mod.Vector | undefined;
     /**
      * Sets the base color of the button.
      * @param color - The new base color.
      */
     set baseColor(color: mod.Vector);
     /**
-     * Sets the base color of the button. Useful for chaining operations.
+     * Sets the base color of the button.
      * @param color - The new base color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setBaseColor(color: mod.Vector): this;
     /**
-     * The base alpha of the button.
+     * The base alpha of the button, or undefined if deleted.
+     * @returns The base alpha opacity, or undefined if deleted.
      */
-    get baseAlpha(): number;
+    get baseAlpha(): number | undefined;
     /**
      * Sets the base alpha of the button.
      * @param alpha - The new base alpha.
      */
     set baseAlpha(alpha: number);
     /**
-     * Sets the base alpha of the button. Useful for chaining operations.
+     * Sets the base alpha of the button.
      * @param alpha - The new base alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setBaseAlpha(alpha: number): this;
     /**
-     * The disabled color of the button.
+     * The disabled color of the button, or undefined if deleted.
+     * @returns The disabled color vector, or undefined if deleted.
      */
-    get disabledColor(): mod.Vector;
+    get disabledColor(): mod.Vector | undefined;
     /**
      * Sets the disabled color of the button.
      * @param color - The new disabled color.
      */
     set disabledColor(color: mod.Vector);
     /**
-     * Sets the disabled color of the button. Useful for chaining operations.
+     * Sets the disabled color of the button.
      * @param color - The new disabled color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setDisabledColor(color: mod.Vector): this;
     /**
-     * The disabled alpha of the button.
+     * The disabled alpha of the button, or undefined if deleted.
+     * @returns The disabled alpha opacity, or undefined if deleted.
      */
-    get disabledAlpha(): number;
+    get disabledAlpha(): number | undefined;
     /**
      * Sets the disabled alpha of the button.
      * @param alpha - The new disabled alpha.
      */
     set disabledAlpha(alpha: number);
     /**
-     * Sets the disabled alpha of the button. Useful for chaining operations.
+     * Sets the disabled alpha of the button.
      * @param alpha - The new disabled alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setDisabledAlpha(alpha: number): this;
     /**
-     * The pressed color of the button.
+     * The pressed color of the button, or undefined if deleted.
+     * @returns The pressed color vector, or undefined if deleted.
      */
-    get pressedColor(): mod.Vector;
+    get pressedColor(): mod.Vector | undefined;
     /**
      * Sets the pressed color of the button.
      * @param color - The new pressed color.
      */
     set pressedColor(color: mod.Vector);
     /**
-     * Sets the pressed color of the button. Useful for chaining operations.
+     * Sets the pressed color of the button.
      * @param color - The new pressed color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
-    setColorPressed(color: mod.Vector): this;
+    setPressedColor(color: mod.Vector): this;
     /**
-     * The pressed alpha of the button.
+     * The pressed alpha of the button, or undefined if deleted.
+     * @returns The pressed alpha opacity, or undefined if deleted.
      */
-    get pressedAlpha(): number;
+    get pressedAlpha(): number | undefined;
     /**
      * Sets the pressed alpha of the button.
      * @param alpha - The new pressed alpha.
      */
     set pressedAlpha(alpha: number);
     /**
-     * Sets the pressed alpha of the button. Useful for chaining operations.
+     * Sets the pressed alpha of the button.
      * @param alpha - The new pressed alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setPressedAlpha(alpha: number): this;
     /**
-     * The focused color of the button.
+     * The focused color of the button, or undefined if deleted.
+     * @returns The focused color vector, or undefined if deleted.
      */
-    get focusedColor(): mod.Vector;
+    get focusedColor(): mod.Vector | undefined;
     /**
      * Sets the focused color of the button.
      * @param color - The new focused color.
      */
     set focusedColor(color: mod.Vector);
     /**
-     * Sets the focused color of the button. Useful for chaining operations.
+     * Sets the focused color of the button.
      * @param color - The new focused color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setFocusedColor(color: mod.Vector): this;
     /**
-     * The focused alpha of the button.
+     * The focused alpha of the button, or undefined if deleted.
+     * @returns The focused alpha opacity, or undefined if deleted.
      */
-    get focusedAlpha(): number;
+    get focusedAlpha(): number | undefined;
     /**
      * Sets the focused alpha of the button.
      * @param alpha - The new focused alpha.
      */
     set focusedAlpha(alpha: number);
     /**
-     * Sets the focused alpha of the button. Useful for chaining operations.
+     * Sets the focused alpha of the button.
      * @param alpha - The new focused alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     setFocusedAlpha(alpha: number): this;
-    /**
-     * The click down handler of the button.
-     */
-    get onClickDown(): UI.ButtonHandler | undefined;
-    /**
-     * Sets the click down handler of the button.
-     * @param onClickDown - The new click down handler.
-     */
-    set onClickDown(onClickDown: UI.ButtonHandler | undefined);
-    /**
-     * Sets the click handler of the button. Useful for chaining operations.
-     * @param onClick - The new click handler.
-     * @returns This element instance.
-     */
-    setOnClickDown(onClickDown?: UI.ButtonHandler): this;
-    /**
-     * The click up handler of the button.
-     */
-    get onClickUp(): UI.ButtonHandler | undefined;
-    /**
-     * Sets the click up handler of the button.
-     * @param onClickUp - The new click up handler.
-     */
-    set onClickUp(onClickUp: UI.ButtonHandler | undefined);
-    /**
-     * Sets the click handler of the button. Useful for chaining operations.
-     * @param onClickUp - The new click up handler.
-     * @returns This element instance.
-     */
-    setOnClickUp(onClickUp?: UI.ButtonHandler): this;
-    /**
-     * The focus in handler of the button.
-     */
-    get onFocusIn(): UI.ButtonHandler | undefined;
-    /**
-     * Sets the focus in handler of the button.
-     * @param onFocusIn - The new focus in handler.
-     */
-    set onFocusIn(onFocusIn: UI.ButtonHandler | undefined);
-    /**
-     * Sets the focus in handler of the button. Useful for chaining operations.
-     * @param onFocusIn - The new focus in handler.
-     * @returns This element instance.
-     */
-    setOnFocusIn(onFocusIn?: UI.ButtonHandler): this;
-    /**
-     * The focus out handler of the button.
-     */
-    get onFocusOut(): UI.ButtonHandler | undefined;
-    /**
-     * Sets the focus out handler of the button.
-     * @param onFocusOut - The new focus out handler.
-     */
-    set onFocusOut(onFocusOut: UI.ButtonHandler | undefined);
-    /**
-     * Sets the focus out handler of the button. Useful for chaining operations.
-     * @param onFocusOut - The new focus out handler.
-     * @returns This element instance.
-     */
-    setOnFocusOut(onFocusOut?: UI.ButtonHandler): this;
 }
 export declare namespace UIButton {
-    /**
-     * The parameters for creating a new button.
-     */
-    type Params = UI.ElementParams & {
-        enabled?: boolean;
-        baseColor?: mod.Vector;
-        baseAlpha?: number;
-        disabledColor?: mod.Vector;
-        disabledAlpha?: number;
-        pressedColor?: mod.Vector;
-        pressedAlpha?: number;
-        focusedColor?: mod.Vector;
-        focusedAlpha?: number;
-        onClickDown?: UI.ButtonHandler;
-        onClickUp?: UI.ButtonHandler;
-        onFocusIn?: UI.ButtonHandler;
-        onFocusOut?: UI.ButtonHandler;
-    };
+    export import Event = UIBaseButton.Event;
+    type Handlers = UIBaseButton.Handlers;
+    type Styling = UIBaseButton.Styling;
+    type Params = UIBaseButton.Params;
 }

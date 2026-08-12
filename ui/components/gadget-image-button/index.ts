@@ -3,14 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIGadgetImage } from '../gadget-image/index.ts';
 
-// version: 1.0.2
+// version: 9.0.0
 export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
-    // UIGadgetImage properties (delegated via delegateProperties)
-    declare public gadget: mod.Gadgets;
-
-    // UIGadgetImage setter methods (delegated via delegateProperties)
-    declare public setGadget: (gadget: mod.Gadgets) => this;
-
     /**
      * Creates a new gadget image button.
      * @param params - The parameters for the gadget image button.
@@ -28,7 +22,15 @@ export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
             return new UIGadgetImage(gadgetImageParams);
         };
 
-        super(params, createContent, ['gadget'] as readonly string[]);
+        super(params, createContent);
+    }
+
+    /**
+     * The gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    public get gadget(): mod.Gadgets | undefined {
+        return this._isValid ? this.content?.gadget : undefined;
     }
 }
 

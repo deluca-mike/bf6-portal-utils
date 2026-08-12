@@ -167,7 +167,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `FFASpawnPoints.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
+#### `FFASpawnPoints.setLogging(log?: (text: string, error?: unknown) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the FFASpawnPoints module. The spawn system logs various events including spawn point selection, queue processing, and warnings. This allows you to monitor and debug spawn behavior.
 

@@ -3,16 +3,8 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIWeaponImage } from '../weapon-image/index.ts';
 
-// version: 1.0.2
+// version: 9.0.0
 export class UIWeaponImageButton extends UIContentButton<UIWeaponImage> {
-    // UIWeaponImage properties (delegated via delegateProperties)
-    declare public weapon: mod.Weapons;
-    declare public weaponPackage: mod.WeaponPackage;
-
-    // UIWeaponImage setter methods (delegated via delegateProperties)
-    declare public setWeapon: (weapon: mod.Weapons) => this;
-    declare public setWeaponPackage: (weaponPackage: mod.WeaponPackage) => this;
-
     /**
      * Creates a new weapon image button.
      * @param params - The parameters for the weapon image button.
@@ -31,7 +23,23 @@ export class UIWeaponImageButton extends UIContentButton<UIWeaponImage> {
             return new UIWeaponImage(weaponImageParams);
         };
 
-        super(params, createContent, ['weapon', 'weaponPackage'] as readonly string[]);
+        super(params, createContent);
+    }
+
+    /**
+     * The weapon of the weapon image button, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
+     */
+    public get weapon(): mod.Weapons | undefined {
+        return this._isValid ? this.content?.weapon : undefined;
+    }
+
+    /**
+     * The weapon package of the weapon image button, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    public get weaponPackage(): mod.WeaponPackage | undefined {
+        return this._isValid ? this.content?.weaponPackage : undefined;
     }
 }
 

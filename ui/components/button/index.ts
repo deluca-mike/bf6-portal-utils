@@ -1,22 +1,8 @@
 import { UI } from '../../index.ts';
+import { UIBaseButton } from '../base-button/index.ts';
 
-// version: 7.0.0
-export class UIButton extends UI.Element implements UI.Button {
-    protected _enabled: boolean;
-    protected _baseColor: mod.Vector;
-    protected _baseAlpha: number;
-    protected _disabledColor: mod.Vector;
-    protected _disabledAlpha: number;
-    protected _pressedColor: mod.Vector;
-    protected _pressedAlpha: number;
-    protected _focusedColor: mod.Vector;
-    protected _focusedAlpha: number;
-    protected _onClickDown?: UI.ButtonHandler;
-    protected _onClickUp?: UI.ButtonHandler;
-    protected _onFocusIn?: UI.ButtonHandler;
-    protected _onFocusOut?: UI.ButtonHandler;
-    protected _unregisterAsButton: () => void;
-
+// version: 9.0.0
+export class UIButton extends UIBaseButton {
     /**
      * Creates a new button.
      * @param params - The parameters for the button.
@@ -24,29 +10,21 @@ export class UIButton extends UI.Element implements UI.Button {
      * Similarly, alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
      */
     public constructor(params: UIButton.Params) {
+        super(params);
+
+        if (!this._isValid) return;
+
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 1,
-            bgFill: params.bgFill ?? mod.UIBgFill.Solid,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const receiver = this._receiver!;
+        const name = this._name;
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 1;
+        const bgFill = params.bgFill ?? mod.UIBgFill.Solid;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const enabled = params.enabled ?? true;
         const baseColor = params.baseColor ?? UI.COLORS.BF_GREY_2;
         const baseAlpha = params.baseAlpha ?? 1;
@@ -57,108 +35,84 @@ export class UIButton extends UI.Element implements UI.Button {
         const focusedColor = params.focusedColor ?? UI.COLORS.BF_GREY_1;
         const focusedAlpha = params.focusedAlpha ?? 1;
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            boolean, // enabled
-            mod.Vector, // baseColor
-            number, // baseAlpha
-            mod.Vector, // disabledColor
-            number, // disabledAlpha
-            mod.Vector, // pressedColor
-            number, // pressedAlpha
-            mod.Vector, // hoverColor
-            number, // hoverAlpha
-            mod.Vector, // focusedColor
-            number, // focusedAlpha
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            0,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            enabled,
-            baseColor,
-            baseAlpha,
-            disabledColor,
-            disabledAlpha,
-            pressedColor,
-            pressedAlpha,
-            focusedColor,
-            focusedAlpha,
-            focusedColor,
-            focusedAlpha,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIButton(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIButton(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth
+            );
         } else {
-            mod.AddUIButton(...args, receiver.nativeReceiver);
+            mod.AddUIButton(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
-
-        this._enabled = enabled;
-        this._baseColor = baseColor;
-        this._baseAlpha = baseAlpha;
-        this._disabledColor = disabledColor;
-        this._disabledAlpha = disabledAlpha;
-        this._pressedColor = pressedColor;
-        this._pressedAlpha = pressedAlpha;
-        this._focusedColor = focusedColor;
-        this._focusedAlpha = focusedAlpha;
+        this._bindNativeWidget(name);
 
         if (params.onClickDown) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, true);
-            this._onClickDown = params.onClickDown;
+            this._setButtonHandler(UIBaseButton.Event.ClickDown, params.onClickDown);
         }
 
         if (params.onClickUp) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, true);
-            this._onClickUp = params.onClickUp;
+            this._setButtonHandler(UIBaseButton.Event.ClickUp, params.onClickUp);
         }
 
         if (params.onFocusIn) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, true);
-            this._onFocusIn = params.onFocusIn;
+            this._setButtonHandler(UIBaseButton.Event.FocusIn, params.onFocusIn);
         }
 
         if (params.onFocusOut) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, true);
-            this._onFocusOut = params.onFocusOut;
+            this._setButtonHandler(UIBaseButton.Event.FocusOut, params.onFocusOut);
         }
-
-        this._unregisterAsButton = UI.registerButton(this._name, this);
     }
 
     /**
-     * @inheritdoc
+     * Whether the button is enabled, or undefined if deleted.
+     * @returns True if enabled, false if disabled, or undefined if deleted.
      */
-    public override delete(): void {
-        this._unregisterAsButton();
-        super.delete();
-    }
-
-    /**
-     * Whether the button is enabled.
-     */
-    public get enabled(): boolean {
-        return this._enabled;
+    public get enabled(): boolean | undefined {
+        return this._isValid ? mod.GetUIButtonEnabled(this._uiWidget) : undefined;
     }
 
     /**
@@ -166,26 +120,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param enabled - The new enabled state.
      */
     public set enabled(enabled: boolean) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonEnabled(this._uiWidget, (this._enabled = enabled));
+        this.setEnabled(enabled);
     }
 
     /**
-     * Sets whether the button is enabled. Useful for chaining operations.
+     * Sets whether the button is enabled.
      * @param enabled - The new enabled state.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setEnabled(enabled: boolean): this {
-        this.enabled = enabled;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonEnabled(this._uiWidget, enabled);
+
         return this;
     }
 
     /**
-     * The base color of the button.
+     * The base color of the button, or undefined if deleted.
+     * @returns The base color vector, or undefined if deleted.
      */
-    public get baseColor(): mod.Vector {
-        return this._baseColor;
+    public get baseColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUIButtonColorBase(this._uiWidget) : undefined;
     }
 
     /**
@@ -193,26 +149,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param color - The new base color.
      */
     public set baseColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonColorBase(this._uiWidget, (this._baseColor = color));
+        this.setBaseColor(color);
     }
 
     /**
-     * Sets the base color of the button. Useful for chaining operations.
+     * Sets the base color of the button.
      * @param color - The new base color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setBaseColor(color: mod.Vector): this {
-        this.baseColor = color;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonColorBase(this._uiWidget, color);
+
         return this;
     }
 
     /**
-     * The base alpha of the button.
+     * The base alpha of the button, or undefined if deleted.
+     * @returns The base alpha opacity, or undefined if deleted.
      */
-    public get baseAlpha(): number {
-        return this._baseAlpha;
+    public get baseAlpha(): number | undefined {
+        return this._isValid ? mod.GetUIButtonAlphaBase(this._uiWidget) : undefined;
     }
 
     /**
@@ -220,26 +178,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param alpha - The new base alpha.
      */
     public set baseAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonAlphaBase(this._uiWidget, (this._baseAlpha = alpha));
+        this.setBaseAlpha(alpha);
     }
 
     /**
-     * Sets the base alpha of the button. Useful for chaining operations.
+     * Sets the base alpha of the button.
      * @param alpha - The new base alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setBaseAlpha(alpha: number): this {
-        this.baseAlpha = alpha;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonAlphaBase(this._uiWidget, alpha);
+
         return this;
     }
 
     /**
-     * The disabled color of the button.
+     * The disabled color of the button, or undefined if deleted.
+     * @returns The disabled color vector, or undefined if deleted.
      */
-    public get disabledColor(): mod.Vector {
-        return this._disabledColor;
+    public get disabledColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUIButtonColorDisabled(this._uiWidget) : undefined;
     }
 
     /**
@@ -247,26 +207,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param color - The new disabled color.
      */
     public set disabledColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonColorDisabled(this._uiWidget, (this._disabledColor = color));
+        this.setDisabledColor(color);
     }
 
     /**
-     * Sets the disabled color of the button. Useful for chaining operations.
+     * Sets the disabled color of the button.
      * @param color - The new disabled color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setDisabledColor(color: mod.Vector): this {
-        this.disabledColor = color;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonColorDisabled(this._uiWidget, color);
+
         return this;
     }
 
     /**
-     * The disabled alpha of the button.
+     * The disabled alpha of the button, or undefined if deleted.
+     * @returns The disabled alpha opacity, or undefined if deleted.
      */
-    public get disabledAlpha(): number {
-        return this._disabledAlpha;
+    public get disabledAlpha(): number | undefined {
+        return this._isValid ? mod.GetUIButtonAlphaDisabled(this._uiWidget) : undefined;
     }
 
     /**
@@ -274,26 +236,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param alpha - The new disabled alpha.
      */
     public set disabledAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonAlphaDisabled(this._uiWidget, (this._disabledAlpha = alpha));
+        this.setDisabledAlpha(alpha);
     }
 
     /**
-     * Sets the disabled alpha of the button. Useful for chaining operations.
+     * Sets the disabled alpha of the button.
      * @param alpha - The new disabled alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setDisabledAlpha(alpha: number): this {
-        this.disabledAlpha = alpha;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonAlphaDisabled(this._uiWidget, alpha);
+
         return this;
     }
 
     /**
-     * The pressed color of the button.
+     * The pressed color of the button, or undefined if deleted.
+     * @returns The pressed color vector, or undefined if deleted.
      */
-    public get pressedColor(): mod.Vector {
-        return this._pressedColor;
+    public get pressedColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUIButtonColorPressed(this._uiWidget) : undefined;
     }
 
     /**
@@ -301,26 +265,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param color - The new pressed color.
      */
     public set pressedColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonColorPressed(this._uiWidget, (this._pressedColor = color));
+        this.setPressedColor(color);
     }
 
     /**
-     * Sets the pressed color of the button. Useful for chaining operations.
+     * Sets the pressed color of the button.
      * @param color - The new pressed color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
-    public setColorPressed(color: mod.Vector): this {
-        this.pressedColor = color;
+    public setPressedColor(color: mod.Vector): this {
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonColorPressed(this._uiWidget, color);
+
         return this;
     }
 
     /**
-     * The pressed alpha of the button.
+     * The pressed alpha of the button, or undefined if deleted.
+     * @returns The pressed alpha opacity, or undefined if deleted.
      */
-    public get pressedAlpha(): number {
-        return this._pressedAlpha;
+    public get pressedAlpha(): number | undefined {
+        return this._isValid ? mod.GetUIButtonAlphaPressed(this._uiWidget) : undefined;
     }
 
     /**
@@ -328,26 +294,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param alpha - The new pressed alpha.
      */
     public set pressedAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonAlphaPressed(this._uiWidget, (this._pressedAlpha = alpha));
+        this.setPressedAlpha(alpha);
     }
 
     /**
-     * Sets the pressed alpha of the button. Useful for chaining operations.
+     * Sets the pressed alpha of the button.
      * @param alpha - The new pressed alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setPressedAlpha(alpha: number): this {
-        this.pressedAlpha = alpha;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonAlphaPressed(this._uiWidget, alpha);
+
         return this;
     }
 
     /**
-     * The focused color of the button.
+     * The focused color of the button, or undefined if deleted.
+     * @returns The focused color vector, or undefined if deleted.
      */
-    public get focusedColor(): mod.Vector {
-        return this._focusedColor;
+    public get focusedColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUIButtonColorFocused(this._uiWidget) : undefined;
     }
 
     /**
@@ -355,26 +323,28 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param color - The new focused color.
      */
     public set focusedColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonColorFocused(this._uiWidget, (this._focusedColor = color));
+        this.setFocusedColor(color);
     }
 
     /**
-     * Sets the focused color of the button. Useful for chaining operations.
+     * Sets the focused color of the button.
      * @param color - The new focused color.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setFocusedColor(color: mod.Vector): this {
-        this.focusedColor = color;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIButtonColorFocused(this._uiWidget, color);
+
         return this;
     }
 
     /**
-     * The focused alpha of the button.
+     * The focused alpha of the button, or undefined if deleted.
+     * @returns The focused alpha opacity, or undefined if deleted.
      */
-    public get focusedAlpha(): number {
-        return this._focusedAlpha;
+    public get focusedAlpha(): number | undefined {
+        return this._isValid ? mod.GetUIButtonAlphaFocused(this._uiWidget) : undefined;
     }
 
     /**
@@ -382,171 +352,26 @@ export class UIButton extends UI.Element implements UI.Button {
      * @param alpha - The new focused alpha.
      */
     public set focusedAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIButtonAlphaFocused(this._uiWidget, (this._focusedAlpha = alpha));
+        this.setFocusedAlpha(alpha);
     }
 
     /**
-     * Sets the focused alpha of the button. Useful for chaining operations.
+     * Sets the focused alpha of the button.
      * @param alpha - The new focused alpha.
-     * @returns This element instance.
+     * @returns This button for chaining.
      */
     public setFocusedAlpha(alpha: number): this {
-        this.focusedAlpha = alpha;
-        return this;
-    }
+        if (this._getIsInvalidAndLogWarning()) return this;
 
-    /**
-     * The click down handler of the button.
-     */
-    public get onClickDown(): UI.ButtonHandler | undefined {
-        return this._onClickDown;
-    }
+        mod.SetUIButtonAlphaFocused(this._uiWidget, alpha);
 
-    /**
-     * Sets the click down handler of the button.
-     * @param onClickDown - The new click down handler.
-     */
-    public set onClickDown(onClickDown: UI.ButtonHandler | undefined) {
-        if (this._isDeletedCheck()) return;
-
-        if (onClickDown && !this._onClickDown) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, true);
-        } else if (!onClickDown && this._onClickDown) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, false);
-        }
-
-        this._onClickDown = onClickDown;
-    }
-
-    /**
-     * Sets the click handler of the button. Useful for chaining operations.
-     * @param onClick - The new click handler.
-     * @returns This element instance.
-     */
-    public setOnClickDown(onClickDown?: UI.ButtonHandler): this {
-        this.onClickDown = onClickDown;
-        return this;
-    }
-
-    /**
-     * The click up handler of the button.
-     */
-    public get onClickUp(): UI.ButtonHandler | undefined {
-        return this._onClickUp;
-    }
-
-    /**
-     * Sets the click up handler of the button.
-     * @param onClickUp - The new click up handler.
-     */
-    public set onClickUp(onClickUp: UI.ButtonHandler | undefined) {
-        if (this._isDeletedCheck()) return;
-
-        if (onClickUp && !this._onClickUp) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, true);
-        } else if (!onClickUp && this._onClickUp) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, false);
-        }
-
-        this._onClickUp = onClickUp;
-    }
-
-    /**
-     * Sets the click handler of the button. Useful for chaining operations.
-     * @param onClickUp - The new click up handler.
-     * @returns This element instance.
-     */
-    public setOnClickUp(onClickUp?: UI.ButtonHandler): this {
-        this.onClickUp = onClickUp;
-        return this;
-    }
-
-    /**
-     * The focus in handler of the button.
-     */
-    public get onFocusIn(): UI.ButtonHandler | undefined {
-        return this._onFocusIn;
-    }
-
-    /**
-     * Sets the focus in handler of the button.
-     * @param onFocusIn - The new focus in handler.
-     */
-    public set onFocusIn(onFocusIn: UI.ButtonHandler | undefined) {
-        if (this._isDeletedCheck()) return;
-
-        if (onFocusIn && !this._onFocusIn) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, true);
-        } else if (!onFocusIn && this._onFocusIn) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, false);
-        }
-
-        this._onFocusIn = onFocusIn;
-    }
-
-    /**
-     * Sets the focus in handler of the button. Useful for chaining operations.
-     * @param onFocusIn - The new focus in handler.
-     * @returns This element instance.
-     */
-    public setOnFocusIn(onFocusIn?: UI.ButtonHandler): this {
-        this.onFocusIn = onFocusIn;
-        return this;
-    }
-
-    /**
-     * The focus out handler of the button.
-     */
-    public get onFocusOut(): UI.ButtonHandler | undefined {
-        return this._onFocusOut;
-    }
-
-    /**
-     * Sets the focus out handler of the button.
-     * @param onFocusOut - The new focus out handler.
-     */
-    public set onFocusOut(onFocusOut: UI.ButtonHandler | undefined) {
-        if (this._isDeletedCheck()) return;
-
-        if (onFocusOut && !this._onFocusOut) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, true);
-        } else if (!onFocusOut && this._onFocusOut) {
-            mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, false);
-        }
-
-        this._onFocusOut = onFocusOut;
-    }
-
-    /**
-     * Sets the focus out handler of the button. Useful for chaining operations.
-     * @param onFocusOut - The new focus out handler.
-     * @returns This element instance.
-     */
-    public setOnFocusOut(onFocusOut?: UI.ButtonHandler): this {
-        this.onFocusOut = onFocusOut;
         return this;
     }
 }
 
 export namespace UIButton {
-    /**
-     * The parameters for creating a new button.
-     */
-    export type Params = UI.ElementParams & {
-        enabled?: boolean;
-        baseColor?: mod.Vector;
-        baseAlpha?: number;
-        disabledColor?: mod.Vector;
-        disabledAlpha?: number;
-        pressedColor?: mod.Vector;
-        pressedAlpha?: number;
-        focusedColor?: mod.Vector;
-        focusedAlpha?: number;
-        onClickDown?: UI.ButtonHandler;
-        onClickUp?: UI.ButtonHandler;
-        onFocusIn?: UI.ButtonHandler;
-        onFocusOut?: UI.ButtonHandler;
-    };
+    export import Event = UIBaseButton.Event;
+    export type Handlers = UIBaseButton.Handlers;
+    export type Styling = UIBaseButton.Styling;
+    export type Params = UIBaseButton.Params;
 }

@@ -1,80 +1,83 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.2
+// version: 9.0.0
 export class UIWeaponImage extends UI.Element {
-    protected _weapon: mod.Weapons;
-    protected _weaponPackage: mod.WeaponPackage;
+    private static readonly _weapons = new Array<mod.Weapons | null>(UI.MAX_ELEMENTS);
+    private static readonly _weaponPackages = new Array<mod.WeaponPackage | null>(UI.MAX_ELEMENTS);
 
     /**
      * Creates a new weapon image.
      * @param params - The parameters for the weapon image.
      */
     public constructor(params: UIWeaponImage.Params) {
+        super(params);
+
+        if (!this._isValid) return;
+
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: UI.COLORS.WHITE,
-            bgAlpha: 0,
-            bgFill: mod.UIBgFill.None,
-            depth: mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const receiver = this._receiver!;
+        const name = this._name;
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
         const weaponPackage = params.weaponPackage ?? mod.CreateNewWeaponPackage();
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.Weapons, // weapon,
-            mod.UIWidget, // parent
-            mod.WeaponPackage, // weaponPackage
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            params.weapon,
-            parent.uiWidget,
-            weaponPackage,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIWeaponImage(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIWeaponImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.weapon,
+                UI.Element._getNativeWidget(parent)!,
+                weaponPackage
+            );
         } else {
-            mod.AddUIWeaponImage(...args, receiver.nativeReceiver);
+            mod.AddUIWeaponImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.weapon,
+                UI.Element._getNativeWidget(parent)!,
+                weaponPackage,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
+        this._bindNativeWidget(name);
 
-        this._weapon = params.weapon;
-        this._weaponPackage = weaponPackage;
+        UIWeaponImage._weapons[this._slot] = params.weapon;
+        UIWeaponImage._weaponPackages[this._slot] = weaponPackage;
 
         // `mod.AddUIWeaponImage` lacks the ability to define starting invisibility, so we have to set it manually.
-        if (!elementParams.visible) {
-            this.setVisible(false);
+        if (!visible) {
+            this.visible = false;
         }
     }
 
     /**
-     * The weapon of the weapon image.
+     * @inheritdoc
      */
-    public get weapon(): mod.Weapons {
-        return this._weapon;
+    public override delete(): void {
+        const slot = this._getSlotAndLogWarning();
+
+        if (slot === UI.Element._INVALID_INDEX) return;
+
+        UIWeaponImage._weapons[slot] = null;
+        UIWeaponImage._weaponPackages[slot] = null;
+        super.delete();
+    }
+
+    /**
+     * The weapon of the weapon image, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
+     */
+    public get weapon(): mod.Weapons | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIWeaponImage._weapons[slot] ?? undefined);
     }
 
     /**
@@ -84,28 +87,32 @@ export class UIWeaponImage extends UI.Element {
      * @param weapon - The new weapon.
      */
     public set weapon(weapon: mod.Weapons) {
-        if (this._isDeletedCheck()) return;
-
-        this._logging.log('Setting UIWeaponImage weapon not supported.', UI.LogLevel.Warning);
+        this.setWeapon(weapon);
     }
 
     /**
-     * Sets the weapon of the weapon image. Useful for chaining operations.
+     * Sets the weapon of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
      * been created.
-     * @param weapon - The weapon to set.
-     * @returns This element instance.
+     * @param weapon - The new weapon.
+     * @returns This weapon image for chaining.
      */
     public setWeapon(weapon: mod.Weapons): this {
-        this._weapon = weapon;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        UIWeaponImage._logging.log('Setting UIWeaponImage weapon not supported', UI.LogLevel.Warning);
+
         return this;
     }
 
     /**
-     * The weapon package of the weapon image.
+     * The weapon package of the weapon image, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
      */
-    public get weaponPackage(): mod.WeaponPackage {
-        return this._weaponPackage;
+    public get weaponPackage(): mod.WeaponPackage | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIWeaponImage._weaponPackages[slot] ?? undefined);
     }
 
     /**
@@ -115,20 +122,21 @@ export class UIWeaponImage extends UI.Element {
      * @param weaponPackage - The new weapon package.
      */
     public set weaponPackage(weaponPackage: mod.WeaponPackage) {
-        if (this._isDeletedCheck()) return;
-
-        this._logging.log('Setting UIWeaponImage weaponPackage not supported.', UI.LogLevel.Warning);
+        this.setWeaponPackage(weaponPackage);
     }
 
     /**
-     * Sets the weapon package of the weapon image. Useful for chaining operations.
+     * Sets the weapon package of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
      * after it has been created.
-     * @param weaponPackage - The weapon package to set.
-     * @returns This element instance.
+     * @param weaponPackage - The new weapon package.
+     * @returns This weapon image for chaining.
      */
     public setWeaponPackage(weaponPackage: mod.WeaponPackage): this {
-        this._weaponPackage = weaponPackage;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        UIWeaponImage._logging.log('Setting UIWeaponImage weaponPackage not supported', UI.LogLevel.Warning);
+
         return this;
     }
 }

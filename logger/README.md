@@ -2,7 +2,7 @@
 
 <ai>
 
-This TypeScript `Logger` class removes the biggest Battlefield Portal debugging pain point: until now you could only display strings that were pre-uploaded to the Experience website via a `strings.json` file, and displaying concatenated string with more than 3 parts was tricky, if not impossible. Further, `console.log` is only available for PC users, with a file written to their filesystem. By pairing a lightweight UI window with the `logger.strings.json` character map, this module lets you log any runtime text (errors, telemetry, formatted data, etc.) directly to the screen, even on console builds.
+This TypeScript `Logger` class removes the biggest Battlefield Portal debugging pain point: until now you could only display strings that were pre-uploaded to the Experience website via a `strings.json` file, and displaying concatenated strings with more than 3 parts was tricky, if not impossible. Further, `console.log` is only available for PC users, with a file written to their filesystem. By pairing a lightweight UI window with the `logger.strings.json` character map, this module lets you log any runtime text (errors, telemetry, formatted data, etc.) directly to the screen, even on console builds.
 
 - **Dynamic mode** behaves like a scrolling console, always appending at the bottom and pushing older rows upward.
 - **Static mode** lets you target a specific row index (e.g., keep player position on row 10 while other diagnostics fill lines 0‑9).
@@ -34,7 +34,7 @@ This TypeScript `Logger` class removes the biggest Battlefield Portal debugging 
 - **Static dashboards** – Pin persistent diagnostics (positions, squad metadata, timers) to precise rows.
 - **Dynamic consoles** – Stream verbose traces (button clicks, state transitions, error stacks) without worrying about pre-provisioned strings.
 - **Multiple Instances** – Keep both modes active: e.g., static logger on the left for gauges, dynamic logger on the right for realtime traces.
-- **Performance considerations** – For long text messages or tall dynamic loggers, use `logAsync()` instead of `log()`. Long text can result in many 3-character Text UI Widgets, and in dynamic mode, moving all existing rows upward requires many UI operations. By using `logAsync()` without `await`, the logging operation becomes non-blocking by being sent to the microtask queue, preventing frame drops or execution delays.
+- **Performance considerations** – For long text messages or tall dynamic loggers, use `logAsync()` instead of `log()`. Long text can result in multiple 4-character Text UI Widgets, and in dynamic mode, moving all existing rows upward requires UI repositioning operations. By using `logAsync()` without `await`, the logging operation becomes non-blocking by being sent to the microtask queue, preventing frame drops or execution delays.
 
 </ai>
 
@@ -69,7 +69,7 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
     dynamicLogger?.logAsync(`Very long diagnostic message that will create many UI widgets...`);
 
     while (true) {
-        const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
+        const position = mod.GetObjectPosition(player);
 
         const x = mod.XComponentOf(position).toFixed(2);
         const y = mod.YComponentOf(position).toFixed(2);
@@ -92,41 +92,40 @@ export async function OnPlayerDeployed(eventPlayer: mod.Player): Promise<void> {
 
 ### `class Logger`
 
-All window measurements are in UI pixels. Defaults are taken from [`logger/logger.ts`](logger.ts).
+All window measurements are in UI pixels. Defaults are taken from [`logger/index.ts`](index.ts).
 
 | Member | Description |
 | --- | --- |
-| `constructor(player: mod.Player, options?: Logger.Options)` | Creates a logger window for `player`. Defaults: `width=400`, `height=300`, `x=10`, `y=10`, `anchor=TopLeft`, `bgColor=UI.COLORS.BF_GREY_4`, `bgAlpha=0.5`, `bgFill=Blur`, `textColor=UI.COLORS.BF_GREEN_BRIGHT`, `visible=false`, `staticRows=false`, `parent=UI.ROOT_NODE`. Text scale is currently fixed at `1` while part-width corrections are in progress. |
-| `name(): string` | Returns the underlying container name, useful when cross-referencing widgets in the UI debugger. |
+| `constructor(player: mod.Player, options?: Logger.Options)` | Creates a logger window for `player`. Defaults: `width=400`, `height=300`, `x=10`, `y=10`, `anchor=TopLeft`, `bgColor=UI.COLORS.BF_GREY_4`, `bgAlpha=0.5`, `bgFill=Blur`, `textColor=UI.COLORS.BF_GREEN_BRIGHT`, `visible=false`, `staticRows=false`, `parent=UI.ROOT_NODE`. |
 | `visible: boolean` | Getter/setter for the container visibility. Set to `true` to show the logger window, `false` to hide it. |
-| `show(): void` / `hide(): void` / `toggle(): void` | Convenience methods that set the `visible` property. `show()` sets `visible = true`, `hide()` sets `visible = false`, and `toggle()` inverts the current visibility state. |
-| `clear(): void` | Deletes every rendered row/container to reclaim UI budget. |
-| `destroy(): void` | Calls `clear()` and removes the window container entirely—use when unloading the logger. |
-| `log(text: string, rowIndex?: number): void` | Core logging entry point. In static mode, writes to `rowIndex` (default `0`). In dynamic mode, appends at the bottom and scrolls upward when full. Strings longer than the window width automatically append an ellipsis row (`...`). |
-| `logAsync(text: string, rowIndex?: number): Promise<void>` | Asynchronous, non-blocking version of `log()`. Use this when logging long text that would result in many 3-character Text UI Widgets, especially in tall dynamic loggers where moving all existing rows upward requires many UI operations. Can be called without `await` to avoid blocking execution. |
+| `show(): Logger` / `hide(): Logger` / `toggle(): Logger` | Convenience methods that set the `visible` property and return the instance for chaining. |
+| `clear(): Logger` | Deletes every rendered row/container to reclaim UI budget. |
+| `delete(): void` | Calls `clear()` and removes the window container entirely—use when unloading the logger. |
+| `log(text: string, rowIndex?: number): Logger` | Core logging entry point. In static mode, writes to `rowIndex` (default `0`). In dynamic mode, appends at the bottom and scrolls upward when full. Strings longer than the window width automatically wrap or append an ellipsis (`...`). |
+| `logAsync(text: string, rowIndex?: number): Promise<void>` | Asynchronous, non-blocking version of `log()`. Uses a shared static microtask promise to avoid promise allocations. |
 
 Internals worth noting when debugging:
 
-- Rows are recycled via `prepareNextRow()` so long-running sessions stay performant.
-- Text is chunked into three-character-or-less segments and mapped through `Logger.buildMessage`, which is why the character lookup in the strings file matters.
+- **Row & Widget Recycling**: In dynamic mode, rows that scroll off the top are recycled and repositioned to the bottom, and their existing child `UIText` widgets are updated in place, completely eliminating widget creation and destruction churn during active logging.
+- **4-Character Chunking**: Text is chunked into segments of up to four characters and mapped through `Logger._buildMessage` using prefix format templates in `strings.json`, minimizing the number of `UIText` widgets required per row.
+- **Zero-Allocation Layout Engine**: Character widths are cached in a static `Uint8Array(128)` table, calculating text width with $O(1)$ integer additions and zero garbage collection overhead.
 
 ### `Logger.Options`
 
-Optional bag passed to the constructor. See [`mod/index.d.ts`](../mod/index.d.ts) for type declarations.
+Optional configuration object passed to the constructor.
 
 | Property | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `staticRows` | `boolean` | `false` | Set `true` for **"static-mode"** for row targeting, `false` for **"dynamic-mode"** for console-style logging. |
 | `truncate` | `boolean` | `false` | Only valid in **"dynamic-mode"**. Set to `true` to truncate multi-line logs and terminate with ellipses. |
-| `parent` | `UI.Root \| UI.Container` | `UI.ROOT_NODE` | Override if you want the logger embedded in another container. Must be a `UI.Root` or `UI.Container` instance (not a native `mod.UIWidget`). Use the `UI` module to create parent containers as needed. If not specified, the logger attaches to the root UI node. |
+| `parent` | `UI.Root \| UI.Container` | `UI.ROOT_NODE` | Override if you want the logger embedded in another container. Must be a `UI.Root` or `UIContainer` instance (not a native `mod.UIWidget`). If not specified, the logger attaches to the root UI node. |
 | `anchor` | `mod.UIAnchor` | `mod.UIAnchor.TopLeft` | Determines how `x`/`y` offsets are interpreted. |
 | `x`, `y` | `number` | `10`, `10` | Window origin (in pixels) relative to the anchor. |
-| `width`, `height` | `number` | `400`, `300` | Determines row count (`maxRows` is `(height - padding) / 20`). |
+| `width`, `height` | `number` | `400`, `300` | Determines row count (`maxRows` is `(height - 20) / 20`). |
 | `bgColor` | `mod.Vector` | `UI.COLORS.BF_GREY_4` | Background color for the container. |
 | `bgAlpha` | `number` | `0.5` | Opacity of the window background. |
 | `bgFill` | `mod.UIBgFill` | `mod.UIBgFill.Blur` | Background fill style for the container. |
 | `textColor` | `mod.Vector` | `UI.COLORS.BF_GREEN_BRIGHT` | Applied to every text widget inside the logger. |
-| `textScale` | `'small' \| 'medium' \| 'large'` | `'medium'` | Currently ignored (scale factor is hardcoded to 1 until width compensation work lands). |
 | `visible` | `boolean` | `false` | Set `true` to show the window immediately when constructed. |
 
 ---
@@ -137,34 +136,21 @@ This module includes a `strings.json` file that will be automatically merged by 
 
 The logger renders arbitrary strings by mapping each character to a localized token. At runtime, `mod.stringkeys.logger` contains:
 
-- `format` templates for one-, two-, and three-character chunks plus a `badFormat` fallback.
+- `format` templates for two-, three-, and four-character chunks (e.g. `"T2"`, `"T3"`, `"T4"`) plus a `badFormat` fallback (single-character parts are rendered directly via `mod.Message(mod.stringkeys.logger.chars[char])` without format templates).
 - `chars` dictionary that maps every supported character (letters, digits, punctuation) to the same character.
-- unsupported characters display as `*`
+- Unsupported characters display as `*`.
 
-If you need additional glyphs, extend the JSON first, then update `Logger.getCharacterWidth` so layout calculations stay accurate.
+If you need additional glyphs, extend the JSON first, then update the character width table so layout calculations stay accurate.
 
 ---
 
 ## Character Spacing and Display Caveats
 
-Battlefield Portal’s custom UI font is **not monospaced**, so each glyph renders with a different width. To make dynamic logging possible, the logger relies on a custom `Logger.getCharacterWidth`, which is a hand-tuned table that approximates the relative width of every supported character in 0.5 increments. That approximation keeps text readable, but you may notice slightly wider gaps where character chunks meet. More polish is planned to smooth these seams; for now, expect occasional spacing hiccups.
+Battlefield Portal’s custom UI font is **not monospaced**, so each glyph renders with a different width. To make dynamic logging possible, the logger relies on a precomputed `Uint8Array` character width table that approximates the relative width of every supported character in 0.5 increments. That approximation keeps text readable, but you may notice slightly wider gaps where character chunks meet.
 
 In particular:
 
-- left square brackets (`[`) **always** come prepended with a backslash (`\`) for an unknown reason
-
----
-
-## Upcoming Features
-
-In no particular order, planned upcoming work and improvements include:
-
-- increased performance (reduced load) by moving all dynamic rows up in a container, rather than one by one.
-- breaking out the dynamic string "text boxes" into its own module so they can be used in generic UIs within Portal
-- window/text scales (i.e. "small", "medium", "large")
-- an input mode so you could call arbitrary `mod` functions from the "console", with autocompletion
-- scrollable in dynamic mode so you can go back in the history to see logs that have seen been purged from view
-- performance and memory improvements
+- Left square brackets (`[`) **always** come prepended with a backslash (`\`) in Portal's font engine.
 
 ---
 
@@ -179,5 +165,3 @@ In no particular order, planned upcoming work and improvements include:
 ## Feedback & Support
 
 This module is under **active development**. Feature requests, bug reports, usage questions, or general ideas are welcome—open an issue or reach out through the project channels and you'll get a timely response. Real-world use cases help shape the roadmap (better text scaling, formatting helpers, persistent logs, etc.), so please share your experiences.
-
----

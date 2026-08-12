@@ -272,8 +272,10 @@ Available event types include:
 - `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`
 - `OnAIParachuteRunning`, `OnAIParachuteSucceeded`
 - `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
+- `OnBombDropped`, `OnBombPickedUp`, `OnBombStateChanged`
 - `OnCapturePointCaptured`, `OnCapturePointCapturing`, `OnCapturePointLost`
 - `OnGameModeEnding`, `OnGameModeStarted`
+- `OnGolmudTrainStopped`
 - `OnPlayerJoinGame`, `OnPlayerLeaveGame`
 - `OnPlayerDeployed`, `OnPlayerUndeploy`
 - `OnMandown`, `OnRevived`, `OnPlayerDamaged`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`, `OnPlayerInteract`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`
@@ -307,13 +309,13 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Events.LogLevel, includeRawError?: boolean): void`
+#### `Events.setLogging(log?: (text: string, error?: unknown) => Promise<void> | void, logLevel?: Events.LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
 
 **Parameters:**
 
-- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `log` – The logger function to use. Pass `undefined` (or `null`) to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `Events.LogLevel.Warning`.
 - `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
@@ -535,9 +537,9 @@ The `Events` module uses a centralized subscription system:
 
 2. **Internal Triggering** – When a Battlefield Portal event occurs, the corresponding exported function calls `Events.trigger()` with the event type and parameters.
 
-3. **Handler Storage** – Subscribed handlers are stored in a `Map<Type, Set<AllHandlers>>`, allowing multiple handlers per event type.
+3. **Handler Storage** – Subscribed handlers are stored in a flat array (`handlers`) inside a prototype-based `EventChannel` object for each event. To optimize memory, this array is lazy-initialized on the first subscription.
 
-4. **Handler Execution** – When an event is triggered, each subscribed handler is invoked via `CallbackHandler.invoke()` in sequence. Synchronous handlers run immediately (before the next handler); asynchronous handlers are invoked and their promises are not awaited, so they run without blocking. `CallbackHandler` catches any thrown or rejected errors so that one failing handler does not prevent the rest from running; errors are logged if logging is configured via `Events.setLogging()`. This design allows short synchronous handlers to run immediately instead of being queued as a microtask, while still isolating failures. Asynchronous handlers are preferred for non-trivial work.
+4. **Handler Execution** – When an event is triggered, each subscribed handler is invoked in sequence using `CallbackHandler.invoke` with direct arguments, providing a completely zero-allocation execution path that avoids array or spread parameter allocations. Synchronous handlers run immediately (before the next handler); asynchronous handlers are invoked and their promises are not awaited, so they run without blocking. `CallbackHandler` catches any thrown or rejected errors so that one failing handler does not prevent the rest from running; errors are logged if logging is configured via `Events.setLogging()`. This design allows short synchronous handlers to run immediately instead of being queued as a microtask, while still isolating failures. Asynchronous handlers are preferred for non-trivial work.
 
 5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into handler failures without manual error handling.
 

@@ -29,7 +29,7 @@ const container = new UIContainer({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.text.helloWorld), // 'Hello World'
+            label: mod.Message(mod.stringkeys.text.helloWorld), // 'Hello World'
             position: { x: 0, y: 0 },
             textSize: 48,
         } as UIContainer.ChildParams<UIText.Params>,
@@ -73,22 +73,26 @@ container.delete();
 
 ### Inherited from `UI.Element`
 
-`UIContainer` inherits all properties and methods from `UI.Element`, including:
+`UIContainer` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Container-Specific
 
-- **`children: UI.Element[]`** (getter) – Array of child elements. Automatically maintained when children are created, moved, or deleted. Elements are automatically added when created with this container as their parent, and automatically removed when deleted or moved to another parent.
-
+- **`children: readonly UI.Element[] | undefined`** (getter) – Snapshot array of child elements, or `undefined` if deleted.
+- **`getChildren(): readonly UI.Element[] | undefined`** – Retrieves child elements.
+- **`getChild(index: number): UI.Element | null | undefined`** – Retrieves a child element at the specified index (`null` if out of bounds, `undefined` if deleted).
+- **`childCount: number | undefined`** (getter) – Direct child count, or `undefined` if deleted.
+- **`getChildCount(): number | undefined`** – Retrieves direct child count, or `undefined` if deleted.
+- **`forEachChild(callback: (child: UI.Element, index: number) => void): void`** – Iterates over all direct child elements without allocating an intermediate array (protected by `CallbackHandler`).
 - **`delete(): void`** – Overrides `Element.delete()` to recursively delete all children before deleting the container itself.
 
 ---
@@ -117,7 +121,7 @@ const container = new UIContainer({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.text.hello), // 'Hello'
+            label: mod.Message(mod.stringkeys.text.hello), // 'Hello'
             position: { x: 0, y: 0 },
         } as UIContainer.ChildParams<UIText.Params>,
     ],
@@ -138,5 +142,5 @@ type Params = UI.ElementParams & {
 
 ## Further Reference
 
-- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace, `Element` class, and [element behavior conventions](../../README.md#element-behavior-conventions) (parent-child relationships, recursive deletion, receiver inheritance, etc.)
+- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace, `Element` class, and [core concepts](../../README.md#core-concepts) (parent-child relationships, recursive deletion, receiver inheritance, etc.)
 - [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations

@@ -2,7 +2,7 @@ import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 2.0.2
+// version: 2.1.0
 export namespace PerformanceStats {
     const logging = new Logging('PS');
 
@@ -12,13 +12,17 @@ export namespace PerformanceStats {
     export const LogLevel = Logging.LogLevel;
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
@@ -37,7 +41,6 @@ export namespace PerformanceStats {
     // Window State (Updated every second)
     let tickCount = 0;
     let lastWindowTime = 0;
-    let lastTimeoutCall = 0;
 
     // Smoothed Output State (For UI)
     let smoothedTickRate = TARGET_HZ;
@@ -50,42 +53,40 @@ export namespace PerformanceStats {
     /**
      * The core timeout lag measurement loop for UI and logging.
      */
-    function measureTimeoutLag() {
+    function measureTimeoutLag(): void {
         const now = Date.now();
         const deltaMs = now - lastWindowTime;
 
+        if (deltaMs <= 0) return;
+
         // Calculate average spot metrics for this specific window.
         const rawTickRate = (tickCount / deltaMs) * 1_000;
-
-        const timeoutLagMs = Math.max(0, now - (lastTimeoutCall + SAMPLE_RATE_MS)); // How late `setTimeout` woke up.
+        const timeoutLagMs = Math.max(0, now - (lastWindowTime + SAMPLE_RATE_MS)); // How late timer woke up.
 
         // Apply exponential moving average (EMA) for UI stability.
         smoothedTickRate = getSmoothedValue(rawTickRate, smoothedTickRate);
         smoothedTimeoutLagMs = getSmoothedValue(timeoutLagMs, smoothedTimeoutLagMs);
 
-        // Instant spike logging.
-        if (timeoutLagMs > 100) {
-            logging.log(`Timeout lag spike: +${~~timeoutLagMs}ms over.`, LogLevel.Warning);
+        // Instant spike logging with log-level guard to eliminate string allocations.
+        if (logging.willLog(LogLevel.Warning)) {
+            if (timeoutLagMs > 100) {
+                logging.log(`Timeout lag spike: +${~~timeoutLagMs}ms over`, LogLevel.Warning);
+            }
+
+            if (rawTickRate < 25) {
+                logging.log(`Tick rate dropped: ${~~rawTickRate}Hz`, LogLevel.Warning);
+            }
         }
 
-        if (rawTickRate < 25) {
-            logging.log(`Tick rate dropped: ${~~rawTickRate}Hz`, LogLevel.Warning);
-        }
-
-        // Reset and schedule next window.
+        // Reset for next window.
         tickCount = 0;
         lastWindowTime = now;
-        lastTimeoutCall = Date.now();
-
-        Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS);
     }
 
     /**
      * The per-tick tracker for scaling and counting.
-     * It's critical this is the first (or one of the first) things subscribed so it accurately captures the
-     * engine's tick cadence.
      */
-    const trackTick = () => {
+    function trackTick(): void {
         const now = Date.now();
 
         // Update Spot Math for compute scaling.
@@ -94,53 +95,52 @@ export namespace PerformanceStats {
 
         // Accumulate ticks for the window loop.
         ++tickCount;
-    };
+    }
 
-    const startTrackingTicks = () => {
+    function startTrackingTicks(): void {
         unsubscribe();
 
         Events.OngoingGlobal.subscribe(trackTick);
 
-        // Kick off the macro measurement loop.
-        lastTimeoutCall = lastWindowTime = lastTickTime = Date.now();
-
-        Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS);
-    };
+        // Kick off the macro measurement loop using a persistent interval.
+        lastWindowTime = lastTickTime = Date.now();
+        Timers.setInterval(measureTimeoutLag, SAMPLE_RATE_MS);
+    }
 
     const unsubscribe = Events.OnGameModeStarted.subscribe(startTrackingTicks);
 
     if (logging.willLog(LogLevel.Info)) {
-        logging.log(`Monitoring started.`, LogLevel.Info);
+        logging.log('Monitoring started', LogLevel.Info);
     }
 
     /**
      * @returns The smoothed tick rate. Good/stable for UI display.
      */
-    export function getSmoothedTickRate() {
+    export function getSmoothedTickRate(): number {
         return smoothedTickRate;
     }
 
     /**
      * @returns The smoothed lag time. Good/stable for UI display.
      */
-    export function getSmoothedTimeoutLagMs() {
+    export function getSmoothedTimeoutLagMs(): number {
         return smoothedTimeoutLagMs;
     }
 
     /**
-     * Returns the value that is somewhat analogous to SFT when above 33m.
+     * Returns the value that is somewhat analogous to SFT when above 33ms.
      * @returns The raw delta time between the last two ticks. Good for compute scaling.
      */
-    export function getSpotDeltaMs() {
+    export function getSpotDeltaMs(): number {
         return lastTickDeltaMs;
     }
 
     /**
      * Returns the value that is analogous to STR.
-     * @returns The tick rate. Good for compute scaling.
+     * @returns The tick rate in Hz. Good for compute scaling.
      */
-    export function getSpotTickRate() {
-        return TARGET_DELTA_MS / lastTickDeltaMs;
+    export function getSpotTickRate(): number {
+        return TARGET_DELTA_MS / Math.max(1, lastTickDeltaMs);
     }
 
     /**
@@ -148,7 +148,7 @@ export namespace PerformanceStats {
      * 1.0 = Perfect 30Hz performance.
      * < 1.0 = Engine is bogged down, scale your compute back.
      */
-    export function getSpotHealthFactor() {
+    export function getSpotHealthFactor(): number {
         // Cap at 1.0 so a randomly fast tick doesn't cause logic to scale > 100%
         return Math.min(1.0, getSpotTickRate());
     }

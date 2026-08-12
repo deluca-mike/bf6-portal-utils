@@ -9,7 +9,7 @@ import { UIContainer } from '../ui/components/container/index.ts';
 import { UITextButton } from '../ui/components/text-button/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 1.1.1
+// version: 1.2.0
 export namespace FFADropIns {
     const logging = new Logging('FDI');
 
@@ -19,13 +19,17 @@ export namespace FFADropIns {
     export const LogLevel = Logging.LogLevel;
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
@@ -209,7 +213,7 @@ export namespace FFADropIns {
         const spawnPoint = mod.SpawnObject(
             mod.RuntimeSpawn_Common.PlayerSpawner,
             location,
-            Vectors.ZERO_VECTOR
+            Vectors.toVector(Vectors.ZERO)
         ) as mod.SpawnPoint;
 
         return {
@@ -255,7 +259,7 @@ export namespace FFADropIns {
 
             if (logging.willLog(LogLevel.Debug)) {
                 logging.log(
-                    `Spawning P_${soldier.playerId} at ${Vectors.getVectorString(spawn.location)}.`,
+                    `Spawning P_${soldier.playerId} at ${Vectors.getVectorString(Vectors.toVector3(spawn.location))}.`,
                     LogLevel.Debug
                 );
             }
@@ -298,9 +302,9 @@ export namespace FFADropIns {
         }
 
         private static _getPosition(player: mod.Player): Vectors.Vector3 {
-            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO_VECTOR3;
+            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO;
 
-            const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
+            const position = mod.GetObjectPosition(player);
 
             return Vectors.truncate(Vectors.multiply(Vectors.toVector3(position), 100), 0);
         }
@@ -328,9 +332,11 @@ export namespace FFADropIns {
          * @param player - The player to force into the queue.
          */
         public static forceIntoQueue(player: mod.Player): void {
-            if (!mod.IsPlayerValid(player)) return;
+            const playerId = mod.GetObjId(player);
 
-            const soldier = Soldier._ALL_SOLDIERS.get(mod.GetObjId(player));
+            if (playerId === undefined) return;
+
+            const soldier = Soldier._ALL_SOLDIERS.get(playerId);
 
             if (!soldier || soldier.deleteIfNotValid()) return;
 
@@ -381,7 +387,7 @@ export namespace FFADropIns {
                 pressedAlpha: 1,
                 focusedColor: UI.COLORS.BF_GREY_1,
                 focusedAlpha: 1,
-                message: mod.Message(mod.stringkeys.ffaDropIns.buttons.spawn),
+                label: mod.Message(mod.stringkeys.ffaDropIns.buttons.spawn),
                 textSize: 30,
                 textColor: UI.COLORS.BF_GREEN_BRIGHT,
                 onClickUp: (player: mod.Player) => this._addToQueue(),
@@ -401,7 +407,7 @@ export namespace FFADropIns {
                 pressedAlpha: 1,
                 focusedColor: UI.COLORS.BF_GREY_1,
                 focusedAlpha: 1,
-                message: mod.Message(mod.stringkeys.ffaDropIns.buttons.delay, promptDelay),
+                label: mod.Message(mod.stringkeys.ffaDropIns.buttons.delay, promptDelay),
                 textSize: 30,
                 textColor: UI.COLORS.BF_YELLOW_BRIGHT,
                 onClickUp: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
@@ -413,7 +419,7 @@ export namespace FFADropIns {
                 width: 400,
                 height: 50,
                 anchor: mod.UIAnchor.TopCenter,
-                message: mod.Message(mod.stringkeys.ffaDropIns.countdown, 0),
+                label: mod.Message(mod.stringkeys.ffaDropIns.countdown, 0),
                 textSize: 30,
                 textColor: UI.COLORS.BF_GREEN_BRIGHT,
                 bgColor: UI.COLORS.BF_GREY_4,
@@ -423,24 +429,31 @@ export namespace FFADropIns {
                 receiver: player,
             });
 
-            this._delayCountdownClock = new Clocks.CountDownClock(initialPromptDelay, {
+            this._delayCountdownClockId = Clocks.createCountDown(initialPromptDelay, {
                 onSecond: (seconds: number) => {
-                    if (this._delayCountdownClock?.isComplete) {
-                        this._countdownUI?.hide();
-                        this._promptUI?.show();
+                    if (this._delayCountdownClockId !== null && Clocks.isComplete(this._delayCountdownClockId)) {
+                        if (this._countdownUI) {
+                            this._countdownUI.visible = false;
+                        }
+
+                        if (this._promptUI) {
+                            this._promptUI.visible = true;
+                        }
                     }
 
-                    if (this._delayCountdownClock?.isRunning) {
+                    if (this._delayCountdownClockId !== null && Clocks.isRunning(this._delayCountdownClockId)) {
                         if (this._promptUI?.visible) {
-                            this._promptUI?.hide();
+                            this._promptUI.visible = false;
                         }
 
-                        if (!this._countdownUI?.visible) {
-                            this._countdownUI?.show();
+                        if (!this._countdownUI?.visible && this._countdownUI) {
+                            this._countdownUI.visible = true;
                         }
                     }
 
-                    this._countdownUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds));
+                    if (this._countdownUI) {
+                        this._countdownUI.label = mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds);
+                    }
                 },
             });
 
@@ -449,7 +462,7 @@ export namespace FFADropIns {
                     width: 360,
                     height: 26,
                     anchor: mod.UIAnchor.BottomCenter,
-                    message: mod.Message(mod.stringkeys.ffaDropIns.debug.position, 0, 0, 0),
+                    label: mod.Message(mod.stringkeys.ffaDropIns.debug.position, 0, 0, 0),
                     textSize: 20,
                     textColor: UI.COLORS.BF_GREEN_BRIGHT,
                     bgColor: UI.COLORS.BF_GREY_4,
@@ -460,10 +473,13 @@ export namespace FFADropIns {
 
                 const updatePosition = () => {
                     const { x, y, z } = Soldier._getPosition(player);
-                    this._debugPositionUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z));
+
+                    if (this._debugPositionUI) {
+                        this._debugPositionUI.label = mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z);
+                    }
                 };
 
-                this._updatePositionInterval = Timers.setInterval(updatePosition, 1_000);
+                this._updatePositionIntervalId = Timers.setInterval(updatePosition, 1_000);
             }
         }
 
@@ -473,13 +489,13 @@ export namespace FFADropIns {
 
         private _isAISoldier: boolean;
 
-        private _delayCountdownClock?: Clocks.CountDownClock;
+        private _delayCountdownClockId: Clocks.ClockID | null = null;
 
         private _promptUI?: UIContainer;
 
         private _countdownUI?: UIText;
 
-        private _updatePositionInterval?: number;
+        private _updatePositionIntervalId: Timers.TimerID | null = null;
 
         private _debugPositionUI?: UIText;
 
@@ -512,7 +528,10 @@ export namespace FFADropIns {
 
             if (delay <= 0) return this._addToQueue();
 
-            this._delayCountdownClock?.setDuration(delay).start();
+            if (this._delayCountdownClockId === null) return;
+
+            Clocks.setDuration(this._delayCountdownClockId, delay);
+            Clocks.start(this._delayCountdownClockId);
         }
 
         /**
@@ -524,8 +543,13 @@ export namespace FFADropIns {
 
             logging.log(`P_${this._playerId} is no longer valid.`, LogLevel.Warning);
 
-            this._delayCountdownClock?.stop();
-            Timers.clearInterval(this._updatePositionInterval);
+            if (this._delayCountdownClockId !== null) {
+                Clocks.stop(this._delayCountdownClockId);
+            }
+
+            if (this._updatePositionIntervalId !== null) {
+                Timers.clearInterval(this._updatePositionIntervalId);
+            }
 
             this._promptUI?.delete();
             this._countdownUI?.delete();
@@ -538,8 +562,13 @@ export namespace FFADropIns {
 
         private _addToQueue(): void {
             if (!this._isAISoldier) {
-                this._delayCountdownClock?.reset();
-                this._promptUI?.hide();
+                if (this._delayCountdownClockId !== null) {
+                    Clocks.reset(this._delayCountdownClockId);
+                }
+
+                if (this._promptUI) {
+                    this._promptUI.visible = false;
+                }
             }
 
             spawnQueue.push(this);

@@ -1,74 +1,77 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.2
+// version: 9.0.0
 export class UIGadgetImage extends UI.Element {
-    protected _gadget: mod.Gadgets;
+    private static readonly _gadgets = new Array<mod.Gadgets | null>(UI.MAX_ELEMENTS);
 
     /**
      * Creates a new gadget image.
      * @param params - The parameters for the gadget image.
      */
     public constructor(params: UIGadgetImage.Params) {
+        super(params);
+
+        if (!this._isValid) return;
+
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = this._receiver!;
+        const name = this._name;
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
 
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: UI.COLORS.WHITE,
-            bgAlpha: 0,
-            bgFill: mod.UIBgFill.None,
-            depth: mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.Gadgets, // gadget,
-            mod.UIWidget, // parent
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            params.gadget,
-            parent.uiWidget,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIGadgetImage(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIGadgetImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.gadget,
+                UI.Element._getNativeWidget(parent)!
+            );
         } else {
-            mod.AddUIGadgetImage(...args, receiver.nativeReceiver);
+            mod.AddUIGadgetImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.gadget,
+                UI.Element._getNativeWidget(parent)!,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
+        this._bindNativeWidget(name);
 
-        this._gadget = params.gadget;
+        UIGadgetImage._gadgets[this._slot] = params.gadget;
 
         // `mod.AddUIGadgetImage` lacks the ability to define starting invisibility, so we have to set it manually.
-        if (!elementParams.visible) {
-            this.setVisible(false);
+        if (!visible) {
+            this.visible = false;
         }
     }
 
     /**
-     * The gadget of the gadget image.
+     * @inheritdoc
      */
-    public get gadget(): mod.Gadgets {
-        return this._gadget;
+    public override delete(): void {
+        const slot = this._getSlotAndLogWarning();
+
+        if (slot === UI.Element._INVALID_INDEX) return;
+
+        UIGadgetImage._gadgets[slot] = null;
+        super.delete();
+    }
+
+    /**
+     * The gadget of the gadget image, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    public get gadget(): mod.Gadgets | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIGadgetImage._gadgets[slot] ?? undefined);
     }
 
     /**
@@ -78,9 +81,7 @@ export class UIGadgetImage extends UI.Element {
      * @param gadget - The new gadget.
      */
     public set gadget(gadget: mod.Gadgets) {
-        if (this._isDeletedCheck()) return;
-
-        this._logging.log('Setting UIGadgetImage gadget not supported.', UI.LogLevel.Warning);
+        this.setGadget(gadget);
     }
 
     /**
@@ -88,10 +89,13 @@ export class UIGadgetImage extends UI.Element {
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
      * been created.
      * @param gadget - The new gadget.
-     * @returns This element instance.
+     * @returns This gadget image for chaining.
      */
     public setGadget(gadget: mod.Gadgets): this {
-        this._gadget = gadget;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        UIGadgetImage._logging.log('Setting UIGadgetImage gadget not supported', UI.LogLevel.Warning);
+
         return this;
     }
 }
