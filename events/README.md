@@ -268,7 +268,7 @@ Events.Type.OnPlayerDeployed(somePlayer);
 
 Available event types include:
 
-- `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
+- `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingBomb`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
 - `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`
 - `OnAIParachuteRunning`, `OnAIParachuteSucceeded`
 - `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
@@ -289,6 +289,8 @@ Available event types include:
 - `OnSpawnerSpawned`
 - `OnTimeLimitReached`
 - `OnVehicleDestroyed`, `OnVehicleSpawned`
+- `OnBombDropped`, `OnBombPickedUp`, `OnBombStateChanged`
+- `OnGolmudTrainStopped`
 
 </ai>
 

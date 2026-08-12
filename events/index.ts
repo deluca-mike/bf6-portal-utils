@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 1.5.2
+// version: 1.6.0
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -460,16 +460,16 @@ export function OnAIWaypointIdleSucceeded(player: mod.Player): void {
     Events.OnAIWaypointIdleSucceeded.trigger(player);
 }
 
-export function OnBombDropped(bomb: mod.Bomb): void {
-    Events.OnBombDropped.trigger(bomb);
+export function OnBombDropped(bomb: mod.Bomb, player: mod.Player): void {
+    Events.OnBombDropped.trigger(bomb, player);
 }
 
-export function OnBombPickedUp(bomb: mod.Bomb): void {
-    Events.OnBombPickedUp.trigger(bomb);
+export function OnBombPickedUp(bomb: mod.Bomb, player: mod.Player): void {
+    Events.OnBombPickedUp.trigger(bomb, player);
 }
 
-export function OnBombStateChanged(bomb: mod.Bomb): void {
-    Events.OnBombStateChanged.trigger(bomb);
+export function OnBombStateChanged(bomb: mod.Bomb, state: mod.BombState): void {
+    Events.OnBombStateChanged.trigger(bomb, state);
 }
 
 export function OnCapturePointCaptured(capturePoint: mod.CapturePoint): void {
@@ -492,8 +492,8 @@ export function OnGameModeStarted(): void {
     Events.OnGameModeStarted.trigger();
 }
 
-export function OnGolmudTrainStopped(): void {
-    Events.OnGolmudTrainStopped.trigger();
+export function OnGolmudTrainStopped(reason: mod.GolmudTrainStopReason): void {
+    Events.OnGolmudTrainStopped.trigger(reason);
 }
 
 export function OnMandown(player: mod.Player, otherPlayer: mod.Player): void {
