@@ -127,12 +127,16 @@ The namespace is not instantiated; all members are static.
 
 ---
 
+<ai>
+
 ## Known Limitations & Caveats
 
 - **Do not benchmark `mod.Wait` or `Timers.setTimeout`** – Any function that yields to the engine (directly or indirectly) will stall until the next server tick (~33ms), turning a microbenchmark into a “count how many frames passed” test. This is why the async helpers explicitly warn against using `mod.Wait` or `Timers.setTimeout` in the callback.
 - **Server variability** – Results can vary between runs and between servers depending on load, other scripts, and engine scheduling. Use the numbers as **guides**, not strict guarantees.
 - **Blocking work only** – Benchmarks only measure the time spent in the function body plus any pure-JS work it calls. They do not capture time waiting on engine I/O or network.
 - **No built-in logging** – This module intentionally does not depend on the Logging or Logger modules. You are responsible for logging or displaying results.
+
+</ai>
 
 ---
 

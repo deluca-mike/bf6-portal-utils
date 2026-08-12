@@ -2,7 +2,19 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 1.6.0
+// version: 1.8.0
+
+/**
+ * Priority levels for event handlers.
+ * Lower numbers run earlier, higher numbers run later.
+ * Custom numbers can also be used.
+ */
+export enum EventPriority {
+    First = -100,
+    Normal = 0,
+    Last = 100,
+}
+
 namespace EventsTypes {
     /**
      * Map of each event name to its trigger function. Use for typed references to event payloads
@@ -11,7 +23,10 @@ namespace EventsTypes {
      */
     export const Type = {
         OngoingGlobal,
+        OnTickStart,
+        OnTickEnd,
         OngoingAreaTrigger,
+        OngoingBlockingSphere,
         OngoingBomb,
         OngoingCapturePoint,
         OngoingEmplacementSpawner,
@@ -55,19 +70,23 @@ namespace EventsTypes {
         OnPlayerDied,
         OnPlayerEarnedKill,
         OnPlayerEarnedKillAssist,
+        OnPlayerEmerged,
         OnPlayerEnterAreaTrigger,
         OnPlayerEnterCapturePoint,
+        OnPlayerEnteredWater,
         OnPlayerEnterVehicle,
         OnPlayerEnterVehicleSeat,
         OnPlayerEnterVL7Cloud,
         OnPlayerExitAreaTrigger,
         OnPlayerExitCapturePoint,
+        OnPlayerExitedWater,
         OnPlayerExitVehicle,
         OnPlayerExitVehicleSeat,
         OnPlayerExitVL7Cloud,
         OnPlayerInteract,
         OnPlayerJoinGame,
         OnPlayerLeaveGame,
+        OnPlayerSubmerged,
         OnPlayerSwitchTeam,
         OnPlayerUIButtonEvent,
         OnPlayerUndeploy,
@@ -111,32 +130,7 @@ namespace EventsTypes {
      * exposes this interface with `subscribe`, `unsubscribe`, and `trigger` typed to that event's payload.
      * @template K - Event name; handler and trigger args are inferred from the corresponding trigger function.
      */
-    export type Channel<K extends SignatureKey> = {
-        /**
-         * Subscribe a handler for this event. The handler receives the same arguments as this event's trigger.
-         * @param handler - Callback invoked when the event is triggered; args match the event's payload.
-         * @returns Function to call to unsubscribe this handler.
-         */
-        subscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): () => void;
-
-        /**
-         * Unsubscribe a handler previously added with `subscribe`. Pass the same function reference.
-         * @param handler - The same function reference that was passed to `subscribe`.
-         */
-        unsubscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): void;
-
-        /**
-         * Trigger this event. Pass the same arguments as the exported trigger function for this event.
-         * @param args - Event payload; types match the corresponding standalone trigger function (e.g. `OnPlayerDied`).
-         */
-        trigger(...args: Parameters<Signature[K]>): void;
-
-        /**
-         * Return the number of handlers currently subscribed to this event.
-         * @returns Count of subscribed handlers (0 if none).
-         */
-        handlerCount(): number;
-    };
+    export type Channel<K extends SignatureKey> = EventChannel<K>;
 
     /**
      * Map of each event name to its typed channel (`subscribe`, `unsubscribe`, `trigger`, `handlerCount`).
@@ -146,27 +140,18 @@ namespace EventsTypes {
         [K in SignatureKey]: K extends SignatureKey ? Channel<K> : never;
     };
 
-    // Get the event key (name) from a trigger function value.
-    type TypeName<T extends TypeValue> = {
-        [K in SignatureKey]: Signature[K] extends T ? K : never;
-    }[SignatureKey];
-
     /**
      * Get the handler function type for a specific event type.
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
      */
-    export type HandlerForType<T extends TypeValue> =
-        TypeName<T> extends SignatureKey
-            ? Signature[TypeName<T>] extends (...args: infer P) => void
-                ? (...args: P) => void | Promise<void>
-                : never
-            : never;
+    export type HandlerForType<T extends TypeValue> = T extends (...args: infer P) => void
+        ? (...args: P) => void | Promise<void>
+        : never;
 
     /**
      * Get the parameter tuple for a specific event type.
      */
-    export type EventParameters<T extends TypeValue> =
-        TypeName<T> extends SignatureKey ? Parameters<Signature[TypeName<T>]> : never;
+    export type EventParameters<T extends TypeValue> = T extends (...args: infer P) => void ? P : never;
 
     /**
      * Create a union of all possible handler types.
@@ -178,24 +163,155 @@ namespace EventsTypes {
             : never;
     }[SignatureKey];
 
-    export type State = {
-        logTimeout?: number;
-        incompleteTriggers: number;
-        handlers: Set<EventsTypes.AllHandlers>;
+    export type TriggerWithChannel = TypeValue & {
+        _channel?: EventChannel<SignatureKey>;
     };
 }
 
+namespace EventsPrivate {
+    export const LOG_TIMEOUT_MS = 10_000;
+
+    export const logging = new Logging('Events');
+
+    let isTickEndPending = false;
+
+    /**
+     * Schedules the virtual OnTickEnd event to resolve at the end of the current frame via mod.Wait(0).
+     */
+    export function scheduleTickEnd(): void {
+        if (isTickEndPending) return;
+
+        isTickEndPending = true;
+        mod.Wait(0).then(onTickEndPromiseResolved);
+    }
+
+    function onTickEndPromiseResolved(): void {
+        isTickEndPending = false;
+        OnTickEnd();
+    }
+}
+
+class EventChannel<K extends EventsTypes.SignatureKey> {
+    public handlers: EventsTypes.HandlerForType<EventsTypes.Signature[K]>[] | null = null;
+    public priorities: number[] | null = null;
+    public incompleteTriggers = 0;
+    public logTimeout: number | null = null;
+
+    constructor(public readonly typeValue: EventsTypes.Signature[K]) {}
+
+    public subscribe(
+        handler: EventsTypes.HandlerForType<EventsTypes.Signature[K]>,
+        priority: number = EventPriority.Normal
+    ): () => void {
+        if (!this.handlers || !this.priorities) {
+            this.handlers = [handler];
+            this.priorities = [priority];
+        } else {
+            const handlers = this.handlers.slice();
+            const priorities = this.priorities.slice();
+            const len = priorities.length;
+            let insertIdx = len;
+
+            for (let i = 0; i < len; ++i) {
+                if (priorities[i] > priority) {
+                    insertIdx = i;
+                    break;
+                }
+            }
+
+            handlers.splice(insertIdx, 0, handler);
+            priorities.splice(insertIdx, 0, priority);
+            this.handlers = handlers;
+            this.priorities = priorities;
+        }
+
+        return () => this.unsubscribe(handler);
+    }
+
+    public unsubscribe(handler: EventsTypes.HandlerForType<EventsTypes.Signature[K]>): void {
+        if (!this.handlers || !this.priorities) return;
+
+        const idx = this.handlers.indexOf(handler);
+
+        if (idx === -1) return;
+
+        if (this.handlers.length === 1) {
+            this.handlers = null;
+            this.priorities = null;
+        } else {
+            const handlers = this.handlers.slice();
+            const priorities = this.priorities.slice();
+            handlers.splice(idx, 1);
+            priorities.splice(idx, 1);
+            this.handlers = handlers;
+            this.priorities = priorities;
+        }
+    }
+
+    public trigger(...args: EventsTypes.EventParameters<EventsTypes.Signature[K]>): void;
+    public trigger(a?: unknown, b?: unknown, c?: unknown, d?: unknown): void {
+        const handlers = this.handlers;
+
+        if (!handlers) return;
+
+        const len = handlers.length;
+
+        if (len === 0) return;
+
+        // Incomplete-trigger accounting: Portal servers previously aborted the JS thread for a block of synchronous
+        // work after ~50ms, so a trigger can be started (increment below) but never reach the decrement. We schedule a
+        // one-shot timeout to log how many such incomplete triggers occurred in the last _LOG_TIMEOUT_MS window in
+        // order to avoid spamming the log, especially for high-frequency triggers like any of the Ongoing events.
+        if (this.incompleteTriggers > 0 && !this.logTimeout) {
+            const processIncompleteTriggers = () => {
+                this.logTimeout = null;
+
+                EventsPrivate.logging.log(
+                    `${this.incompleteTriggers} incomplete triggers for ${this.typeValue?.name ?? 'unknown'} in last ${EventsPrivate.LOG_TIMEOUT_MS}ms`,
+                    Logging.LogLevel.Warning
+                );
+
+                this.incompleteTriggers = 0;
+            };
+
+            this.logTimeout = Timers.setTimeout(processIncompleteTriggers, EventsPrivate.LOG_TIMEOUT_MS);
+        }
+
+        ++this.incompleteTriggers;
+
+        // Execute each handler asynchronously and non-blocking.
+        // Errors in one handler won't prevent other handlers from executing.
+        for (let i = 0; i < len; ++i) {
+            CallbackHandler.invoke(
+                handlers[i] as (...args: unknown[]) => Promise<void> | void,
+                a,
+                b,
+                c,
+                d,
+                EventsPrivate.logging,
+                'trigger'
+            );
+        }
+
+        // Decrement runs synchronously after the loop; the only way it is skipped is tick abort.
+        --this.incompleteTriggers;
+    }
+
+    public handlerCount(): number {
+        return this.handlers?.length ?? 0;
+    }
+}
+
 class EventsImplementation {
-    private static readonly _LOG_TIMEOUT_MS = 10_000;
-
-    private static readonly _logging = new Logging('Events');
-
-    private static readonly _states = new Map<EventsTypes.TypeValue, EventsTypes.State>();
-
     /**
      * The event types.
      */
     public static readonly Type = EventsTypes.Type;
+
+    /**
+     * The event priority levels.
+     */
+    public static readonly EventPriority = EventPriority;
 
     /**
      * The logging levels.
@@ -208,83 +324,80 @@ class EventsImplementation {
 
         for (const key of typeKeys) {
             const typeValue = EventsTypes.Type[key];
+            const channel = new EventChannel(typeValue);
+
+            // Link channel to the trigger function object for fast retrieval.
+            (typeValue as EventsTypes.TriggerWithChannel)._channel = channel;
 
             (
                 EventsImplementation as unknown as Record<
                     EventsTypes.SignatureKey,
-                    EventsTypes.Channel<EventsTypes.SignatureKey>
+                    EventChannel<EventsTypes.SignatureKey>
                 >
-            )[key] = {
-                subscribe(handler: EventsTypes.AllHandlers): () => void {
-                    return EventsImplementation.subscribe(
-                        typeValue,
-                        handler as EventsTypes.HandlerForType<typeof typeValue>
-                    );
-                },
-                unsubscribe(handler: EventsTypes.AllHandlers): void {
-                    EventsImplementation.unsubscribe(
-                        typeValue,
-                        handler as EventsTypes.HandlerForType<typeof typeValue>
-                    );
-                },
-                trigger(...args: EventsTypes.Parameters<EventsTypes.AllHandlers>): void {
-                    EventsImplementation.trigger(typeValue, ...(args as EventsTypes.EventParameters<typeof typeValue>));
-                },
-                handlerCount(): number {
-                    return EventsImplementation.handlerCount(typeValue);
-                },
-            };
+            )[key] = channel;
         }
+
+        // OnTickStart is an alias for OngoingGlobal: share the same EventChannel instance
+        const ongoingGlobalChannel = (
+            EventsImplementation as unknown as Record<EventsTypes.SignatureKey, EventChannel<EventsTypes.SignatureKey>>
+        )['OngoingGlobal'];
+
+        (EventsImplementation as unknown as Record<EventsTypes.SignatureKey, EventChannel<EventsTypes.SignatureKey>>)[
+            'OnTickStart'
+        ] = ongoingGlobalChannel;
+
+        (EventsTypes.Type.OnTickStart as EventsTypes.TriggerWithChannel)._channel = ongoingGlobalChannel;
     }
 
     private constructor() {}
 
-    private static getSate(type: EventsTypes.TypeValue): EventsTypes.State {
-        const state = EventsImplementation._states.get(type);
+    private static getChannel(type: EventsTypes.TypeValue): EventChannel<EventsTypes.SignatureKey> {
+        const typeWithChannel = type as EventsTypes.TriggerWithChannel;
 
-        if (state) return state;
+        let channel = typeWithChannel._channel;
 
-        const createdState: EventsTypes.State = {
-            incompleteTriggers: 0,
-            handlers: new Set<EventsTypes.AllHandlers>(),
-        };
+        if (!channel) {
+            channel = new EventChannel(type);
+            typeWithChannel._channel = channel;
+        }
 
-        EventsImplementation._states.set(type, createdState);
-
-        return createdState;
+        return channel;
     }
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     public static setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
-        EventsImplementation._logging.setLogging(log, logLevel, includeRawError);
+        EventsPrivate.logging.setLogging(log, logLevel, includeRawError);
     }
 
     /**
      * Subscribe to an event.
      * @param type - The event type to subscribe to.
      * @param handler - The handler function to call when the event is triggered.
+     * @param priority - The priority of the handler (e.g. `EventPriority.First`, `EventPriority.Normal`, `EventPriority.Last`, or custom number). Lower numbers run earlier. Defaults to `EventPriority.Normal` (0).
      * @returns A function to unsubscribe from the event.
      */
     public static subscribe<T extends EventsTypes.TypeValue>(
         type: T,
-        handler: EventsTypes.HandlerForType<T>
+        handler: EventsTypes.HandlerForType<T>,
+        priority: number = EventPriority.Normal
     ): () => void {
-        const state = EventsImplementation.getSate(type);
-
-        state.handlers.add(handler as EventsTypes.AllHandlers);
-
-        const unsubscriber = () => EventsImplementation.unsubscribe(type, handler);
-
-        return unsubscriber;
+        return EventsImplementation.getChannel(type).subscribe(
+            handler as unknown as EventsTypes.HandlerForType<EventsTypes.Signature[EventsTypes.SignatureKey]>,
+            priority
+        );
     }
 
     /**
@@ -293,9 +406,9 @@ class EventsImplementation {
      * @param handler - The handler function that was subscribed.
      */
     public static unsubscribe<T extends EventsTypes.TypeValue>(type: T, handler: EventsTypes.HandlerForType<T>): void {
-        const state = EventsImplementation.getSate(type);
-
-        state.handlers.delete(handler as EventsTypes.AllHandlers);
+        EventsImplementation.getChannel(type).unsubscribe(
+            handler as unknown as EventsTypes.HandlerForType<EventsTypes.Signature[EventsTypes.SignatureKey]>
+        );
     }
 
     /**
@@ -304,39 +417,11 @@ class EventsImplementation {
      * @param args - The arguments to pass to the handler function.
      */
     public static trigger<T extends EventsTypes.TypeValue>(type: T, ...args: EventsTypes.EventParameters<T>): void {
-        const state = EventsImplementation.getSate(type);
-
-        const typeName = (type as { name?: string }).name ?? 'unknown';
-
-        // Incomplete-trigger accounting: Portal servers previously aborted the JS thread for a block of synchronous
-        // work after ~50ms, so a trigger can be started (increment below) but never reach the decrement. We schedule a
-        // one-shot timeout to log how many such incomplete triggers occurred in the last _LOG_TIMEOUT_MS window in
-        // order to avoid spamming the log, especially for high-frequency triggers like any of the Ongoing events.
-        if (state.incompleteTriggers > 0 && !state.logTimeout) {
-            const processIncompleteTriggers = () => {
-                state.logTimeout = undefined;
-
-                EventsImplementation._logging.log(
-                    `${state.incompleteTriggers} incomplete triggers for ${typeName} in last ${EventsImplementation._LOG_TIMEOUT_MS}ms.`,
-                    Logging.LogLevel.Warning
-                );
-
-                state.incompleteTriggers = 0;
-            };
-
-            state.logTimeout = Timers.setTimeout(processIncompleteTriggers, EventsImplementation._LOG_TIMEOUT_MS);
-        }
-
-        ++state.incompleteTriggers;
-
-        // Execute each handler asynchronously and non-blocking.
-        // Errors in one handler won't prevent other handlers from executing.
-        for (const handler of state.handlers) {
-            CallbackHandler.invoke(handler, args, typeName, EventsImplementation._logging, Logging.LogLevel.Error);
-        }
-
-        // Decrement runs synchronously after the loop; the only way it is skipped is tick abort (50ms cap).
-        --state.incompleteTriggers;
+        (
+            EventsImplementation.getChannel(type) as unknown as {
+                trigger(a?: unknown, b?: unknown, c?: unknown, d?: unknown): void;
+            }
+        ).trigger(args[0], args[1], args[2], args[3]);
     }
 
     /**
@@ -345,7 +430,7 @@ class EventsImplementation {
      * @returns Count of subscribed handlers (0 if none).
      */
     public static handlerCount<T extends EventsTypes.TypeValue>(type: T): number {
-        return EventsImplementation.getSate(type).handlers.size;
+        return EventsImplementation.getChannel(type).handlerCount();
     }
 }
 
@@ -353,11 +438,24 @@ export const Events = EventsImplementation as typeof EventsImplementation & Even
 
 /* eslint-disable jsdoc/require-jsdoc */
 export function OngoingGlobal(): void {
+    EventsPrivate.scheduleTickEnd();
     Events.OngoingGlobal.trigger();
+}
+
+export function OnTickStart(): void {
+    OngoingGlobal();
+}
+
+export function OnTickEnd(): void {
+    Events.OnTickEnd.trigger();
 }
 
 export function OngoingAreaTrigger(areaTrigger: mod.AreaTrigger): void {
     Events.OngoingAreaTrigger.trigger(areaTrigger);
+}
+
+export function OngoingBlockingSphere(blockingSphere: mod.BlockingSphere): void {
+    Events.OngoingBlockingSphere.trigger(blockingSphere);
 }
 
 export function OngoingBomb(bomb: mod.Bomb): void {
@@ -547,12 +645,20 @@ export function OnPlayerEarnedKillAssist(assistingPlayer: mod.Player, victim: mo
     Events.OnPlayerEarnedKillAssist.trigger(assistingPlayer, victim);
 }
 
+export function OnPlayerEmerged(player: mod.Player): void {
+    Events.OnPlayerEmerged.trigger(player);
+}
+
 export function OnPlayerEnterAreaTrigger(player: mod.Player, areaTrigger: mod.AreaTrigger): void {
     Events.OnPlayerEnterAreaTrigger.trigger(player, areaTrigger);
 }
 
 export function OnPlayerEnterCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void {
     Events.OnPlayerEnterCapturePoint.trigger(player, capturePoint);
+}
+
+export function OnPlayerEnteredWater(player: mod.Player): void {
+    Events.OnPlayerEnteredWater.trigger(player);
 }
 
 export function OnPlayerEnterVehicle(player: mod.Player, vehicle: mod.Vehicle): void {
@@ -573,6 +679,10 @@ export function OnPlayerExitAreaTrigger(player: mod.Player, areaTrigger: mod.Are
 
 export function OnPlayerExitCapturePoint(player: mod.Player, capturePoint: mod.CapturePoint): void {
     Events.OnPlayerExitCapturePoint.trigger(player, capturePoint);
+}
+
+export function OnPlayerExitedWater(player: mod.Player): void {
+    Events.OnPlayerExitedWater.trigger(player);
 }
 
 export function OnPlayerExitVehicle(player: mod.Player, vehicle: mod.Vehicle): void {
@@ -597,6 +707,10 @@ export function OnPlayerJoinGame(player: mod.Player): void {
 
 export function OnPlayerLeaveGame(playerId: number): void {
     Events.OnPlayerLeaveGame.trigger(playerId);
+}
+
+export function OnPlayerSubmerged(player: mod.Player): void {
+    Events.OnPlayerSubmerged.trigger(player);
 }
 
 export function OnPlayerSwitchTeam(player: mod.Player, team: mod.Team): void {

@@ -98,7 +98,18 @@ Events.OnGameModeEnding.subscribe(() => {
 
 - **Error Isolation** – Each handler is invoked via `CallbackHandler`, so errors (sync or async) in one handler are caught and logged and do not prevent other handlers from executing. A bug in one subscription cannot break the rest of the event system.
 
-- **Execution** – Synchronous handlers run to completion before the next handler is invoked; the trigger does not wait for asynchronous handlers' promises to settle. Long-running synchronous handlers will block other handlers and the caller; keep sync work short or use async handlers.
+- **Execution & Priority** – Handlers execute synchronously in ascending order of their priority (`EventPriority.First` (-100) $\to$ `EventPriority.Normal` (0) $\to$ `EventPriority.Last` (100) or custom integer values). Within the same priority level, handlers execute in deterministic FIFO (order of subscription) sequence. Synchronous handlers run to completion before the next handler is invoked; the trigger does not wait for asynchronous handlers' promises to settle. Long-running synchronous handlers will block other handlers and the caller; keep sync work short or use async handlers.
+
+- **Tick Lifecycle Architecture (`OnTickStart` vs `OnTickEnd`)** – Battlefield Portal processes each frame across distinct phases. The `Events` module standardizes this via `OnTickStart` (aliased to `OngoingGlobal`) and a virtual `OnTickEnd` event driven by scheduled microtask resolution:
+    - **Phase 1: `OnTickStart` (Input & Early Engine Events)**: Runs at priority `Normal` (`0`). Handlers that capture raw engine state, poll player positions, or dispatch requests early in the frame subscribe here (e.g. `Timers`, `PlayerLocations`, `Raycast`, `ScavengerDrop`, `MultiClickDetector`, `PerformanceStats`, and standard user game logic).
+    - **Phase 2: Mid-Tick Engine Events**: The Portal server dispatches discrete macro-events (e.g. `OnPlayerUIButtonEvent`, `OnPlayerDamaged`, `OnRayCastHit`).
+    - **Phase 3: `OnTickEnd` (Simulation, Reactivity & Commit Pipeline)**: Runs after all macro-events and their microtasks have finished. Modules subscribe here using a strict priority ladder to guarantee deterministic, same-frame simulation and presentation without multi-tick latency:
+        1. **`Timelines` (`-100` / `First`)**: Advances high-level step sequences, starts/stops tweens.
+        2. **`Solid` (`-95`)**: Advances the reactive scheduler, evaluates deferred reactive effects (`deferTicks`), and propagates dirty signals.
+        3. **`Animations` (`-90`)**: Interpolates active tweens, evaluates harmonic springs and momentum decay, and applies values to target objects.
+        4. **`Spatial` (`-80`)**: Computes continuous kinematics, look-at/follow trackers, and updates world transform matrices across the scene graph hierarchy.
+        5. **Late Game Logic (`0` / `Normal`)**: Custom post-processing and late HUD updates.
+        6. **`UI.flush()` (`100` / `Last`)**: Coalesces all accumulated dirty UI properties across the entire frame and issues a single batch of native C++ FFI calls before client rendering.
 
 - **Configurable Error Logging** – Handler errors are automatically logged using the `Logging` module. Use `Events.setLogging()` to configure a logger function, minimum log level, and whether to include error details. This provides visibility into handler failures without requiring manual error handling in every handler.
 
@@ -116,14 +127,14 @@ Subscribes a handler function to an event. The handler will be called whenever t
 
 **Channel style** – Prefer this for better IntelliSense; the handler signature is fully typed for that event.
 
-- **Signature:** `Events.<EventName>.subscribe(handler): () => void`
-- **Parameters:** `handler` – A function matching the signature for this event. Parameter types are inferred.
+- **Signature:** `Events.<EventName>.subscribe(handler, priority?): () => void`
+- **Parameters:** `handler` – A function matching the signature for this event. Parameter types are inferred; `priority` – (Optional) Handler priority (e.g. `EventPriority.First`, `EventPriority.Normal`, `EventPriority.Last`, or custom integer). Lower values run earlier. Defaults to `EventPriority.Normal` (0).
 - **Returns:** A function that can be called to unsubscribe the handler.
 
 **Object style** – Use when you need to pass the event type by value.
 
-- **Signature:** `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>): () => void`
-- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – A function matching the signature for the event type.
+- **Signature:** `Events.subscribe<T extends Type>(type: T, handler: HandlerForType<T>, priority?): () => void`
+- **Parameters:** `type` – The event type from `Events.Type` (trigger function for that event); `handler` – A function matching the signature for the event type; `priority` – (Optional) Handler priority. Defaults to `EventPriority.Normal` (0).
 - **Returns:** A function that can be called to unsubscribe the handler.
 
 **Examples:**
@@ -131,6 +142,8 @@ Subscribes a handler function to an event. The handler will be called whenever t
 <ai>
 
 ```ts
+import { Events, EventPriority } from 'bf6-portal-utils/events';
+
 // Channel style (preferred)
 const joinGameUnsubscribe = Events.OnPlayerJoinGame.subscribe((player: mod.Player) => {
     console.log(`Player joined game: ${mod.GetObjId(player)}`);
@@ -138,10 +151,23 @@ const joinGameUnsubscribe = Events.OnPlayerJoinGame.subscribe((player: mod.Playe
 // Later, unsubscribe
 joinGameUnsubscribe();
 
+// Subscribe with priority
+Events.OngoingGlobal.subscribe(() => {
+    console.log('Runs before normal and late handlers');
+}, EventPriority.First);
+
+Events.OngoingGlobal.subscribe(() => {
+    console.log('Runs after all game logic handlers (e.g. flushing UI dirty states)');
+}, EventPriority.Last);
+
 // Object style
-const playerDeployedUnsubscribe = Events.subscribe(Events.Type.OnPlayerDeployed, (player: mod.Player) => {
-    console.log(`Player deployed: ${mod.GetObjId(player)}`);
-});
+const playerDeployedUnsubscribe = Events.subscribe(
+    Events.Type.OnPlayerDeployed,
+    (player: mod.Player) => {
+        console.log(`Player deployed: ${mod.GetObjId(player)}`);
+    },
+    EventPriority.Normal
+);
 // Later, unsubscribe
 playerDeployedUnsubscribe();
 ```
@@ -268,31 +294,49 @@ Events.Type.OnPlayerDeployed(somePlayer);
 
 Available event types include:
 
-- `OngoingGlobal`, `OngoingAreaTrigger`, `OngoingBomb`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
-- `OnAIMoveToFailed`, `OnAIMoveToRunning`, `OnAIMoveToSucceeded`
-- `OnAIParachuteRunning`, `OnAIParachuteSucceeded`
-- `OnAIWaypointIdleFailed`, `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`
-- `OnCapturePointCaptured`, `OnCapturePointCapturing`, `OnCapturePointLost`
-- `OnGameModeEnding`, `OnGameModeStarted`
-- `OnPlayerJoinGame`, `OnPlayerLeaveGame`
-- `OnPlayerDeployed`, `OnPlayerUndeploy`
-- `OnMandown`, `OnRevived`, `OnPlayerDamaged`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`, `OnPlayerInteract`, `OnPlayerSwitchTeam`, `OnPlayerUIButtonEvent`
-- `OnPlayerEnterAreaTrigger`, `OnPlayerExitAreaTrigger`
-- `OnPlayerEnterCapturePoint`, `OnPlayerExitCapturePoint`
-- `OnPlayerEnterVehicle`, `OnPlayerExitVehicle`
-- `OnPlayerEnterVehicleSeat`, `OnPlayerExitVehicleSeat`
-- `OnPlayerEnterVL7Cloud`, `OnPlayerExitVL7Cloud`
-- `OnPortalGadgetAimStart`, `OnPortalGadgetAimStop`, `OnPortalGadgetFireStart`, `OnPortalGadgetFireStop`, `OnPortalGadgetLaserToggle`
-- `OnMCOMArmed`, `OnMCOMDefused`, `OnMCOMDestroyed`
-- `OnRayCastHit`, `OnRayCastMissed`
-- `OnRingOfFireZoneSizeChange`
-- `OnSpawnerSpawned`
-- `OnTimeLimitReached`
-- `OnVehicleDestroyed`, `OnVehicleSpawned`
-- `OnBombDropped`, `OnBombPickedUp`, `OnBombStateChanged`
-- `OnGolmudTrainStopped`
+- **Tick & Ongoing Loops**
+    - _Tick Loops:_ `OngoingGlobal` (alias: `OnTickStart`), `OnTickEnd`
+    - _Entity Ongoing:_ `OngoingAreaTrigger`, `OngoingBlockingSphere`, `OngoingBomb`, `OngoingCapturePoint`, `OngoingEmplacementSpawner`, `OngoingHQ`, `OngoingInteractPoint`, `OngoingLootSpawner`, `OngoingMCOM`, `OngoingPlayer`, `OngoingRingOfFire`, `OngoingSector`, `OngoingSpawner`, `OngoingSpawnPoint`, `OngoingTeam`, `OngoingVehicle`, `OngoingVehicleSpawner`, `OngoingWaypointPath`, `OngoingWorldIcon`
+- **Player Lifecycle, Combat & Interaction**
+    - _Session & Spawning:_ `OnPlayerJoinGame`, `OnPlayerLeaveGame`, `OnPlayerSwitchTeam`, `OnPlayerDeployed`, `OnPlayerUndeploy`
+    - _Health & Combat:_ `OnPlayerDamaged`, `OnMandown`, `OnRevived`, `OnPlayerDied`, `OnPlayerEarnedKill`, `OnPlayerEarnedKillAssist`
+    - _UI & Interaction:_ `OnPlayerInteract`, `OnPlayerUIButtonEvent`
+- **Player Environment & Volumes**
+    - _Triggers & Points:_ `OnPlayerEnterAreaTrigger`, `OnPlayerExitAreaTrigger`, `OnPlayerEnterCapturePoint`, `OnPlayerExitCapturePoint`
+    - _Water:_ `OnPlayerEnteredWater`, `OnPlayerExitedWater`, `OnPlayerSubmerged`, `OnPlayerEmerged`
+    - _Hazards:_ `OnPlayerEnterVL7Cloud`, `OnPlayerExitVL7Cloud`
+- **Vehicles**
+    - _Boarding & Seating:_ `OnPlayerEnterVehicle`, `OnPlayerExitVehicle`, `OnPlayerEnterVehicleSeat`, `OnPlayerExitVehicleSeat`
+    - _Lifecycle:_ `OnVehicleSpawned`, `OnVehicleDestroyed`
+- **Game Modes & Objectives**
+    - _Match Flow:_ `OnGameModeStarted`, `OnGameModeEnding`, `OnTimeLimitReached`
+    - _Capture Points:_ `OnCapturePointCapturing`, `OnCapturePointCaptured`, `OnCapturePointLost`
+    - _MCOM / Rush:_ `OnMCOMArmed`, `OnMCOMDefused`, `OnMCOMDestroyed`
+    - _Bomb / Delivery:_ `OnBombPickedUp`, `OnBombDropped`, `OnBombStateChanged`
+    - _Ring of Fire:_ `OnRingOfFireZoneSizeChange`
+- **AI & Bots**
+    - _Movement:_ `OnAIMoveToRunning`, `OnAIMoveToSucceeded`, `OnAIMoveToFailed`
+    - _Parachuting:_ `OnAIParachuteRunning`, `OnAIParachuteSucceeded`
+    - _Waypoints:_ `OnAIWaypointIdleRunning`, `OnAIWaypointIdleSucceeded`, `OnAIWaypointIdleFailed`
+- **Gadgets, Physics & World**
+    - _Portal Gadget:_ `OnPortalGadgetAimStart`, `OnPortalGadgetAimStop`, `OnPortalGadgetFireStart`, `OnPortalGadgetFireStop`, `OnPortalGadgetLaserToggle`
+    - _Raycasting:_ `OnRayCastHit`, `OnRayCastMissed`
+    - _Spawners:_ `OnSpawnerSpawned`
+    - _Map Specific:_ `OnGolmudTrainStopped`
 
 </ai>
+
+#### `Events.EventPriority`
+
+An enum defining standard execution priority levels for event handlers. Handlers execute in ascending priority order (lower numbers run earlier).
+
+Available priority levels:
+
+- `First` (-100) – Runs before standard handlers. Useful for pre-processing, input capture, or initialization.
+- `Normal` (0) – Default priority for all handlers when no priority argument is specified.
+- `Last` (100) – Runs after standard handlers. Useful for post-processing, batch commits, UI dirty-state flushing, or cleanup tasks.
+
+You may also pass any custom integer value (e.g. `-50`, `10`, `500`) for fine-grained execution ordering. Handlers with identical priority values execute in deterministic FIFO order (the sequence in which they were subscribed).
 
 #### `Events.LogLevel`
 
@@ -307,13 +351,13 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `Events.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: Events.LogLevel, includeRawError?: boolean): void`
+#### `Events.setLogging(log?: (text: string, error?: unknown) => Promise<void> | void, logLevel?: Events.LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the Events module. When event handlers throw errors, they are automatically caught and logged using the configured logger. This allows you to monitor and debug handler failures without crashing your mod.
 
 **Parameters:**
 
-- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `log` – The logger function to use. Pass `undefined` (or `null`) to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `Events.LogLevel.Warning`.
 - `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
@@ -535,9 +579,9 @@ The `Events` module uses a centralized subscription system:
 
 2. **Internal Triggering** – When a Battlefield Portal event occurs, the corresponding exported function calls `Events.trigger()` with the event type and parameters.
 
-3. **Handler Storage** – Subscribed handlers are stored in a `Map<Type, Set<AllHandlers>>`, allowing multiple handlers per event type.
+3. **Handler Storage** – Subscribed handlers are stored in a flat array (`handlers`) inside a prototype-based `EventChannel` object for each event. To optimize memory, this array is lazy-initialized on the first subscription.
 
-4. **Handler Execution** – When an event is triggered, each subscribed handler is invoked via `CallbackHandler.invoke()` in sequence. Synchronous handlers run immediately (before the next handler); asynchronous handlers are invoked and their promises are not awaited, so they run without blocking. `CallbackHandler` catches any thrown or rejected errors so that one failing handler does not prevent the rest from running; errors are logged if logging is configured via `Events.setLogging()`. This design allows short synchronous handlers to run immediately instead of being queued as a microtask, while still isolating failures. Asynchronous handlers are preferred for non-trivial work.
+4. **Handler Execution** – When an event is triggered, each subscribed handler is invoked in sequence using `CallbackHandler.invoke` with direct arguments, providing a completely zero-allocation execution path that avoids array or spread parameter allocations. Synchronous handlers run immediately (before the next handler); asynchronous handlers are invoked and their promises are not awaited, so they run without blocking. `CallbackHandler` catches any thrown or rejected errors so that one failing handler does not prevent the rest from running; errors are logged if logging is configured via `Events.setLogging()`. This design allows short synchronous handlers to run immediately instead of being queued as a microtask, while still isolating failures. Asynchronous handlers are preferred for non-trivial work.
 
 5. **Error Logging** – Handler errors are caught and logged using the `Logging` module. The logging configuration can be set via `Events.setLogging()`, allowing you to control verbosity and error detail inclusion. This provides visibility into handler failures without manual error handling.
 
@@ -562,17 +606,17 @@ You’ll see these warnings only if logging is configured with `Events.setLoggin
 
 ## Known Limitations & Caveats
 
-- **Tick Budget (~50ms)** – The server may abort the JavaScript process for a game tick if total work exceeds its per-tick cap, leading to incomplete event executions. The module logs how many triggers did not complete per event type over a rolling window; see [Tick Budget and Incomplete Triggers](#tick-budget-and-incomplete-triggers) for details and mitigation.
-
 - **Single Event Hook Requirement** – You must not implement or export any Battlefield Portal event handler functions in your own code. If you do, they will conflict with this module's implementations and cause undefined behavior.
 
 - **Handler Reference Equality** – When unsubscribing, you must pass the exact same function reference that was used in `subscribe()`. Anonymous functions cannot be unsubscribed unless you store the reference. **Recommended:** Use the unsubscribe function returned by `subscribe()` instead of storing handler references.
 
-- **Execution Order** – Handler execution order is not guaranteed. If you need handlers to execute in a specific order, chain them manually or use a single handler that calls other functions in order.
+- **Execution Order** – Handlers execute in ascending order of their priority (`First` $\to$ `Normal` $\to$ `Last` or custom numbers). Handlers with the same priority value execute in deterministic FIFO order (the order in which they were subscribed).
 
 - **No Return Values** – Event handlers cannot return values to the caller. All handlers return `void` or `Promise<void>`. If you need to collect results, use shared state or callbacks.
 
 - **Completion and Ordering** – Synchronous handlers complete before the trigger returns; asynchronous handlers are not awaited, so you cannot rely on async handlers finishing before other code runs. Long-running synchronous handlers block other handlers and the caller—prefer async handlers for non-trivial work. Use promises or callbacks if you need to wait for handler completion.
+
+- **Tick Budget (~50ms)** – The server may abort the JavaScript process for a game tick if total work exceeds its per-tick cap, leading to incomplete event executions. This is mechanism has since been disabled, but the module will still log how many triggers did not complete per event type over a rolling window; see [Tick Budget and Incomplete Triggers](#tick-budget-and-incomplete-triggers) for details and mitigation.
 
 </ai>
 

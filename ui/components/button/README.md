@@ -6,7 +6,7 @@ The `UIButton` component creates an interactive button widget. Buttons support m
 
 </ai>
 
-> **Note** This component extends `UI.Element` and implements `UI.Button`. For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md).
+> **Note** This component extends `UIBaseButton` (which extends `UI.Element`). For information about the base `UI` namespace functionality, see the [main UI documentation](../../README.md) and [UIBaseButton documentation](../base-button/README.md).
 
 ---
 
@@ -29,7 +29,9 @@ const button = new UIButton({
 });
 
 // Update button state
-button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.GREEN);
+button.enabled = false;
+button.baseColor = UI.COLORS.BLUE;
+button.pressedColor = UI.COLORS.GREEN;
 ```
 
 </ai>
@@ -44,23 +46,23 @@ button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
-| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
+| `bgColor` | `UI.Color = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
 | `bgAlpha` | `number = 1` | Button background opacity. Note: Alphas are multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.Solid` | Button fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.Solid` | Button fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `enabled` | `boolean = true` | Initial enabled state. |
-| `baseColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Base button color. |
+| `baseColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Base button color. |
 | `baseAlpha` | `number = 1` | Base button opacity. |
-| `disabledColor` | `mod.Vector = UI.COLORS.BF_GREY_3` | Disabled state color. |
+| `disabledColor` | `UI.Color = UI.COLORS.BF_GREY_3` | Disabled state color. |
 | `disabledAlpha` | `number = 1` | Disabled state opacity. |
-| `pressedColor` | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
+| `pressedColor` | `UI.Color = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
 | `pressedAlpha` | `number = 1` | Pressed state opacity. |
-| `focusedColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Focused state color. |
+| `focusedColor` | `UI.Color = UI.COLORS.BF_GREY_1` | Focused state color. |
 | `focusedAlpha` | `number = 1` | Focused state opacity. |
 | `onClickDown` | `UI.ButtonHandler \| undefined` | Invoked on press (`ButtonDown`). When provided, enables that event on the widget. |
 | `onClickUp` | `UI.ButtonHandler \| undefined` | Invoked on release (`ButtonUp`). When provided, enables that event on the widget. Usual place for “activate on click” behavior. |
@@ -73,53 +75,42 @@ button.setEnabled(false).setBaseColor(UI.COLORS.BLUE).setPressedColor(UI.COLORS.
 
 ### Inherited from `UI.Element`
 
-`UIButton` inherits all properties and methods from `UI.Element`, including:
+`UIButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
+- **Visibility**: `visible`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Button-Specific
 
+- **`UIButton.MAX_BUTTONS: number`** (static constant) – Maximum number of interactive UI buttons supported simultaneously (512).
+- **`UIButton.getActiveButtonCount(): number`** (static method) – Retrieves the current number of active interactive buttons in the system.
 - **`enabled: boolean`** (getter/setter) – Button enabled state.
-
-- **`setEnabled(enabled: boolean): UIButton`** – Sets enabled state and returns `this` for method chaining.
-
-- **`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut: UI.ButtonHandler | undefined`** (getter/setter) – Per-event handlers. May be synchronous or asynchronous.
-
-- **`setOnClickDown`, `setOnClickUp`, `setOnFocusIn`, `setOnFocusOut(handler?: UI.ButtonHandler): UIButton`** – Set the corresponding handler and return `this` for method chaining.
-
-**Color & Alpha Getters/Setters** (all support method chaining):
-
-- **`baseColor`, `disabledColor`, `focusedColor`, `pressedColor: mod.Vector`** (getter/setter)
-- **`setBaseColor(color)`, `setDisabledColor(color)`, `setFocusedColor(color)`, `setPressedColor(color): UIButton`**
-- **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `pressedAlpha: number`** (getter/setter)
-- **`setBaseAlpha(alpha)`, `setDisabledAlpha(alpha)`, `setFocusedAlpha(alpha)`, `setPressedAlpha(alpha): UIButton`**
-
-- **`delete(): void`** – Overrides `Element.delete()` to clean up button registration before deleting the button.
+- **`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut: UI.ButtonHandler | undefined`** (getter/setter) – Per-event handlers. Setting or clearing a handler dynamically enables or disables the corresponding `mod.UIButtonEvent` on the engine widget.
+- **`baseColor`, `disabledColor`, `focusedColor`, `pressedColor: UI.Color`** (getter/setter) – State-specific colors. Supports zero-allocation read overloads (`getBaseColor(out?)`, `getDisabledColor(out?)`, `getFocusedColor(out?)`, `getPressedColor(out?)`).
+- **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `pressedAlpha: number`** (getter/setter) – State-specific alphas.
+- **`delete(): void`** – Overrides `Element.delete()` to unregister button event routing and free its button slot before deleting the widget.
 
 ---
-
-## Type Definitions
 
 ### `UIButton.Params`
 
 ```ts
 type Params = UI.ElementParams & {
     enabled?: boolean;
-    baseColor?: mod.Vector;
+    baseColor?: UI.Color;
     baseAlpha?: number;
-    disabledColor?: mod.Vector;
+    disabledColor?: UI.Color;
     disabledAlpha?: number;
-    pressedColor?: mod.Vector;
+    pressedColor?: UI.Color;
     pressedAlpha?: number;
-    focusedColor?: mod.Vector;
+    focusedColor?: UI.Color;
     focusedAlpha?: number;
     onClickDown?: UI.ButtonHandler;
     onClickUp?: UI.ButtonHandler;
@@ -140,13 +131,11 @@ Battlefield Portal supports **hover in** and **hover out** button events (`mod.U
 
 - **Sync vs async handlers**: Each handler may be synchronous or asynchronous. In other parts of the UI/event system, async handlers are often preferred so that long-running work does not block the event stack. For `UIButton`, the engine delivers each UI button event to a single handler identified by the button's unique global reference, so only this button's matching handler runs for that event. Synchronous callbacks—including long-running ones—are therefore safe and will not block other button or event handlers.
 
-- **Button Registration**: Buttons automatically register themselves with the UI system during construction using `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
+- **Button Slot Allocation**: Buttons automatically allocate a button slot in the SoA button table during construction. When a button is deleted, its slot is automatically freed back to the button pool.
 
 - **Color Multiplication**: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white) to get the expected color results.
 
 - **Alpha Multiplication**: Alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 ---
 

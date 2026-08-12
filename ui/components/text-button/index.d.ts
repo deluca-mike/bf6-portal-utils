@@ -1,91 +1,138 @@
+import { Colors } from '../../../colors/index.ts';
+import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
-import { UIButton } from '../button/index.ts';
+import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
 export declare class UITextButton extends UIContentButton<UIText> {
-    message: mod.Message;
-    textAnchor: mod.UIAnchor;
-    textSize: number;
-    setMessage: (message: mod.Message) => this;
-    setTextAnchor: (anchor: mod.UIAnchor) => this;
-    setTextSize: (size: number) => this;
-    protected _textDisabledColor: mod.Vector;
-    protected _textDisabledAlpha: number;
+    private static readonly _scratchTextParams;
     /**
      * Creates a new text button.
      * @param params - The parameters for the text button.
      */
     constructor(params: UITextButton.Params);
-    private _setContentEnabled;
+    protected _setContentEnabled(enabled: boolean): void;
     /**
-     * @inheritdoc
+     * The label message of the text, or undefined if deleted.
+     * @returns The label message, or undefined if deleted.
      */
-    get enabled(): boolean;
+    get label(): mod.Message | undefined;
     /**
-     * @inheritdoc
+     * Sets the label message of the text.
+     * @param label - The new label message.
      */
-    set enabled(enabled: boolean);
+    set label(label: mod.Message);
     /**
-     * @inheritdoc
+     * Sets the label message of the text.
+     * @param label - The new label message.
+     * @returns This text button for chaining.
      */
-    setEnabled(enabled: boolean): this;
+    setLabel(label: mod.Message): this;
     /**
-     * The color of the text when the button is enabled.
+     * The size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
      */
-    get textColor(): mod.Vector;
+    get textSize(): number | undefined;
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     */
+    set textSize(size: number);
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     * @returns This text button for chaining.
+     */
+    setTextSize(size: number): this;
+    /**
+     * The anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
+     */
+    get textAnchor(): UI.Anchor | undefined;
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     */
+    set textAnchor(anchor: UI.Anchor);
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     * @returns This text button for chaining.
+     */
+    setTextAnchor(anchor: UI.Anchor): this;
+    /**
+     * The color of the text when the button is enabled, or undefined if deleted.
+     * @returns The text color, or undefined if deleted.
+     */
+    get textColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The text color, or undefined if deleted.
+     */
+    getTextColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the text when the button is enabled.
      * @param color - The new color.
      */
-    set textColor(color: mod.Vector);
+    set textColor(color: Colors.Color);
     /**
-     * Sets the color of the text when the button is enabled. Useful for chaining operations.
+     * Sets the color of the text when the button is enabled.
      * @param color - The new color.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
-    setTextColor(color: mod.Vector): this;
+    setTextColor(color: Colors.Color): this;
     /**
-     * The alpha of the text when the button is enabled.
+     * The alpha of the text when the button is enabled, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
      */
-    get textAlpha(): number;
+    get textAlpha(): number | undefined;
     /**
      * Sets the alpha of the text when the button is enabled.
      * @param alpha - The new alpha.
      */
     set textAlpha(alpha: number);
     /**
-     * Sets the alpha of the text when the button is enabled. Useful for chaining operations.
+     * Sets the alpha of the text when the button is enabled.
      * @param alpha - The new alpha.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
     setTextAlpha(alpha: number): this;
     /**
-     * The color of the text when the button is disabled.
+     * The color of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text color, or undefined if deleted.
      */
-    get textDisabledColor(): mod.Vector;
+    get textDisabledColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the disabled text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled text color, or undefined if deleted.
+     */
+    getTextDisabledColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the text when the button is disabled.
      * @param color - The new color.
      */
-    set textDisabledColor(color: mod.Vector);
+    set textDisabledColor(color: Colors.Color);
     /**
-     * Sets the color of the text when the button is disabled. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
+     * Sets the color of the text when the button is disabled.
+     * @param color - The new disabled color.
+     * @returns This text button for chaining.
      */
-    setTextDisabledColor(color: mod.Vector): this;
+    setTextDisabledColor(color: Colors.Color): this;
     /**
-     * The alpha of the text when the button is disabled.
+     * The alpha of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text alpha opacity, or undefined if deleted.
      */
-    get textDisabledAlpha(): number;
+    get textDisabledAlpha(): number | undefined;
     /**
      * Sets the alpha of the text when the button is disabled.
      * @param alpha - The new alpha.
      */
     set textDisabledAlpha(alpha: number);
     /**
-     * Sets the alpha of the text when the button is disabled. Useful for chaining operations.
+     * Sets the alpha of the text when the button is disabled.
      * @param alpha - The new alpha.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
     setTextDisabledAlpha(alpha: number): this;
 }
@@ -93,9 +140,9 @@ export declare namespace UITextButton {
     /**
      * The parameters for creating a new text button.
      */
-    type Params = UIButton.Params &
+    type Params = UIBaseButton.Params &
         UIText.Params & {
-            textDisabledColor?: mod.Vector;
+            textDisabledColor?: Colors.Color;
             textDisabledAlpha?: number;
         };
 }

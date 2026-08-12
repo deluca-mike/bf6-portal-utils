@@ -23,13 +23,13 @@ import { UI } from 'bf6-portal-utils/ui';
 const container = new UIContainer({
     position: { x: 0, y: 0 },
     size: { width: 300, height: 400 },
-    anchor: mod.UIAnchor.Center,
+    anchor: UI.Anchor.Center,
     bgColor: UI.COLORS.BF_GREY_3,
     bgAlpha: 0.9,
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.text.helloWorld), // 'Hello World'
+            label: mod.Message(mod.stringkeys.text.helloWorld), // 'Hello World'
             position: { x: 0, y: 0 },
             textSize: 48,
         } as UIContainer.ChildParams<UIText.Params>,
@@ -56,13 +56,13 @@ container.delete();
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
-| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Background color. |
+| `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.None` | Fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `childrenParams` | `Array<UIContainer.ChildParams<any>> = []` | Nested elements automatically receive this container as `parent`. Each child must have a `type` property set to the class constructor (e.g., `UIContainer`, `UIText`, `UIButton`, `UITextButton`). |
@@ -73,22 +73,26 @@ container.delete();
 
 ### Inherited from `UI.Element`
 
-`UIContainer` inherits all properties and methods from `UI.Element`, including:
+`UIContainer` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
+- **Visibility**: `visible`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Container-Specific
 
-- **`children: UI.Element[]`** (getter) – Array of child elements. Automatically maintained when children are created, moved, or deleted. Elements are automatically added when created with this container as their parent, and automatically removed when deleted or moved to another parent.
-
+- **`children: readonly UI.Element[] | undefined`** (getter) – Snapshot array of child elements, or `undefined` if deleted.
+- **`getChildren(): readonly UI.Element[] | undefined`** – Retrieves child elements.
+- **`getChild(index: number): UI.Element | null | undefined`** – Retrieves a child element at the specified index (`null` if out of bounds, `undefined` if deleted).
+- **`childCount: number | undefined`** (getter) – Direct child count, or `undefined` if deleted.
+- **`getChildCount(): number | undefined`** – Retrieves direct child count, or `undefined` if deleted.
+- **`forEachChild(callback: (child: UI.Element, index: number) => void): void`** – Iterates over all direct child elements without allocating an intermediate array (protected by `CallbackHandler`).
 - **`delete(): void`** – Overrides `Element.delete()` to recursively delete all children before deleting the container itself.
 
 ---
@@ -117,7 +121,7 @@ const container = new UIContainer({
     childrenParams: [
         {
             type: UIText,
-            message: mod.Message(mod.stringkeys.text.hello), // 'Hello'
+            label: mod.Message(mod.stringkeys.text.hello), // 'Hello'
             position: { x: 0, y: 0 },
         } as UIContainer.ChildParams<UIText.Params>,
     ],
@@ -138,5 +142,5 @@ type Params = UI.ElementParams & {
 
 ## Further Reference
 
-- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace, `Element` class, and [element behavior conventions](../../README.md#element-behavior-conventions) (parent-child relationships, recursive deletion, receiver inheritance, etc.)
+- [Main UI Documentation](../../README.md) – For information about the base `UI` namespace, `Element` class, and [core concepts](../../README.md#core-concepts) (parent-child relationships, recursive deletion, receiver inheritance, etc.)
 - [`bf6-portal-mod-types`](https://www.npmjs.com/package/bf6-portal-mod-types) – Official Battlefield Portal type declarations

@@ -2,3 +2,13 @@ node_modules
 .yalc
 yalc.lock
 .DS_Store
+.agents
+.gemini
+GEMINI.md
+
+# graphify
+graphify-out/cache
+graphify-out/**/*cost.json
+graphify-out/*.local.json
+.graphify_python
+.graphify_root

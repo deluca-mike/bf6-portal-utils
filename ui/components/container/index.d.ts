@@ -1,43 +1,42 @@
 import { UI } from '../../index.ts';
 export declare class UIContainer extends UI.Element implements UI.Parent {
-    protected _children: Set<UI.Element>;
     /**
      * Creates a new container.
      * @param params - The parameters for the container.
      */
     constructor(params: UIContainer.Params);
     /**
-     * The children of the container.
+     * Returns a snapshot array of direct child elements, or undefined if deleted.
+     * @returns Array of direct children, or undefined if deleted.
      */
-    get children(): UI.Element[];
+    get children(): readonly UI.Element[] | undefined;
     /**
-     * @inheritdoc
+     * Retrieves a child element at the specified index.
+     * @param index - Zero-based index of the child.
+     * @returns The child element, null if out of bounds, or undefined if deleted.
      */
-    delete(): void;
+    getChild(index: number): UI.Element | null | undefined;
     /**
-     * Attaches a child to the container.
-     * @param child - The child to attach.
+     * The total direct child count of the container, or undefined if deleted.
+     * @returns The number of direct children, or undefined if deleted.
      */
-    attachChild(child: UI.Element): void;
+    get childCount(): number | undefined;
     /**
-     * Detaches a child from the container.
-     * @param child - The child to detach.
+     * Iterates over all direct child elements without allocating an intermediate array.
+     * @param callback - Function invoked for each child.
      */
-    detachChild(child: UI.Element): void;
+    forEachChild(callback: (child: UI.Element, index: number) => void): void;
 }
 export declare namespace UIContainer {
     /**
      * UIContainer children parameters with a 'type' property and the properties required by that element's constructor.
-     * @param T - The type of the element.
-     * @returns The child parameters.
+     * @template T - The type of the element.
      */
-    type ChildParams<T extends UI.ElementParams> = T & {
+    type ChildParams<T extends UI.ElementParams = any> = T & {
         type: new (params: T) => UI.Element;
     };
     /**
      * The parameters for creating a new container.
-     * @param T - The type of the element.
-     * @returns The container parameters.
      */
     type Params = UI.ElementParams & {
         childrenParams?: ChildParams<any>[];
