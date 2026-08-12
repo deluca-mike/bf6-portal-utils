@@ -1,10 +1,9 @@
 import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
-import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version: 2.0.2
+// version: 3.0.0
 export namespace Raycast {
     const logging = new Logging('Raycast');
 
@@ -14,13 +13,17 @@ export namespace Raycast {
     export const LogLevel = Logging.LogLevel;
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
@@ -49,270 +52,347 @@ export namespace Raycast {
         | { onHit: HitCallback<T>; onMiss?: MissCallback }
         | { onHit?: HitCallback<T>; onMiss: MissCallback };
 
-    type PendingRay = {
-        start: Vector3;
-        end: Vector3;
-        totalDistance: number;
-        timestamp: number;
-        nativeVectorReturn: boolean;
-        onHit?: HitCallback<mod.Vector | Vector3>;
-        onMiss?: MissCallback;
-    };
+    const MAX_PLAYERS = 100;
+    const GLOBAL_SLOT_INDEX = 100; // Slot index for player-less global raycasts
+    const TOTAL_WORKER_SLOTS = 101; // 0..99 for players, 100 for global
 
-    type PlayerState = {
-        pendingMisses: number;
-        rays: Map<number, PendingRay>;
-    };
+    const QUEUE_CAPACITY = 512;
+    const TIMEOUT_MS = 2_000;
+    const SERVER_START_TIME = Date.now();
 
-    let nextRayId: number = 0;
+    const FLAG_IN_FLIGHT = 1 << 0;
+    const FLAG_NATIVE_VECTOR = 1 << 1;
+    const FLAG_PLAYER_CONNECTED = 1 << 2;
 
-    const states: Map<number, PlayerState> = new Map();
+    // --- Circular Ring Buffer for Queued Requests (32-bit Float Coordinate Storage) ---
+    let _queueHead = 0;
+    let _queueTail = 0;
+    let _queueCount = 0;
 
-    const DISTANCE_EPSILON = 0.5; // 0.5 meters
-    const DEFAULT_TTL_MS = 2_000; // 2 Seconds
-    const PRUNE_INTERVAL_MS = 5_000; // 5 Seconds
+    const _queueStartX = new Float32Array(QUEUE_CAPACITY);
+    const _queueStartY = new Float32Array(QUEUE_CAPACITY);
+    const _queueStartZ = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndX = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndY = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndZ = new Float32Array(QUEUE_CAPACITY);
+    const _queueFlags = new Uint8Array(QUEUE_CAPACITY);
+    const _queueOnHit = new Array<HitCallback<mod.Vector | Vector3> | null>(QUEUE_CAPACITY);
+    const _queueOnMiss = new Array<MissCallback | null>(QUEUE_CAPACITY);
 
-    // Automatically prunes all player states every PRUNE_INTERVAL_MS.
-    Timers.setInterval(pruneAllStates, PRUNE_INTERVAL_MS);
+    // --- In-Flight Worker Slots (0..99: player ID, 100: global) ---
+    let _inFlightCount = 0;
+    let _initializedPlayers = false;
 
-    Events.OnRayCastHit.subscribe(handleHit);
-    Events.OnRayCastMissed.subscribe(handleMiss);
+    const _inFlightFlags = new Uint8Array(TOTAL_WORKER_SLOTS);
+    const _inFlightOnHit = new Array<HitCallback<mod.Vector | Vector3> | null>(TOTAL_WORKER_SLOTS);
+    const _inFlightOnMiss = new Array<MissCallback | null>(TOTAL_WORKER_SLOTS);
+    const _inFlightTimestamp = new Uint32Array(TOTAL_WORKER_SLOTS);
 
-    export function cast(player: mod.Player, start: Vector3, end: Vector3, callbacks: Callbacks<Vector3>): void;
+    function getUptime(): number {
+        return Date.now() - SERVER_START_TIME;
+    }
 
-    export function cast(
-        player: mod.Player,
-        start: mod.Vector,
-        end: mod.Vector,
-        callbacks: Callbacks<mod.Vector>
-    ): void;
+    function _setFlag(slotIndex: number, flag: number): void {
+        _inFlightFlags[slotIndex] |= flag;
+    }
+
+    function _clearFlag(slotIndex: number, flag: number): void {
+        _inFlightFlags[slotIndex] &= ~flag;
+    }
+
+    function _isInFlight(slotIndex: number): boolean {
+        return (_inFlightFlags[slotIndex] & FLAG_IN_FLIGHT) !== 0;
+    }
+
+    function _isConnected(slotIndex: number): boolean {
+        return (_inFlightFlags[slotIndex] & FLAG_PLAYER_CONNECTED) !== 0;
+    }
+
+    function _isNativeVector(slotIndex: number): boolean {
+        return (_inFlightFlags[slotIndex] & FLAG_NATIVE_VECTOR) !== 0;
+    }
+
+    function _getSlotIndex(eventPlayer: mod.Player): number {
+        try {
+            const objId = mod.GetObjId(eventPlayer);
+            return objId >= 0 && objId < MAX_PLAYERS ? objId : GLOBAL_SLOT_INDEX;
+        } catch {
+            return GLOBAL_SLOT_INDEX;
+        }
+    }
+
+    Events.OngoingGlobal.subscribe(_handleOngoingGlobal);
+    Events.OnRayCastHit.subscribe(_handleHit);
+    Events.OnRayCastMissed.subscribe(_handleMiss);
+    Events.OnPlayerJoinGame.subscribe(_handlePlayerJoin);
+    Events.OnPlayerLeaveGame.subscribe(_handlePlayerLeave);
+
+    function _handlePlayerJoin(player: mod.Player): void {
+        const playerId = mod.GetObjId(player);
+
+        if (playerId >= 0 && playerId < MAX_PLAYERS) {
+            _setFlag(playerId, FLAG_PLAYER_CONNECTED);
+        }
+    }
+
+    function _handlePlayerLeave(playerId: number): void {
+        if (playerId >= 0 && playerId < MAX_PLAYERS) {
+            _clearFlag(playerId, FLAG_PLAYER_CONNECTED);
+        }
+    }
+
+    function _initConnectedPlayers(): void {
+        _initializedPlayers = true;
+
+        const all = mod.AllPlayers();
+        const count = mod.CountOf(all);
+
+        for (let i = 0; i < count; ++i) {
+            const id = mod.GetObjId(mod.ValueInArray(all, i) as mod.Player);
+
+            if (id >= 0 && id < MAX_PLAYERS) {
+                _setFlag(id, FLAG_PLAYER_CONNECTED);
+            }
+        }
+    }
+
+    function _freeSlot(slotIndex: number): void {
+        _clearFlag(slotIndex, FLAG_IN_FLIGHT | FLAG_NATIVE_VECTOR);
+        _inFlightOnHit[slotIndex] = null;
+        _inFlightOnMiss[slotIndex] = null;
+        _inFlightTimestamp[slotIndex] = 0;
+
+        if (_inFlightCount > 0) {
+            --_inFlightCount;
+        }
+    }
+
+    function _checkTimeouts(now: number): void {
+        for (let i = 0; i < TOTAL_WORKER_SLOTS; ++i) {
+            if (!_isInFlight(i)) continue;
+
+            if (now - _inFlightTimestamp[i] <= TIMEOUT_MS) continue;
+
+            const onMiss = _inFlightOnMiss[i];
+            _freeSlot(i);
+
+            if (onMiss) {
+                CallbackHandler.invokeNoArgs(onMiss, logging, 'timeout');
+            }
+        }
+    }
+
+    function _tryDispatchSlot(slotIndex: number, player: mod.Player | null, now: number): boolean {
+        if (_queueCount === 0) return false;
+
+        const head = _queueHead;
+        const startX = _queueStartX[head];
+        const startY = _queueStartY[head];
+        const startZ = _queueStartZ[head];
+        const endX = _queueEndX[head];
+        const endY = _queueEndY[head];
+        const endZ = _queueEndZ[head];
+        const flags = _queueFlags[head];
+        const onHit = _queueOnHit[head];
+        const onMiss = _queueOnMiss[head];
+
+        const startVec = mod.CreateVector(startX, startY, startZ);
+        const endVec = mod.CreateVector(endX, endY, endZ);
+
+        try {
+            if (player !== null) {
+                mod.RayCast(player, startVec, endVec);
+            } else {
+                mod.RayCast(startVec, endVec);
+            }
+        } catch (error: unknown) {
+            logging.log(`Failed to dispatch raycast for slot ${slotIndex}`, Logging.LogLevel.Warning, error);
+
+            if (player !== null) {
+                _clearFlag(slotIndex, FLAG_PLAYER_CONNECTED);
+            }
+
+            return false;
+        }
+
+        _queueOnHit[head] = null;
+        _queueOnMiss[head] = null;
+        _queueHead = (_queueHead + 1) % QUEUE_CAPACITY;
+        --_queueCount;
+
+        _setFlag(slotIndex, FLAG_IN_FLIGHT | (flags & FLAG_NATIVE_VECTOR));
+        _inFlightOnHit[slotIndex] = onHit;
+        _inFlightOnMiss[slotIndex] = onMiss;
+        _inFlightTimestamp[slotIndex] = now;
+        ++_inFlightCount;
+
+        return true;
+    }
+
+    function _handleOngoingGlobal(): void {
+        const now = getUptime();
+
+        if (_inFlightCount > 0) {
+            _checkTimeouts(now);
+        }
+
+        if (_queueCount === 0) return;
+
+        if (!_initializedPlayers) {
+            _initConnectedPlayers();
+        }
+
+        // 1. Dispatch global player-less slot if idle
+        if (!_isInFlight(GLOBAL_SLOT_INDEX)) {
+            _tryDispatchSlot(GLOBAL_SLOT_INDEX, null, now);
+        }
+
+        // 2. Dispatch available player slots
+        for (let playerId = 0; playerId < MAX_PLAYERS; ++playerId) {
+            if (_queueCount === 0) break;
+
+            if (!_isConnected(playerId) || _isInFlight(playerId)) continue;
+
+            const player = mod.GetPlayer(playerId);
+
+            if (player === undefined) {
+                _clearFlag(playerId, FLAG_PLAYER_CONNECTED);
+                continue;
+            }
+
+            _tryDispatchSlot(playerId, player, now);
+        }
+    }
+
+    function _handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void {
+        const slotIndex = _getSlotIndex(eventPlayer);
+
+        if (!_isInFlight(slotIndex)) return;
+
+        const isNative = _isNativeVector(slotIndex);
+        const onHit = _inFlightOnHit[slotIndex];
+
+        _freeSlot(slotIndex);
+
+        if (!onHit) return;
+
+        if (isNative) {
+            CallbackHandler.invoke(
+                onHit as HitCallback<mod.Vector>,
+                eventPoint,
+                eventNormal,
+                undefined,
+                undefined,
+                logging,
+                'onHit'
+            );
+        } else {
+            CallbackHandler.invoke(
+                onHit as HitCallback<Vector3>,
+                Vectors.toVector3(eventPoint),
+                Vectors.toVector3(eventNormal),
+                undefined,
+                undefined,
+                logging,
+                'onHit'
+            );
+        }
+    }
+
+    function _handleMiss(eventPlayer: mod.Player): void {
+        const slotIndex = _getSlotIndex(eventPlayer);
+
+        if (!_isInFlight(slotIndex)) return;
+
+        const onMiss = _inFlightOnMiss[slotIndex];
+
+        _freeSlot(slotIndex);
+
+        if (onMiss) {
+            CallbackHandler.invokeNoArgs(onMiss, logging, 'onMiss');
+        }
+    }
+
+    export function cast(start: Vector3, end: Vector3, callbacks: Callbacks<Vector3>): void;
+
+    export function cast(start: mod.Vector, end: mod.Vector, callbacks: Callbacks<mod.Vector>): void;
 
     /**
-     * Casts a ray with specific callbacks. The callback vector types must match the `start` and `end` vector types.
-     * @example
-     * Raycast.cast(player, { x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 10 }, {
-     *     onHit: (hitPoint, hitNormal) => {
-     *         console.log(`Ray hit at ${hitPoint.x}, ${hitPoint.y}, ${hitPoint.z}`);
-     *     },
-     * });
-     * Raycast.cast(player, mod.CreateVector(0, 0, 0), mod.CreateVector(10, 10, 10), {
-     *     onHit: (hitPoint, hitNormal) => {
-     *         console.log(`Ray hit at ${mod.XComponentOf(hitPoint)}, ${mod.YComponentOf(hitPoint)}, ${mod.ZComponentOf(hitPoint)}`);
-     *     },
-     * });
-     * @param player - The player to assign the ray to.
+     * Casts a ray with specific callbacks. The callback vector types match the `start` and `end` vector types.
+     * Requests are queued and dispatched across available worker slots (up to 1 ray per player + 1 global ray per tick).
+     * Returns early (no-op) if neither `onHit` nor `onMiss` callback is provided, or if the raycast queue is full.
      * @param start - The start position of the ray.
      * @param end - The end position of the ray.
-     * @param callbacks - The callbacks to be called (at least one must be provided).
+     * @param callbacks - The callbacks to be called.
      *   - `onHit`: The callback to be called when the ray hits a target.
      *   - `onMiss`: The callback to be called when the ray misses a target.
      */
-    export function cast<T extends mod.Vector | Vector3>(
-        player: mod.Player,
-        start: T,
-        end: T,
-        callbacks: Callbacks<T>
-    ): void {
-        // Don't even fire the ray if someone ignores type safety (Optional, but good practice).
-        if (typeof callbacks?.onHit !== 'function' && typeof callbacks?.onMiss !== 'function') return;
-
-        const playerId = mod.GetObjId(player);
-
-        if (!states.has(playerId)) {
-            states.set(playerId, { pendingMisses: 0, rays: new Map() });
-        }
-
-        const state = states.get(playerId)!;
-
-        prunePlayerState(state); // Lazy Cleanup: Remove expired rays before adding new ones.
-
-        const nativeVectorReturn = !Vectors.isVector3(start);
-
-        let startVector3: Vector3;
-        let endVector3: Vector3;
-        let startVector: mod.Vector;
-        let endVector: mod.Vector;
-
-        // We check 'start' to decide the mode.
-        if (nativeVectorReturn) {
-            startVector3 = Vectors.toVector3(start as mod.Vector);
-            endVector3 = Vectors.toVector3(end as mod.Vector);
-            startVector = start as mod.Vector;
-            endVector = end as mod.Vector;
-        } else {
-            startVector3 = start as Vector3;
-            endVector3 = end as Vector3;
-            startVector = Vectors.toVector(startVector3);
-            endVector = Vectors.toVector(endVector3);
-        }
-
-        state.rays.set(nextRayId++, {
-            start: startVector3,
-            end: endVector3,
-            totalDistance: Vectors.distance(startVector3, endVector3), // Pre-compute length for faster math later.
-            timestamp: Date.now(),
-            nativeVectorReturn,
-            onHit: callbacks.onHit as HitCallback<mod.Vector | Vector3>,
-            onMiss: callbacks.onMiss,
-        });
-
-        mod.RayCast(player, startVector, endVector);
-    }
-
-    /**
-     * Handles a ray hit event from `mod.OnRayCastHit`.
-     * O(N) search (but this is fine given the expected low active ray count per player).
-     * @param eventPlayer - The player the ray was assigned to.
-     * @param eventPoint - The point where the ray hit a target.
-     * @param eventNormal - The normal of the surface where the ray hit the target.
-     */
-    function handleHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector): void {
-        const state = states.get(mod.GetObjId(eventPlayer));
-
-        if (!state || state.rays.size === 0) return;
-
-        const point = Vectors.toVector3(eventPoint);
-        const ray = popBestRay(point, state.rays);
-
-        if (!ray) return;
-
-        if (ray.nativeVectorReturn) {
-            CallbackHandler.invoke(
-                ray.onHit as HitCallback<mod.Vector>,
-                [eventPoint, eventNormal],
-                'onHit',
-                logging,
-                LogLevel.Error
-            );
-        } else {
-            CallbackHandler.invoke(
-                ray.onHit as HitCallback<Vector3>,
-                [point, Vectors.toVector3(eventNormal)],
-                'onHit',
-                logging,
-                LogLevel.Error
-            );
-        }
-
-        resolvePendingMisses(state);
-    }
-
-    /**
-     * Handles a ray miss event from `mod.OnRayCastMissed`.
-     * Note that misses are only attributable to an active ray if the number of pending (yet attributed) misses equals
-     * the number of active rays. If not, the miss is stored as a pending miss and wil be attributed later.
-     * @param eventPlayer - The player the ray was assigned to.
-     */
-    function handleMiss(eventPlayer: mod.Player): void {
-        const state = states.get(mod.GetObjId(eventPlayer));
-
-        if (!state || state.rays.size === 0) return;
-
-        state.pendingMisses++;
-        resolvePendingMisses(state);
-    }
-
-    /**
-     * Used when a player leaves to clean up memory leaks by pruning all player states, like a Garbage Collector.
-     * You can hook this into the global `OnPlayerLeaveGame` event, but it will already be called automatically every
-     * `PRUNE_INTERVAL_MS`.
-     */
-    export function pruneAllStates(): void {
-        // We can iterate the map keys (playerIds)
-        for (const [playerId, state] of states.entries()) {
-            prunePlayerState(state);
-
-            // If the player is gone, their state will eventually be empty.
-            // If empty, delete the player entry entirely.
-            if (state.rays.size === 0 && state.pendingMisses === 0) {
-                states.delete(playerId);
-            }
-        }
-    }
-
-    /**
-     * Prunes a single player's state. Used during 'cast' to keep the active player's logic clean.
-     * @param state - The player state to prune.
-     */
-    export function prunePlayerState(state: PlayerState) {
-        const now = Date.now();
-        let stateChanged = false;
-
-        for (const [rayId, ray] of state.rays.entries()) {
-            if (now - ray.timestamp <= DEFAULT_TTL_MS) continue;
-
-            handleMissCallback(ray);
-
-            if (state.pendingMisses > 0) {
-                state.pendingMisses--;
-            }
-
-            state.rays.delete(rayId);
-            stateChanged = true;
-        }
-
-        // If we removed rays, the ratio of Rays:Misses has changed. Check if this unblocked the remaining queue.
-        if (stateChanged) {
-            resolvePendingMisses(state);
-        }
-    }
-
-    /**
-     * Checks if the number of pending misses equals the number of active rays.
-     * If so, all active rays are considered misses.
-     * @param state - The player state to resolve pending misses for.
-     */
-    function resolvePendingMisses(state: PlayerState) {
-        // If we have no rays, we cannot have pending misses, so clear the pending misses to prevent "orphan" miss
-        // events from poisoning the next raycast.
-        if (state.rays.size === 0) {
-            state.pendingMisses = 0;
+    export function cast<T extends mod.Vector | Vector3>(start: T, end: T, callbacks: Callbacks<T>): void {
+        if (typeof callbacks?.onHit !== 'function' && typeof callbacks?.onMiss !== 'function') {
             return;
         }
 
-        // We can only assume that every remaining ray is a miss if we have more (or equal) misses than rays.
-        if (state.pendingMisses < state.rays.size) return;
-
-        for (const ray of state.rays.values()) {
-            handleMissCallback(ray);
+        if (_queueCount >= QUEUE_CAPACITY) {
+            logging.log('Queue is full', Logging.LogLevel.Error);
+            return;
         }
 
-        state.rays.clear();
-        state.pendingMisses = 0;
-    }
+        const isV3 = Vectors.isVector3(start);
+        let startX: number;
+        let startY: number;
+        let startZ: number;
+        let endX: number;
+        let endY: number;
+        let endZ: number;
 
-    function handleMissCallback(ray: PendingRay): void {
-        CallbackHandler.invokeNoArgs(ray.onMiss, 'onMiss', logging, LogLevel.Error);
-    }
-
-    function popBestRay(point: Vector3, activeRays: Map<number, PendingRay>): PendingRay | null {
-        let bestRayKey: number | null = null;
-        let lowestError = Number.MAX_SAFE_INTEGER;
-
-        const now = Date.now();
-
-        // Linear scan is unavoidable but very fast for small N.
-        for (const [key, ray] of activeRays) {
-            if (now - ray.timestamp > DEFAULT_TTL_MS) continue;
-
-            const d1 = Vectors.distance(ray.start, point);
-            const d2 = Vectors.distance(point, ray.end);
-
-            // If Dist(Start->Hit) + Dist(Hit->End) ~= TotalLength, point is on line segment.
-            // Calculate error |(d1 + d2) - TotalLength| (a perfect hit has an error of 0.0).
-            const error = Math.abs(d1 + d2 - ray.totalDistance);
-
-            if (error > DISTANCE_EPSILON || error > lowestError) continue;
-
-            lowestError = error;
-            bestRayKey = key;
+        if (isV3) {
+            const s = start as Vector3;
+            const e = end as Vector3;
+            startX = s.x;
+            startY = s.y;
+            startZ = s.z;
+            endX = e.x;
+            endY = e.y;
+            endZ = e.z;
+        } else {
+            const s = start as mod.Vector;
+            const e = end as mod.Vector;
+            startX = mod.XComponentOf(s);
+            startY = mod.YComponentOf(s);
+            startZ = mod.ZComponentOf(s);
+            endX = mod.XComponentOf(e);
+            endY = mod.YComponentOf(e);
+            endZ = mod.ZComponentOf(e);
         }
 
-        if (bestRayKey === null) return null;
+        const tail = _queueTail;
+        _queueStartX[tail] = startX;
+        _queueStartY[tail] = startY;
+        _queueStartZ[tail] = startZ;
+        _queueEndX[tail] = endX;
+        _queueEndY[tail] = endY;
+        _queueEndZ[tail] = endZ;
+        _queueFlags[tail] = isV3 ? 0 : FLAG_NATIVE_VECTOR;
+        _queueOnHit[tail] = (callbacks.onHit as HitCallback<mod.Vector | Vector3>) ?? null;
+        _queueOnMiss[tail] = callbacks.onMiss ?? null;
 
-        const bestRay = activeRays.get(bestRayKey)!;
-        activeRays.delete(bestRayKey);
+        _queueTail = (_queueTail + 1) % QUEUE_CAPACITY;
+        ++_queueCount;
+    }
 
-        return bestRay;
+    /**
+     * Gets the number of currently queued raycast requests.
+     * @returns The number of queued raycasts awaiting dispatch.
+     */
+    export function getPendingRayCount(): number {
+        return _queueCount;
+    }
+
+    /**
+     * Gets the number of currently in-flight raycast requests.
+     * @returns The number of dispatched raycasts awaiting physics engine resolution.
+     */
+    export function getInFlightRayCount(): number {
+        return _inFlightCount;
     }
 }

@@ -2,7 +2,7 @@
 
 <ai>
 
-The `CallbackHandler` namespace provides a small utility for safely invoking user callbacks (sync or async). It catches synchronous throws and asynchronous promise rejections, logs them via a passed-in `Logging` instance, and does not rethrow—so a failing callback cannot kill the execution of the calling logic. Other modules in this repo (e.g. Timers, Events, UI, Raycast, Clocks) use it internally; you can use it in your own modules when invoking optional or user-provided callbacks.
+The `CallbackHandler` namespace provides a lightweight utility for safely invoking user callbacks (sync or async) with **zero runtime allocations**. It catches synchronous throws and asynchronous promise rejections, logs them via a passed-in `Logging` instance at `LogLevel.Error`, and does not rethrow—ensuring that a failing callback cannot disrupt host execution.
 
 </ai>
 
@@ -16,7 +16,7 @@ The `CallbackHandler` namespace provides a small utility for safely invoking use
     import { CallbackHandler } from 'bf6-portal-utils/callback-handler';
     import { Logging } from 'bf6-portal-utils/logging';
     ```
-3. When invoking an optional or user-provided callback, use `CallbackHandler.invoke()` or `CallbackHandler.invokeNoArgs()` instead of calling the callback directly.
+3. When invoking an optional or user-provided callback, use `CallbackHandler.invokeNoArgs()` or `CallbackHandler.invoke()`.
 4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
@@ -29,14 +29,14 @@ import { Logging } from 'bf6-portal-utils/logging';
 
 const logging = new Logging('MyModule');
 
-// Optional callback with arguments
+// Optional callback with up to 4 arguments (zero allocations)
 function notifyPlayer(player: mod.Player, message: string): void {
-    CallbackHandler.invoke(this._onMessage, [player, message], 'onMessage', logging, Logging.LogLevel.Error);
+    CallbackHandler.invoke(this._onMessage, player, message, undefined, undefined, logging, 'notifyPlayer');
 }
 
-// Optional no-args callback (e.g. timer tick, event fired)
+// Optional no-args callback (zero allocations)
 function tick(): void {
-    CallbackHandler.invokeNoArgs(this._onTick, 'onTick', logging, Logging.LogLevel.Error);
+    CallbackHandler.invokeNoArgs(this._onTick, logging);
 }
 ```
 
@@ -52,18 +52,17 @@ function tick(): void {
 
 | Method | Description |
 | --- | --- |
-| `invoke<T>(callback: T \| undefined, args: Parameters<T>, errorContext: string, logging: Logging, logLevel?: Logging.LogLevel): void` | Invokes `callback` with `args` if defined. Handles both synchronous and asynchronous callbacks (returning `void` or `Promise<void>`). Sync errors are caught and logged with the given `errorContext`; async rejections are logged via `.catch()`. Does not rethrow. Default `logLevel` is `Logging.LogLevel.Error`. |
-| `invokeNoArgs(callback: (() => Promise<void> \| void) \| undefined, errorContext: string, logging: Logging, logLevel?: Logging.LogLevel): void` | Convenience wrapper that invokes a no-argument callback. Equivalent to `invoke(callback, [], errorContext, logging, logLevel)`. |
+| `invokeNoArgs(callback: (() => Promise<void> \| void) \| null \| undefined, logging: Logging, context?: string): void` | Safely invokes a no-argument callback. Sync errors are caught and logged at `LogLevel.Error`; async rejections are logged via `.catch()`. Does not rethrow. |
+| `invoke<T>(callback: T \| null \| undefined, a: unknown, b: unknown, c: unknown, d: unknown, logging: Logging, context?: string): void` | Safely invokes `callback` directly with up to 4 explicit arguments. Avoids rest parameter array creations and spread operator allocations at runtime. |
 
 ---
 
 ## How It Works
 
-1. **No-op when undefined** – If `callback` is `undefined`, the functions return immediately without calling the logger.
-2. **Sync errors** – The callback is run in a `try/catch`. Any thrown value is passed to `logging.log()` with the provided `errorContext` and `logLevel`, then execution continues.
-3. **Async errors** – If the callback returns a `Promise`, its rejection is handled with `.catch()` and logged the same way, avoiding unhandled promise rejections.
-
-Using `CallbackHandler` ensures that a single bad callback does not break the rest of your mod; errors are isolated and reported through your existing logging setup.
+1. **No-op when undefined or null** – If `callback` is `undefined` or `null`, the functions return immediately without calling the logger.
+2. **Sync errors** – The callback is run in a `try/catch`. Any thrown value is logged to `logging.log()` at `LogLevel.Error` with the callback's name (or `'anonymous callback'`) and optional `context` prefix, then execution continues.
+3. **Async errors** – If the callback returns a `Promise`, its rejection is handled with `.catch()` and logged the same way, preventing unhandled promise rejections.
+4. **Zero Allocations** – Both `invoke` and `invokeNoArgs` pass arguments explicitly without creating rest parameter arrays (`...args`) or closure wrappers, resulting in zero runtime garbage collection pressure.
 
 ---
 

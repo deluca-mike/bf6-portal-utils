@@ -2,7 +2,7 @@ import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 5.0.2
+// version 6.0.0
 export namespace Sounds {
     const logging = new Logging('Sounds');
 
@@ -12,270 +12,44 @@ export namespace Sounds {
     export const LogLevel = Logging.LogLevel;
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
         logging.setLogging(log, logLevel, includeRawError);
     }
 
-    const DEFAULT_AMPLITUDE: number = 1.0;
-
     const DEFAULT_FADE_DURATION: number = 2_000; // 2 seconds default fade duration (in milliseconds).
-
     const DEFAULT_FADE_STEPS: number = 10;
-
     const DEFAULT_ATTENUATION_RANGE: number = 10; // 10 meters default attenuation range (in meters).
 
-    const ONE_SHOT_DISPOSE_BUFFER_TIME: number = 100; // 100ms buffer time to ensure the stop or fade can occur.
+    const _ZERO_VECTOR = mod.CreateVector(0, 0, 0);
 
-    type Target = mod.Player | mod.Squad | mod.Team;
-
-    abstract class Sound {
-        protected constructor(sfxAsset: mod.RuntimeSpawn_Common, spawnSFX: () => mod.SFX, options?: Options) {
-            this._sfxAsset = sfxAsset;
-            this._amplitude = options?.amplitude ?? DEFAULT_AMPLITUDE;
-            this._target = options?.target;
-            this._sfx = spawnSFX();
-            this._sfxId = mod.GetObjId(this._sfx);
-        }
-
-        protected _disposed: boolean = false;
-
-        protected _playing: boolean = false;
-
-        protected _sfxAsset: mod.RuntimeSpawn_Common;
-
-        protected _amplitude: number;
-
-        protected _target?: Target;
-
-        protected _sfx: mod.SFX;
-
-        protected _sfxId: number;
-
-        protected _stopTimer?: number;
-
-        protected _fadeTimer?: number;
-
-        protected _play?: () => void;
-
-        protected _getPlayLog?: (duration?: number) => string;
-
-        protected _oneShot(options?: OneShotOptions): () => void {
-            this.play(options?.duration);
-
-            if (options?.fadeOptions) {
-                this.fade(options.fadeOptions);
-            }
-
-            const playDuration = options?.duration ?? Number.MAX_SAFE_INTEGER;
-
-            const fadeStopDuration = options?.fadeOptions?.stopOnComplete
-                ? (options.fadeOptions?.delay ?? 0) + (options.fadeOptions?.duration ?? DEFAULT_FADE_DURATION)
-                : Number.MAX_SAFE_INTEGER;
-
-            const earliestStopDuration = Math.min(playDuration, fadeStopDuration);
-
-            const stopAndCleanup = () => {
-                this.cancelStop();
-                this.cancelFade();
-                this.stop();
-                this.dispose();
-
-                if (logging.willLog(LogLevel.Debug)) {
-                    logging.log(`One-shot sound ${this._sfxId} auto-stopped.`, LogLevel.Debug);
-                }
-            };
-
-            const autoStopTimer =
-                earliestStopDuration < Number.MAX_SAFE_INTEGER
-                    ? Timers.setTimeout(stopAndCleanup, earliestStopDuration + ONE_SHOT_DISPOSE_BUFFER_TIME)
-                    : undefined;
-
-            const stop = () => {
-                Timers.clearTimeout(autoStopTimer);
-                stopAndCleanup();
-            };
-
-            return stop;
-        }
-
-        public get disposed(): boolean {
-            return this._disposed;
-        }
-
-        public get playing(): boolean {
-            return this._playing;
-        }
-
-        public get sfxAsset(): mod.RuntimeSpawn_Common {
-            return this._sfxAsset;
-        }
-
-        public get amplitude(): number {
-            return this._amplitude;
-        }
-
-        public set amplitude(amplitude: number) {
-            if (this._playing) {
-                mod.SetSoundAmplitude(this._sfx, amplitude);
-            }
-
-            this._amplitude = amplitude;
-        }
-
-        public setAmplitude(amplitude: number): this {
-            this.amplitude = amplitude;
-            return this;
-        }
-
-        public get target(): Target | undefined {
-            return this._target;
-        }
-
-        public play(duration?: number): this {
-            this.cancelStop();
-            this.cancelFade();
-
-            if (!this._play) return this;
-
-            this._play();
-
-            this._playing = true;
-
-            if (duration !== undefined) {
-                const stop = () => void this.stop();
-                this._stopTimer = Timers.setTimeout(stop, duration);
-            }
-
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(this._getPlayLog?.(duration) ?? `Sound ${this._sfxId} played`, LogLevel.Info);
-            }
-
-            return this;
-        }
-
-        public stop(): this {
-            if (!this._playing) return this;
-
-            this._playing = false;
-
-            this.cancelStop();
-            this.cancelFade();
-            mod.StopSound(this._sfx);
-
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Sound ${this._sfxId} stopped.`, LogLevel.Info);
-            }
-
-            return this;
-        }
-
-        public fade(options?: FadeOptions): this {
-            if (!this._playing) return this;
-
-            const delay = options?.delay ?? 0;
-            const targetAmplitude = options?.targetAmplitude ?? 0;
-            const stopOnComplete = options?.stopOnComplete ?? targetAmplitude === 0;
-            const duration = options?.duration ?? DEFAULT_FADE_DURATION;
-
-            let steps = options?.steps ?? DEFAULT_FADE_STEPS;
-            steps = steps > 0 ? steps : 1;
-
-            const stepSize = (this._amplitude - targetAmplitude) / steps;
-            const stepDuration = duration / steps;
-
-            const fadeStep = () => {
-                this.amplitude = this._amplitude - stepSize;
-
-                if (--steps > 0) {
-                    this._fadeTimer = Timers.setTimeout(fadeStep, stepDuration);
-                } else {
-                    this._fadeTimer = undefined;
-
-                    if (stopOnComplete) {
-                        this.stop();
-                    }
-
-                    if (logging.willLog(LogLevel.Debug)) {
-                        logging.log(`Sound ${this._sfxId} completed fade to ${targetAmplitude}.`, LogLevel.Debug);
-                    }
-                }
-            };
-
-            this.cancelFade();
-
-            this._fadeTimer = Timers.setTimeout(fadeStep, delay + stepDuration);
-
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Sound ${this._sfxId} fade to ${targetAmplitude} starting in ${delay}ms.`, LogLevel.Info);
-            }
-
-            return this;
-        }
-
-        public cancelStop(): this {
-            if (this._stopTimer) {
-                Timers.clearTimeout(this._stopTimer);
-                this._stopTimer = undefined;
-            }
-
-            return this;
-        }
-
-        public cancelFade(): this {
-            if (this._fadeTimer) {
-                Timers.clearTimeout(this._fadeTimer);
-                this._fadeTimer = undefined;
-            }
-
-            return this;
-        }
-
-        public dispose(): void {
-            if (this._playing) {
-                this.cancelStop();
-                this.cancelFade();
-                this.stop();
-            }
-
-            if (this._disposed) return;
-
-            mod.UnspawnObject(this._sfx);
-            this._disposed = true;
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`Sound ${this._sfxId} disposed.`, LogLevel.Debug);
-            }
-        }
-    }
-
-    /**
-     * The options for sound creation.
-     */
-    type Options = {
-        /**
-         * The amplitude of the sound. Default is 1.
-         */
-        amplitude?: number;
-        /**
-         * The target to play the sound for. Default is undefined, which means all players hear the sound.
-         * If specified, only this player/squad/team hears the sound. If undefined, all players hear the sound.
-         */
-        target?: Target;
-    };
+    export type Target = mod.Player | mod.Squad | mod.Team;
 
     /**
      * The options for sound fading.
      */
     export type FadeOptions = {
+        /**
+         * The starting amplitude of the fade.
+         */
+        startAmplitude: number;
+        /**
+         * The target amplitude of the sound.
+         * Default is 0 (which is a fade out).
+         */
+        targetAmplitude?: number;
         /**
          * The delay before the fade starts in milliseconds.
          * Default is 0.
@@ -286,11 +60,6 @@ export namespace Sounds {
          * Default is 2,000 milliseconds.
          */
         duration?: number;
-        /**
-         * The target amplitude of the sound.
-         * Default is 0 (which is a fade out).
-         */
-        targetAmplitude?: number;
         /**
          * The number of steps to use for the fade.
          * Default is 10.
@@ -304,197 +73,452 @@ export namespace Sounds {
     };
 
     /**
-     * The options for one-shot sound playback.
+     * The options for sound playback.
      */
-    type OneShotOptions = {
+    export type PlayOptions = {
         /**
-         * The optional duration of the sound in milliseconds, leave undefined for infinite duration (i.e. for looping assets).
-         * Note that a duration of 0 is effectively an immediate stop.
+         * The target to play the sound for. Default is undefined, which means all players hear the sound.
+         */
+        target?: Target;
+        /**
+         * The world position to play the sound at (mod.Vector or Vectors.Vector3).
+         * Note: Ignored for 2D sounds.
+         */
+        position?: mod.Vector | Vectors.Vector3;
+        /**
+         * The attenuation range of the sound in meters. Default is 10 meters if position is specified.
+         * Note: Ignored for 2D sounds.
+         */
+        attenuationRange?: number;
+        /**
+         * The optional playback duration in milliseconds after which the sound is automatically stopped.
          */
         duration?: number;
         /**
-         * The optional fade options.
+         * Optional fade options applied during playback.
          */
-        fadeOptions?: FadeOptions;
+        fadeOptions?: Omit<FadeOptions, 'startAmplitude'>;
     };
 
-    export class Sound2D extends Sound {
-        private static _spawnSFX(sfxAsset: mod.RuntimeSpawn_Common): mod.SFX {
-            return mod.SpawnObject(sfxAsset, Vectors.ZERO_VECTOR, Vectors.ZERO_VECTOR) as mod.SFX;
-        }
+    /**
+     * The options for one-shot sound playback.
+     */
+    export type PlayOneShotOptions = PlayOptions;
 
-        public static play(sfxAsset: mod.RuntimeSpawn_Common, options?: OneShotOptions2D): () => void {
-            const sound = new Sound2D(sfxAsset, options);
+    type SFXState = {
+        stopTimerId?: Timers.TimerID | null;
+        fadeTimerId?: Timers.TimerID | null;
+    };
 
-            return sound._oneShot(options);
-        }
+    const _states = new Map<number, SFXState>();
 
-        public constructor(sfxAsset: mod.RuntimeSpawn_Common, options?: Options2D) {
-            super(sfxAsset, () => Sound2D._spawnSFX(sfxAsset), options);
+    function _playSound(
+        sfx: mod.SFX,
+        amplitude: number,
+        position?: mod.Vector,
+        attenuationRange?: number,
+        target?: Target
+    ): void {
+        if (position !== undefined || attenuationRange !== undefined) {
+            position = position ?? mod.GetObjectPosition(sfx);
+            attenuationRange = attenuationRange ?? DEFAULT_ATTENUATION_RANGE;
 
-            if (this._target === undefined) {
-                this._play = () => mod.PlaySound(this._sfx, this._amplitude);
-                const targetString = 'all players';
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Player)) {
-                this._play = () => mod.PlaySound(this._sfx, this._amplitude, this._target as mod.Player);
-                const targetString = `player ${mod.GetObjId(this._target as mod.Player)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Squad)) {
-                this._play = () => mod.PlaySound(this._sfx, this._amplitude, this._target as mod.Squad);
-                const targetString = `squad ${mod.GetSquadName(this._target as mod.Squad)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Team)) {
-                this._play = () => mod.PlaySound(this._sfx, this._amplitude, this._target as mod.Team);
-                const targetString = `team ${mod.GetObjId(this._target as mod.Team)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
+            if (target === undefined) {
+                mod.PlaySound(sfx, amplitude, position, attenuationRange);
+            } else if (mod.IsType(target, mod.Types.Player)) {
+                mod.PlaySound(sfx, amplitude, position, attenuationRange, target as mod.Player);
+            } else if (mod.IsType(target, mod.Types.Squad)) {
+                mod.PlaySound(sfx, amplitude, position, attenuationRange, target as mod.Squad);
+            } else if (mod.IsType(target, mod.Types.Team)) {
+                mod.PlaySound(sfx, amplitude, position, attenuationRange, target as mod.Team);
             } else {
-                logging.log(`Target type is invalid.`, LogLevel.Error);
+                logging.log('Target type is invalid', LogLevel.Error);
             }
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`2D Sound ${this._sfxId} initialized.`, LogLevel.Debug);
-            }
-        }
-
-        private _buildPlayLogString(targetString?: string, duration?: number): string {
-            if (duration !== undefined) {
-                return `Sound ${this._sfxId} played for ${targetString} (amplitude ${this._amplitude.toFixed(2)}, duration ${duration}ms).`;
+        } else {
+            if (target === undefined) {
+                mod.PlaySound(sfx, amplitude);
+            } else if (mod.IsType(target, mod.Types.Player)) {
+                mod.PlaySound(sfx, amplitude, target as mod.Player);
+            } else if (mod.IsType(target, mod.Types.Squad)) {
+                mod.PlaySound(sfx, amplitude, target as mod.Squad);
+            } else if (mod.IsType(target, mod.Types.Team)) {
+                mod.PlaySound(sfx, amplitude, target as mod.Team);
             } else {
-                return `Sound ${this._sfxId} played for ${targetString} (amplitude ${this._amplitude.toFixed(2)}, indefinite duration).`;
+                logging.log('Target type is invalid', LogLevel.Error);
             }
         }
     }
 
-    /**
-     * The options for 2D sound creation.
-     */
-    export type Options2D = Options;
+    function _getOrCreateState(sfxId: number): SFXState {
+        let state = _states.get(sfxId);
 
-    /**
-     * The options for 2D one-shot sound playback.
-     */
-    export type OneShotOptions2D = Options2D & OneShotOptions;
-
-    export class Sound3D extends Sound {
-        private static _spawnSFX(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector): mod.SFX {
-            return mod.SpawnObject(sfxAsset, position, Vectors.ZERO_VECTOR) as mod.SFX;
+        if (!state) {
+            state = {};
+            _states.set(sfxId, state);
         }
 
-        public static play(
-            sfxAsset: mod.RuntimeSpawn_Common,
-            position: mod.Vector,
-            options?: OneShotOptions3D
-        ): () => void {
-            const sound = new Sound3D(sfxAsset, position, options);
+        return state;
+    }
 
-            return sound._oneShot(options);
+    function _cancelStop(sfxId: number): void {
+        const state = _states.get(sfxId);
+
+        if (!state) return;
+
+        if (state.stopTimerId != null) {
+            Timers.clearTimeout(state.stopTimerId);
+        }
+        state.stopTimerId = undefined;
+
+        if (!state.fadeTimerId) {
+            _states.delete(sfxId);
+        }
+    }
+
+    function _cancelFade(sfxId: number): void {
+        const state = _states.get(sfxId);
+
+        if (!state) return;
+
+        if (state.fadeTimerId != null) {
+            Timers.clearInterval(state.fadeTimerId);
+        }
+        state.fadeTimerId = undefined;
+
+        if (!state.stopTimerId) {
+            _states.delete(sfxId);
+        }
+    }
+
+    function _cancelTimers(sfxId: number): void {
+        const state = _states.get(sfxId);
+
+        if (!state) return;
+
+        if (state.stopTimerId != null) {
+            Timers.clearTimeout(state.stopTimerId);
+            state.stopTimerId = undefined;
         }
 
-        public constructor(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, options?: Options3D) {
-            super(sfxAsset, () => Sound3D._spawnSFX(sfxAsset, position), options);
+        if (state.fadeTimerId != null) {
+            Timers.clearInterval(state.fadeTimerId);
+            state.fadeTimerId = undefined;
+        }
 
-            this._position = position;
-            this._attenuationRange = options?.attenuationRange ?? DEFAULT_ATTENUATION_RANGE;
+        _states.delete(sfxId);
+    }
 
-            if (this._target === undefined) {
-                this._play = () => mod.PlaySound(this._sfx, this._amplitude, this._position, this._attenuationRange);
-                const targetString = 'all players';
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Player)) {
-                this._play = () =>
-                    mod.PlaySound(
-                        this._sfx,
-                        this._amplitude,
-                        this._position,
-                        this._attenuationRange,
-                        this._target as mod.Player
-                    );
+    function _fadeInternal(
+        sfx: mod.SFX,
+        sfxId: number,
+        startAmplitude: number,
+        targetAmplitude: number = 0,
+        delay: number = 0,
+        duration: number = DEFAULT_FADE_DURATION,
+        steps: number = DEFAULT_FADE_STEPS,
+        stopOnComplete: boolean = targetAmplitude === 0,
+        disposeOnComplete: boolean = false
+    ): void {
+        _cancelFade(sfxId);
 
-                const targetString = `player ${mod.GetObjId(this._target as mod.Player)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Squad)) {
-                this._play = () =>
-                    mod.PlaySound(
-                        this._sfx,
-                        this._amplitude,
-                        this._position,
-                        this._attenuationRange,
-                        this._target as mod.Squad
-                    );
+        const stepCount = steps > 0 ? steps : 1;
+        const stepSize = (startAmplitude - targetAmplitude) / stepCount;
+        const stepDuration = duration / stepCount;
 
-                const targetString = `squad ${mod.GetSquadName(this._target as mod.Squad)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else if (mod.IsType(this._target, mod.Types.Team)) {
-                this._play = () =>
-                    mod.PlaySound(
-                        this._sfx,
-                        this._amplitude,
-                        this._position,
-                        this._attenuationRange,
-                        this._target as mod.Team
-                    );
+        let currentAmplitude = startAmplitude;
+        let remainingSteps = stepCount;
 
-                const targetString = `team ${mod.GetObjId(this._target as mod.Team)}`;
-                this._getPlayLog = (duration?: number) => this._buildPlayLogString(targetString, duration);
-            } else {
-                logging.log(`Target type is invalid.`, LogLevel.Error);
+        const stepFade = () => {
+            if (!isValid(sfxId)) {
+                _cancelFade(sfxId);
+                return;
             }
+
+            currentAmplitude = Math.max(0, currentAmplitude - stepSize);
+            mod.SetSoundAmplitude(sfx, currentAmplitude);
+            --remainingSteps;
+
+            if (remainingSteps > 0) return;
+
+            _cancelFade(sfxId);
 
             if (logging.willLog(LogLevel.Debug)) {
-                logging.log(
-                    `3D Sound ${this._sfxId} initialized at position ${Vectors.getVectorString(this._position)}.`,
-                    LogLevel.Debug
-                );
+                logging.log(`Sound ${sfxId} completed fade to ${targetAmplitude}`, LogLevel.Debug);
             }
+
+            if (disposeOnComplete) {
+                dispose(sfx);
+            } else if (stopOnComplete) {
+                stop(sfx);
+            }
+        };
+
+        const startFade = () => {
+            const state = _getOrCreateState(sfxId);
+
+            if (!isValid(sfxId)) return;
+
+            state.fadeTimerId = Timers.setInterval(stepFade, stepDuration);
+        };
+
+        if (delay > 0) {
+            _getOrCreateState(sfxId).fadeTimerId = Timers.setTimeout(startFade, delay);
+        } else {
+            startFade();
         }
 
-        private _position: mod.Vector;
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Sound ${sfxId} fade to ${targetAmplitude} starting in ${delay}ms`, LogLevel.Info);
+        }
+    }
 
-        private _attenuationRange: number;
+    function _playInternal(
+        sfx: mod.SFX,
+        sfxId: number,
+        amplitude: number,
+        target?: Target,
+        position?: mod.Vector | Vectors.Vector3,
+        attenuationRange?: number,
+        duration?: number,
+        fadeOptions?: Omit<FadeOptions, 'startAmplitude'>,
+        disposeOnComplete: boolean = false
+    ): void {
+        _playSound(sfx, amplitude, _getVector(position), attenuationRange, target);
 
-        public get location(): mod.Vector {
-            return this._position;
+        if (duration !== undefined) {
+            const onStopTimeout = () => {
+                _cancelStop(sfxId);
+
+                if (disposeOnComplete) {
+                    dispose(sfx);
+                } else {
+                    stop(sfx);
+                }
+            };
+
+            _getOrCreateState(sfxId).stopTimerId = Timers.setTimeout(onStopTimeout, duration);
         }
 
-        public get attenuationRange(): number {
-            return this._attenuationRange;
+        if (fadeOptions !== undefined) {
+            _fadeInternal(
+                sfx,
+                sfxId,
+                amplitude,
+                fadeOptions.targetAmplitude,
+                fadeOptions.delay,
+                fadeOptions.duration,
+                fadeOptions.steps,
+                fadeOptions.stopOnComplete,
+                disposeOnComplete
+            );
         }
 
-        public set attenuationRange(attenuationRange: number) {
-            this._attenuationRange = attenuationRange;
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Sound ${sfxId} played at amplitude ${amplitude.toFixed(2)}`, LogLevel.Info);
+        }
+    }
+
+    function _getVector(vector?: mod.Vector | Vectors.Vector3): mod.Vector | undefined {
+        return vector !== undefined ? (Vectors.isVector3(vector) ? Vectors.toVector(vector) : vector) : undefined;
+    }
+
+    /**
+     * Spawns a new native `mod.SFX` spatial object at the given position (default 0,0,0) with zero rotation.
+     * @param sfxAsset - The runtime spawn asset.
+     * @param position - Optional 3D spawn position (mod.Vector or Vectors.Vector3).
+     * @returns The spawned `mod.SFX` spatial object.
+     */
+    export function create(sfxAsset: mod.RuntimeSpawn_Common, position?: mod.Vector | Vectors.Vector3): mod.SFX {
+        const sfx = mod.SpawnObject(sfxAsset, _getVector(position) ?? _ZERO_VECTOR, _ZERO_VECTOR) as mod.SFX;
+
+        if (logging.willLog(LogLevel.Debug)) {
+            logging.log(`Sound ${mod.GetObjId(sfx)} created`, LogLevel.Debug);
+        }
+
+        return sfx;
+    }
+
+    /**
+     * Plays any `mod.SFX` object with the specified amplitude and optional configuration.
+     * Note: `position` and `attenuationRange` in options are ignored for 2D sounds.
+     * @param sfx - The `mod.SFX` object.
+     * @param amplitude - The playback amplitude.
+     * @param options - Optional playback configuration.
+     * @throws {Error} If the target type is invalid.
+     */
+    export function play(sfx: mod.SFX, amplitude: number, options?: PlayOptions): void {
+        const sfxId = mod.GetObjId(sfx);
+
+        _cancelTimers(sfxId);
+
+        _playInternal(
+            sfx,
+            sfxId,
+            amplitude,
+            options?.target,
+            options?.position,
+            options?.attenuationRange,
+            options?.duration,
+            options?.fadeOptions,
+            false
+        );
+    }
+
+    /**
+     * Fire-and-forget helper: creates an SFX, plays it for the specified duration,
+     * and automatically unspawns/disposes it when finished.
+     * Note: `position` and `attenuationRange` in options are ignored for 2D sounds.
+     * @param sfxAsset - The runtime spawn asset.
+     * @param duration - The playback duration in milliseconds.
+     * @param amplitude - The playback amplitude.
+     * @param options - Optional playback configuration.
+     * @returns The spawned `mod.SFX` spatial object.
+     * @throws {Error} If the target type is invalid.
+     */
+    export function playOneShot(
+        sfxAsset: mod.RuntimeSpawn_Common,
+        duration: number,
+        amplitude: number,
+        options?: PlayOneShotOptions
+    ): mod.SFX {
+        const sfx = create(sfxAsset, options?.position);
+
+        _playInternal(
+            sfx,
+            mod.GetObjId(sfx),
+            amplitude,
+            options?.target,
+            options?.position,
+            options?.attenuationRange,
+            duration,
+            options?.fadeOptions,
+            true
+        );
+
+        return sfx;
+    }
+
+    /**
+     * Stops playback and clears any active stop or fade timers.
+     * @param sfx - The `mod.SFX` object.
+     * @param delay - Optional delay in milliseconds before stopping the sound. Default is 0 (stops immediately).
+     */
+    export function stop(sfx: mod.SFX, delay: number = 0): void {
+        const sfxId = mod.GetObjId(sfx);
+
+        _cancelStop(sfxId);
+        _cancelFade(sfxId);
+
+        if (delay > 0) {
+            const state = _getOrCreateState(sfxId);
+
+            state.stopTimerId = Timers.setTimeout(() => {
+                _cancelStop(sfxId);
+
+                if (isValid(sfxId)) {
+                    mod.StopSound(sfx);
+                }
+
+                if (logging.willLog(LogLevel.Info)) {
+                    logging.log(`Sound ${sfxId} stopped`, LogLevel.Info);
+                }
+            }, delay);
 
             if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Sound ${this._sfxId} attenuation range set to ${attenuationRange}m.`, LogLevel.Info);
+                logging.log(`Sound ${sfxId} scheduled to stop in ${delay}ms`, LogLevel.Info);
             }
+
+            return;
         }
 
-        public setAttenuationRange(attenuationRange: number): this {
-            this.attenuationRange = attenuationRange;
-            return this;
+        if (isValid(sfxId)) {
+            mod.StopSound(sfx);
         }
 
-        private _buildPlayLogString(targetString?: string, duration?: number): string {
-            if (duration !== undefined) {
-                return `Sound ${this._sfxId} played for ${targetString} (amplitude ${this._amplitude.toFixed(2)}, att. range ${this._attenuationRange.toFixed(2)}m, duration ${duration}ms).`;
-            } else {
-                return `Sound ${this._sfxId} played for ${targetString} (amplitude ${this._amplitude.toFixed(2)}, att. range ${this._attenuationRange.toFixed(2)}m, indefinite duration).`;
-            }
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Sound ${sfxId} stopped`, LogLevel.Info);
         }
     }
 
     /**
-     * The options for 3D sound creation.
+     * Fades the amplitude of a sound over time using a stepped interval.
+     * @param sfx - The `mod.SFX` object.
+     * @param options - Fade configuration options.
      */
-    export type Options3D = Options & {
-        /**
-         * The attenuation range of the sound. Default is 10 meters.
-         */
-        attenuationRange?: number;
-    };
+    export function fade(sfx: mod.SFX, options: FadeOptions): void {
+        const sfxId = mod.GetObjId(sfx);
+
+        _fadeInternal(
+            sfx,
+            sfxId,
+            options.startAmplitude,
+            options.targetAmplitude,
+            options.delay,
+            options.duration,
+            options.steps,
+            options.stopOnComplete,
+            false
+        );
+    }
 
     /**
-     * The options for 3D one-shot sound playback.
+     * Cancels an active auto-stop timer on the sound.
+     * @param sfx - The `mod.SFX` object.
      */
-    export type OneShotOptions3D = Options3D & OneShotOptions;
+    export function cancelStop(sfx: mod.SFX): void {
+        _cancelStop(mod.GetObjId(sfx));
+    }
+
+    /**
+     * Cancels an active fade timer on the sound.
+     * @param sfx - The `mod.SFX` object.
+     */
+    export function cancelFade(sfx: mod.SFX): void {
+        _cancelFade(mod.GetObjId(sfx));
+    }
+
+    /**
+     * Sets the amplitude of a sound immediately.
+     * @param sfx - The `mod.SFX` object.
+     * @param amplitude - The target amplitude.
+     */
+    export function setAmplitude(sfx: mod.SFX, amplitude: number): void {
+        const sfxId = mod.GetObjId(sfx);
+
+        if (!isValid(sfxId)) return;
+
+        mod.SetSoundAmplitude(sfx, amplitude);
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Sound ${sfxId} amplitude set to ${amplitude.toFixed(2)}`, LogLevel.Info);
+        }
+    }
+
+    /**
+     * Stops playback, clears timers, removes state, and unspawns the `mod.SFX` object.
+     * @param sfx - The `mod.SFX` object.
+     */
+    export function dispose(sfx: mod.SFX): void {
+        const sfxId = mod.GetObjId(sfx);
+
+        _cancelTimers(sfxId);
+
+        if (isValid(sfxId)) {
+            mod.StopSound(sfx);
+            mod.UnspawnObject(sfx);
+        }
+
+        if (logging.willLog(LogLevel.Debug)) {
+            logging.log(`Sound ${sfxId} disposed`, LogLevel.Debug);
+        }
+    }
+
+    /**
+     * Checks if the sound ID is currently valid and spawned in the engine.
+     * @param sfxId - The numeric object ID of the SFX.
+     * @returns True if the SFX object exists and is valid.
+     */
+    export function isValid(sfxId: number): boolean {
+        return mod.IsValid(mod.GetSFX(sfxId));
+    }
 }

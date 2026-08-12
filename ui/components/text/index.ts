@@ -1,132 +1,134 @@
 import { UI } from '../../index.ts';
 
-// version: 6.0.2
+// version: 9.0.0
 export class UIText extends UI.Element {
-    protected _message: mod.Message;
-    protected _textSize: number;
-    protected _textColor: mod.Vector;
-    protected _textAlpha: number;
-    protected _textAnchor: mod.UIAnchor;
-    protected _padding: number;
+    private static readonly _labels = new Array<mod.Message | null>(UI.MAX_ELEMENTS);
 
     /**
      * Creates a new text.
      * @param params - The parameters for the text.
      */
     public constructor(params: UIText.Params) {
+        super(params);
+
+        if (!this._isValid) return;
+
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = this._receiver!;
+        const name = this._name;
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
         const padding = params.padding ?? 0;
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 0,
-            bgFill: params.bgFill ?? mod.UIBgFill.None,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 0;
+        const bgFill = params.bgFill ?? mod.UIBgFill.None;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const textSize = params.textSize ?? 36;
         const textColor = params.textColor ?? UI.COLORS.BLACK;
         const textAlpha = params.textAlpha ?? 1;
         const textAnchor = params.textAnchor ?? mod.UIAnchor.Center;
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.Message, // message
-            number, // textSize
-            mod.Vector, // textColor
-            number, // textAlpha
-            mod.UIAnchor, // textAnchor
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            padding,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            params.message,
-            textSize,
-            textColor,
-            textAlpha,
-            textAnchor,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIText(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIText(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                padding,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.label,
+                textSize,
+                textColor,
+                textAlpha,
+                textAnchor,
+                depth
+            );
         } else {
-            mod.AddUIText(...args, receiver.nativeReceiver);
+            mod.AddUIText(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent)!,
+                visible,
+                padding,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.label,
+                textSize,
+                textColor,
+                textAlpha,
+                textAnchor,
+                depth,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
+        this._bindNativeWidget(name);
 
-        this._message = params.message;
-        this._textSize = textSize;
-        this._textColor = textColor;
-        this._textAlpha = textAlpha;
-        this._textAnchor = textAnchor;
-        this._padding = padding;
+        UIText._labels[this._slot] = params.label;
     }
 
     /**
-     * The message of the text. This is an opaque type and cannot be unpacked into a string or compared.
+     * @inheritdoc
      */
-    public get message(): mod.Message {
-        return this._message;
+    public override delete(): void {
+        const slot = this._getSlotAndLogWarning();
+
+        if (slot === UI.Element._INVALID_INDEX) return;
+
+        UIText._labels[slot] = null;
+        super.delete();
     }
 
     /**
-     * Sets the message of the text.
-     * @param message - The new message.
+     * The label message of the text, or undefined if deleted.
+     * @returns The label message, or undefined if deleted.
      */
-    public set message(message: mod.Message) {
-        if (this._isDeletedCheck()) return;
+    public get label(): mod.Message | undefined {
+        const slot = this._slot;
 
-        mod.SetUITextLabel(this._uiWidget, (this._message = message));
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIText._labels[slot] ?? undefined);
     }
 
     /**
-     * Sets the message of the text. Useful for chaining operations.
-     * @param message - The new message.
-     * @returns This element instance.
+     * Sets the label message of the text.
+     * @param label - The new label message.
      */
-    public setMessage(message: mod.Message): this {
-        this.message = message;
+    public set label(label: mod.Message) {
+        this.setLabel(label);
+    }
+
+    /**
+     * Sets the label message of the text.
+     * @param label - The new label message.
+     * @returns This text for chaining.
+     */
+    public setLabel(label: mod.Message): this {
+        const slot = this._getSlotAndLogWarning();
+
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIText._labels[slot] = label;
+
+        mod.SetUITextLabel(this._uiWidget, label);
+
         return this;
     }
 
     /**
-     * The alpha of the text.
+     * The alpha of the text, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
      */
-    public get textAlpha(): number {
-        return this._textAlpha;
+    public get textAlpha(): number | undefined {
+        return this._isValid ? mod.GetUITextAlpha(this._uiWidget) : undefined;
     }
 
     /**
@@ -134,26 +136,28 @@ export class UIText extends UI.Element {
      * @param alpha - The new alpha.
      */
     public set textAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextAlpha(this._uiWidget, (this._textAlpha = alpha));
+        this.setTextAlpha(alpha);
     }
 
     /**
-     * Sets the alpha of the text. Useful for chaining operations.
+     * Sets the alpha of the text.
      * @param alpha - The new alpha.
-     * @returns This element instance.
+     * @returns This text for chaining.
      */
     public setTextAlpha(alpha: number): this {
-        this.textAlpha = alpha;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUITextAlpha(this._uiWidget, alpha);
+
         return this;
     }
 
     /**
-     * The anchor of the text.
+     * The anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
      */
-    public get textAnchor(): mod.UIAnchor {
-        return this._textAnchor;
+    public get textAnchor(): mod.UIAnchor | undefined {
+        return this._isValid ? mod.GetUITextAnchor(this._uiWidget) : undefined;
     }
 
     /**
@@ -161,26 +165,28 @@ export class UIText extends UI.Element {
      * @param anchor - The new anchor.
      */
     public set textAnchor(anchor: mod.UIAnchor) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextAnchor(this._uiWidget, (this._textAnchor = anchor));
+        this.setTextAnchor(anchor);
     }
 
     /**
-     * Sets the anchor of the text. Useful for chaining operations.
+     * Sets the anchor of the text.
      * @param anchor - The new anchor.
-     * @returns This element instance.
+     * @returns This text for chaining.
      */
     public setTextAnchor(anchor: mod.UIAnchor): this {
-        this.textAnchor = anchor;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUITextAnchor(this._uiWidget, anchor);
+
         return this;
     }
 
     /**
-     * The color of the text.
+     * The color of the text, or undefined if deleted.
+     * @returns The text color vector, or undefined if deleted.
      */
-    public get textColor(): mod.Vector {
-        return this._textColor;
+    public get textColor(): mod.Vector | undefined {
+        return this._isValid ? mod.GetUITextColor(this._uiWidget) : undefined;
     }
 
     /**
@@ -188,26 +194,28 @@ export class UIText extends UI.Element {
      * @param color - The new color.
      */
     public set textColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextColor(this._uiWidget, (this._textColor = color));
+        this.setTextColor(color);
     }
 
     /**
-     * Sets the color of the text. Useful for chaining operations.
+     * Sets the color of the text.
      * @param color - The new color.
-     * @returns This element instance.
+     * @returns This text for chaining.
      */
     public setTextColor(color: mod.Vector): this {
-        this.textColor = color;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUITextColor(this._uiWidget, color);
+
         return this;
     }
 
     /**
-     * The size of the text.
+     * The size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
      */
-    public get textSize(): number {
-        return this._textSize;
+    public get textSize(): number | undefined {
+        return this._isValid ? mod.GetUITextSize(this._uiWidget) : undefined;
     }
 
     /**
@@ -215,26 +223,28 @@ export class UIText extends UI.Element {
      * @param size - The new size.
      */
     public set textSize(size: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextSize(this._uiWidget, (this._textSize = size));
+        this.setTextSize(size);
     }
 
     /**
-     * Sets the size of the text. Useful for chaining operations.
+     * Sets the size of the text.
      * @param size - The new size.
-     * @returns This element instance.
+     * @returns This text for chaining.
      */
     public setTextSize(size: number): this {
-        this.textSize = size;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUITextSize(this._uiWidget, size);
+
         return this;
     }
 
     /**
-     * The padding around the text.
+     * The padding around the text, or undefined if deleted.
+     * @returns The padding, or undefined if deleted.
      */
-    public get padding(): number {
-        return this._padding;
+    public get padding(): number | undefined {
+        return this._isValid ? mod.GetUIWidgetPadding(this._uiWidget) : undefined;
     }
 
     /**
@@ -242,18 +252,19 @@ export class UIText extends UI.Element {
      * @param padding - The new padding.
      */
     public set padding(padding: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIWidgetPadding(this._uiWidget, (this._padding = padding));
+        this.setPadding(padding);
     }
 
     /**
-     * Sets the padding around the text. Useful for chaining operations.
+     * Sets the padding around the text.
      * @param padding - The new padding.
-     * @returns This element instance.
+     * @returns This text for chaining.
      */
     public setPadding(padding: number): this {
-        this.padding = padding;
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        mod.SetUIWidgetPadding(this._uiWidget, padding);
+
         return this;
     }
 }
@@ -263,7 +274,7 @@ export namespace UIText {
      * The parameters for creating a new text.
      */
     export type Params = UI.ElementParams & {
-        message: mod.Message;
+        label: mod.Message;
         textSize?: number;
         textColor?: mod.Vector;
         textAlpha?: number;

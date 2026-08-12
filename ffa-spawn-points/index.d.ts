@@ -5,13 +5,17 @@ export declare namespace FFASpawnPoints {
      */
     const LogLevel: typeof Logging.LogLevel;
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
@@ -97,10 +101,10 @@ export declare namespace FFASpawnPoints {
         private _player;
         private _playerId;
         private _isAISoldier;
-        private _delayCountdownClock?;
+        private _delayCountdownClockId;
         private _promptUI?;
         private _countdownUI?;
-        private _updatePositionInterval?;
+        private _updatePositionIntervalId;
         private _debugPositionUI?;
         /**
          * @returns The player associated with this `Soldier` instance.

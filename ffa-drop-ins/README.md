@@ -147,7 +147,7 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
-#### `FFADropIns.setLogging(log?: (text: string) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
+#### `FFADropIns.setLogging(log?: (text: string, error?: unknown) => Promise<void> | void, logLevel?: LogLevel, includeRawError?: boolean): void`
 
 Configures logging for the FFADropIns module. The spawn system logs initialization, queue processing, and warnings.
 

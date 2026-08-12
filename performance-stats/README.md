@@ -89,7 +89,7 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging module documentation](../logging/README.md). |
 | `getSmoothedTickRate(): number` | Returns the smoothed server tick rate (Hz). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSmoothedTimeoutLagMs(): number` | Returns the smoothed script lag (ms) over the 1s sampling window (how late the window callback ran vs the expected 1s). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSpotDeltaMs(): number` | Returns the raw delta time (ms) between the last two `OngoingGlobal` ticks (somewhat analogous to SFT when above ~33ms). Use for real-time compute scaling (e.g. scaling work per tick). |
@@ -110,7 +110,7 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 1. **Tick tracking** – The module subscribes to `Events.OnGameModeStarted` at load time; when the game mode starts, it subscribes to `Events.OngoingGlobal`. In that handler it records the current time and computes `currentTickDeltaMs` (time since the previous tick) and increments a tick counter. Subscribing early ensures the handler runs near the engine’s tick cadence.
 
-2. **Window loop** – A recurring 1-second timeout (`Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
+2. **Window loop** – A recurring 1-second interval (`Timers.setInterval(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
     - Computes raw server tick rate and raw timeout lag.
     - Updates smoothed values with an exponential moving average (smoothing factor 0.3).
     - Logs a warning if raw timeout lag &gt; 100ms or raw server tick rate &lt; 25.

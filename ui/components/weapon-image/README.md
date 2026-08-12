@@ -60,30 +60,23 @@ const weaponImage = new UIWeaponImage({
 
 ### Inherited from `UI.Element`
 
-`UIWeaponImage` inherits all properties and methods from `UI.Element`, including:
+`UIWeaponImage` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### WeaponImage-Specific
 
 - **`weapon: mod.Weapons`** (getter) – The weapon being displayed (read-only).
-
-- **`weapon: mod.Weapons`** (setter) – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the weapon image after it has been created. Setting this property will log a warning and have no effect.
-
-- **`setWeapon(weapon: mod.Weapons): UIWeaponImage`** – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the weapon image after it has been created. Returns `this` for method chaining but has no effect.
-
-- **`weaponPackage: mod.WeaponPackage`** (getter) – The weapon package being displayed (read-only). **Note** Adding attachments to this weapon package will have no effect on the UI element.
-
-- **`weaponPackage: mod.WeaponPackage`** (setter) – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the weapon package after it has been created. Setting this property will log a warning and have no effect.
-
-- **`setWeaponPackage(weaponPackage: mod.WeaponPackage): UIWeaponImage`** – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the weapon package after it has been created. Returns `this` for method chaining but has no effect.
+- **`weapon: mod.Weapons`** (setter) – **Deprecated.** Setting this property logs a warning and has no effect because the Portal API lacks the ability to change the weapon post-creation.
+- **`weaponPackage: mod.WeaponPackage`** (getter) – The weapon package being displayed (read-only). **Note** Adding attachments to this weapon package post-creation will have no effect on the UI element.
+- **`weaponPackage: mod.WeaponPackage`** (setter) – **Deprecated.** Setting this property logs a warning and has no effect.
 
 ---
 
@@ -102,13 +95,9 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
-- **Weapon Immutability**: Once a `UIWeaponImage` is created, the weapon and weapon package cannot be changed. The `weapon` and `weaponPackage` setters and their corresponding `set` methods are deprecated and will log a warning if used. To change the displayed weapon, create a new `UIWeaponImage` instance.
-
+- **Weapon Immutability**: Once a `UIWeaponImage` is created, the weapon and weapon package cannot be changed. To change the displayed weapon, create a new `UIWeaponImage` instance.
 - **Weapon Package**: The `weaponPackage` parameter allows you to specify weapon attachments and modifications. If not provided, a new empty weapon package is created using `mod.CreateNewWeaponPackage()`.
-
-- **Initial Visibility Limitation**: The underlying Portal API (`mod.AddUIWeaponImage`) lacks the ability to define starting invisibility. If you set `visible: false` in the constructor parameters, the component will automatically set visibility to `false` after construction, which may result in the image showing very briefly, unless it is a child of a parent that is already not visible.
-
-- **Method Chaining**: The `setWeapon()` and `setWeaponPackage()` methods return `this` for method chaining, but note that they have no effect due to API limitations.
+- **Initial Visibility Limitation**: The underlying Portal API (`mod.AddUIWeaponImage`) lacks the ability to define starting invisibility. If you set `visible: false` in constructor params, the component sets visibility to `false` immediately after construction.
 
 ---
 

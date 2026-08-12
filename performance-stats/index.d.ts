@@ -5,13 +5,17 @@ export declare namespace PerformanceStats {
      */
     const LogLevel: typeof Logging.LogLevel;
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
@@ -24,13 +28,13 @@ export declare namespace PerformanceStats {
      */
     function getSmoothedTimeoutLagMs(): number;
     /**
-     * Returns the value that is somewhat analogous to SFT when above 33m.
+     * Returns the value that is somewhat analogous to SFT when above 33ms.
      * @returns The raw delta time between the last two ticks. Good for compute scaling.
      */
     function getSpotDeltaMs(): number;
     /**
      * Returns the value that is analogous to STR.
-     * @returns The tick rate. Good for compute scaling.
+     * @returns The tick rate in Hz. Good for compute scaling.
      */
     function getSpotTickRate(): number;
     /**

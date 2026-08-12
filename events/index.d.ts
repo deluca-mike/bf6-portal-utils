@@ -5,7 +5,7 @@ declare namespace EventsTypes {
      * (e.g. `Parameters<typeof Events.Type.OnPlayerDied>`) or dynamic dispatch. Prefer the channel API
      * (`Events.OnPlayerDied.subscribe(handler)`) for subscribe/trigger with full IntelliSense.
      */
-    export const Type: {
+    const Type: {
         readonly OngoingGlobal: typeof OngoingGlobal;
         readonly OngoingAreaTrigger: typeof OngoingAreaTrigger;
         readonly OngoingBomb: typeof OngoingBomb;
@@ -84,92 +84,68 @@ declare namespace EventsTypes {
     /**
      * Extract parameters from a function type.
      */
-    export type Parameters<T> = T extends (...args: infer P) => void ? P : never;
+    type Parameters<T> = T extends (...args: infer P) => void ? P : never;
     /**
      * Trigger function types (single source of truth); same shape as Events.Type.
      */
-    export type Signature = typeof Type;
+    type Signature = typeof Type;
     /**
      * One of the trigger function names (a key from Events.Type).
      */
-    export type SignatureKey = keyof Signature;
+    type SignatureKey = keyof Signature;
     /**
      * One of the trigger functions (a value from Events.Type).
      */
-    export type TypeValue = Signature[SignatureKey];
+    type TypeValue = Signature[SignatureKey];
     /**
      * Typed channel for a single event. Each event (e.g. `Events.OngoingInteractPoint`, `Events.OnPlayerDied`)
      * exposes this interface with `subscribe`, `unsubscribe`, and `trigger` typed to that event's payload.
      * @template K - Event name; handler and trigger args are inferred from the corresponding trigger function.
      */
-    export type Channel<K extends SignatureKey> = {
-        /**
-         * Subscribe a handler for this event. The handler receives the same arguments as this event's trigger.
-         * @param handler - Callback invoked when the event is triggered; args match the event's payload.
-         * @returns Function to call to unsubscribe this handler.
-         */
-        subscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): () => void;
-        /**
-         * Unsubscribe a handler previously added with `subscribe`. Pass the same function reference.
-         * @param handler - The same function reference that was passed to `subscribe`.
-         */
-        unsubscribe(handler: (...args: Parameters<Signature[K]>) => void | Promise<void>): void;
-        /**
-         * Trigger this event. Pass the same arguments as the exported trigger function for this event.
-         * @param args - Event payload; types match the corresponding standalone trigger function (e.g. `OnPlayerDied`).
-         */
-        trigger(...args: Parameters<Signature[K]>): void;
-        /**
-         * Return the number of handlers currently subscribed to this event.
-         * @returns Count of subscribed handlers (0 if none).
-         */
-        handlerCount(): number;
-    };
+    type Channel<K extends SignatureKey> = EventChannel<K>;
     /**
      * Map of each event name to its typed channel (`subscribe`, `unsubscribe`, `trigger`, `handlerCount`).
      * Merged onto the Events namespace so you get e.g. `Events.OngoingInteractPoint.subscribe(handler)`.
      */
-    export type ChannelsMap = {
+    type ChannelsMap = {
         [K in SignatureKey]: K extends SignatureKey ? Channel<K> : never;
     };
-    type TypeName<T extends TypeValue> = {
-        [K in SignatureKey]: Signature[K] extends T ? K : never;
-    }[SignatureKey];
     /**
      * Get the handler function type for a specific event type.
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
      */
-    export type HandlerForType<T extends TypeValue> =
-        TypeName<T> extends SignatureKey
-            ? Signature[TypeName<T>] extends (...args: infer P) => void
-                ? (...args: P) => void | Promise<void>
-                : never
-            : never;
+    type HandlerForType<T extends TypeValue> = T extends (...args: infer P) => void
+        ? (...args: P) => void | Promise<void>
+        : never;
     /**
      * Get the parameter tuple for a specific event type.
      */
-    export type EventParameters<T extends TypeValue> =
-        TypeName<T> extends SignatureKey ? Parameters<Signature[TypeName<T>]> : never;
+    type EventParameters<T extends TypeValue> = T extends (...args: infer P) => void ? P : never;
     /**
      * Create a union of all possible handler types.
      * Handlers can be synchronous or asynchronous (returning void or Promise<void>).
      */
-    export type AllHandlers = {
+    type AllHandlers = {
         [K in SignatureKey]: Signature[K] extends (...args: infer P) => void
             ? (...args: P) => void | Promise<void>
             : never;
     }[SignatureKey];
-    export type State = {
-        logTimeout?: number;
-        incompleteTriggers: number;
-        handlers: Set<EventsTypes.AllHandlers>;
+    type TriggerWithChannel = TypeValue & {
+        _channel?: EventChannel<SignatureKey>;
     };
-    export {};
+}
+declare class EventChannel<K extends EventsTypes.SignatureKey> {
+    readonly typeValue: EventsTypes.Signature[K];
+    handlers: EventsTypes.HandlerForType<EventsTypes.Signature[K]>[] | null;
+    incompleteTriggers: number;
+    logTimeout: number | null;
+    constructor(typeValue: EventsTypes.Signature[K]);
+    subscribe(handler: EventsTypes.HandlerForType<EventsTypes.Signature[K]>): () => void;
+    unsubscribe(handler: EventsTypes.HandlerForType<EventsTypes.Signature[K]>): void;
+    trigger(...args: EventsTypes.EventParameters<EventsTypes.Signature[K]>): void;
+    handlerCount(): number;
 }
 declare class EventsImplementation {
-    private static readonly _LOG_TIMEOUT_MS;
-    private static readonly _logging;
-    private static readonly _states;
     /**
      * The event types.
      */
@@ -254,15 +230,19 @@ declare class EventsImplementation {
      */
     static readonly LogLevel: typeof Logging.LogLevel;
     private constructor();
-    private static getSate;
+    private static getChannel;
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
     static setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;

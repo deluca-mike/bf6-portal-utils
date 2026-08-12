@@ -1,16 +1,21 @@
 import { UI } from '../../index.ts';
 export declare class UIWeaponImage extends UI.Element {
-    protected _weapon: mod.Weapons;
-    protected _weaponPackage: mod.WeaponPackage;
+    private static readonly _weapons;
+    private static readonly _weaponPackages;
     /**
      * Creates a new weapon image.
      * @param params - The parameters for the weapon image.
      */
     constructor(params: UIWeaponImage.Params);
     /**
-     * The weapon of the weapon image.
+     * @inheritdoc
      */
-    get weapon(): mod.Weapons;
+    delete(): void;
+    /**
+     * The weapon of the weapon image, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
+     */
+    get weapon(): mod.Weapons | undefined;
     /**
      * Sets the weapon of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
@@ -19,17 +24,18 @@ export declare class UIWeaponImage extends UI.Element {
      */
     set weapon(weapon: mod.Weapons);
     /**
-     * Sets the weapon of the weapon image. Useful for chaining operations.
+     * Sets the weapon of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
      * been created.
-     * @param weapon - The weapon to set.
-     * @returns This element instance.
+     * @param weapon - The new weapon.
+     * @returns This weapon image for chaining.
      */
     setWeapon(weapon: mod.Weapons): this;
     /**
-     * The weapon package of the weapon image.
+     * The weapon package of the weapon image, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
      */
-    get weaponPackage(): mod.WeaponPackage;
+    get weaponPackage(): mod.WeaponPackage | undefined;
     /**
      * Sets the weapon package of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
@@ -38,11 +44,11 @@ export declare class UIWeaponImage extends UI.Element {
      */
     set weaponPackage(weaponPackage: mod.WeaponPackage);
     /**
-     * Sets the weapon package of the weapon image. Useful for chaining operations.
+     * Sets the weapon package of the weapon image.
      * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
      * after it has been created.
-     * @param weaponPackage - The weapon package to set.
-     * @returns This element instance.
+     * @param weaponPackage - The new weapon package.
+     * @returns This weapon image for chaining.
      */
     setWeaponPackage(weaponPackage: mod.WeaponPackage): this;
 }
