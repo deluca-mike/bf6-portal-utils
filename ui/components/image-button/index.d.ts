@@ -1,86 +1,105 @@
+import { Colors } from '../../../colors/index.ts';
+import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
+import { UIBaseButton } from '../base-button/index.ts';
 import { UIImage } from '../image/index.ts';
 export declare class UIImageButton extends UIContentButton<UIImage> {
-    imageType: mod.UIImageType;
-    setImageType: (imageType: mod.UIImageType) => this;
-    protected _imageDisabledColor: mod.Vector;
-    protected _imageDisabledAlpha: number;
     /**
      * Creates a new image button.
      * @param params - The parameters for the image button.
      */
     constructor(params: UIImageButton.Params);
-    private _setContentEnabled;
+    protected _setContentEnabled(enabled: boolean): void;
     /**
-     * @inheritdoc
+     * The type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    get enabled(): boolean;
+    get imageType(): UI.ImageType | undefined;
     /**
-     * @inheritdoc
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
      */
-    set enabled(enabled: boolean);
+    set imageType(imageType: UI.ImageType);
     /**
-     * @inheritdoc
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     * @returns This image button for chaining.
      */
-    setEnabled(enabled: boolean): this;
+    setImageType(imageType: UI.ImageType): this;
     /**
-     * The color of the image.
+     * The color of the image, or undefined if deleted.
+     * @returns The image color, or undefined if deleted.
      */
-    get imageColor(): mod.Vector;
+    get imageColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The image color, or undefined if deleted.
+     */
+    getImageColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
-    set imageColor(color: mod.Vector);
+    set imageColor(color: Colors.Color);
     /**
-     * Sets the color of the image. Useful for chaining operations.
+     * Sets the color of the image.
      * @param color - The new color of the image.
-     * @returns This element instance.
+     * @returns This image button for chaining.
      */
-    setImageColor(color: mod.Vector): this;
+    setImageColor(color: Colors.Color): this;
     /**
-     * The alpha of the image.
+     * The alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
      */
-    get imageAlpha(): number;
+    get imageAlpha(): number | undefined;
     /**
      * Sets the alpha of the image.
      * @param alpha - The new alpha of the image.
      */
     set imageAlpha(alpha: number);
     /**
-     * Sets the alpha of the image. Useful for chaining operations.
+     * Sets the alpha of the image.
      * @param alpha - The new alpha of the image.
-     * @returns This element instance.
+     * @returns This image button for chaining.
      */
     setImageAlpha(alpha: number): this;
     /**
-     * The disabled color of the image.
+     * The disabled color of the image, or undefined if deleted.
+     * @returns The disabled image color, or undefined if deleted.
      */
-    get imageDisabledColor(): mod.Vector;
+    get imageDisabledColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the disabled image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled image color, or undefined if deleted.
+     */
+    getImageDisabledColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
      */
-    set imageDisabledColor(color: mod.Vector);
+    set imageDisabledColor(color: Colors.Color);
     /**
-     * Sets the disabled color of the image. Useful for chaining operations.
+     * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
-     * @returns This element instance.
+     * @returns This image button for chaining.
      */
-    setImageDisabledColor(color: mod.Vector): this;
+    setImageDisabledColor(color: Colors.Color): this;
     /**
-     * The disabled alpha of the image.
+     * The disabled alpha of the image, or undefined if deleted.
+     * @returns The disabled image alpha opacity, or undefined if deleted.
      */
-    get imageDisabledAlpha(): number;
+    get imageDisabledAlpha(): number | undefined;
     /**
      * Sets the disabled alpha of the image.
-     * @param alpha - The new disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
      */
     set imageDisabledAlpha(alpha: number);
     /**
-     * Sets the disabled alpha of the image. Useful for chaining operations.
-     * @param alpha - The new disabled alpha of the image.
-     * @returns This element instance.
+     * Sets the disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
+     * @returns This image button for chaining.
      */
     setImageDisabledAlpha(alpha: number): this;
 }
@@ -88,9 +107,9 @@ export declare namespace UIImageButton {
     /**
      * The parameters for creating a new image button.
      */
-    type Params = UIContentButton.Params &
+    type Params = UIBaseButton.Params &
         UIImage.Params & {
-            imageDisabledColor?: mod.Vector;
+            imageDisabledColor?: Colors.Color;
             imageDisabledAlpha?: number;
         };
 }

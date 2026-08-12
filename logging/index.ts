@@ -1,4 +1,4 @@
-// version: 1.1.0
+// version: 1.2.0
 export class Logging {
     constructor(tag: string) {
         this._tag = tag;
@@ -12,13 +12,18 @@ export class Logging {
 
     private _logger?: (text: string, error?: unknown) => Promise<void> | void;
 
+    private readonly _asyncErrorHandler = (loggingError: unknown): void => {
+        // Catch and log async logger errors to prevent unhandled promise rejections.
+        console.log(`<${this._tag}> Error in async logger:`, loggingError);
+    };
+
     /**
      * Safely converts an error of unknown type to a string.
      * This method cannot throw - it will always return a string.
      * @param error - The error to convert to a string.
      * @returns The error as a string.
      */
-    private _safeErrorToString(error: unknown): string {
+    private static _safeErrorToString(error: unknown): string {
         try {
             if (error instanceof Error) {
                 // Try to get the message, but handle cases where .message might throw.
@@ -47,21 +52,25 @@ export class Logging {
      * @returns True if logging will occur, false otherwise.
      */
     public willLog(logLevel: Logging.LogLevel): boolean {
-        return this._logger !== undefined && logLevel >= this._logLevel;
+        return this._logger != null && logLevel >= this._logLevel;
     }
 
+    /**
+     * Logs a message with the given log level.
+     * @param text - The text to log.
+     * @param logLevel - The log level to use.
+     * @param error - The error to include in the log.
+     */
     public log(text: string, logLevel: Logging.LogLevel = Logging.LogLevel.Warning, error?: unknown): void {
         if (!this._logger || logLevel < this._logLevel) return;
 
         try {
-            const errorText = this._includeRawError && error ? ` - Error: ${this._safeErrorToString(error)}` : '';
+            const errorText = this._includeRawError && error ? ` - Error: ${Logging._safeErrorToString(error)}` : '';
+
             const result = this._logger(`<${this._tag}> ${text}${errorText}`, error);
 
             if (result instanceof Promise) {
-                result.catch((loggingError) => {
-                    // Catch and log async logger errors to prevent unhandled promise rejections.
-                    console.log(`<${this._tag}> Error in async logger:`, loggingError);
-                });
+                result.catch(this._asyncErrorHandler);
             }
         } catch (logError: unknown) {
             // Catch and log sync logger errors so the logging functionality can still run.
@@ -71,7 +80,7 @@ export class Logging {
 
     /**
      * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
-     * the the text of the log message.
+     * the text of the log message.
      * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
      *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
      *              also include ` - Error: …` when `includeRawError` is true.

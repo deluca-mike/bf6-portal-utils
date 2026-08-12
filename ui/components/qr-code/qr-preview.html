@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battlefield 6 Portal - UIQRCode Interactive Canvas Playground</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-main: #c9d1d9;
+            --text-bright: #f0f6fc;
+            --text-dim: #8b949e;
+            --accent-cyan: #00d2ff;
+            --accent-blue: #0969da;
+            --accent-green: #238636;
+            --accent-green-bright: #3fb950;
+            --accent-orange: #f0883e;
+            --accent-purple: #bc8cff;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title h1 {
+            font-size: 1.25rem;
+            color: var(--text-bright);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-cyan {
+            background: rgba(0, 210, 255, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 210, 255, 0.3);
+        }
+
+        .badge-green {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green-bright);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            padding: 24px;
+            gap: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Sidebar Controls */
+        .sidebar {
+            width: 380px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-label {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .form-label span.value-pill {
+            color: var(--accent-cyan);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        textarea, input[type="text"], select {
+            width: 100%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-bright);
+            padding: 10px 12px;
+            font-size: 0.88rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        textarea:focus, input[type="text"]:focus, select:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 210, 255, 0.15);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            line-height: 1.4;
+        }
+
+        .presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .preset-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-dim);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: var(--border-color);
+            color: var(--text-bright);
+            border-color: var(--accent-cyan);
+        }
+
+        .row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-cyan);
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .color-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="color"] {
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            width: 40px;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 2px;
+        }
+
+        /* Main Viewport */
+        .main-viewport {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Metrics Bar */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent-cyan);
+        }
+
+        .metric-card.savings::before {
+            background: var(--accent-green-bright);
+        }
+
+        .metric-card.slots::before {
+            background: var(--accent-purple);
+        }
+
+        .metric-card.version::before {
+            background: var(--accent-orange);
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-bright);
+            font-family: monospace;
+        }
+
+        .metric-sub {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        /* Canvas Stage */
+        .stage-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .stage-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-bright);
+            cursor: pointer;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #090d13;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #161e2a 0%, #090d13 100%),
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 20px 20px, 20px 20px;
+            border-radius: var(--radius-md);
+            border: 1px dashed var(--border-color);
+            padding: 24px;
+            min-height: 480px;
+            overflow: auto;
+            position: relative;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+        }
+
+        /* Playback slider bar */
+        .playback-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+        }
+
+        .playback-bar.hidden {
+            display: none;
+        }
+
+        /* Decoder Verification Pill */
+        .decode-status-box {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(35, 134, 54, 0.15);
+            border: 1px solid rgba(63, 185, 80, 0.4);
+            border-radius: var(--radius-md);
+            color: var(--accent-green-bright);
+            font-size: 0.85rem;
+        }
+
+        .decode-status-box.error {
+            background: rgba(218, 54, 51, 0.15);
+            border-color: rgba(248, 81, 73, 0.4);
+            color: #f85149;
+        }
+
+        .decode-status-box code {
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+    <!-- Embedded standalone jsQR decoder for instantaneous in-browser scan verification -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+
+<header>
+    <div class="header-title">
+        <h1>BF6 Portal UIQRCode Renderer</h1>
+        <span class="badge badge-cyan">Hybrid Painter's + Merging</span>
+        <span class="badge badge-green">1 Slot & Zero GC</span>
+    </div>
+    <div style="font-size: 0.82rem; color: var(--text-dim);">
+        Emulating Battlefield 6 Portal Z-Index Engine
+    </div>
+</header>
+
+<div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <!-- Payload Settings -->
+        <div class="card">
+            <div class="card-title">📝 Payload & Error Correction</div>
+            
+            <div class="form-group">
+                <label class="form-label" for="qrText">Text / URL Payload</label>
+                <textarea id="qrText">https://portal.battlefield.com/join?matchId=BF6-987654</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Presets</label>
+                <div class="presets">
+                    <button class="preset-btn" onclick="setPreset('https://portal.battlefield.com/play?matchId=987654321&mode=conquest')">BF6 Match URL</button>
+                    <button class="preset-btn" onclick="setPreset('https://discord.gg/battlefield-portal')">Discord Invite</button>
+                    <button class="preset-btn" onclick="setPreset('HELLO WORLD')">Short String</button>
+                    <button class="preset-btn" onclick="setPreset('1234567890123456789012345678901234567890')">Numeric 40-digit</button>
+                    <button class="preset-btn" onclick="setPreset('A'.repeat(180))">High Density (V10)</button>
+                    <button class="preset-btn" onclick="setPreset('ABC xyz 123 !@#$%^&*()_+-=[]{}|;:,.<>?/~`\'')">Special Characters</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="eccSelect">Error Correction (ECC)</label>
+                <select id="eccSelect">
+                    <option value="L">Low (L - 7% Recovery)</option>
+                    <option value="M" selected>Medium (M - 15% Recovery)</option>
+                    <option value="Q">Quartile (Q - 25% Recovery)</option>
+                    <option value="H">High (H - 30% Recovery)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Sizing & Canvas Layout -->
+        <div class="card">
+            <div class="card-title">📐 Scale & Margins</div>
+
+            <div class="form-group">
+                <label class="form-label" for="scaleRange">
+                    Scale Multiplier
+                    <span class="value-pill" id="scaleVal">1.0x (10px/mod)</span>
+                </label>
+                <input type="range" id="scaleRange" min="0.3" max="3.0" step="0.1" value="1.0">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="marginRange">
+                    Quiet Zone Margin
+                    <span class="value-pill" id="marginVal">0 modules</span>
+                </label>
+                <input type="range" id="marginRange" min="0" max="8" step="1" value="0">
+            </div>
+        </div>
+
+        <!-- Color Styling -->
+        <div class="card">
+            <div class="card-title">🎨 Colors & Opacity</div>
+
+            <div class="row-2">
+                <div class="form-group">
+                    <label class="form-label" for="darkColor">Dark Modules</label>
+                    <div class="color-picker-row">
+                        <input type="color" id="darkColor" value="#000000">
+                        <input type="range" id="darkAlpha" min="0.1" max="1" step="0.05" value="1.0" title="Dark Alpha">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="lightColor">Light Canvas</label>
+                    <div class="color-picker-row">
+                        <input type="color" id="lightColor" value="#ffffff">
+                        <input type="range" id="lightAlpha" min="0.1" max="1" step="0.05" value="1.0" title="Light Alpha">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Viewport -->
+    <div class="main-viewport">
+        <!-- Metrics Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card version">
+                <div class="metric-label">QR Version & Size</div>
+                <div class="metric-value" id="metricVersion">V1 (21×21)</div>
+                <div class="metric-sub" id="metricPixels">210 × 210 px</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">Native Draw Calls</div>
+                <div class="metric-value" id="metricDrawCalls">--</div>
+                <div class="metric-sub" id="metricNaiveDiff">vs -- naive calls</div>
+            </div>
+
+            <div class="metric-card savings">
+                <div class="metric-label">Draw Call Reduction</div>
+                <div class="metric-value" id="metricSavings" style="color: var(--accent-green-bright);">--%</div>
+                <div class="metric-sub">Painter's + Rectilinear Merge</div>
+            </div>
+
+            <div class="metric-card slots">
+                <div class="metric-label">Engine Slot Usage</div>
+                <div class="metric-value" style="color: var(--accent-purple);">1 / 2048</div>
+                <div class="metric-sub">Single Element Slot</div>
+            </div>
+        </div>
+
+        <!-- Canvas Stage -->
+        <div class="stage-card">
+            <div class="stage-toolbar">
+                <div class="toggle-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="inspectCheckbox">
+                        <span>Highlight Draw Call Rectangles</span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="stepByStepCheckbox">
+                        <span>Step-by-Step Painter Playback</span>
+                    </label>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">
+                    Z-Index Stack: <span style="color: var(--accent-cyan); font-family: monospace;">Z=0 (Base) → Z=3 (Cores) → Z=4 (Data)</span>
+                </div>
+            </div>
+
+            <!-- Playback Slider Bar -->
+            <div class="playback-bar hidden" id="playbackBar">
+                <label class="form-label" style="margin: 0; min-width: 140px;">
+                    Render Step: <span class="value-pill" id="currentStepPill">1 / 1</span>
+                </label>
+                <input type="range" id="playbackSlider" min="1" max="1" value="1" style="flex: 1;">
+            </div>
+
+            <!-- Live Canvas -->
+            <div class="canvas-wrapper">
+                <canvas id="qrCanvas"></canvas>
+            </div>
+
+            <!-- Decoder Status Bar -->
+            <div class="decode-status-box" id="decodeStatusBox">
+                <div>
+                    <strong>🔍 Scannable Verification:</strong>
+                    <span id="decodeStatusText">Validating matrix decode...</span>
+                </div>
+                <code id="decodePayloadCode">--</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// 1. MOCK BATTLEFIELD 6 PORTAL ENGINE (`mod` and `UI`)
+// ============================================================================
+
+const mod = {
+    UIAnchor: {
+        TopLeft: 0,
+        TopCenter: 1,
+        TopRight: 2,
+        CenterLeft: 3,
+        Center: 4,
+        CenterRight: 5,
+        BottomLeft: 6,
+        BottomCenter: 7,
+        BottomRight: 8,
+    },
+    UIDepth: {
+        BehindGameUI: 0,
+        AboveGameUI: 1,
+        AboveAll: 2,
+    },
+    UIBgFill: {
+        Solid: 0,
+        Outline: 1,
+    },
+    CreateVector: (x, y, z = 0) => ({ x, y, z }),
+    _widgets: new Map(),
+    _widgetList: [], // In order of creation for Painter's Algorithm Z-Index
+    GetUIRoot: () => ({
+        name: 'ui_root',
+        isContainer: true,
+        visible: true,
+        position: { x: 0, y: 0, z: 0 },
+        size: { x: 1920, y: 1080, z: 0 },
+        children: []
+    }),
+    AddUIContainer: (name, position, size, anchor, parent, visible, padding, bgColor, bgAlpha, bgFill, depth, receiver) => {
+        const widget = {
+            name,
+            position,
+            size,
+            anchor,
+            parent,
+            visible: visible ?? true,
+            bgColor: bgColor ?? { x: 1, y: 1, z: 1 },
+            bgAlpha: bgAlpha ?? 1,
+            bgFill: bgFill ?? 0,
+            depth: depth ?? 1,
+            children: [],
+            creationOrder: mod._widgetList.length
+        };
+        mod._widgets.set(name, widget);
+        mod._widgetList.push(widget);
+        if (parent && parent.children) {
+            parent.children.push(widget);
+        }
+    },
+    FindUIWidgetWithName: (name) => mod._widgets.get(name) || null,
+    DeleteUIWidget: (widget) => {
+        if (!widget) return;
+        const name = typeof widget === 'string' ? widget : widget.name;
+        const w = mod._widgets.get(name);
+        if (w) {
+            mod._widgets.delete(name);
+            const idx = mod._widgetList.indexOf(w);
+            if (idx >= 0) mod._widgetList.splice(idx, 1);
+            if (w.children) {
+                for (const child of [...w.children]) {
+                    mod.DeleteUIWidget(child);
+                }
+            }
+        }
+    },
+    resetMock: () => {
+        mod._widgets.clear();
+        mod._widgetList = [];
+    }
+};
+
+const UI = {
+    MAX_ELEMENTS: 2048,
+    ROOT_NODE: mod.GetUIRoot(),
+    COLORS: {
+        WHITE: { x: 1, y: 1, z: 1 },
+        BLACK: { x: 0, y: 0, z: 0 },
+    },
+    Element: class {
+        static _INVALID_INDEX = -1;
+        static _nextId = 1;
+        _id = UI.Element._nextId++;
+        _slot = 0;
+        _name = `ui_elem_${this._id}`;
+        _isValid = true;
+        _receiver = { nativeReceiver: undefined };
+        _uiWidget = null;
+        width = 0;
+        height = 0;
+        depth = 1;
+
+        constructor(params) {
+            this.width = params.width ?? 100;
+            this.height = params.height ?? 100;
+            this.depth = params.depth ?? 1;
+        }
+
+        _bindNativeWidget(name) {
+            this._uiWidget = mod.FindUIWidgetWithName(name);
+        }
+
+        static _getPosition(params) {
+            return { x: params.x ?? 0, y: params.y ?? 0 };
+        }
+
+        static _getNativeWidget(parent) {
+            return parent;
+        }
+
+        _getSlotAndLogWarning() {
+            return this._slot;
+        }
+
+        setBgColor(c) {
+            if (this._uiWidget) this._uiWidget.bgColor = c;
+        }
+
+        delete() {
+            if (this._uiWidget) {
+                mod.DeleteUIWidget(this._uiWidget);
+                this._uiWidget = null;
+            }
+            this._isValid = false;
+        }
+    }
+};
+
+// ============================================================================
+// 2. UIQRCode IMPLEMENTATION (EXACT HYBRID ALGORITHM & ENCODER)
+// ============================================================================
+
+class UIQRCode extends UI.Element {
+    static BASE_MODULE_SIZE = 10;
+    static _matrices = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _scales = new Float32Array(UI.MAX_ELEMENTS);
+    static _margins = new Int16Array(UI.MAX_ELEMENTS);
+    static _darkColors = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _darkAlphas = new Float32Array(UI.MAX_ELEMENTS);
+    static _lightColors = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _lightAlphas = new Float32Array(UI.MAX_ELEMENTS);
+    static _eccs = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _texts = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _childWidgets = new Array(UI.MAX_ELEMENTS).fill(null);
+    static _visitedBuffer = new Uint8Array(177 * 177);
+
+    constructor(params) {
+        const matrix = UIQRCode._resolveMatrix(params);
+        const matrixSize = matrix ? matrix.length : 0;
+        const scale = params.scale ?? 1;
+        const margin = params.margin ?? 0;
+        const totalUnits = matrixSize + 2 * margin;
+
+        const baseWidth =
+            params.width ??
+            params.size?.width ??
+            (totalUnits > 0 ? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale : 100);
+        const baseHeight =
+            params.height ??
+            params.size?.height ??
+            (totalUnits > 0 ? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale : 100);
+
+        const lightColor = params.lightColor ?? UI.COLORS.WHITE;
+        const lightAlpha = params.lightAlpha ?? 1;
+        const darkColor = params.darkColor ?? UI.COLORS.BLACK;
+        const darkAlpha = params.darkAlpha ?? 1;
+
+        const { x, y } = UI.Element._getPosition(params);
+
+        super({
+            x,
+            y,
+            width: baseWidth,
+            height: baseHeight,
+            parent: params.parent,
+            anchor: params.anchor,
+            visible: params.visible,
+            bgColor: lightColor,
+            bgAlpha: lightAlpha,
+            bgFill: mod.UIBgFill.Solid,
+            depth: params.depth,
+        });
+
+        const parent = params.parent ?? UI.ROOT_NODE;
+        const name = this._name;
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+
+        mod.AddUIContainer(
+            name,
+            mod.CreateVector(x, y, 0),
+            mod.CreateVector(baseWidth, baseHeight, 0),
+            anchor,
+            UI.Element._getNativeWidget(parent),
+            visible,
+            0,
+            lightColor,
+            lightAlpha,
+            mod.UIBgFill.Solid,
+            depth
+        );
+
+        this._bindNativeWidget(name);
+
+        const slot = this._slot;
+        UIQRCode._matrices[slot] = matrix;
+        UIQRCode._scales[slot] = scale;
+        UIQRCode._margins[slot] = margin;
+        UIQRCode._darkColors[slot] = darkColor;
+        UIQRCode._darkAlphas[slot] = darkAlpha;
+        UIQRCode._lightColors[slot] = lightColor;
+        UIQRCode._lightAlphas[slot] = lightAlpha;
+        UIQRCode._eccs[slot] = params.ecc ?? null;
+        UIQRCode._texts[slot] = params.text ?? null;
+        UIQRCode._childWidgets[slot] = [];
+
+        if (matrix) {
+            this._renderQR(matrix, baseWidth, baseHeight, scale, margin, darkColor, darkAlpha, lightColor, lightAlpha);
+        }
+    }
+
+    static _resolveMatrix(params) {
+        if (params.matrix) {
+            return UIQRCode._normalizeMatrix(params.matrix);
+        }
+        if (params.text !== undefined) {
+            return UIQRCode.Encoder.encode(params.text, params.ecc ?? UIQRCode.ECC.Medium);
+        }
+        return null;
+    }
+
+    static _normalizeMatrix(matrix) {
+        const height = matrix.length;
+        const result = new Array(height);
+        for (let r = 0; r < height; ++r) {
+            const row = matrix[r];
+            const width = row.length;
+            const boolRow = new Array(width);
+            for (let c = 0; c < width; ++c) {
+                const val = row[c];
+                boolRow[c] = val === true || val === 1;
+            }
+            result[r] = boolRow;
+        }
+        return result;
+    }
+
+    _renderQR(matrix, totalWidth, totalHeight, scale, margin, darkColor, darkAlpha, lightColor, lightAlpha) {
+        const slot = this._slot;
+        const parentWidget = this._uiWidget;
+        const depth = this.depth ?? mod.UIDepth.AboveGameUI;
+        const N = matrix.length;
+
+        if (N === 0) return;
+
+        const gridUnits = N + 2 * margin;
+        const cellWidth = totalWidth / gridUnits;
+        const cellHeight = totalHeight / gridUnits;
+
+        const childWidgets = [];
+        let drawCalls = 1; // 1 for the root background canvas
+
+        const totalCells = N * N;
+        if (UIQRCode._visitedBuffer.length < totalCells) {
+            UIQRCode._visitedBuffer.fill(0);
+        } else {
+            UIQRCode._visitedBuffer.fill(0, 0, totalCells);
+        }
+
+        const visited = UIQRCode._visitedBuffer;
+
+        const drawRect = (col, row, spanW, spanH, color, alpha, type = 'data') => {
+            const x0 = Math.round((col + margin) * cellWidth);
+            const y0 = Math.round((row + margin) * cellHeight);
+            const x1 = Math.round((col + spanW + margin) * cellWidth);
+            const y1 = Math.round((row + spanH + margin) * cellHeight);
+            const w = Math.max(1, x1 - x0);
+            const h = Math.max(1, y1 - y0);
+
+            const childName = `ui_qr_${this._id}_${drawCalls}`;
+
+            mod.AddUIContainer(
+                childName,
+                mod.CreateVector(x0, y0, 0),
+                mod.CreateVector(w, h, 0),
+                mod.UIAnchor.TopLeft,
+                parentWidget,
+                true,
+                0,
+                color,
+                alpha,
+                mod.UIBgFill.Solid,
+                depth
+            );
+
+            const widget = mod.FindUIWidgetWithName(childName);
+            widget._debugType = type;
+            widget._gridRect = { col, row, spanW, spanH };
+            childWidgets.push(widget);
+            drawCalls++;
+        };
+
+        // Phase 2: Structural Elements (Z-Index Stacking)
+        const isStandardSize = N >= 21 && (N - 17) % 4 === 0;
+        const version = isStandardSize ? (N - 17) / 4 : 0;
+
+        if (version >= 1 && version <= 40) {
+            // Finder Patterns (3 Corner Eyes)
+            const finders = [
+                { r: 0, c: 0 },
+                { r: 0, c: N - 7 },
+                { r: N - 7, c: 0 },
+            ];
+
+            for (let f = 0; f < 3; ++f) {
+                const { r, c } = finders[f];
+                // Layer 1: 7x7 Dark base
+                drawRect(c, r, 7, 7, darkColor, darkAlpha, 'finder_base');
+                // Layer 2: 5x5 Light cutout
+                drawRect(c + 1, r + 1, 5, 5, lightColor, lightAlpha, 'finder_cutout');
+                // Layer 3: 3x3 Dark core
+                drawRect(c + 2, r + 2, 3, 3, darkColor, darkAlpha, 'finder_core');
+
+                // Mark 7x7 cells as visited
+                for (let i = 0; i < 7; ++i) {
+                    const rowOffset = (r + i) * N;
+                    for (let j = 0; j < 7; ++j) {
+                        visited[rowOffset + (c + j)] = 1;
+                    }
+                }
+            }
+
+            // Alignment Patterns (Version >= 2)
+            if (version >= 2) {
+                const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
+                const posLen = positions.length;
+
+                for (let p1 = 0; p1 < posLen; ++p1) {
+                    const rc = positions[p1];
+
+                    for (let p2 = 0; p2 < posLen; ++p2) {
+                        const cc = positions[p2];
+
+                        // Skip positions that collide with Finder Pattern corners (+ separator)
+                        if ((rc <= 8 && cc <= 8) || (rc <= 8 && cc >= N - 9) || (rc >= N - 9 && cc <= 8)) {
+                            continue;
+                        }
+
+                        const r = rc - 2;
+                        const c = cc - 2;
+
+                        // Layer 1: 5x5 Dark base
+                        drawRect(c, r, 5, 5, darkColor, darkAlpha, 'align_base');
+                        // Layer 2: 3x3 Light cutout
+                        drawRect(c + 1, r + 1, 3, 3, lightColor, lightAlpha, 'align_cutout');
+                        // Layer 3: 1x1 Dark core
+                        drawRect(c + 2, r + 2, 1, 1, darkColor, darkAlpha, 'align_core');
+
+                        // Mark 5x5 cells as visited
+                        for (let i = 0; i < 5; ++i) {
+                            const rowOffset = (r + i) * N;
+                            for (let j = 0; j < 5; ++j) {
+                                visited[rowOffset + (c + j)] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Phase 3: Data Modules (Greedy Rectilinear Merging with Bounded Overlap)
+        for (let r = 0; r < N; ++r) {
+            const row = matrix[r];
+            const rowOffset = r * N;
+
+            for (let c = 0; c < N; ++c) {
+                if (!row[c] || visited[rowOffset + c] !== 0) {
+                    continue;
+                }
+
+                // Expand Horizontally across unvisited (0) and previously drawn dark data (2)
+                let w = 1;
+                let lastUnvisitedW = 1;
+                while (c + w < N && row[c + w] && visited[rowOffset + (c + w)] !== 1) {
+                    if (visited[rowOffset + (c + w)] === 0) {
+                        lastUnvisitedW = w + 1;
+                    }
+                    w++;
+                }
+                w = lastUnvisitedW;
+
+                // Expand Vertically
+                let h = 1;
+                while (r + h < N) {
+                    const nextRow = matrix[r + h];
+                    const nextRowOffset = (r + h) * N;
+                    let match = true;
+                    let hasUnvisited = false;
+
+                    for (let k = 0; k < w; ++k) {
+                        const v = visited[nextRowOffset + (c + k)];
+                        if (!nextRow[c + k] || v === 1) {
+                            match = false;
+                            break;
+                        }
+                        if (v === 0) hasUnvisited = true;
+                    }
+
+                    if (!match || !hasUnvisited) break;
+                    h++;
+                }
+
+                // Draw Merged Dark Rectangle
+                drawRect(c, r, w, h, darkColor, darkAlpha, 'data_merged');
+
+                // Mark w x h region as visited (state 2)
+                for (let i = 0; i < h; ++i) {
+                    const markRowOffset = (r + i) * N;
+                    for (let j = 0; j < w; ++j) {
+                        visited[markRowOffset + (c + j)] = 2;
+                    }
+                }
+
+                c += w - 1;
+            }
+        }
+
+        UIQRCode._childWidgets[slot] = childWidgets;
+    }
+
+    _clearChildWidgets() {
+        const slot = this._slot;
+        const widgets = UIQRCode._childWidgets[slot];
+        if (widgets) {
+            for (let i = 0; i < widgets.length; ++i) {
+                mod.DeleteUIWidget(widgets[i]);
+            }
+            widgets.length = 0;
+        }
+    }
+
+    delete() {
+        this._clearChildWidgets();
+        super.delete();
+    }
+
+    get drawCallCount() {
+        const widgets = UIQRCode._childWidgets[this._slot];
+        return widgets ? widgets.length + 1 : 1;
+    }
+
+    get matrix() {
+        return UIQRCode._matrices[this._slot];
+    }
+
+    get version() {
+        const mat = this.matrix;
+        if (!mat || mat.length < 21 || (mat.length - 17) % 4 !== 0) return undefined;
+        return (mat.length - 17) / 4;
+    }
+
+    setText(text, ecc) {
+        const slot = this._slot;
+        const effectiveEcc = ecc ?? UIQRCode._eccs[slot] ?? UIQRCode.ECC.Medium;
+        const matrix = UIQRCode.Encoder.encode(text, effectiveEcc);
+        UIQRCode._texts[slot] = text;
+        UIQRCode._eccs[slot] = effectiveEcc;
+        UIQRCode._matrices[slot] = matrix;
+        this._rebuildQR();
+        return this;
+    }
+
+    _rebuildQR() {
+        const slot = this._slot;
+        const matrix = UIQRCode._matrices[slot];
+        if (!matrix) return;
+
+        const scale = UIQRCode._scales[slot];
+        const margin = UIQRCode._margins[slot];
+        const darkColor = UIQRCode._darkColors[slot] ?? UI.COLORS.BLACK;
+        const darkAlpha = UIQRCode._darkAlphas[slot] || 1;
+        const lightColor = UIQRCode._lightColors[slot] ?? UI.COLORS.WHITE;
+        const lightAlpha = UIQRCode._lightAlphas[slot] || 1;
+
+        const totalUnits = matrix.length + 2 * margin;
+        const currentWidth = totalUnits * UIQRCode.BASE_MODULE_SIZE * scale;
+        const currentHeight = totalUnits * UIQRCode.BASE_MODULE_SIZE * scale;
+
+        this.width = currentWidth;
+        this.height = currentHeight;
+        if (this._uiWidget) {
+            this._uiWidget.size = mod.CreateVector(currentWidth, currentHeight, 0);
+            this._uiWidget.bgColor = lightColor;
+            this._uiWidget.bgAlpha = lightAlpha;
+        }
+
+        this._clearChildWidgets();
+        this._renderQR(
+            matrix,
+            currentWidth,
+            currentHeight,
+            scale,
+            margin,
+            darkColor,
+            darkAlpha,
+            lightColor,
+            lightAlpha
+        );
+    }
+}
+
+UIQRCode.ALIGNMENT_POSITIONS = Object.freeze([
+    [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50],
+    [6, 30, 54], [6, 32, 58], [6, 34, 62], [6, 26, 46, 66], [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78],
+    [6, 30, 56, 82], [6, 30, 58, 86], [6, 34, 62, 90], [6, 28, 50, 72, 94], [6, 26, 50, 74, 98], [6, 30, 54, 78, 102],
+    [6, 28, 54, 80, 106], [6, 32, 58, 84, 110], [6, 30, 58, 86, 114], [6, 34, 62, 90, 118], [6, 26, 50, 74, 98, 122],
+    [6, 30, 54, 78, 102, 126], [6, 26, 52, 78, 104, 130], [6, 30, 56, 82, 108, 134], [6, 34, 60, 86, 112, 138],
+    [6, 30, 58, 86, 114, 142], [6, 34, 62, 90, 118, 146], [6, 30, 54, 78, 102, 126, 150], [6, 24, 50, 76, 102, 128, 154],
+    [6, 28, 54, 80, 106, 132, 158], [6, 32, 58, 84, 110, 136, 162], [6, 26, 54, 82, 110, 138, 166], [6, 30, 58, 86, 114, 142, 170]
+]);
+
+UIQRCode.ECC = {
+    Low: 'L',
+    Medium: 'M',
+    Quartile: 'Q',
+    High: 'H',
+};
+
+// ============================================================================
+// 3. ZERO-DEPENDENCY QR ENCODER (ISO/IEC 18004)
+// ============================================================================
+
+UIQRCode.Encoder = (() => {
+    const GF_EXP = new Uint8Array(512);
+    const GF_LOG = new Uint8Array(256);
+
+    let x = 1;
+    for (let i = 0; i < 255; ++i) {
+        GF_EXP[i] = x;
+        GF_EXP[i + 255] = x;
+        GF_LOG[x] = i;
+        x <<= 1;
+        if (x & 0x100) x ^= 0x11d;
+    }
+
+    function gfMul(a, b) {
+        if (a === 0 || b === 0) return 0;
+        return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+    }
+
+    function polyMul(p1, p2) {
+        const result = new Uint8Array(p1.length + p2.length - 1);
+        for (let i = 0; i < p1.length; ++i) {
+            for (let j = 0; j < p2.length; ++j) {
+                result[i + j] ^= gfMul(p1[i], p2[j]);
+            }
+        }
+        return result;
+    }
+
+    function getGeneratorPoly(degree) {
+        let poly = new Uint8Array([1]);
+        for (let i = 0; i < degree; ++i) {
+            poly = polyMul(poly, new Uint8Array([1, GF_EXP[i]]));
+        }
+        return poly;
+    }
+
+    function computeReedSolomon(data, eccLen) {
+        const gen = getGeneratorPoly(eccLen);
+        const msg = new Uint8Array(data.length + eccLen);
+        msg.set(data);
+
+        for (let i = 0; i < data.length; ++i) {
+            const coef = msg[i];
+            if (coef !== 0) {
+                for (let j = 0; j < gen.length; ++j) {
+                    msg[i + j] ^= gfMul(gen[j], coef);
+                }
+            }
+        }
+
+        const out = new Uint8Array(eccLen);
+        out.set(msg.subarray(data.length));
+        return out;
+    }
+
+    function encodeUtf8(str) {
+        const bytes = [];
+        for (let i = 0; i < str.length; ++i) {
+            const code = str.charCodeAt(i);
+            if (code < 0x80) {
+                bytes.push(code);
+            } else if (code < 0x800) {
+                bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+            } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < str.length) {
+                const next = str.charCodeAt(++i);
+                const codePoint = 0x10000 + ((code & 0x3ff) << 10) + (next & 0x3ff);
+                bytes.push(
+                    0xf0 | (codePoint >> 18),
+                    0x80 | ((codePoint >> 12) & 0x3f),
+                    0x80 | ((codePoint >> 6) & 0x3f),
+                    0x80 | (codePoint & 0x3f)
+                );
+            } else {
+                bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+            }
+        }
+        return new Uint8Array(bytes);
+    }
+
+    const ECC_TABLE = [
+        [[7, 1, 19, 0, 0], [10, 1, 16, 0, 0], [13, 1, 13, 0, 0], [17, 1, 9, 0, 0]],
+        [[10, 1, 34, 0, 0], [16, 1, 28, 0, 0], [22, 1, 22, 0, 0], [28, 1, 16, 0, 0]],
+        [[15, 1, 55, 0, 0], [26, 1, 44, 0, 0], [18, 2, 17, 0, 0], [22, 2, 13, 0, 0]],
+        [[20, 1, 80, 0, 0], [18, 2, 32, 0, 0], [26, 2, 24, 0, 0], [16, 4, 9, 0, 0]],
+        [[26, 1, 108, 0, 0], [24, 2, 43, 0, 0], [18, 2, 15, 2, 16], [22, 2, 11, 2, 12]],
+        [[18, 2, 68, 0, 0], [16, 4, 27, 0, 0], [24, 4, 19, 0, 0], [28, 4, 15, 0, 0]],
+        [[20, 2, 78, 0, 0], [18, 4, 31, 0, 0], [18, 2, 14, 4, 15], [26, 4, 13, 1, 14]],
+        [[24, 2, 97, 0, 0], [22, 2, 38, 2, 39], [22, 4, 18, 2, 19], [26, 4, 14, 2, 15]],
+        [[30, 2, 116, 0, 0], [22, 3, 36, 2, 37], [20, 4, 16, 4, 17], [24, 4, 12, 4, 13]],
+        [[18, 2, 68, 2, 69], [26, 4, 43, 1, 44], [24, 6, 19, 2, 20], [28, 6, 15, 2, 16]],
+        [[20, 4, 81, 0, 0], [30, 1, 50, 4, 51], [28, 4, 22, 4, 23], [24, 3, 12, 8, 13]],
+        [[24, 2, 92, 2, 93], [22, 6, 36, 2, 37], [26, 4, 20, 6, 21], [28, 7, 14, 4, 15]],
+        [[26, 4, 107, 0, 0], [22, 8, 37, 1, 38], [25, 8, 20, 4, 21], [28, 12, 11, 4, 12]],
+        [[30, 3, 115, 1, 116], [24, 4, 40, 5, 41], [28, 11, 16, 5, 17], [30, 11, 12, 5, 13]],
+        [[22, 5, 87, 1, 88], [24, 5, 41, 5, 42], [30, 5, 24, 7, 25], [24, 11, 12, 7, 13]],
+        [[24, 5, 98, 1, 99], [28, 7, 45, 3, 46], [30, 15, 19, 2, 20], [30, 3, 15, 13, 16]],
+        [[28, 1, 107, 5, 108], [28, 10, 46, 1, 47], [30, 1, 22, 15, 23], [28, 2, 14, 17, 15]],
+        [[30, 5, 120, 1, 121], [26, 9, 43, 4, 44], [28, 17, 22, 1, 23], [28, 2, 14, 19, 15]],
+        [[28, 3, 113, 4, 114], [26, 3, 44, 11, 45], [26, 17, 21, 4, 22], [26, 9, 13, 16, 14]],
+        [[28, 3, 107, 5, 108], [26, 3, 41, 13, 42], [30, 15, 24, 5, 25], [28, 15, 15, 10, 16]],
+        [[28, 4, 116, 4, 117], [26, 17, 42, 0, 0], [28, 17, 22, 6, 23], [30, 19, 16, 6, 17]],
+        [[28, 2, 111, 7, 112], [28, 17, 46, 0, 0], [30, 7, 24, 16, 25], [24, 34, 13, 0, 0]],
+        [[30, 4, 121, 5, 122], [28, 4, 47, 14, 48], [30, 11, 24, 14, 25], [30, 16, 15, 14, 16]],
+        [[30, 6, 117, 4, 118], [28, 6, 45, 14, 46], [30, 11, 24, 16, 25], [30, 30, 16, 2, 17]],
+        [[26, 8, 106, 4, 107], [28, 8, 47, 13, 48], [30, 7, 24, 22, 25], [30, 22, 15, 13, 16]],
+        [[28, 10, 114, 2, 115], [28, 19, 46, 4, 47], [28, 28, 22, 6, 23], [30, 33, 16, 4, 17]],
+        [[30, 8, 122, 4, 123], [28, 22, 45, 3, 46], [30, 8, 23, 26, 24], [30, 12, 15, 28, 16]],
+        [[30, 3, 117, 10, 118], [28, 3, 45, 23, 46], [30, 4, 24, 31, 25], [30, 11, 15, 31, 16]],
+        [[30, 7, 116, 7, 117], [28, 21, 45, 7, 46], [30, 1, 23, 37, 24], [30, 19, 15, 26, 16]],
+        [[30, 5, 115, 10, 116], [28, 19, 47, 10, 48], [30, 15, 24, 25, 25], [30, 23, 15, 25, 16]],
+        [[30, 13, 115, 3, 116], [28, 2, 46, 29, 47], [30, 42, 24, 1, 25], [30, 23, 15, 28, 16]],
+        [[30, 17, 115, 0, 0], [28, 10, 46, 23, 47], [30, 10, 24, 35, 25], [30, 19, 15, 35, 16]],
+        [[30, 17, 115, 1, 116], [28, 14, 46, 21, 47], [30, 29, 24, 19, 25], [30, 11, 15, 46, 16]],
+        [[30, 13, 115, 6, 116], [28, 14, 46, 23, 47], [30, 44, 24, 7, 25], [30, 59, 16, 1, 17]],
+        [[30, 12, 121, 7, 122], [28, 12, 47, 26, 48], [30, 39, 24, 14, 25], [30, 22, 15, 41, 16]],
+        [[30, 6, 121, 14, 122], [28, 6, 47, 34, 48], [30, 46, 24, 10, 25], [30, 2, 15, 64, 16]],
+        [[30, 17, 122, 4, 123], [28, 29, 46, 14, 47], [30, 49, 24, 10, 25], [30, 24, 15, 46, 16]],
+        [[30, 4, 122, 18, 123], [28, 13, 46, 32, 47], [30, 48, 24, 14, 25], [30, 42, 15, 32, 16]],
+        [[30, 20, 117, 4, 118], [28, 40, 47, 7, 48], [30, 43, 24, 22, 25], [30, 10, 15, 67, 16]],
+        [[30, 19, 118, 6, 119], [28, 18, 47, 31, 48], [30, 34, 24, 34, 25], [30, 20, 15, 61, 16]],
+    ];
+
+    function getEccIndex(ecc) {
+        switch (ecc) {
+            case 'L': return 0;
+            case 'M': return 1;
+            case 'Q': return 2;
+            case 'H': return 3;
+            default: return 1;
+        }
+    }
+
+    function getVersionInfoBits(version) {
+        let d = version << 12;
+        while (d >= 1 << 12) {
+            const shift = 31 - Math.clz32(d) - 12;
+            if (shift < 0) break;
+            d ^= 0x1f25 << shift;
+        }
+        return (version << 12) | d;
+    }
+
+    function getFormatInfoBits(ecc, mask) {
+        const eccBits = [1, 0, 3, 2][getEccIndex(ecc)];
+        const data = (eccBits << 3) | mask;
+        let d = data << 10;
+        while (d >= 1 << 10) {
+            const shift = 31 - Math.clz32(d) - 10;
+            if (shift < 0) break;
+            d ^= 0x537 << shift;
+        }
+        return ((data << 10) | d) ^ 0x5412;
+    }
+
+    function encode(text, ecc = 'M') {
+        const utf8 = encodeUtf8(text);
+        const eccIdx = getEccIndex(ecc);
+
+        let version = 0;
+        let totalDataCodewords = 0;
+
+        for (let v = 1; v <= 40; ++v) {
+            const eccConfig = ECC_TABLE[v - 1][eccIdx];
+            const dataCapacity = eccConfig[1] * eccConfig[2] + eccConfig[3] * eccConfig[4];
+
+            const charCountBits = v < 10 ? 8 : 16;
+            const totalBits = 4 + charCountBits + utf8.length * 8;
+            const totalBytes = Math.ceil(totalBits / 8);
+
+            if (totalBytes <= dataCapacity) {
+                version = v;
+                totalDataCodewords = dataCapacity;
+                break;
+            }
+        }
+
+        if (version === 0) {
+            throw new Error(`Payload too large for QR Code (ECC: ${ecc}, bytes: ${utf8.length})`);
+        }
+
+        const charCountBits = version < 10 ? 8 : 16;
+        const bitStream = [];
+
+        function pushBits(val, len) {
+            for (let i = len - 1; i >= 0; --i) {
+                bitStream.push((val >> i) & 1);
+            }
+        }
+
+        pushBits(0b0100, 4);
+        pushBits(utf8.length, charCountBits);
+        for (let i = 0; i < utf8.length; ++i) {
+            pushBits(utf8[i], 8);
+        }
+
+        const capacityBits = totalDataCodewords * 8;
+        const termLen = Math.min(4, capacityBits - bitStream.length);
+        pushBits(0, termLen);
+
+        while (bitStream.length % 8 !== 0) {
+            bitStream.push(0);
+        }
+
+        const padBytes = [0xec, 0x11];
+        let padIdx = 0;
+        while (bitStream.length < capacityBits) {
+            pushBits(padBytes[padIdx], 8);
+            padIdx ^= 1;
+        }
+
+        const dataBytes = new Uint8Array(totalDataCodewords);
+        for (let i = 0; i < totalDataCodewords; ++i) {
+            let byte = 0;
+            for (let b = 0; b < 8; ++b) {
+                byte = (byte << 1) | bitStream[i * 8 + b];
+            }
+            dataBytes[i] = byte;
+        }
+
+        const eccConfig = ECC_TABLE[version - 1][eccIdx];
+        const eccPerBlock = eccConfig[0];
+        const numBlocks = eccConfig[1] + eccConfig[3];
+
+        const dataBlocks = [];
+        const eccBlocks = [];
+
+        let offset = 0;
+        for (let b = 0; b < eccConfig[1]; ++b) {
+            const len = eccConfig[2];
+            const blockData = dataBytes.subarray(offset, offset + len);
+            offset += len;
+            dataBlocks.push(blockData);
+            eccBlocks.push(computeReedSolomon(blockData, eccPerBlock));
+        }
+        for (let b = 0; b < eccConfig[3]; ++b) {
+            const len = eccConfig[4];
+            const blockData = dataBytes.subarray(offset, offset + len);
+            offset += len;
+            dataBlocks.push(blockData);
+            eccBlocks.push(computeReedSolomon(blockData, eccPerBlock));
+        }
+
+        const finalCodewords = [];
+        const maxDataBlockLen = Math.max(eccConfig[2], eccConfig[4]);
+
+        for (let i = 0; i < maxDataBlockLen; ++i) {
+            for (let b = 0; b < numBlocks; ++b) {
+                if (i < dataBlocks[b].length) {
+                    finalCodewords.push(dataBlocks[b][i]);
+                }
+            }
+        }
+
+        for (let i = 0; i < eccPerBlock; ++i) {
+            for (let b = 0; b < numBlocks; ++b) {
+                finalCodewords.push(eccBlocks[b][i]);
+            }
+        }
+
+        const size = 17 + 4 * version;
+        const matrix = Array.from({ length: size }, () => new Array(size).fill(false));
+        const isFunction = Array.from({ length: size }, () => new Array(size).fill(false));
+
+        function setModule(r, c, val, isFunc = true) {
+            matrix[r][c] = val;
+            if (isFunc) isFunction[r][c] = true;
+        }
+
+        function drawFinder(r, c) {
+            for (let i = -1; i <= 7; ++i) {
+                for (let j = -1; j <= 7; ++j) {
+                    const nr = r + i;
+                    const nc = c + j;
+                    if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
+                        if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
+                            const isBlack =
+                                i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+                            setModule(nr, nc, isBlack);
+                        } else {
+                            setModule(nr, nc, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        drawFinder(0, 0);
+        drawFinder(0, size - 7);
+        drawFinder(size - 7, 0);
+
+        if (version >= 2) {
+            const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
+            for (let p1 = 0; p1 < positions.length; ++p1) {
+                const r = positions[p1];
+                for (let p2 = 0; p2 < positions.length; ++p2) {
+                    const c = positions[p2];
+                    if (
+                        (r <= 8 && c <= 8) ||
+                        (r <= 8 && c >= size - 9) ||
+                        (r >= size - 9 && c <= 8)
+                    ) {
+                        continue;
+                    }
+
+                    for (let i = -2; i <= 2; ++i) {
+                        for (let j = -2; j <= 2; ++j) {
+                            const isBlack = Math.max(Math.abs(i), Math.abs(j)) === 2 || (i === 0 && j === 0);
+                            setModule(r + i, c + j, isBlack);
+                        }
+                    }
+                }
+            }
+        }
+
+        for (let i = 8; i < size - 8; ++i) {
+            setModule(6, i, i % 2 === 0);
+            setModule(i, 6, i % 2 === 0);
+        }
+
+        // Dark module
+        setModule(size - 8, 8, true);
+
+        // Reserve format info
+        for (let i = 0; i <= 8; ++i) {
+            if (!isFunction[8][i]) setModule(8, i, false);
+            if (!isFunction[i][8]) setModule(i, 8, false);
+        }
+        for (let i = 0; i < 8; ++i) {
+            setModule(8, size - 1 - i, false);
+        }
+        for (let i = 0; i < 7; ++i) {
+            setModule(size - 1 - i, 8, false);
+        }
+
+        // Reserve version info (v >= 7)
+        if (version >= 7) {
+            for (let i = 0; i < 6; ++i) {
+                for (let j = 0; j < 3; ++j) {
+                    setModule(i, size - 11 + j, false);
+                    setModule(size - 11 + j, i, false);
+                }
+            }
+        }
+
+        // Place data bits in zigzag
+        const totalDataBits = finalCodewords.length * 8;
+        let bitIdx = 0;
+        let right = size - 1;
+        let upward = true;
+
+        while (right > 0) {
+            if (right === 6) right--;
+
+            for (let vert = 0; vert < size; ++vert) {
+                const r = upward ? size - 1 - vert : vert;
+
+                for (let colOffset = 0; colOffset < 2; ++colOffset) {
+                    const c = right - colOffset;
+                    if (!isFunction[r][c]) {
+                        let bit = false;
+                        if (bitIdx < totalDataBits) {
+                            const byte = finalCodewords[bitIdx >> 3];
+                            const bitPos = 7 - (bitIdx & 7);
+                            bit = ((byte >> bitPos) & 1) === 1;
+                        }
+                        bitIdx++;
+                        matrix[r][c] = bit;
+                    }
+                }
+            }
+            upward = !upward;
+            right -= 2;
+        }
+
+        function isMaskCondition(m, r, c) {
+            switch (m) {
+                case 0: return (r + c) % 2 === 0;
+                case 1: return r % 2 === 0;
+                case 2: return c % 3 === 0;
+                case 3: return (r + c) % 3 === 0;
+                case 4: return ((r >> 1) + Math.floor(c / 3)) % 2 === 0;
+                case 5: return ((r * c) % 2) + ((r * c) % 3) === 0;
+                case 6: return (((r * c) % 2) + ((r * c) % 3)) % 2 === 0;
+                case 7: return (((r + c) % 2) + ((r * c) % 3)) % 2 === 0;
+                default: return false;
+            }
+        }
+
+        let bestMask = 0;
+        let lowestPenalty = Infinity;
+
+        for (let m = 0; m < 8; ++m) {
+            let penalty = 0;
+
+            const testMat = new Array(size);
+            for (let r = 0; r < size; ++r) {
+                testMat[r] = new Array(size);
+                for (let c = 0; c < size; ++c) {
+                    testMat[r][c] = isFunction[r][c]
+                        ? matrix[r][c]
+                        : isMaskCondition(m, r, c)
+                          ? !matrix[r][c]
+                          : matrix[r][c];
+                }
+            }
+
+            const formatBits = getFormatInfoBits(ecc, m);
+            const formatCoords = [
+                [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [7, 8], [8, 8],
+                [8, 7], [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
+            ];
+            const formatCoords2 = [
+                [size - 1, 8], [size - 2, 8], [size - 3, 8], [size - 4, 8], [size - 5, 8], [size - 6, 8], [size - 7, 8],
+                [8, size - 8], [8, size - 7], [8, size - 6], [8, size - 5], [8, size - 4], [8, size - 3], [8, size - 2], [8, size - 1],
+            ];
+
+            for (let i = 0; i < 15; ++i) {
+                const bit = ((formatBits >> i) & 1) === 1;
+                testMat[formatCoords[i][0]][formatCoords[i][1]] = bit;
+                testMat[formatCoords2[i][0]][formatCoords2[i][1]] = bit;
+            }
+
+            for (let r = 0; r < size; ++r) {
+                let rowCount = 0;
+                let rowColor = false;
+                let colCount = 0;
+                let colColor = false;
+
+                for (let c = 0; c < size; ++c) {
+                    if (c === 0 || testMat[r][c] !== rowColor) {
+                        rowColor = testMat[r][c];
+                        rowCount = 1;
+                    } else {
+                        rowCount++;
+                        if (rowCount === 5) penalty += 3;
+                        else if (rowCount > 5) penalty++;
+                    }
+
+                    if (c === 0 || testMat[c][r] !== colColor) {
+                        colColor = testMat[c][r];
+                        colCount = 1;
+                    } else {
+                        colCount++;
+                        if (colCount === 5) penalty += 3;
+                        else if (colCount > 5) penalty++;
+                    }
+                }
+            }
+
+            for (let r = 0; r < size - 1; ++r) {
+                for (let c = 0; c < size - 1; ++c) {
+                    const val = testMat[r][c];
+                    if (val === testMat[r][c + 1] && val === testMat[r + 1][c] && val === testMat[r + 1][c + 1]) {
+                        penalty += 3;
+                    }
+                }
+            }
+
+            let darkCount = 0;
+            for (let r = 0; r < size; ++r) {
+                for (let c = 0; c < size; ++c) {
+                    if (testMat[r][c]) darkCount++;
+                }
+            }
+            const ratio = (darkCount * 100) / (size * size);
+            const step = Math.floor(Math.abs(ratio - 50) / 5);
+            penalty += step * 10;
+
+            if (penalty < lowestPenalty) {
+                lowestPenalty = penalty;
+                bestMask = m;
+            }
+        }
+
+        for (let r = 0; r < size; ++r) {
+            for (let c = 0; c < size; ++c) {
+                if (!isFunction[r][c] && isMaskCondition(bestMask, r, c)) {
+                    matrix[r][c] = !matrix[r][c];
+                }
+            }
+        }
+
+        const formatBits = getFormatInfoBits(ecc, bestMask);
+        const formatCoords = [
+            [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [7, 8], [8, 8],
+            [8, 7], [8, 5], [8, 4], [8, 3], [8, 2], [8, 1], [8, 0],
+        ];
+        const formatCoords2 = [
+            [size - 1, 8], [size - 2, 8], [size - 3, 8], [size - 4, 8], [size - 5, 8], [size - 6, 8], [size - 7, 8],
+            [8, size - 8], [8, size - 7], [8, size - 6], [8, size - 5], [8, size - 4], [8, size - 3], [8, size - 2], [8, size - 1],
+        ];
+
+        for (let i = 0; i < 15; ++i) {
+            const bit = ((formatBits >> i) & 1) === 1;
+            setModule(formatCoords[i][0], formatCoords[i][1], bit);
+            setModule(formatCoords2[i][0], formatCoords2[i][1], bit);
+        }
+
+        if (version >= 7) {
+            const verBits = getVersionInfoBits(version);
+            for (let i = 0; i < 18; ++i) {
+                const bit = ((verBits >> i) & 1) === 1;
+                const a = Math.floor(i / 3);
+                const b = (i % 3) + size - 11;
+                setModule(a, b, bit);
+                setModule(b, a, bit);
+            }
+        }
+
+        return matrix;
+    }
+
+    return { encode };
+})();
+
+// ============================================================================
+// 4. CANVAS PAINTER RENDERER (BF6 PORTAL Z-INDEX EMULATOR)
+// ============================================================================
+
+let currentQRCodeInstance = null;
+const canvas = document.getElementById('qrCanvas');
+const ctx = canvas.getContext('2d');
+
+function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    return { x: r, y: g, z: b };
+}
+
+function renderUI() {
+    const text = document.getElementById('qrText').value;
+    const ecc = document.getElementById('eccSelect').value;
+    const scale = parseFloat(document.getElementById('scaleRange').value);
+    const margin = parseInt(document.getElementById('marginRange').value, 10);
+    const darkHex = document.getElementById('darkColor').value;
+    const darkAlpha = parseFloat(document.getElementById('darkAlpha').value);
+    const lightHex = document.getElementById('lightColor').value;
+    const lightAlpha = parseFloat(document.getElementById('lightAlpha').value);
+
+    const inspectMode = document.getElementById('inspectCheckbox').checked;
+    const stepMode = document.getElementById('stepByStepCheckbox').checked;
+    const playbackSlider = document.getElementById('playbackSlider');
+
+    // Reset mock engine
+    mod.resetMock();
+    if (currentQRCodeInstance) {
+        currentQRCodeInstance.delete();
+        currentQRCodeInstance = null;
+    }
+
+    try {
+        currentQRCodeInstance = new UIQRCode({
+            text,
+            ecc,
+            scale,
+            margin,
+            darkColor: hexToRgb(darkHex),
+            darkAlpha,
+            lightColor: hexToRgb(lightHex),
+            lightAlpha,
+        });
+
+        const matrix = currentQRCodeInstance.matrix;
+        const N = matrix ? matrix.length : 0;
+        const version = currentQRCodeInstance.version;
+        const drawCalls = currentQRCodeInstance.drawCallCount;
+
+        // Calculate naive black module count for comparison
+        let naiveCount = 0;
+        for (let r = 0; r < N; ++r) {
+            for (let c = 0; c < N; ++c) {
+                if (matrix[r][c]) naiveCount++;
+            }
+        }
+
+        const savings = naiveCount > 0 ? ((1 - (drawCalls / naiveCount)) * 100).toFixed(1) : 0;
+
+        // Update metrics
+        document.getElementById('metricVersion').textContent = `V${version} (${N}×${N})`;
+        document.getElementById('metricPixels').textContent = `${Math.round(currentQRCodeInstance.width)} × ${Math.round(currentQRCodeInstance.height)} px`;
+        document.getElementById('metricDrawCalls').textContent = `${drawCalls} Calls`;
+        document.getElementById('metricNaiveDiff').textContent = `vs ${naiveCount} naive calls`;
+        document.getElementById('metricSavings').textContent = `${savings}%`;
+
+        // Update step playback bar
+        const playbackBar = document.getElementById('playbackBar');
+        if (stepMode) {
+            playbackBar.classList.remove('hidden');
+            playbackSlider.max = mod._widgetList.length;
+            if (parseInt(playbackSlider.value, 10) > mod._widgetList.length) {
+                playbackSlider.value = mod._widgetList.length;
+            }
+            document.getElementById('currentStepPill').textContent = `${playbackSlider.value} / ${mod._widgetList.length}`;
+        } else {
+            playbackBar.classList.add('hidden');
+            playbackSlider.value = mod._widgetList.length;
+        }
+
+        // Render widgets on HTML5 Canvas according to BF6 Portal Z-Index Order
+        const totalWidgets = mod._widgetList.length;
+        const maxStep = stepMode ? parseInt(playbackSlider.value, 10) : totalWidgets;
+
+        const rootContainer = mod._widgets.get(currentQRCodeInstance._name);
+        const canvasW = Math.round(rootContainer.size.x);
+        const canvasH = Math.round(rootContainer.size.y);
+
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        ctx.clearRect(0, 0, canvasW, canvasH);
+
+        const debugColors = {
+            finder_base: '#ff5555',
+            finder_cutout: '#55ff55',
+            finder_core: '#5555ff',
+            align_base: '#ffaa00',
+            align_cutout: '#00ffff',
+            align_core: '#ff00ff',
+            data_merged: '#00d2ff',
+        };
+
+        // Draw in strict order of creation (Painter's Algorithm Z-Index)
+        for (let i = 0; i < maxStep && i < totalWidgets; ++i) {
+            const w = mod._widgetList[i];
+            const x = Math.round(w.position.x);
+            const y = Math.round(w.position.y);
+            const width = Math.round(w.size.x);
+            const height = Math.round(w.size.y);
+
+            const r = Math.round((w.bgColor?.x ?? 0) * 255);
+            const g = Math.round((w.bgColor?.y ?? 0) * 255);
+            const b = Math.round((w.bgColor?.z ?? 0) * 255);
+            const a = w.bgAlpha ?? 1;
+
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+            ctx.fillRect(x, y, width, height);
+
+            if (inspectMode && w !== rootContainer) {
+                const strokeCol = debugColors[w._debugType] || '#00d2ff';
+                ctx.strokeStyle = strokeCol;
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+            }
+        }
+
+        // Live Decoder Verification
+        verifyDecoder(canvas, text);
+
+    } catch (err) {
+        console.error(err);
+        document.getElementById('decodeStatusBox').className = 'decode-status-box error';
+        document.getElementById('decodeStatusText').textContent = `Error: ${err.message}`;
+        document.getElementById('decodePayloadCode').textContent = '--';
+    }
+}
+
+function verifyDecoder(canvasElem, expectedText) {
+    const statusBox = document.getElementById('decodeStatusBox');
+    const statusText = document.getElementById('decodeStatusText');
+    const payloadCode = document.getElementById('decodePayloadCode');
+
+    if (typeof jsQR === 'undefined') {
+        statusText.textContent = 'Decoder offline (jsQR CDN not reached)';
+        return;
+    }
+
+    try {
+        const imgData = ctx.getImageData(0, 0, canvasElem.width, canvasElem.height);
+        const result = jsQR(imgData.data, imgData.width, imgData.height);
+
+        if (result && result.data === expectedText) {
+            statusBox.className = 'decode-status-box';
+            statusText.textContent = '100% Scannable & Verified by jsQR';
+            payloadCode.textContent = result.data;
+        } else if (result) {
+            statusBox.className = 'decode-status-box error';
+            statusText.textContent = 'Decoded mismatch!';
+            payloadCode.textContent = result.data;
+        } else {
+            statusBox.className = 'decode-status-box error';
+            statusText.textContent = 'Not decoded (Quiet zone or contrast may be required)';
+            payloadCode.textContent = 'null';
+        }
+    } catch (e) {
+        statusBox.className = 'decode-status-box error';
+        statusText.textContent = `Decoder check error: ${e.message}`;
+    }
+}
+
+function setPreset(txt) {
+    document.getElementById('qrText').value = txt;
+    renderUI();
+}
+
+// Event Listeners
+document.getElementById('qrText').addEventListener('input', renderUI);
+document.getElementById('eccSelect').addEventListener('change', renderUI);
+document.getElementById('scaleRange').addEventListener('input', (e) => {
+    const s = parseFloat(e.target.value);
+    document.getElementById('scaleVal').textContent = `${s.toFixed(1)}x (${Math.round(s * 10)}px/mod)`;
+    renderUI();
+});
+document.getElementById('marginRange').addEventListener('input', (e) => {
+    document.getElementById('marginVal').textContent = `${e.target.value} modules`;
+    renderUI();
+});
+document.getElementById('darkColor').addEventListener('input', renderUI);
+document.getElementById('darkAlpha').addEventListener('input', renderUI);
+document.getElementById('lightColor').addEventListener('input', renderUI);
+document.getElementById('lightAlpha').addEventListener('input', renderUI);
+document.getElementById('inspectCheckbox').addEventListener('change', renderUI);
+document.getElementById('stepByStepCheckbox').addEventListener('change', (e) => {
+    document.getElementById('playbackSlider').value = mod._widgetList.length;
+    renderUI();
+});
+document.getElementById('playbackSlider').addEventListener('input', (e) => {
+    document.getElementById('currentStepPill').textContent = `${e.target.value} / ${mod._widgetList.length}`;
+    renderUI();
+});
+
+// Initial Render
+renderUI();
+</script>
+
+</body>
+</html>

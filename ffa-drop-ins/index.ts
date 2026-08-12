@@ -9,28 +9,618 @@ import { UIContainer } from '../ui/components/container/index.ts';
 import { UITextButton } from '../ui/components/text-button/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 1.1.1
-export namespace FFADropIns {
-    const logging = new Logging('FDI');
+/**
+ * Class managing Free-For-All aerial drop-in spawn points, spawn regions, and spawning queues.
+ * @version 2.0.0
+ */
+export class FFADropIns {
+    public static readonly logging = new Logging('FDI');
 
     /**
-     * Log levels for controlling logging verbosity.
+     * Timestamp (in ms) when the server runtime started.
      */
-    export const LogLevel = Logging.LogLevel;
+    public static readonly SERVER_START_TIME = Date.now();
 
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
-    export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+    public static setLogging(
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
-        logging.setLogging(log, logLevel, includeRawError);
+        FFADropIns.logging.setLogging(log, logLevel, includeRawError);
     }
+
+    private static readonly _scratchVector: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+
+    private readonly _count: number;
+    private readonly _posX: Float32Array;
+    private readonly _posY: Float32Array;
+    private readonly _posZ: Float32Array;
+    private readonly _spawnPoints: mod.SpawnPoint[];
+
+    private readonly _rectMinX: Float32Array;
+    private readonly _rectMinZ: Float32Array;
+    private readonly _rectMaxX: Float32Array;
+    private readonly _rectMaxZ: Float32Array;
+    private readonly _cumulativeAreas: Float32Array;
+    private readonly _totalArea: number;
+
+    private readonly _players = new Map<number, FFADropIns.PlayerRecord>();
+    private readonly _spawnQueue: FFADropIns.PlayerRecord[] = [];
+    private readonly _leaveGameUnsubscribe: () => void;
+
+    private readonly _initialPromptDelay: number;
+    private readonly _promptDelay: number;
+    private readonly _queueProcessingDelay: number;
+
+    private _queueProcessingEnabled: boolean = false;
+    private _queueProcessingActive: boolean = false;
+    private _queueProcessingTimerId: Timers.TimerID | null = null;
+
+    /**
+     * Initializes the drop-in spawning system with the given region rectangles, altitude, and options.
+     * @param spawnData - The drop-in spawning region (rectangles and altitude).
+     * @param options - Optional configuration overrides for spawn points and delays.
+     */
+    constructor(spawnData: FFADropIns.SpawnData, options?: FFADropIns.Options) {
+        if (!spawnData || !spawnData.spawnRectangles || spawnData.spawnRectangles.length === 0) {
+            FFADropIns.logging.log('No drop-in rectangles provided.', FFADropIns.LogLevel.Error);
+        }
+
+        mod.EnableHQ(mod.GetHQ(1), false);
+        mod.EnableHQ(mod.GetHQ(2), false);
+
+        // Pre-filter valid zones with area > 0
+        const rawZones = spawnData?.spawnRectangles ?? [];
+        const validZones: FFADropIns.SpawnRectangle[] = [];
+        let runningTotalArea = 0;
+
+        for (let i = 0; i < rawZones.length; ++i) {
+            const zone = rawZones[i];
+            const width = Math.abs(zone.maxX - zone.minX);
+            const depth = Math.abs(zone.maxZ - zone.minZ);
+            const area = width * depth;
+
+            if (area > 0) {
+                validZones.push({
+                    minX: Math.min(zone.minX, zone.maxX),
+                    maxX: Math.max(zone.minX, zone.maxX),
+                    minZ: Math.min(zone.minZ, zone.maxZ),
+                    maxZ: Math.max(zone.minZ, zone.maxZ),
+                });
+            }
+        }
+
+        const zoneCount = validZones.length;
+        this._rectMinX = new Float32Array(zoneCount);
+        this._rectMinZ = new Float32Array(zoneCount);
+        this._rectMaxX = new Float32Array(zoneCount);
+        this._rectMaxZ = new Float32Array(zoneCount);
+        this._cumulativeAreas = new Float32Array(zoneCount);
+
+        for (let i = 0; i < zoneCount; ++i) {
+            const zone = validZones[i];
+            const width = zone.maxX - zone.minX;
+            const depth = zone.maxZ - zone.minZ;
+            const area = width * depth;
+
+            runningTotalArea += area;
+            this._rectMinX[i] = zone.minX;
+            this._rectMinZ[i] = zone.minZ;
+            this._rectMaxX[i] = zone.maxX;
+            this._rectMaxZ[i] = zone.maxZ;
+            this._cumulativeAreas[i] = runningTotalArea;
+        }
+
+        this._totalArea = runningTotalArea;
+
+        if (zoneCount === 0 || runningTotalArea <= 0) {
+            this._count = 0;
+            this._posX = new Float32Array(0);
+            this._posY = new Float32Array(0);
+            this._posZ = new Float32Array(0);
+            this._spawnPoints = [];
+        } else {
+            const requestedPoints = options?.dropInPoints ?? 64;
+            const dropInPoints = Math.max(1, requestedPoints);
+            this._count = dropInPoints;
+
+            this._posX = new Float32Array(dropInPoints);
+            this._posY = new Float32Array(dropInPoints);
+            this._posZ = new Float32Array(dropInPoints);
+            this._spawnPoints = new Array(dropInPoints);
+
+            const tempPt = { x: 0, z: 0 };
+            const zeroRot = Vectors.toVector(Vectors.ZERO);
+            const altitude = spawnData.y;
+
+            for (let i = 0; i < dropInPoints; ++i) {
+                this._sampleRandomPoint(tempPt);
+                const x = tempPt.x;
+                const y = altitude;
+                const z = tempPt.z;
+
+                this._posX[i] = x;
+                this._posY[i] = y;
+                this._posZ[i] = z;
+
+                const location = mod.CreateVector(x, y, z);
+                this._spawnPoints[i] = mod.SpawnObject(
+                    mod.RuntimeSpawn_Common.PlayerSpawner,
+                    location,
+                    zeroRot
+                ) as mod.SpawnPoint;
+            }
+        }
+
+        this._initialPromptDelay = options?.initialPromptDelay ?? 10;
+        this._promptDelay = options?.promptDelay ?? 10;
+        this._queueProcessingDelay = options?.queueProcessingDelay ?? 2;
+
+        this._leaveGameUnsubscribe = Events.OnPlayerLeaveGame.subscribe((playerId) => {
+            this.removePlayer(playerId);
+        });
+
+        if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Info)) {
+            FFADropIns.logging.log(
+                `Initialized with ${this._count} drop-in spawn points across ${zoneCount} rectangles.`,
+                FFADropIns.LogLevel.Info
+            );
+        }
+    }
+
+    /**
+     * Total number of spawn points managed by this instance.
+     * @returns The spawn count.
+     */
+    public get spawnCount(): number {
+        return this._count;
+    }
+
+    private _sampleRandomPoint(out: { x: number; z: number }): void {
+        const randomValue = Math.random() * this._totalArea;
+
+        let low = 0;
+        let high = this._cumulativeAreas.length - 1;
+        let selectedIndex = 0;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+
+            if (this._cumulativeAreas[mid] >= randomValue) {
+                selectedIndex = mid;
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+
+        const minX = this._rectMinX[selectedIndex];
+        const maxX = this._rectMaxX[selectedIndex];
+        const minZ = this._rectMinZ[selectedIndex];
+        const maxZ = this._rectMaxZ[selectedIndex];
+
+        out.x = minX + Math.random() * (maxX - minX);
+        out.z = minZ + Math.random() * (maxZ - minZ);
+    }
+
+    /**
+     * Adds and registers a player to be managed by this drop-in spawning system.
+     * Usually called in `Events.OnPlayerJoinGame`.
+     * @param player - The player to add.
+     * @param showDebugPosition - Whether to display a debug position HUD for this player.
+     */
+    public addPlayer(player: mod.Player, showDebugPosition: boolean = false): void {
+        const playerId = mod.GetObjId(player);
+
+        if (playerId === undefined) return;
+
+        if (this._players.has(playerId)) {
+            this.removePlayer(playerId);
+        }
+
+        const isAI = mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier);
+
+        const record: FFADropIns.PlayerRecord = {
+            player,
+            playerId,
+            isAI,
+            delayCountdownClockId: null,
+            updatePositionIntervalId: null,
+        };
+
+        this._players.set(playerId, record);
+
+        if (isAI) return;
+
+        record.promptUI = new UIContainer({
+            x: 0,
+            y: 0,
+            width: 440,
+            height: 140,
+            anchor: UI.Anchor.Center,
+            visible: false,
+            bgColor: UI.COLORS.BF_GREY_4,
+            bgAlpha: 0.5,
+            bgFill: UI.BgFill.Blur,
+            receiver: player,
+            uiInputModeWhenVisible: true,
+        });
+
+        new UITextButton({
+            parent: record.promptUI,
+            x: 0,
+            y: 20,
+            width: 400,
+            height: 40,
+            anchor: UI.Anchor.TopCenter,
+            bgColor: UI.COLORS.BF_GREY_2,
+            baseColor: UI.COLORS.BF_GREY_2,
+            baseAlpha: 1,
+            pressedColor: UI.COLORS.BF_GREEN_DARK,
+            pressedAlpha: 1,
+            focusedColor: UI.COLORS.BF_GREY_1,
+            focusedAlpha: 1,
+            label: mod.Message(mod.stringkeys.ffaDropIns.buttons.spawn),
+            textSize: 30,
+            textColor: UI.COLORS.BF_GREEN_BRIGHT,
+            onClickUp: () => this._addToQueue(record),
+        });
+
+        new UITextButton({
+            parent: record.promptUI,
+            x: 0,
+            y: 80,
+            width: 400,
+            height: 40,
+            anchor: UI.Anchor.TopCenter,
+            bgColor: UI.COLORS.BF_GREY_2,
+            baseColor: UI.COLORS.BF_GREY_2,
+            baseAlpha: 1,
+            pressedColor: UI.COLORS.BF_YELLOW_DARK,
+            pressedAlpha: 1,
+            focusedColor: UI.COLORS.BF_GREY_1,
+            focusedAlpha: 1,
+            label: mod.Message(mod.stringkeys.ffaDropIns.buttons.delay, this._promptDelay),
+            textSize: 30,
+            textColor: UI.COLORS.BF_YELLOW_BRIGHT,
+            onClickUp: () => this.startDelayForPrompt(playerId, this._promptDelay),
+        });
+
+        record.countdownUI = new UIText({
+            x: 0,
+            y: 60,
+            width: 400,
+            height: 50,
+            anchor: UI.Anchor.TopCenter,
+            label: mod.Message(mod.stringkeys.ffaDropIns.countdown, 0),
+            textSize: 30,
+            textColor: UI.COLORS.BF_GREEN_BRIGHT,
+            bgColor: UI.COLORS.BF_GREY_4,
+            bgAlpha: 0.5,
+            bgFill: UI.BgFill.Solid,
+            visible: false,
+            receiver: player,
+        });
+
+        record.delayCountdownClockId = Clocks.createCountDown(this._initialPromptDelay, {
+            onSecond: (seconds: number) => {
+                if (Clocks.isComplete(record.delayCountdownClockId!)) {
+                    record.countdownUI?.hide();
+                    record.promptUI?.show();
+                }
+
+                if (Clocks.isRunning(record.delayCountdownClockId!)) {
+                    record.promptUI?.hide();
+
+                    if (!record.countdownUI?.visible) {
+                        record.countdownUI?.show();
+                    }
+                }
+
+                record.countdownUI?.setLabel(mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds));
+            },
+        });
+
+        if (showDebugPosition) {
+            record.debugPositionUI = new UIText({
+                width: 360,
+                height: 26,
+                anchor: UI.Anchor.BottomCenter,
+                label: mod.Message(mod.stringkeys.ffaDropIns.debug.position, 0, 0, 0),
+                textSize: 20,
+                textColor: UI.COLORS.BF_GREEN_BRIGHT,
+                bgColor: UI.COLORS.BF_GREY_4,
+                bgAlpha: 0.75,
+                bgFill: UI.BgFill.Blur,
+                receiver: player,
+            });
+
+            const updatePosition = () => {
+                const { x, y, z } = this._getPlayerPosition(player);
+                record.debugPositionUI?.setLabel(mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z));
+            };
+
+            record.updatePositionIntervalId = Timers.setInterval(updatePosition, 1_000);
+        }
+    }
+
+    /**
+     * Removes and unregisters a player from the drop-in spawning system.
+     * @param playerOrId - The player or player ID to remove.
+     * @returns Whether the player was found and removed.
+     */
+    public removePlayer(playerOrId: mod.Player | number): boolean {
+        const record = this._getPlayerRecord(playerOrId);
+
+        if (!record) return false;
+
+        if (record.delayCountdownClockId !== null) {
+            Clocks.stop(record.delayCountdownClockId);
+            record.delayCountdownClockId = null;
+        }
+
+        if (record.updatePositionIntervalId !== null) {
+            Timers.clearInterval(record.updatePositionIntervalId);
+            record.updatePositionIntervalId = null;
+        }
+
+        record.promptUI?.delete();
+        record.countdownUI?.delete();
+        record.debugPositionUI?.delete();
+
+        this._players.delete(record.playerId);
+
+        const queueIndex = this._spawnQueue.indexOf(record);
+
+        if (queueIndex !== -1) {
+            this._spawnQueue.splice(queueIndex, 1);
+        }
+
+        return true;
+    }
+
+    /**
+     * Starts the countdown before prompting the player to spawn or delay again.
+     * Usually called in `Events.OnPlayerJoinGame` or `Events.OnPlayerUndeploy`.
+     * AI soldiers skip the countdown and are added to the spawn queue immediately.
+     * @param playerOrId - The player or player ID.
+     * @param delay - Delay in seconds (defaults to initialPromptDelay).
+     */
+    public startDelayForPrompt(playerOrId: mod.Player | number, delay: number = this._initialPromptDelay): void {
+        const record = this._getPlayerRecord(playerOrId);
+
+        if (!record || !this._isPlayerRecordValid(record)) return;
+
+        if (record.isAI) {
+            this._addToQueue(record);
+            return;
+        }
+
+        if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+            FFADropIns.logging.log(`Starting ${delay}s delay for P_${record.playerId}.`, FFADropIns.LogLevel.Debug);
+        }
+
+        if (delay <= 0) {
+            this._addToQueue(record);
+            return;
+        }
+
+        Clocks.setDuration(record.delayCountdownClockId!, delay);
+        Clocks.start(record.delayCountdownClockId!);
+    }
+
+    /**
+     * Forces a player into the spawn queue immediately, skipping any countdown and prompt.
+     * @param playerOrId - The player or player ID to force into the queue.
+     */
+    public forceIntoQueue(playerOrId: mod.Player | number): void {
+        const record = this._getPlayerRecord(playerOrId);
+
+        if (!record || !this._isPlayerRecordValid(record)) return;
+
+        this._addToQueue(record);
+    }
+
+    /**
+     * Selects a random drop-in spawn point index.
+     * @returns The zero-based index of the chosen spawn point, or null if no spawn points are set.
+     */
+    public getRandomSpawnIndex(): number | null {
+        if (this._count === 0) return null;
+        return Math.floor(Math.random() * this._count);
+    }
+
+    /**
+     * Evaluates and returns the best spawn point index.
+     * For drop-ins without proximity scoring, uniformly selects a random drop point.
+     * Provided for full interface polymorphism with `FFASpawnPoints`.
+     * @returns The zero-based index of the chosen spawn point, or null if no spawn points are set.
+     */
+    public getBestSpawnIndex(): number | null {
+        return this.getRandomSpawnIndex();
+    }
+
+    /**
+     * Enables automatic processing of the spawn queue.
+     */
+    public enableSpawnQueueProcessing(): void {
+        if (this._queueProcessingEnabled) return;
+
+        this._queueProcessingEnabled = true;
+        this._processSpawnQueue();
+    }
+
+    /**
+     * Disables automatic processing of the spawn queue.
+     */
+    public disableSpawnQueueProcessing(): void {
+        this._queueProcessingEnabled = false;
+
+        if (this._queueProcessingTimerId !== null) {
+            Timers.clearTimeout(this._queueProcessingTimerId);
+            this._queueProcessingTimerId = null;
+        }
+
+        this._queueProcessingActive = false;
+    }
+
+    /**
+     * Clears all players currently waiting in the spawn queue without spawning them.
+     */
+    public clearSpawnQueue(): void {
+        this._spawnQueue.length = 0;
+    }
+
+    /**
+     * Destroys this `FFADropIns` instance, removing all player UI, timers, and event listeners.
+     */
+    public destroy(): void {
+        this._leaveGameUnsubscribe();
+
+        if (this._queueProcessingTimerId !== null) {
+            Timers.clearTimeout(this._queueProcessingTimerId);
+            this._queueProcessingTimerId = null;
+        }
+
+        this._queueProcessingEnabled = false;
+        this._queueProcessingActive = false;
+
+        const playerIds = Array.from(this._players.keys());
+
+        for (let i = 0; i < playerIds.length; ++i) {
+            this.removePlayer(playerIds[i]);
+        }
+
+        this._spawnQueue.length = 0;
+    }
+
+    private _addToQueue(record: FFADropIns.PlayerRecord): void {
+        if (!record.isAI) {
+            if (record.delayCountdownClockId !== null) {
+                Clocks.reset(record.delayCountdownClockId);
+            }
+
+            record.promptUI?.show();
+        }
+
+        if (!this._spawnQueue.includes(record)) {
+            this._spawnQueue.push(record);
+        }
+
+        if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+            FFADropIns.logging.log(
+                `P_${record.playerId} added to queue (${this._spawnQueue.length} total).`,
+                FFADropIns.LogLevel.Debug
+            );
+        }
+
+        if (!this._queueProcessingEnabled || this._queueProcessingActive) return;
+
+        if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+            FFADropIns.logging.log('Restarting spawn queue processing.', FFADropIns.LogLevel.Debug);
+        }
+
+        this._processSpawnQueue();
+    }
+
+    private _processSpawnQueue(): void {
+        this._queueProcessingActive = true;
+
+        if (!this._queueProcessingEnabled) {
+            this._queueProcessingActive = false;
+            return;
+        }
+
+        if (this._count === 0) {
+            FFADropIns.logging.log('No spawn points set.', FFADropIns.LogLevel.Warning);
+            this._queueProcessingActive = false;
+            return;
+        }
+
+        if (this._spawnQueue.length === 0) {
+            if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+                FFADropIns.logging.log('No players in queue. Suspending processing.', FFADropIns.LogLevel.Debug);
+            }
+
+            this._queueProcessingActive = false;
+            return;
+        } else if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+            FFADropIns.logging.log(`Processing ${this._spawnQueue.length} in queue.`, FFADropIns.LogLevel.Debug);
+        }
+
+        while (this._spawnQueue.length > 0) {
+            const record = this._spawnQueue.shift();
+
+            if (!record || !this._isPlayerRecordValid(record)) continue;
+
+            const spawnIndex = this.getRandomSpawnIndex();
+
+            if (spawnIndex === null) continue;
+
+            const spawnPoint = this._spawnPoints[spawnIndex];
+
+            if (FFADropIns.logging.willLog(FFADropIns.LogLevel.Debug)) {
+                FFADropIns._scratchVector.x = this._posX[spawnIndex];
+                FFADropIns._scratchVector.y = this._posY[spawnIndex];
+                FFADropIns._scratchVector.z = this._posZ[spawnIndex];
+
+                FFADropIns.logging.log(
+                    `Spawning P_${record.playerId} at ${Vectors.getVectorString(FFADropIns._scratchVector)}.`,
+                    FFADropIns.LogLevel.Debug
+                );
+            }
+
+            mod.SpawnPlayerFromSpawnPoint(record.player, spawnPoint);
+        }
+
+        this._queueProcessingTimerId = Timers.setTimeout(
+            () => this._processSpawnQueue(),
+            this._queueProcessingDelay * 1000
+        );
+    }
+
+    private _isPlayerRecordValid(record: FFADropIns.PlayerRecord): boolean {
+        if (mod.IsPlayerValid(record.player)) return true;
+
+        this.removePlayer(record.playerId);
+
+        return false;
+    }
+
+    private _getPlayerPosition(player: mod.Player): Vectors.Vector3 {
+        if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO;
+
+        const position = mod.GetObjectPosition(player);
+
+        return Vectors.truncate(
+            Vectors.multiply(Vectors.toVector3(position), 100, FFADropIns._scratchVector),
+            0,
+            FFADropIns._scratchVector
+        );
+    }
+
+    private _getPlayerRecord(playerOrId: mod.Player | number): FFADropIns.PlayerRecord | null {
+        const playerId = typeof playerOrId === 'number' ? playerOrId : mod.GetObjId(playerOrId);
+
+        return playerId === undefined ? null : (this._players.get(playerId) ?? null);
+    }
+}
+
+export namespace FFADropIns {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
+    export const LogLevel = Logging.LogLevel;
 
     /**
      * Type for defining rectangle components of a drop-in spawning region.
@@ -41,75 +631,6 @@ export namespace FFADropIns {
         maxX: number;
         maxZ: number;
     };
-
-    interface Point {
-        x: number;
-        z: number;
-    }
-
-    class SpawnRegion {
-        private rectangles: SpawnRectangle[] = [];
-        private cumulativeAreas: number[] = [];
-        private totalArea: number = 0;
-
-        constructor(zones: SpawnRectangle[]) {
-            if (!zones || zones.length === 0) {
-                throw new Error('SpawnRegion must be initialized with at least one rectangle.');
-            }
-
-            // Pre-calculate areas and weights
-            for (const zone of zones) {
-                // Ensure min is actually smaller than max to prevent negative areas
-                const width = Math.abs(zone.maxX - zone.minX);
-                const depth = Math.abs(zone.maxZ - zone.minZ);
-                const area = width * depth;
-
-                if (area <= 0) continue;
-
-                // Only add zones that actually have size
-                this.rectangles.push(zone);
-                this.totalArea += area;
-                this.cumulativeAreas.push(this.totalArea);
-            }
-        }
-
-        private _randomFloat(min: number, max: number): number {
-            return min + Math.random() * (max - min);
-        }
-
-        /**
-         * Returns a random X/Z coordinate uniformly distributed across all zones.
-         * Time Complexity: O(log N) where N is the number of rectangles.
-         */
-        public getSpawnPoint(): Point {
-            // 1. Select which Rectangle to spawn in based on Area Weight
-            // (Larger rectangles get picked more often)
-            const randomValue = Math.random() * this.totalArea;
-
-            // Binary Search to find the rectangle index
-            let low = 0;
-            let high = this.cumulativeAreas.length - 1;
-            let selectedIndex = -1;
-
-            while (low <= high) {
-                const mid = Math.floor((low + high) / 2);
-
-                if (this.cumulativeAreas[mid] >= randomValue) {
-                    selectedIndex = mid;
-                    high = mid - 1;
-                } else {
-                    low = mid + 1;
-                }
-            }
-
-            const rectangle = this.rectangles[selectedIndex];
-
-            return {
-                x: this._randomFloat(rectangle.minX, rectangle.maxX),
-                z: this._randomFloat(rectangle.minZ, rectangle.maxZ),
-            };
-        }
-    }
 
     /**
      * Type for defining drop-in spawn data when initializing the system.
@@ -125,436 +646,39 @@ export namespace FFADropIns {
         y: number;
     };
 
-    type Spawn = {
-        index: number;
-        spawnPoint: mod.SpawnPoint;
-        location: mod.Vector;
-    };
+    /**
+     * Internal player tracking record for FFA drop-in spawning and UI timers.
+     */
+    export interface PlayerRecord {
+        player: mod.Player;
+        playerId: number;
+        isAI: boolean;
+        delayCountdownClockId: Clocks.ClockID | null;
+        promptUI?: UIContainer;
+        countdownUI?: UIText;
+        updatePositionIntervalId: Timers.TimerID | null;
+        debugPositionUI?: UIText;
+    }
 
     /**
-     * Optional overrides for drop-in spawning points and delays when calling `initialize()`:
+     * Optional configuration overrides for drop-in spawning points and delays:
      */
-    export type InitializeOptions = {
+    export type Options = {
         /**
-         * The number of drop-in spawn points to create.
+         * The number of drop-in spawn points to create. (Default: 64)
          */
         dropInPoints?: number;
         /**
-         * The initial delay before prompting the player to spawn (in seconds).
+         * The initial delay before prompting the player to spawn (in seconds). (Default: 10)
          */
         initialPromptDelay?: number;
         /**
-         * The delay between prompts (in seconds).
+         * The delay between prompts (in seconds). (Default: 10)
          */
         promptDelay?: number;
         /**
-         * The delay between processing the spawn queue (in seconds).
+         * The delay between processing the spawn queue (in seconds). (Default: 2)
          */
         queueProcessingDelay?: number;
     };
-
-    const spawnQueue: Soldier[] = [];
-    const ffaSpawns: Spawn[] = [];
-
-    let promptDelay: number = 10;
-    let initialPromptDelay: number = 10;
-    let queueProcessingDelay: number = 2;
-    let queueProcessingEnabled: boolean = false;
-    let queueProcessingActive: boolean = false;
-
-    /**
-     * Initializes the spawning system. Should be called in the `OnGameModeStarted()` event.
-     * @param spawnData - The data to use.
-     * @param options - The options to use for overriding the defaults.
-     */
-    export function initialize(spawnData: SpawnData, options?: InitializeOptions): void {
-        if (ffaSpawns.length > 0) {
-            logging.log(`Already initialized.`, LogLevel.Warning);
-            return;
-        }
-
-        if (spawnData.spawnRectangles.length === 0) {
-            logging.log(`No drop-in rectangles provided. Initialization aborted.`, LogLevel.Warning);
-            return;
-        }
-
-        mod.EnableHQ(mod.GetHQ(1), false);
-        mod.EnableHQ(mod.GetHQ(2), false);
-
-        const spawnRegion = new SpawnRegion(spawnData.spawnRectangles);
-
-        if (logging.willLog(LogLevel.Info)) {
-            logging.log(`Using ${spawnData.spawnRectangles.length} drop-in rectangles.`, LogLevel.Info);
-        }
-
-        const dropInPoints = options?.dropInPoints ?? 64;
-
-        for (let i = 0; i < dropInPoints; ++i) {
-            ffaSpawns.push(createRandomSpawnPoint(spawnRegion, spawnData.y, i));
-        }
-
-        initialPromptDelay = options?.initialPromptDelay ?? initialPromptDelay;
-        promptDelay = options?.promptDelay ?? promptDelay;
-        queueProcessingDelay = options?.queueProcessingDelay ?? queueProcessingDelay;
-
-        if (logging.willLog(LogLevel.Info)) {
-            logging.log(`Initialized with ${dropInPoints} drop-in spawn points.`, LogLevel.Info);
-        }
-    }
-
-    function createRandomSpawnPoint(spawnRegion: SpawnRegion, y: number, index: number): Spawn {
-        const { x, z } = spawnRegion.getSpawnPoint();
-        const location = mod.CreateVector(x, y, z);
-
-        const spawnPoint = mod.SpawnObject(
-            mod.RuntimeSpawn_Common.PlayerSpawner,
-            location,
-            Vectors.ZERO_VECTOR
-        ) as mod.SpawnPoint;
-
-        return {
-            index,
-            spawnPoint,
-            location,
-        };
-    }
-
-    function processSpawnQueue(): void {
-        queueProcessingActive = true;
-
-        if (!queueProcessingEnabled) {
-            queueProcessingActive = false;
-            return;
-        }
-
-        if (ffaSpawns.length == 0) {
-            logging.log(`No spawn points set.`, LogLevel.Warning);
-            queueProcessingActive = false;
-            return;
-        }
-
-        if (logging.willLog(LogLevel.Debug)) {
-            logging.log(`Processing ${spawnQueue.length} in queue.`, LogLevel.Debug);
-        }
-
-        if (spawnQueue.length == 0) {
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`No players in queue. Suspending processing.`, LogLevel.Debug);
-            }
-
-            queueProcessingActive = false;
-            return;
-        }
-
-        while (spawnQueue.length > 0) {
-            const soldier = spawnQueue.shift();
-
-            if (!soldier || soldier.deleteIfNotValid()) continue;
-
-            const spawn = ffaSpawns[Math.floor(Math.random() * ffaSpawns.length)];
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(
-                    `Spawning P_${soldier.playerId} at ${Vectors.getVectorString(spawn.location)}.`,
-                    LogLevel.Debug
-                );
-            }
-
-            mod.SpawnPlayerFromSpawnPoint(soldier.player, spawn.spawnPoint);
-        }
-
-        Timers.setTimeout(processSpawnQueue, queueProcessingDelay * 1000);
-    }
-
-    /**
-     * Enables the processing of the spawn queue.
-     */
-    export function enableSpawnQueueProcessing(): void {
-        if (queueProcessingEnabled) return;
-
-        queueProcessingEnabled = true;
-        processSpawnQueue();
-    }
-
-    /**
-     * Disables the processing of the spawn queue.
-     */
-    export function disableSpawnQueueProcessing(): void {
-        queueProcessingEnabled = false;
-    }
-
-    /**
-     * Class representing a soldier whose spawning will be managed by this module.
-     */
-    export class Soldier {
-        private static readonly _ALL_SOLDIERS = new Map<number, Soldier>();
-
-        static {
-            Events.OnPlayerLeaveGame.subscribe(Soldier._deleteSoldierIfNotValid);
-        }
-
-        public static _deleteSoldierIfNotValid(playerId: number): void {
-            Soldier._ALL_SOLDIERS.get(playerId)?.deleteIfNotValid();
-        }
-
-        private static _getPosition(player: mod.Player): Vectors.Vector3 {
-            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO_VECTOR3;
-
-            const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
-
-            return Vectors.truncate(Vectors.multiply(Vectors.toVector3(position), 100), 0);
-        }
-
-        /**
-         * Starts the countdown before prompting the player to spawn or delay again.
-         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-         * AI soldiers will skip the countdown and spawn immediately.
-         * @param player - The player to start the delay for.
-         */
-        public static startDelayForPrompt(player: mod.Player): void {
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`Start delay request for P_${mod.GetObjId(player)}.`, LogLevel.Debug);
-            }
-
-            const soldier = Soldier._ALL_SOLDIERS.get(mod.GetObjId(player));
-
-            if (!soldier || soldier.deleteIfNotValid()) return;
-
-            soldier.startDelayForPrompt();
-        }
-
-        /**
-         * Forces a player to be added to the spawn queue, skipping the countdown and prompt.
-         * @param player - The player to force into the queue.
-         */
-        public static forceIntoQueue(player: mod.Player): void {
-            if (!mod.IsPlayerValid(player)) return;
-
-            const soldier = Soldier._ALL_SOLDIERS.get(mod.GetObjId(player));
-
-            if (!soldier || soldier.deleteIfNotValid()) return;
-
-            soldier._addToQueue();
-        }
-
-        /**
-         * Every player that should be handled by this spawning system should be instantiated as a `Soldier`,
-         * usually in the `OnPlayerJoinGame()` event.
-         * @param player - The player to instantiate the `Soldier` for.
-         * @param showDebugPosition - Whether to show the debug position.
-         */
-        constructor(player: mod.Player, showDebugPosition: boolean = false) {
-            this._player = player;
-            this._playerId = mod.GetObjId(player);
-
-            Soldier._ALL_SOLDIERS.set(this._playerId, this);
-
-            this._isAISoldier = mod.GetSoldierState(player, mod.SoldierStateBool.IsAISoldier);
-
-            if (this._isAISoldier) return;
-
-            this._promptUI = new UIContainer({
-                x: 0,
-                y: 0,
-                width: 440,
-                height: 140,
-                anchor: mod.UIAnchor.Center,
-                visible: false,
-                bgColor: UI.COLORS.BF_GREY_4,
-                bgAlpha: 0.5,
-                bgFill: mod.UIBgFill.Blur,
-                receiver: player,
-                uiInputModeWhenVisible: true,
-            });
-
-            new UITextButton({
-                parent: this._promptUI,
-                x: 0,
-                y: 20,
-                width: 400,
-                height: 40,
-                anchor: mod.UIAnchor.TopCenter,
-                bgColor: UI.COLORS.BF_GREY_2,
-                baseColor: UI.COLORS.BF_GREY_2,
-                baseAlpha: 1,
-                pressedColor: UI.COLORS.BF_GREEN_DARK,
-                pressedAlpha: 1,
-                focusedColor: UI.COLORS.BF_GREY_1,
-                focusedAlpha: 1,
-                message: mod.Message(mod.stringkeys.ffaDropIns.buttons.spawn),
-                textSize: 30,
-                textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                onClickUp: (player: mod.Player) => this._addToQueue(),
-            });
-
-            new UITextButton({
-                parent: this._promptUI,
-                x: 0,
-                y: 80,
-                width: 400,
-                height: 40,
-                anchor: mod.UIAnchor.TopCenter,
-                bgColor: UI.COLORS.BF_GREY_2,
-                baseColor: UI.COLORS.BF_GREY_2,
-                baseAlpha: 1,
-                pressedColor: UI.COLORS.BF_YELLOW_DARK,
-                pressedAlpha: 1,
-                focusedColor: UI.COLORS.BF_GREY_1,
-                focusedAlpha: 1,
-                message: mod.Message(mod.stringkeys.ffaDropIns.buttons.delay, promptDelay),
-                textSize: 30,
-                textColor: UI.COLORS.BF_YELLOW_BRIGHT,
-                onClickUp: (player: mod.Player) => this.startDelayForPrompt(promptDelay),
-            });
-
-            this._countdownUI = new UIText({
-                x: 0,
-                y: 60,
-                width: 400,
-                height: 50,
-                anchor: mod.UIAnchor.TopCenter,
-                message: mod.Message(mod.stringkeys.ffaDropIns.countdown, 0),
-                textSize: 30,
-                textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                bgColor: UI.COLORS.BF_GREY_4,
-                bgAlpha: 0.5,
-                bgFill: mod.UIBgFill.Solid,
-                visible: false,
-                receiver: player,
-            });
-
-            this._delayCountdownClock = new Clocks.CountDownClock(initialPromptDelay, {
-                onSecond: (seconds: number) => {
-                    if (this._delayCountdownClock?.isComplete) {
-                        this._countdownUI?.hide();
-                        this._promptUI?.show();
-                    }
-
-                    if (this._delayCountdownClock?.isRunning) {
-                        if (this._promptUI?.visible) {
-                            this._promptUI?.hide();
-                        }
-
-                        if (!this._countdownUI?.visible) {
-                            this._countdownUI?.show();
-                        }
-                    }
-
-                    this._countdownUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds));
-                },
-            });
-
-            if (showDebugPosition) {
-                this._debugPositionUI = new UIText({
-                    width: 360,
-                    height: 26,
-                    anchor: mod.UIAnchor.BottomCenter,
-                    message: mod.Message(mod.stringkeys.ffaDropIns.debug.position, 0, 0, 0),
-                    textSize: 20,
-                    textColor: UI.COLORS.BF_GREEN_BRIGHT,
-                    bgColor: UI.COLORS.BF_GREY_4,
-                    bgAlpha: 0.75,
-                    bgFill: mod.UIBgFill.Blur,
-                    receiver: player,
-                });
-
-                const updatePosition = () => {
-                    const { x, y, z } = Soldier._getPosition(player);
-                    this._debugPositionUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z));
-                };
-
-                this._updatePositionInterval = Timers.setInterval(updatePosition, 1_000);
-            }
-        }
-
-        private _player: mod.Player;
-
-        private _playerId: number;
-
-        private _isAISoldier: boolean;
-
-        private _delayCountdownClock?: Clocks.CountDownClock;
-
-        private _promptUI?: UIContainer;
-
-        private _countdownUI?: UIText;
-
-        private _updatePositionInterval?: number;
-
-        private _debugPositionUI?: UIText;
-
-        /**
-         * @returns The player associated with this `Soldier` instance.
-         */
-        public get player(): mod.Player {
-            return this._player;
-        }
-
-        /**
-         * @returns The unique ID of the player associated with this instance.
-         */
-        public get playerId(): number {
-            return this._playerId;
-        }
-
-        /**
-         * Starts the countdown before prompting the player to spawn or delay again.
-         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-         * AI soldiers will skip the countdown and spawn immediately.
-         * @param delay - The delay to start the countdown for (in seconds). Defaults to the initial prompt delay.
-         */
-        public startDelayForPrompt(delay: number = initialPromptDelay): void {
-            if (this._isAISoldier) return this._addToQueue();
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`Starting ${delay}s delay for P_${this._playerId}.`, LogLevel.Debug);
-            }
-
-            if (delay <= 0) return this._addToQueue();
-
-            this._delayCountdownClock?.setDuration(delay).start();
-        }
-
-        /**
-         * Deletes the `Soldier` instance if the player is no longer valid.
-         * @returns Whether the `Soldier` instance was deleted.
-         */
-        public deleteIfNotValid(): boolean {
-            if (mod.IsPlayerValid(this._player)) return false;
-
-            logging.log(`P_${this._playerId} is no longer valid.`, LogLevel.Warning);
-
-            this._delayCountdownClock?.stop();
-            Timers.clearInterval(this._updatePositionInterval);
-
-            this._promptUI?.delete();
-            this._countdownUI?.delete();
-            this._debugPositionUI?.delete();
-
-            Soldier._ALL_SOLDIERS.delete(this._playerId);
-
-            return true;
-        }
-
-        private _addToQueue(): void {
-            if (!this._isAISoldier) {
-                this._delayCountdownClock?.reset();
-                this._promptUI?.hide();
-            }
-
-            spawnQueue.push(this);
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`P_${this._playerId} added to queue (${spawnQueue.length} total).`, LogLevel.Debug);
-            }
-
-            if (!queueProcessingEnabled || queueProcessingActive) return;
-
-            if (logging.willLog(LogLevel.Debug)) {
-                logging.log(`Restarting spawn queue processing.`, LogLevel.Debug);
-            }
-
-            processSpawnQueue();
-        }
-    }
 }

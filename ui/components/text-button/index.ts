@@ -1,24 +1,11 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
-import { UIButton } from '../button/index.ts';
+import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
 
-// version: 6.0.2
+// version: 10.0.0
 export class UITextButton extends UIContentButton<UIText> {
-    // UIText properties (delegated via delegateProperties)
-    declare public message: mod.Message;
-    declare public textAnchor: mod.UIAnchor;
-    declare public textSize: number;
-
-    // UIText setter methods (delegated via delegateProperties)
-    declare public setMessage: (message: mod.Message) => this;
-    declare public setTextAnchor: (anchor: mod.UIAnchor) => this;
-    declare public setTextSize: (size: number) => this;
-
-    protected _textDisabledColor: mod.Vector;
-
-    protected _textDisabledAlpha: number;
-
     /**
      * Creates a new text button.
      * @param params - The parameters for the text button.
@@ -29,7 +16,7 @@ export class UITextButton extends UIContentButton<UIText> {
                 parent,
                 width,
                 height,
-                message: params.message,
+                label: params.label,
                 textSize: params.textSize,
                 textColor: params.textColor,
                 textAlpha: params.textAlpha,
@@ -40,87 +27,193 @@ export class UITextButton extends UIContentButton<UIText> {
             return new UIText(textParams);
         };
 
-        super(params, createContent, ['message', 'textSize', 'textAnchor'] as readonly string[]);
+        super(params, createContent);
 
-        this._textDisabledColor = params.textDisabledColor ?? UI.COLORS.BF_GREY_2;
-        this._textDisabledAlpha = params.textDisabledAlpha ?? 1;
+        if (!this._isValid) return;
 
-        if (!this._button.enabled) {
+        const btnSlot = this._buttonSlot;
+        const textColor = params.textColor ?? UI.COLORS.BLACK;
+        const textAlpha = params.textAlpha ?? 1;
+        const textDisabledColor = params.textDisabledColor ?? UI.COLORS.BF_GREY_2;
+        const textDisabledAlpha = params.textDisabledAlpha ?? 1;
+
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, textAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, textColor);
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, textDisabledAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, textDisabledColor);
+
+        if (!this.enabled) {
             this._setContentEnabled(false);
         }
     }
 
-    private _setContentEnabled(enabled: boolean): void {
-        if (enabled) {
-            mod.SetUITextColor(this._content.uiWidget, this._content.textColor);
-            mod.SetUITextAlpha(this._content.uiWidget, this._content.textAlpha);
-        } else {
-            mod.SetUITextColor(this._content.uiWidget, this._textDisabledColor);
-            mod.SetUITextAlpha(this._content.uiWidget, this._textDisabledAlpha);
-        }
+    protected override _setContentEnabled(enabled: boolean): void {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
+
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return;
+
+        const content = this.content;
+        const contentWidget = content ? UI.Element._getNativeWidget(content) : null;
+
+        if (!content || !contentWidget) return;
+
+        const rgba = enabled ? UIContentButton._contentRgba[btnSlot] : UIContentButton._contentDisabledRgba[btnSlot];
+        const color = UIBaseButton._unpackColor(rgba);
+        const alpha = UIBaseButton._unpackAlpha(rgba);
+
+        content.setTextColor(color);
+        content.setTextAlpha(alpha);
     }
 
     /**
-     * @inheritdoc
+     * The label message of the text, or undefined if deleted.
+     * @returns The label message, or undefined if deleted.
      */
-    public override get enabled(): boolean {
-        return this._button.enabled;
+    public get label(): mod.Message | undefined {
+        return this._isValid ? this.content?.label : undefined;
     }
 
     /**
-     * @inheritdoc
+     * Sets the label message of the text.
+     * @param label - The new label message.
      */
-    public override set enabled(enabled: boolean) {
-        if (this._isDeletedCheck()) return;
-
-        this._button.enabled = enabled;
-        this._setContentEnabled(enabled);
+    public set label(label: mod.Message) {
+        this.setLabel(label);
     }
 
     /**
-     * @inheritdoc
+     * Sets the label message of the text.
+     * @param label - The new label message.
+     * @returns This text button for chaining.
      */
-    public override setEnabled(enabled: boolean): this {
-        this.enabled = enabled;
+    public setLabel(label: mod.Message): this {
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        this.content?.setLabel(label);
+
         return this;
     }
 
     /**
-     * The color of the text when the button is enabled.
+     * The size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
      */
-    public get textColor(): mod.Vector {
-        return this._content.textColor;
+    public get textSize(): number | undefined {
+        return this._isValid ? this.content?.textSize : undefined;
+    }
+
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     */
+    public set textSize(size: number) {
+        this.setTextSize(size);
+    }
+
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     * @returns This text button for chaining.
+     */
+    public setTextSize(size: number): this {
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        this.content?.setTextSize(size);
+
+        return this;
+    }
+
+    /**
+     * The anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
+     */
+    public get textAnchor(): UI.Anchor | undefined {
+        return this._isValid ? this.content?.textAnchor : undefined;
+    }
+
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     */
+    public set textAnchor(anchor: UI.Anchor) {
+        this.setTextAnchor(anchor);
+    }
+
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     * @returns This text button for chaining.
+     */
+    public setTextAnchor(anchor: UI.Anchor): this {
+        if (this._getIsInvalidAndLogWarning()) return this;
+
+        this.content?.setTextAnchor(anchor);
+
+        return this;
+    }
+
+    /**
+     * The color of the text when the button is enabled, or undefined if deleted.
+     * @returns The text color, or undefined if deleted.
+     */
+    public get textColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The text color, or undefined if deleted.
+     */
+    public getTextColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot], out);
     }
 
     /**
      * Sets the color of the text when the button is enabled.
      * @param color - The new color.
      */
-    public set textColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.textColor = color;
-
-        if (this._button.enabled) {
-            mod.SetUITextColor(this._content.uiWidget, color);
-        }
+    public set textColor(color: Colors.Color) {
+        this.setTextColor(color);
     }
 
     /**
-     * Sets the color of the text when the button is enabled. Useful for chaining operations.
+     * Sets the color of the text when the button is enabled.
      * @param color - The new color.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
-    public setTextColor(color: mod.Vector): this {
-        this.textColor = color;
+    public setTextColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
+
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, color);
+
+        if (this.enabled) {
+            this.content?.setTextColor(color);
+        }
+
         return this;
     }
 
     /**
-     * The alpha of the text when the button is enabled.
+     * The alpha of the text when the button is enabled, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
      */
-    public get textAlpha(): number {
-        return this._content.textAlpha;
+    public get textAlpha(): number | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackAlpha(UIContentButton._contentRgba[btnSlot]);
     }
 
     /**
@@ -128,61 +221,90 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param alpha - The new alpha.
      */
     public set textAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.textAlpha = alpha;
-
-        if (this._button.enabled) {
-            mod.SetUITextAlpha(this._content.uiWidget, alpha);
-        }
+        this.setTextAlpha(alpha);
     }
 
     /**
-     * Sets the alpha of the text when the button is enabled. Useful for chaining operations.
+     * Sets the alpha of the text when the button is enabled.
      * @param alpha - The new alpha.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
     public setTextAlpha(alpha: number): this {
-        this.textAlpha = alpha;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
+
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, alpha);
+
+        if (this.enabled) {
+            this.content?.setTextAlpha(alpha);
+        }
+
         return this;
     }
 
     /**
-     * The color of the text when the button is disabled.
+     * The color of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text color, or undefined if deleted.
      */
-    public get textDisabledColor(): mod.Vector {
-        return this._textDisabledColor;
+    public get textDisabledColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the disabled text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled text color, or undefined if deleted.
+     */
+    public getTextDisabledColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot], out);
     }
 
     /**
      * Sets the color of the text when the button is disabled.
      * @param color - The new color.
      */
-    public set textDisabledColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        this._textDisabledColor = color;
-
-        if (!this._button.enabled) {
-            mod.SetUITextColor(this._content.uiWidget, color);
-        }
+    public set textDisabledColor(color: Colors.Color) {
+        this.setTextDisabledColor(color);
     }
 
     /**
-     * Sets the color of the text when the button is disabled. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
+     * Sets the color of the text when the button is disabled.
+     * @param color - The new disabled color.
+     * @returns This text button for chaining.
      */
-    public setTextDisabledColor(color: mod.Vector): this {
-        this.textDisabledColor = color;
+    public setTextDisabledColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
+
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, color);
+
+        if (!this.enabled) {
+            this.content?.setTextColor(color);
+        }
+
         return this;
     }
 
     /**
-     * The alpha of the text when the button is disabled.
+     * The alpha of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text alpha opacity, or undefined if deleted.
      */
-    public get textDisabledAlpha(): number {
-        return this._textDisabledAlpha;
+    public get textDisabledAlpha(): number | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIBaseButton._unpackAlpha(UIContentButton._contentDisabledRgba[btnSlot]);
     }
 
     /**
@@ -190,22 +312,25 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param alpha - The new alpha.
      */
     public set textDisabledAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        this._textDisabledAlpha = alpha;
-
-        if (!this._button.enabled) {
-            mod.SetUITextAlpha(this._content.uiWidget, alpha);
-        }
+        this.setTextDisabledAlpha(alpha);
     }
 
     /**
-     * Sets the alpha of the text when the button is disabled. Useful for chaining operations.
+     * Sets the alpha of the text when the button is disabled.
      * @param alpha - The new alpha.
-     * @returns This element instance.
+     * @returns This text button for chaining.
      */
     public setTextDisabledAlpha(alpha: number): this {
-        this.textDisabledAlpha = alpha;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
+
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, alpha);
+
+        if (!this.enabled) {
+            this.content?.setTextAlpha(alpha);
+        }
+
         return this;
     }
 }
@@ -214,9 +339,9 @@ export namespace UITextButton {
     /**
      * The parameters for creating a new text button.
      */
-    export type Params = UIButton.Params &
+    export type Params = UIBaseButton.Params &
         UIText.Params & {
-            textDisabledColor?: mod.Vector;
+            textDisabledColor?: Colors.Color;
             textDisabledAlpha?: number;
         };
 }

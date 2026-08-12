@@ -22,7 +22,7 @@ import { UI } from 'bf6-portal-utils/ui';
 const button = new UIImageButton({
     position: { x: 0, y: 0 },
     size: { width: 64, height: 64 },
-    imageType: mod.UIImageType.CrownOutline,
+    imageType: UI.ImageType.CrownOutline,
     imageColor: UI.COLORS.WHITE,
     onClickUp: async (player: mod.Player) => {
         console.log(`Player ${mod.GetObjId(player)} released the button!`);
@@ -31,7 +31,9 @@ const button = new UIImageButton({
 });
 
 // Update button and image properties
-button.setImageType(mod.UIImageType.CrownSolid).setImageColor(UI.COLORS.BLUE).setEnabled(false);
+button.imageType = UI.ImageType.CrownSolid;
+button.imageColor = UI.COLORS.BLUE;
+button.enabled = false;
 ```
 
 </ai>
@@ -42,15 +44,15 @@ button.setImageType(mod.UIImageType.CrownSolid).setImageColor(UI.COLORS.BLUE).se
 
 | Param | Type / Default | Notes |
 | --- | --- | --- |
-| All parameters from `UIButton.Params`, plus: |
-| `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
-| `imageColor` | `mod.Vector = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
-| `imageAlpha` | `number = 0` | Image opacity (used when button is enabled). |
-| `imageDisabledColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
+| All parameters from `UIBaseButton.Params`, plus: |
+| `imageType` | `UI.ImageType` | **Required.** The type of image to display. |
+| `imageColor` | `UI.Color = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
+| `imageAlpha` | `number = 1` | Image opacity (used when button is enabled). |
+| `imageDisabledColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
 | `imageDisabledAlpha` | `number = 1` | Image opacity when button is disabled. |
 | `padding` | `number = 0` | Container padding. |
 
-For a complete list of `UIButton.Params`, see the [UIButton documentation](../button/README.md).
+For a complete list of `UIBaseButton.Params`, see the [UIBaseButton documentation](../base-button/README.md).
 
 ---
 
@@ -58,58 +60,45 @@ For a complete list of `UIButton.Params`, see the [UIButton documentation](../bu
 
 ### Inherited from `UI.Element`
 
-`UIImageButton` inherits all properties and methods from `UI.Element`, including:
+`UIImageButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
+- **Visibility**: `visible`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill` (delegated from button)
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Lifecycle**: `delete()`, `isDeleted`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
-### Delegated from Internal Button
+### Delegated Button Properties
 
-All button properties are delegated from the internal `UIButton` instance:
+All button properties are forwarded to the underlying button widget:
 
-- **Button State**: `enabled`, `setEnabled()`
-- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
-- **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
+- **Button State**: `enabled`
+- **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
+- **Button Colors**: `baseColor`, `getBaseColor(out?)`, `disabledColor`, `getDisabledColor(out?)`, `pressedColor`, `getPressedColor(out?)`, `focusedColor`, `getFocusedColor(out?)`
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Image
 
-Image properties are delegated from the internal `UIImage` instance:
-
-- **`imageType: mod.UIImageType`** (getter/setter) – The type of image to display.
-- **`setImageType(imageType: mod.UIImageType): UIImageButton`** – Sets the image type and returns `this` for method chaining.
+- **`imageType: UI.ImageType`** (getter/setter) – The type of image to display.
 
 ### ImageButton-Specific
 
-- **`imageColor: mod.Vector`** (getter/setter) – Image color tint (used when button is enabled).
-- **`setImageColor(color: mod.Vector): UIImageButton`** – Sets image color and returns `this` for method chaining.
+- **`imageColor: UI.Color`** (getter/setter) – Image color tint (used when button is enabled). Supports zero-allocation `getImageColor(out?)`.
 - **`imageAlpha: number`** (getter/setter) – Image opacity (used when button is enabled).
-- **`setImageAlpha(alpha: number): UIImageButton`** – Sets image opacity and returns `this` for method chaining.
-- **`imageDisabledColor: mod.Vector`** (getter/setter) – Image color when button is disabled.
-- **`setImageDisabledColor(color: mod.Vector): UIImageButton`** – Sets disabled image color and returns `this` for method chaining.
+- **`imageDisabledColor: UI.Color`** (getter/setter) – Image color when button is disabled. Supports zero-allocation `getImageDisabledColor(out?)`.
 - **`imageDisabledAlpha: number`** (getter/setter) – Image opacity when button is disabled.
-- **`setImageDisabledAlpha(alpha: number): UIImageButton`** – Sets disabled image opacity and returns `this` for method chaining.
 - **`padding: number`** (getter/setter) – Container padding.
-- **`setPadding(padding: number): UIImageButton`** – Sets padding and returns `this` for method chaining.
 
 ### Overrides
 
 - **`width: number`** (getter/setter) – Setting width also updates the button widget and image width, accounting for padding.
-
 - **`height: number`** (getter/setter) – Setting height also updates the button widget and image height, accounting for padding.
-
 - **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and image size, accounting for padding.
-
-- **`setSize(params: UI.Size): UIImageButton`** – Sets size for container, button, and image, returns `this`.
-
 - **`enabled: boolean`** (getter/setter) – Overrides to also update image appearance when enabled/disabled.
 
 ---
@@ -121,7 +110,7 @@ Image properties are delegated from the internal `UIImage` instance:
 ```ts
 type Params = UIContentButton.Params &
     UIImage.Params & {
-        imageDisabledColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_2
+        imageDisabledColor?: UI.Color; // Default: UI.COLORS.BF_GREY_2
         imageDisabledAlpha?: number; // Default: 1
     };
 ```
@@ -131,12 +120,8 @@ type Params = UIContentButton.Params &
 ## Usage Notes
 
 - **Automatic Image State Management**: When the button's `enabled` state changes, the image automatically switches between `imageColor`/`imageAlpha` (enabled) and `imageDisabledColor`/`imageDisabledAlpha` (disabled).
-
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and image size, accounting for padding.
-
 - **Padding**: The component supports padding, which creates space between the button border and the image content. The image size is automatically adjusted to account for padding.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 ---
 
