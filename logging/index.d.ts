@@ -4,13 +4,14 @@ export declare class Logging {
     private _logLevel;
     private _includeRawError;
     private _logger?;
+    private readonly _asyncErrorHandler;
     /**
      * Safely converts an error of unknown type to a string.
      * This method cannot throw - it will always return a string.
      * @param error - The error to convert to a string.
      * @returns The error as a string.
      */
-    private _safeErrorToString;
+    private static _safeErrorToString;
     /**
      * Checks if a message with the given log level would actually be logged.
      * Use this to avoid building expensive log messages when logging is disabled or below the threshold.
@@ -18,6 +19,12 @@ export declare class Logging {
      * @returns True if logging will occur, false otherwise.
      */
     willLog(logLevel: Logging.LogLevel): boolean;
+    /**
+     * Logs a message with the given log level.
+     * @param text - The text to log.
+     * @param logLevel - The log level to use.
+     * @param error - The error to include in the log.
+     */
     log(text: string, logLevel?: Logging.LogLevel, error?: unknown): void;
     /**
      * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to

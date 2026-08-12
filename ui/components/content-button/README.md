@@ -2,9 +2,9 @@
 
 <ai>
 
-The `UIContentButton` is an abstract base class for buttons that contain content elements (such as text or images). It handles the common pattern of wrapping a `UIButton` and a content element in a `UIContainer`, managing their layout, and delegating properties appropriately. It is need because natively (via the `mod` namespace UI widget system) only containers can be parents and have children.
+The `UIContentButton` is an abstract base class for buttons that contain content elements (such as text or images). It handles the common pattern of wrapping a `UIButton` and a content element in a `UIContainer`, managing their layout, and exposing properties cleanly on its prototype. It is needed because natively (via the `mod` namespace UI widget system) only containers can be parents and have children.
 
-This class is not meant to be instantiated directly. Instead, use concrete implementations like `UITextButton` which extends this class, or build you own buttons with content by extending this class.
+This class is not meant to be instantiated directly. Instead, use concrete implementations like `UITextButton` which extends this class, or build your own buttons with content by extending this class.
 
 </ai>
 
@@ -25,8 +25,7 @@ This class is not meant to be instantiated directly. Instead, use concrete imple
 The class automatically:
 
 - Creates and manages the internal button and content elements
-- Delegates button properties (colors, alphas, `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`, etc.) to the instance
-- Delegates content properties (specified via the `contentProperties` parameter) to the instance
+- Forwards button properties (colors, alphas, `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`, etc.) to the internal button
 - Manages padding and size synchronization between all three layers
 - Handles cleanup when deleted
 
@@ -43,8 +42,7 @@ The constructor is `protected` and should not be called directly. Concrete imple
 ```ts
 protected constructor(
     params: UIContentButton.Params,
-    createContent: (parent: UI.Parent, width: number, height: number) => TContent,
-    contentProperties: TContentProps
+    createContent: (parent: UI.Parent, width: number, height: number) => TContent
 )
 ```
 
@@ -52,7 +50,6 @@ protected constructor(
 
 - `params` – The parameters for the content button, including all `UIButton.Params` plus optional `padding`
 - `createContent` – A factory function that creates the content element given a parent and a prescribed inner width and height
-- `contentProperties` – An array of property names to delegate from the content element to the instance
 
 </ai>
 
@@ -62,52 +59,38 @@ protected constructor(
 
 ### Inherited from `UI.Element`
 
-`UIContentButton` inherits all properties and methods from `UI.Element`, including:
+`UIContentButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
-All button properties are automatically delegated from the internal `UIButton` instance:
+All button properties are forwarded from the internal `UIButton` instance:
 
-- **Button State**: `enabled`, `setEnabled()`
-- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
+- **Button State**: `enabled`
+- **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
-
-### Delegated from Content Element
-
-Properties specified in `contentProperties` are automatically delegated from the internal content element. For example, `UITextButton` delegates `message`, `textSize`, and `textAnchor` from the internal `UIText` instance.
 
 ### ContentButton-Specific
 
 - **`padding: number`** (getter/setter) – Container padding. The content element's size is automatically adjusted to account for padding.
-
-- **`setPadding(padding: number): UIContentButton`** – Sets padding and returns `this` for method chaining.
-
 - **`enabled: boolean`** (getter/setter) – Button enabled state (delegated from button).
-
-- **`setEnabled(enabled: boolean): UIContentButton`** – Sets enabled state and returns `this` for method chaining.
 
 ### Overrides
 
 - **`width: number`** (getter/setter) – Setting width also updates the button widget and content element width, accounting for padding.
-
 - **`height: number`** (getter/setter) – Setting height also updates the button widget and content element height, accounting for padding.
-
 - **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and content element size, accounting for padding.
-
-- **`setSize(params: UI.Size): UIContentButton`** – Sets size for container, button, and content, returns `this`.
-
 - **`delete(): void`** – Overrides to delete the internal button and content elements before deleting the container.
 
 ---
@@ -128,10 +111,9 @@ type Params = UIButton.Params & {
 
 To create a custom content button, extend `UIContentButton` and specify:
 
-1. The content element type as the first generic parameter
-2. The content properties to delegate as the second generic parameter (as a `readonly string[]`)
-3. A factory function to create the content element
-4. Any additional properties or behavior specific to your content type
+1. The content element type as the generic parameter
+2. A factory function to create the content element in `super(params, createContent)`
+3. Any additional properties or behavior specific to your content type
 
 See [TextButton](../text-button/README.md), [ImageButton](../image-button/README.md), [WeaponImageButton](../weapon-image-button/README.md), and [GadgetImageButton](../gadget-image-button/README.md) for examples.
 
@@ -142,14 +124,8 @@ See [TextButton](../text-button/README.md), [ImageButton](../image-button/README
 ## Usage Notes
 
 - **Padding Handling**: When padding is set, the content element's size is automatically reduced by `padding * 2` (once for each side) to account for the padding space.
-
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates all three layers (container, button, and content), ensuring they stay in sync.
-
-- **Property Delegation**: Properties are delegated using `UI.delegateProperties()`, which creates getters, setters, and setter methods (e.g., `setPropertyName`) for each property.
-
-- **Internal Elements**: The internal button and content elements are not exposed as public properties. Access them through the delegated properties instead.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
+- **Internal Elements**: The internal button and content elements are protected fields (`_button`, `_content`).
 
 </ai>
 

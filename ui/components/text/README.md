@@ -27,10 +27,10 @@ const text = new UIText({
     visible: true,
 });
 
-// Update the message
-text.setMessage(mod.Message(mod.stringkeys.labels.updatedText)) // 'Updated Text'
-    .setTextColor(UI.COLORS.BLUE)
-    .setTextSize(36);
+// Update text properties
+text.message = mod.Message(mod.stringkeys.labels.updatedText); // 'Updated Text'
+text.textColor = UI.COLORS.BLUE;
+text.textSize = 36;
 ```
 
 </ai>
@@ -67,43 +67,26 @@ text.setMessage(mod.Message(mod.stringkeys.labels.updatedText)) // 'Updated Text
 
 ### Inherited from `UI.Element`
 
-`UIText` inherits all properties and methods from `UI.Element`, including:
+`UIText` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Text-Specific
 
 - **`message: mod.Message`** (getter/setter) – The text content. Use the setter to update the message. Note: `mod.Message` is opaque and cannot be unpacked into a string.
-
-- **`setMessage(message: mod.Message): UIText`** – Sets the message and returns `this` for method chaining.
-
 - **`textSize: number`** (getter/setter) – Font size.
-
-- **`setTextSize(size: number): UIText`** – Sets font size and returns `this` for method chaining.
-
 - **`textColor: mod.Vector`** (getter/setter) – Text color.
-
-- **`setTextColor(color: mod.Vector): UIText`** – Sets text color and returns `this` for method chaining.
-
 - **`textAlpha: number`** (getter/setter) – Text opacity.
-
-- **`setTextAlpha(alpha: number): UIText`** – Sets text opacity and returns `this` for method chaining.
-
 - **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
-
-- **`setTextAnchor(anchor: mod.UIAnchor): UIText`** – Sets text anchor and returns `this` for method chaining.
-
 - **`padding: number`** (getter/setter) – Container padding.
-
-- **`setPadding(padding: number): UIText`** – Sets padding and returns `this` for method chaining.
 
 ---
 
@@ -129,10 +112,7 @@ type Params = UI.ElementParams & {
 ## Usage Notes
 
 - **Message Opaqueness**: `mod.Message` is opaque and cannot be unpacked into a string. You can only create messages using `mod.Message()` with numbers, `mod.Player` types, or strings in `mod.stringkeys`.
-
 - **Padding**: Unlike the base `Element` class, `UIText` supports padding. This allows you to add space around the text content.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 </ai>
 

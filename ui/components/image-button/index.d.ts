@@ -1,8 +1,6 @@
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
 export declare class UIImageButton extends UIContentButton<UIImage> {
-    imageType: mod.UIImageType;
-    setImageType: (imageType: mod.UIImageType) => this;
     protected _imageDisabledColor: mod.Vector;
     protected _imageDisabledAlpha: number;
     /**
@@ -20,11 +18,18 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
      */
     set enabled(enabled: boolean);
     /**
-     * @inheritdoc
+     * The type of the image.
+     * @returns The image type.
      */
-    setEnabled(enabled: boolean): this;
+    get imageType(): mod.UIImageType;
+    /**
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     */
+    set imageType(imageType: mod.UIImageType);
     /**
      * The color of the image.
+     * @returns The image color vector.
      */
     get imageColor(): mod.Vector;
     /**
@@ -33,13 +38,8 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
      */
     set imageColor(color: mod.Vector);
     /**
-     * Sets the color of the image. Useful for chaining operations.
-     * @param color - The new color of the image.
-     * @returns This element instance.
-     */
-    setImageColor(color: mod.Vector): this;
-    /**
      * The alpha of the image.
+     * @returns The image alpha opacity.
      */
     get imageAlpha(): number;
     /**
@@ -48,13 +48,8 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
      */
     set imageAlpha(alpha: number);
     /**
-     * Sets the alpha of the image. Useful for chaining operations.
-     * @param alpha - The new alpha of the image.
-     * @returns This element instance.
-     */
-    setImageAlpha(alpha: number): this;
-    /**
      * The disabled color of the image.
+     * @returns The disabled image color vector.
      */
     get imageDisabledColor(): mod.Vector;
     /**
@@ -63,26 +58,15 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
      */
     set imageDisabledColor(color: mod.Vector);
     /**
-     * Sets the disabled color of the image. Useful for chaining operations.
-     * @param color - The new disabled color of the image.
-     * @returns This element instance.
-     */
-    setImageDisabledColor(color: mod.Vector): this;
-    /**
      * The disabled alpha of the image.
+     * @returns The disabled image alpha opacity.
      */
     get imageDisabledAlpha(): number;
     /**
      * Sets the disabled alpha of the image.
-     * @param alpha - The new disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
      */
     set imageDisabledAlpha(alpha: number);
-    /**
-     * Sets the disabled alpha of the image. Useful for chaining operations.
-     * @param alpha - The new disabled alpha of the image.
-     * @returns This element instance.
-     */
-    setImageDisabledAlpha(alpha: number): this;
 }
 export declare namespace UIImageButton {
     /**

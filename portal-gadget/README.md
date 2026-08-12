@@ -159,9 +159,9 @@ const unsubscribe = PortalGadget.onFireStart(async (player, isZooming, getTarget
 
 1. **Event wiring** - The module subscribes to `Events.OnPortalGadgetFireStart` and `Events.OnPortalGadgetFireStop` at load time.
 2. **State capture** - When a fire event arrives, it captures eye position, facing direction, and zoom state from soldier state APIs.
-3. **Laser transform** - It computes the laser origin/direction from local offsets and angle deltas using a local basis (`forward`, `right`, `up`) plus axis-angle rotation.
-4. **Raycast request** - It projects a destination point at fixed distance and calls `Raycast.cast()` with hit/miss callbacks.
-5. **Target resolution** - Hit resolves with a `mod.Vector`; miss resolves `undefined`. A timeout guard ensures the promise also resolves `undefined` if no callback arrives.
+3. **Laser transform** - It computes the laser origin and direction from local offsets and precomputed closed-form basis projection.
+4. **Raycast request** - It projects a destination point at fixed distance and calls `Raycast.cast()` with hit/miss callbacks within a `try...catch` block.
+5. **Target resolution** - Hit resolves with a `mod.Vector`; miss or raycast error resolves `undefined`. Built-in watchdog handling in the `Raycast` module and local exception guards guarantee resolution without stuck promises.
 
 ---
 

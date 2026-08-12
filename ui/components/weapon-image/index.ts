@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.2
+// version: 2.0.0
 export class UIWeaponImage extends UI.Element {
     protected _weapon: mod.Weapons;
     protected _weaponPackage: mod.WeaponPackage;
@@ -12,7 +12,7 @@ export class UIWeaponImage extends UI.Element {
     public constructor(params: UIWeaponImage.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
 
@@ -66,12 +66,13 @@ export class UIWeaponImage extends UI.Element {
 
         // `mod.AddUIWeaponImage` lacks the ability to define starting invisibility, so we have to set it manually.
         if (!elementParams.visible) {
-            this.setVisible(false);
+            this.visible = false;
         }
     }
 
     /**
      * The weapon of the weapon image.
+     * @returns The weapon.
      */
     public get weapon(): mod.Weapons {
         return this._weapon;
@@ -86,23 +87,12 @@ export class UIWeaponImage extends UI.Element {
     public set weapon(weapon: mod.Weapons) {
         if (this._isDeletedCheck()) return;
 
-        this._logging.log('Setting UIWeaponImage weapon not supported.', UI.LogLevel.Warning);
-    }
-
-    /**
-     * Sets the weapon of the weapon image. Useful for chaining operations.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
-     * been created.
-     * @param weapon - The weapon to set.
-     * @returns This element instance.
-     */
-    public setWeapon(weapon: mod.Weapons): this {
-        this._weapon = weapon;
-        return this;
+        this._logging.log('Setting UIWeaponImage weapon not supported', UI.LogLevel.Warning);
     }
 
     /**
      * The weapon package of the weapon image.
+     * @returns The weapon package.
      */
     public get weaponPackage(): mod.WeaponPackage {
         return this._weaponPackage;
@@ -117,19 +107,7 @@ export class UIWeaponImage extends UI.Element {
     public set weaponPackage(weaponPackage: mod.WeaponPackage) {
         if (this._isDeletedCheck()) return;
 
-        this._logging.log('Setting UIWeaponImage weaponPackage not supported.', UI.LogLevel.Warning);
-    }
-
-    /**
-     * Sets the weapon package of the weapon image. Useful for chaining operations.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
-     * after it has been created.
-     * @param weaponPackage - The weapon package to set.
-     * @returns This element instance.
-     */
-    public setWeaponPackage(weaponPackage: mod.WeaponPackage): this {
-        this._weaponPackage = weaponPackage;
-        return this;
+        this._logging.log('Setting UIWeaponImage weaponPackage not supported', UI.LogLevel.Warning);
     }
 }
 

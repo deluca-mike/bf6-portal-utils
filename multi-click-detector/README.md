@@ -8,7 +8,7 @@ The detector tracks soldier state transitions for each player independently, cou
 
 By default, the detector monitors `mod.SoldierStateBool.IsInteracting`, which is the most user-friendly option because the interact state goes `true` for 1 tick even when there is no object that can be interacted with nearby. This makes it ideal for detecting multi-click sequences without requiring physical interaction points, and is useful because there is no keybind Portal experience developers can hook into to open up a custom UI.
 
-Key features include instance-based construction with per-instance configuration, **automatic event wiring** via the `Events` module (the detector subscribes to `OngoingPlayer`, `OnPlayerDeployed`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` internally), and configurable logging. Soldier state is only continuously read when the player is deployed, so the admin error log is not flooded. Each detector can be enabled or disabled independently. Callbacks can be sync or async; **asynchronous callbacks are preferred** because synchronous callbacks block the entire `OngoingPlayer` event stack. Keep sync callbacks short if you use them.
+Key features include instance-based tracking via an ID system, **automatic event wiring** via the `Events` module (the detector subscribes to `OngoingGlobal`, `OnPlayerDeployed`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` internally), and configurable logging. Soldier state is only continuously read when the player is deployed, so the admin error log is not flooded. Each detector can be enabled or disabled independently. Callbacks can be sync or async; **asynchronous callbacks are preferred** because synchronous callbacks block the entire `OngoingGlobal` event stack. Keep sync callbacks short if you use them.
 
 > **Note** You **must** use the `Events` module as your only mechanism to subscribe to game events. Do not implement or export any Battlefield Portal event handler functions (`OngoingPlayer`, `OnPlayerDeployed`, `OnPlayerDied`, etc.) in your code. The `Events` module subscribes to those events internally and only one implementation of each can exist per project, so it owns those hooks. See the [Events module — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
 
@@ -43,8 +43,8 @@ Events.OnPlayerJoinGame.subscribe((player: mod.Player) => {
     const playerId = mod.GetObjId(player);
 
     // Create a detector for this player. Event wiring is automatic.
-    // Prefer async callbacks—sync callbacks block the entire OngoingPlayer event stack.
-    new MultiClickDetector(
+    // Prefer async callbacks—sync callbacks block the entire OngoingGlobal event stack.
+    const detectorId = MultiClickDetector.create(
         player,
         async () => {
             console.log(`Player ${playerId} performed multi-click!`);
@@ -65,22 +65,22 @@ Events.OnPlayerJoinGame.subscribe((player: mod.Player) => {
 
 ## Core Concepts
 
-- **Instance-Based Detection** – Each detector is a separate instance created for a specific player with its own configuration and callback. Multiple detectors can track the same player with different configurations.
+- **Instance-Based Detection** – Each detector is created via `MultiClickDetector.create(...)` and returns an ID. Multiple detectors can track the same player with different configurations.
 - **Configurable Soldier States** – Each detector can monitor any soldier state boolean from `mod.SoldierStateBool`. The default is `mod.SoldierStateBool.IsInteracting`, which is the most user-friendly option. See [Choosing a Soldier State](#choosing-a-soldier-state) for guidance on selecting the best state for your use case.
-- **State Tracking** – Each detector instance maintains its own state to track the last soldier state value, click count, and sequence start time.
+- **State Tracking** – The module maintains state to track the last soldier state value, click count, and sequence start time for each detector ID.
 - **Edge Detection** – The detector only responds to rising edges (transitions from `false` to `true`) of the configured soldier state, ignoring falling edges and state stability.
 - **Time Window** – State changes must occur within a configurable time window (default 1000ms) to be considered part of the same sequence.
 - **Click Counting** – The detector counts state changes within the time window and triggers the callback when the required number of changes (default 3) is reached.
-- **Automatic event wiring** – The detector subscribes to `Events.OngoingPlayer`, `OnPlayerDeployed`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` at load time. You must not export any Portal event handlers; use the Events module for your own subscriptions.
-- **Enable / disable** – Deployment is tracked at the **player** level: when the player deploys, the module allows detector logic to run for that player (soldier state is only continuously read when deployed); when they undeploy, it does not. This avoids filling the admin error log and means the user **cannot** cause soldier state to be read for an undeployed player by calling `enable()`. Each detector also has its own **enable/disable** state (`enable()` / `disable()`). That per-detector state is **not** overwritten by deploy or undeploy—you can enable or disable individual detectors and they keep that state across deployment. A detector runs only when the player is deployed **and** that detector is enabled.
-- **Callback handling** – Callbacks are invoked via `CallbackHandler`, so sync and async errors are caught and logged and do not stop detector execution. **Synchronous callbacks block the entire `OngoingPlayer` event stack**; keep them short or prefer **asynchronous callbacks** for non-trivial work.
+- **Automatic event wiring** – The detector subscribes to `Events.OngoingGlobal`, `OnPlayerDeployed`, `OnPlayerUndeploy`, and `OnPlayerLeaveGame` at load time. You must not export any Portal event handlers; use the Events module for your own subscriptions.
+- **Enable / disable** – Deployment is tracked at the **player** level: when the player deploys, the module allows detector logic to run for that player (soldier state is only continuously read when deployed); when they undeploy, it does not. This avoids filling the admin error log and means the user **cannot** cause soldier state to be read for an undeployed player by calling `enable()`. Each detector also has its own **enable/disable** state (`enable(id)` / `disable(id)`). That per-detector state is **not** overwritten by deploy or undeploy—you can enable or disable individual detectors and they keep that state across deployment. A detector runs only when the player is deployed **and** that detector is enabled.
+- **Callback handling** – Callbacks are invoked via `CallbackHandler`, so sync and async errors are caught and logged and do not stop detector execution. **Synchronous callbacks block the entire `OngoingGlobal` event stack**; keep them short or prefer **asynchronous callbacks** for non-trivial work.
 - **Configurable Error Logging** – Use `MultiClickDetector.setLogging()` to configure a logger function, minimum log level, and whether to include error details for callback failures.
 
 ---
 
 ## API Reference
 
-### `class MultiClickDetector`
+### `namespace MultiClickDetector`
 
 #### `MultiClickDetector.LogLevel`
 
@@ -99,21 +99,23 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the MultiClickDetector module. Callback errors (sync and async) are caught and logged via `CallbackHandler`. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the MultiClickDetector module. Callback errors (sync and async) are caught and logged via `CallbackHandler`. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
+| `getActiveDetectorCount(): number` | Gets the number of currently active detectors. Useful for debugging and performance monitoring. |
 
-#### Constructor
+#### Creation
 
 | Method | Description |
 | --- | --- |
-| `constructor(player: mod.Player, callback: () => Promise<void> \| void, options?: MultiClickDetector.Options)` | Creates a new multi-click detector for the specified player. The detector is registered for event handling automatically (no manual event wiring). It starts **enabled** (call `disable()` to turn it off). The module only runs detector logic when the player is deployed (deploy/undeploy do not overwrite each detector's enabled state). The callback is invoked via `CallbackHandler` when a multi-click sequence is detected. Callbacks can be sync or async; **async is preferred** because sync callbacks block the entire `OngoingPlayer` event stack. See the `Options` interface below. Default soldier state is `mod.SoldierStateBool.IsInteracting`. |
+| `create(player: mod.Player, callback: () => Promise<void> \| void, options?: MultiClickDetector.Options): DetectorID` | Creates a new multi-click detector for the specified player and returns its `DetectorID`. The detector is registered for event handling automatically (no manual event wiring). It starts **enabled** (call `disable()` to turn it off). The module only runs detector logic when the player is deployed (deploy/undeploy do not overwrite each detector's enabled state). The callback is invoked via `CallbackHandler` when a multi-click sequence is detected. Callbacks can be sync or async; **async is preferred** because sync callbacks block the entire `OngoingGlobal` event stack. See the `Options` interface below. Default soldier state is `mod.SoldierStateBool.IsInteracting`. Returns `INVALID_DETECTOR_ID` if the detector pool is full (max 300). |
 
 #### Instance Methods
 
 | Method | Description |
 | --- | --- |
-| `enable(): void` | Enables this detector so it will process soldier state transitions and invoke the callback when a multi-click sequence is detected (when the player is deployed). The detector's enabled state is **not** overwritten when the player deploys or undeploys—only deployment gates whether the module runs any logic for that player; within that, each detector's enabled state is independent. |
-| `disable(): void` | Disables this detector so it will not process state transitions or invoke the callback. The detector's disabled state is **not** overwritten when the player deploys or undeploys. |
-| `destroy(): void` | Removes the detector from tracking. Call when the detector is no longer needed. Detectors for a player are also cleaned up automatically when that player leaves the game (via the internal `OnPlayerLeaveGame` subscription). |
+| `enable(id: DetectorID): void` | Enables the detector so it will process soldier state transitions and invoke the callback when a multi-click sequence is detected (when the player is deployed). The detector's enabled state is **not** overwritten when the player deploys or undeploys—only deployment gates whether the module runs any logic for that player; within that, each detector's enabled state is independent. |
+| `disable(id: DetectorID): void` | Disables the detector so it will not process state transitions or invoke the callback. The detector's disabled state is **not** overwritten when the player deploys or undeploys. |
+| `destroy(id: DetectorID): void` | Removes the detector from tracking. Call when the detector is no longer needed. Detectors for a player are also cleaned up automatically when that player leaves the game (via the internal `OnPlayerLeaveGame` subscription). |
+| `isActive(id: DetectorID): boolean` | Returns `true` if the detector identified by `id` is active, `false` otherwise. |
 
 #### `MultiClickDetector.Options`
 
@@ -133,19 +135,19 @@ Interface for configuring detector behavior:
 
 ### Event subscription (Events module only)
 
-You must **not** implement or export any Battlefield Portal event handler functions. The detector subscribes internally to `Events.OngoingPlayer`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. Use the Events module for your own logic (e.g. `Events.OnPlayerJoinGame.subscribe(...)` to create detectors). There are no required event handlers for you to wire—event handling is automatic.
+You must **not** implement or export any Battlefield Portal event handler functions. The detector subscribes internally to `Events.OngoingGlobal`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. Use the Events module for your own logic (e.g. `Events.OnPlayerJoinGame.subscribe(...)` to create detectors). There are no required event handlers for you to wire—event handling is automatic.
 
 ### Lifecycle Flow
 
 1. Import `MultiClickDetector` and `Events`; subscribe to game events only via `Events`.
 2. Optionally configure logging with `MultiClickDetector.setLogging()` (recommended during development).
-3. Create detector instances for players in your event subscribers (e.g. `Events.OnPlayerJoinGame.subscribe((player) => { new MultiClickDetector(player, callback, options); })`). No need to call `handleOngoingPlayer` or `pruneInvalidPlayers`—the detector subscribes to the required events internally.
+3. Create detector instances for players in your event subscribers (e.g. `Events.OnPlayerJoinGame.subscribe((player) => { MultiClickDetector.create(player, callback, options); })`). No need to call `handleOngoingPlayer` or `pruneInvalidPlayers`—the detector subscribes to the required events internally.
 4. The module automatically:
     - Gates detector logic by deployment: soldier state is only continuously read when the player is deployed (`OnPlayerDeployed` sets a player-level flag; `OnPlayerUndeploy` clears it). Each detector's own `enable()`/`disable()` state is **not** overwritten by deploy or undeploy.
-    - Tracks soldier state transitions via `OngoingPlayer` (only for deployed players)
+    - Tracks soldier state transitions via `OngoingGlobal` (only for deployed players)
     - Removes all detectors for that player when they leave (`OnPlayerLeaveGame`)
     - For each enabled detector (when the player is deployed), counts state changes within the time window, resets sequences that exceed it, and invokes the callback (via `CallbackHandler`) when the required number of state changes is detected
-5. You may call call `detector.destroy()` when you no longer need a specific detector; otherwise cleanup is automatic on player leave.
+5. You may call `MultiClickDetector.destroy(id)` when you no longer need a specific detector; otherwise cleanup is automatic on player leave.
 
 </ai>
 
@@ -153,25 +155,23 @@ You must **not** implement or export any Battlefield Portal event handler functi
 
 ## How It Works
 
-The `MultiClickDetector` uses edge detection and time-windowed counting to detect multi-click sequences:
+The `MultiClickDetector` uses a Structure of Arrays (SoA) data-oriented model with edge detection and time-windowed counting:
 
-1. **Instance Creation** – When a detector is created via the constructor, it is registered in a static map grouped by player ID. Multiple detectors can track the same player with different configurations.
+1. **Instance Creation** – When a detector is created via `MultiClickDetector.create()`, a slot is allocated in $O(1)$ time from the intrusive free list (`_sequenceStartTimes`). The maximum number of concurrent detectors is capped at 300 to eliminate runtime memory allocations. If the pool is full, it logs an error and returns `INVALID_DETECTOR_ID`.
 
-2. **Automatic Event Subscriptions** – At load time, the class subscribes to `Events.OngoingPlayer`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. When the player **deploys** (or if the player is already deployed), a player-level flag is set so that detector logic (and soldier state reads) runs for that player; when they **undeploy**, that flag is cleared so soldier state is never read for an undeployed player. Deploy/undeploy do **not** overwrite each detector's `enable()`/`disable()` state. When the player leaves, all detectors for that player are removed.
+2. **Automatic Event Subscriptions** – At load time, the module subscribes to `Events.OngoingGlobal`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. When the player **deploys**, a player-level bitflag is set so that detector logic runs for that player. When they **undeploy**, that flag is cleared so soldier state is never read for an undeployed player.
 
-3. **Event Handling** – When `OngoingPlayer` fires, the module looks up the player's state; if the player is not deployed, it returns without reading soldier state. Otherwise it calls each detector's internal handler; each handler only runs if that detector is enabled.
+3. **Event Handling** – When `OngoingGlobal` fires, the module rapidly iterates over the flat parallel arrays, checking bitflags (active, enabled, player deployed). This executes in `O(n)` but performs zero allocations.
 
-4. **Fast Exit Optimization** – For each detector, if the current soldier state matches the last known state, the handler returns immediately. This handles the vast majority of ticks where no state change occurred.
+4. **Fast Exit Optimization** – For each detector, if the current soldier state matches the last known state bit, the loop continues immediately. This handles the vast majority of ticks where no state change occurred.
 
 5. **Edge Detection** – The detector only processes rising edges (transitions from `false` to `true`) of the configured soldier state. Falling edges are ignored.
 
 6. **Time Window Check** – If a sequence is in progress and the time window has expired, the sequence is reset.
 
-7. **Click Counting** – On a rising edge: if first click, record start time and set count to 1; otherwise increment. When the count matches `requiredClicks`, the callback is invoked via `CallbackHandler.invokeNoArgs()` and the sequence is reset. **Synchronous callbacks run inline and block the entire `OngoingPlayer` stack for that player; asynchronous callbacks are preferred.**
+7. **Click Counting** – On a rising edge: if first click, record start time and set count to 1; otherwise increment. When the count matches `requiredClicks`, the callback is invoked via `CallbackHandler.invokeNoArgs()` and the sequence is reset. **Synchronous callbacks run inline and block the entire `OngoingGlobal` stack; asynchronous callbacks are preferred.**
 
 8. **Error Isolation** – Callback errors (sync and async) are caught and logged by `CallbackHandler` and do not stop other detectors or your mod.
-
-9. **Per-Instance Tracking** – Each detector has its own state (last state, click count, sequence start time) and configuration (soldier state, time window, required clicks).
 
 ---
 
@@ -184,13 +184,13 @@ import { MultiClickDetector } from 'bf6-portal-utils/multi-click-detector';
 import { Events } from 'bf6-portal-utils/events';
 
 Events.OnPlayerJoinGame.subscribe((player: mod.Player) => {
-    new MultiClickDetector(player, () => openCustomMenu(player), {
+    MultiClickDetector.create(player, () => openCustomMenu(player), {
         soldierState: mod.SoldierStateBool.IsSprinting,
         requiredClicks: 4,
         windowMs: 1_500,
     });
 
-    new MultiClickDetector(player, () => activateSpecialAbility(player), {
+    MultiClickDetector.create(player, () => activateSpecialAbility(player), {
         soldierState: mod.SoldierStateBool.IsInteracting,
         requiredClicks: 3,
         windowMs: 1_000,
@@ -205,7 +205,7 @@ import { MultiClickDetector } from 'bf6-portal-utils/multi-click-detector';
 import { Events } from 'bf6-portal-utils/events';
 
 Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
-    new MultiClickDetector(player, async () => {
+    MultiClickDetector.create(player, async () => {
         await loadPlayerData(player);
         await openCustomUI(player);
     });
@@ -268,6 +268,8 @@ The remaining soldier states in `mod.SoldierStateBool` are **not recommended** f
 ---
 
 ## Known Limitations & Caveats
+
+- **Pool Capacity** – The detector pool is pre-allocated to 300 concurrent slots (`MAX_DETECTORS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `INVALID_DETECTOR_ID` without throwing an exception.
 
 - **Soldier State Dependency** – The detector relies on soldier state booleans to detect state changes. If the behavior of soldier states changes in future Battlefield Portal updates, detection may be affected. The default `mod.SoldierStateBool.IsInteracting` is the most reliable option, but any state you choose may be subject to game engine changes.
 

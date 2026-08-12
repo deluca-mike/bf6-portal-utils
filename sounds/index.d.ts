@@ -1,67 +1,35 @@
 import { Logging } from '../logging/index.ts';
+import { Vectors } from '../vectors/index.ts';
 export declare namespace Sounds {
     /**
      * A re-export of the `Logging.LogLevel` enum.
      */
-    export const LogLevel: typeof Logging.LogLevel;
+    const LogLevel: typeof Logging.LogLevel;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
-    export function setLogging(
+    function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
     type Target = mod.Player | mod.Squad | mod.Team;
-    abstract class Sound {
-        protected constructor(sfxAsset: mod.RuntimeSpawn_Common, spawnSFX: () => mod.SFX, options?: Options);
-        protected _disposed: boolean;
-        protected _playing: boolean;
-        protected _sfxAsset: mod.RuntimeSpawn_Common;
-        protected _amplitude: number;
-        protected _target?: Target;
-        protected _sfx: mod.SFX;
-        protected _sfxId: number;
-        protected _stopTimer?: number;
-        protected _fadeTimer?: number;
-        protected _play?: () => void;
-        protected _getPlayLog?: (duration?: number) => string;
-        protected _oneShot(options?: OneShotOptions): () => void;
-        get disposed(): boolean;
-        get playing(): boolean;
-        get sfxAsset(): mod.RuntimeSpawn_Common;
-        get amplitude(): number;
-        set amplitude(amplitude: number);
-        setAmplitude(amplitude: number): this;
-        get target(): Target | undefined;
-        play(duration?: number): this;
-        stop(): this;
-        fade(options?: FadeOptions): this;
-        cancelStop(): this;
-        cancelFade(): this;
-        dispose(): void;
-    }
-    /**
-     * The options for sound creation.
-     */
-    type Options = {
-        /**
-         * The amplitude of the sound. Default is 1.
-         */
-        amplitude?: number;
-        /**
-         * The target to play the sound for. Default is undefined, which means all players hear the sound.
-         * If specified, only this player/squad/team hears the sound. If undefined, all players hear the sound.
-         */
-        target?: Target;
-    };
     /**
      * The options for sound fading.
      */
-    export type FadeOptions = {
+    type FadeOptions = {
+        /**
+         * The starting amplitude of the fade.
+         */
+        startAmplitude: number;
+        /**
+         * The target amplitude of the sound.
+         * Default is 0 (which is a fade out).
+         */
+        targetAmplitude?: number;
         /**
          * The delay before the fade starts in milliseconds.
          * Default is 0.
@@ -72,11 +40,6 @@ export declare namespace Sounds {
          * Default is 2,000 milliseconds.
          */
         duration?: number;
-        /**
-         * The target amplitude of the sound.
-         * Default is 0 (which is a fade out).
-         */
-        targetAmplitude?: number;
         /**
          * The number of steps to use for the fade.
          * Default is 10.
@@ -89,57 +52,106 @@ export declare namespace Sounds {
         stopOnComplete?: boolean;
     };
     /**
-     * The options for one-shot sound playback.
+     * The options for sound playback.
      */
-    type OneShotOptions = {
+    type PlayOptions = {
         /**
-         * The optional duration of the sound in milliseconds, leave undefined for infinite duration (i.e. for looping assets).
-         * Note that a duration of 0 is effectively an immediate stop.
+         * The target to play the sound for. Default is undefined, which means all players hear the sound.
+         */
+        target?: Target;
+        /**
+         * The world position to play the sound at (mod.Vector or Vectors.Vector3).
+         * Note: Ignored for 2D sounds.
+         */
+        position?: mod.Vector | Vectors.Vector3;
+        /**
+         * The attenuation range of the sound in meters. Default is 10 meters if position is specified.
+         * Note: Ignored for 2D sounds.
+         */
+        attenuationRange?: number;
+        /**
+         * The optional playback duration in milliseconds after which the sound is automatically stopped.
          */
         duration?: number;
         /**
-         * The optional fade options.
+         * Optional fade options applied during playback.
          */
-        fadeOptions?: FadeOptions;
-    };
-    export class Sound2D extends Sound {
-        private static _spawnSFX;
-        static play(sfxAsset: mod.RuntimeSpawn_Common, options?: OneShotOptions2D): () => void;
-        constructor(sfxAsset: mod.RuntimeSpawn_Common, options?: Options2D);
-        private _buildPlayLogString;
-    }
-    /**
-     * The options for 2D sound creation.
-     */
-    export type Options2D = Options;
-    /**
-     * The options for 2D one-shot sound playback.
-     */
-    export type OneShotOptions2D = Options2D & OneShotOptions;
-    export class Sound3D extends Sound {
-        private static _spawnSFX;
-        static play(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, options?: OneShotOptions3D): () => void;
-        constructor(sfxAsset: mod.RuntimeSpawn_Common, position: mod.Vector, options?: Options3D);
-        private _position;
-        private _attenuationRange;
-        get location(): mod.Vector;
-        get attenuationRange(): number;
-        set attenuationRange(attenuationRange: number);
-        setAttenuationRange(attenuationRange: number): this;
-        private _buildPlayLogString;
-    }
-    /**
-     * The options for 3D sound creation.
-     */
-    export type Options3D = Options & {
-        /**
-         * The attenuation range of the sound. Default is 10 meters.
-         */
-        attenuationRange?: number;
+        fadeOptions?: Omit<FadeOptions, 'startAmplitude'>;
     };
     /**
-     * The options for 3D one-shot sound playback.
+     * The options for one-shot sound playback.
      */
-    export type OneShotOptions3D = Options3D & OneShotOptions;
-    export {};
+    type PlayOneShotOptions = PlayOptions;
+    /**
+     * Spawns a new native `mod.SFX` spatial object at the given position (default 0,0,0) with zero rotation.
+     * @param sfxAsset - The runtime spawn asset.
+     * @param position - Optional 3D spawn position (mod.Vector or Vectors.Vector3).
+     * @returns The spawned `mod.SFX` spatial object.
+     */
+    function create(sfxAsset: mod.RuntimeSpawn_Common, position?: mod.Vector | Vectors.Vector3): mod.SFX;
+    /**
+     * Plays any `mod.SFX` object with the specified amplitude and optional configuration.
+     * Note: `position` and `attenuationRange` in options are ignored for 2D sounds.
+     * @param sfx - The `mod.SFX` object.
+     * @param amplitude - The playback amplitude.
+     * @param options - Optional playback configuration.
+     * @throws {Error} If the target type is invalid.
+     */
+    function play(sfx: mod.SFX, amplitude: number, options?: PlayOptions): void;
+    /**
+     * Fire-and-forget helper: creates an SFX, plays it for the specified duration,
+     * and automatically unspawns/disposes it when finished.
+     * Note: `position` and `attenuationRange` in options are ignored for 2D sounds.
+     * @param sfxAsset - The runtime spawn asset.
+     * @param duration - The playback duration in milliseconds.
+     * @param amplitude - The playback amplitude.
+     * @param options - Optional playback configuration.
+     * @returns The spawned `mod.SFX` spatial object.
+     * @throws {Error} If the target type is invalid.
+     */
+    function playOneShot(
+        sfxAsset: mod.RuntimeSpawn_Common,
+        duration: number,
+        amplitude: number,
+        options?: PlayOneShotOptions
+    ): mod.SFX;
+    /**
+     * Stops playback and clears any active stop or fade timers.
+     * @param sfx - The `mod.SFX` object.
+     * @param delay - Optional delay in milliseconds before stopping the sound. Default is 0 (stops immediately).
+     */
+    function stop(sfx: mod.SFX, delay?: number): void;
+    /**
+     * Fades the amplitude of a sound over time using a stepped interval.
+     * @param sfx - The `mod.SFX` object.
+     * @param options - Fade configuration options.
+     */
+    function fade(sfx: mod.SFX, options: FadeOptions): void;
+    /**
+     * Cancels an active auto-stop timer on the sound.
+     * @param sfx - The `mod.SFX` object.
+     */
+    function cancelStop(sfx: mod.SFX): void;
+    /**
+     * Cancels an active fade timer on the sound.
+     * @param sfx - The `mod.SFX` object.
+     */
+    function cancelFade(sfx: mod.SFX): void;
+    /**
+     * Sets the amplitude of a sound immediately.
+     * @param sfx - The `mod.SFX` object.
+     * @param amplitude - The target amplitude.
+     */
+    function setAmplitude(sfx: mod.SFX, amplitude: number): void;
+    /**
+     * Stops playback, clears timers, removes state, and unspawns the `mod.SFX` object.
+     * @param sfx - The `mod.SFX` object.
+     */
+    function dispose(sfx: mod.SFX): void;
+    /**
+     * Checks if the sound ID is currently valid and spawned in the engine.
+     * @param sfxId - The numeric object ID of the SFX.
+     * @returns True if the SFX object exists and is valid.
+     */
+    function isValid(sfxId: number): boolean;
 }

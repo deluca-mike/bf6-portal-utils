@@ -6,7 +6,7 @@ export declare namespace PlayerUndeployFixer {
     const LogLevel: typeof Logging.LogLevel;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */

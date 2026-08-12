@@ -1,11 +1,6 @@
 import { UI } from '../../index.ts';
 export declare class UIText extends UI.Element {
     protected _message: mod.Message;
-    protected _textSize: number;
-    protected _textColor: mod.Vector;
-    protected _textAlpha: number;
-    protected _textAnchor: mod.UIAnchor;
-    protected _padding: number;
     /**
      * Creates a new text.
      * @param params - The parameters for the text.
@@ -13,6 +8,7 @@ export declare class UIText extends UI.Element {
     constructor(params: UIText.Params);
     /**
      * The message of the text. This is an opaque type and cannot be unpacked into a string or compared.
+     * @returns The message.
      */
     get message(): mod.Message;
     /**
@@ -21,13 +17,8 @@ export declare class UIText extends UI.Element {
      */
     set message(message: mod.Message);
     /**
-     * Sets the message of the text. Useful for chaining operations.
-     * @param message - The new message.
-     * @returns This element instance.
-     */
-    setMessage(message: mod.Message): this;
-    /**
      * The alpha of the text.
+     * @returns The text alpha opacity.
      */
     get textAlpha(): number;
     /**
@@ -36,13 +27,8 @@ export declare class UIText extends UI.Element {
      */
     set textAlpha(alpha: number);
     /**
-     * Sets the alpha of the text. Useful for chaining operations.
-     * @param alpha - The new alpha.
-     * @returns This element instance.
-     */
-    setTextAlpha(alpha: number): this;
-    /**
      * The anchor of the text.
+     * @returns The text anchor alignment.
      */
     get textAnchor(): mod.UIAnchor;
     /**
@@ -51,13 +37,8 @@ export declare class UIText extends UI.Element {
      */
     set textAnchor(anchor: mod.UIAnchor);
     /**
-     * Sets the anchor of the text. Useful for chaining operations.
-     * @param anchor - The new anchor.
-     * @returns This element instance.
-     */
-    setTextAnchor(anchor: mod.UIAnchor): this;
-    /**
      * The color of the text.
+     * @returns The text color vector.
      */
     get textColor(): mod.Vector;
     /**
@@ -66,13 +47,8 @@ export declare class UIText extends UI.Element {
      */
     set textColor(color: mod.Vector);
     /**
-     * Sets the color of the text. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
-     */
-    setTextColor(color: mod.Vector): this;
-    /**
      * The size of the text.
+     * @returns The text size.
      */
     get textSize(): number;
     /**
@@ -81,13 +57,8 @@ export declare class UIText extends UI.Element {
      */
     set textSize(size: number);
     /**
-     * Sets the size of the text. Useful for chaining operations.
-     * @param size - The new size.
-     * @returns This element instance.
-     */
-    setTextSize(size: number): this;
-    /**
      * The padding around the text.
+     * @returns The padding.
      */
     get padding(): number;
     /**
@@ -95,12 +66,6 @@ export declare class UIText extends UI.Element {
      * @param padding - The new padding.
      */
     set padding(padding: number);
-    /**
-     * Sets the padding around the text. Useful for chaining operations.
-     * @param padding - The new padding.
-     * @returns This element instance.
-     */
-    setPadding(padding: number): this;
 }
 export declare namespace UIText {
     /**

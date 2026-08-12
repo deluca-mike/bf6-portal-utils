@@ -1,13 +1,8 @@
 import { UI } from '../../index.ts';
 
-// version: 6.0.2
+// version: 7.0.0
 export class UIText extends UI.Element {
     protected _message: mod.Message;
-    protected _textSize: number;
-    protected _textColor: mod.Vector;
-    protected _textAlpha: number;
-    protected _textAnchor: mod.UIAnchor;
-    protected _padding: number;
 
     /**
      * Creates a new text.
@@ -16,7 +11,7 @@ export class UIText extends UI.Element {
     public constructor(params: UIText.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
         const padding = params.padding ?? 0;
@@ -88,15 +83,11 @@ export class UIText extends UI.Element {
         super(elementParams);
 
         this._message = params.message;
-        this._textSize = textSize;
-        this._textColor = textColor;
-        this._textAlpha = textAlpha;
-        this._textAnchor = textAnchor;
-        this._padding = padding;
     }
 
     /**
      * The message of the text. This is an opaque type and cannot be unpacked into a string or compared.
+     * @returns The message.
      */
     public get message(): mod.Message {
         return this._message;
@@ -113,20 +104,11 @@ export class UIText extends UI.Element {
     }
 
     /**
-     * Sets the message of the text. Useful for chaining operations.
-     * @param message - The new message.
-     * @returns This element instance.
-     */
-    public setMessage(message: mod.Message): this {
-        this.message = message;
-        return this;
-    }
-
-    /**
      * The alpha of the text.
+     * @returns The text alpha opacity.
      */
     public get textAlpha(): number {
-        return this._textAlpha;
+        return mod.GetUITextAlpha(this._uiWidget);
     }
 
     /**
@@ -136,24 +118,15 @@ export class UIText extends UI.Element {
     public set textAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUITextAlpha(this._uiWidget, (this._textAlpha = alpha));
-    }
-
-    /**
-     * Sets the alpha of the text. Useful for chaining operations.
-     * @param alpha - The new alpha.
-     * @returns This element instance.
-     */
-    public setTextAlpha(alpha: number): this {
-        this.textAlpha = alpha;
-        return this;
+        mod.SetUITextAlpha(this._uiWidget, alpha);
     }
 
     /**
      * The anchor of the text.
+     * @returns The text anchor alignment.
      */
     public get textAnchor(): mod.UIAnchor {
-        return this._textAnchor;
+        return mod.GetUITextAnchor(this._uiWidget);
     }
 
     /**
@@ -163,24 +136,15 @@ export class UIText extends UI.Element {
     public set textAnchor(anchor: mod.UIAnchor) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUITextAnchor(this._uiWidget, (this._textAnchor = anchor));
-    }
-
-    /**
-     * Sets the anchor of the text. Useful for chaining operations.
-     * @param anchor - The new anchor.
-     * @returns This element instance.
-     */
-    public setTextAnchor(anchor: mod.UIAnchor): this {
-        this.textAnchor = anchor;
-        return this;
+        mod.SetUITextAnchor(this._uiWidget, anchor);
     }
 
     /**
      * The color of the text.
+     * @returns The text color vector.
      */
     public get textColor(): mod.Vector {
-        return this._textColor;
+        return mod.GetUITextColor(this._uiWidget);
     }
 
     /**
@@ -190,24 +154,15 @@ export class UIText extends UI.Element {
     public set textColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUITextColor(this._uiWidget, (this._textColor = color));
-    }
-
-    /**
-     * Sets the color of the text. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
-     */
-    public setTextColor(color: mod.Vector): this {
-        this.textColor = color;
-        return this;
+        mod.SetUITextColor(this._uiWidget, color);
     }
 
     /**
      * The size of the text.
+     * @returns The text size.
      */
     public get textSize(): number {
-        return this._textSize;
+        return mod.GetUITextSize(this._uiWidget);
     }
 
     /**
@@ -217,24 +172,15 @@ export class UIText extends UI.Element {
     public set textSize(size: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUITextSize(this._uiWidget, (this._textSize = size));
-    }
-
-    /**
-     * Sets the size of the text. Useful for chaining operations.
-     * @param size - The new size.
-     * @returns This element instance.
-     */
-    public setTextSize(size: number): this {
-        this.textSize = size;
-        return this;
+        mod.SetUITextSize(this._uiWidget, size);
     }
 
     /**
      * The padding around the text.
+     * @returns The padding.
      */
     public get padding(): number {
-        return this._padding;
+        return mod.GetUIWidgetPadding(this._uiWidget);
     }
 
     /**
@@ -244,17 +190,7 @@ export class UIText extends UI.Element {
     public set padding(padding: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIWidgetPadding(this._uiWidget, (this._padding = padding));
-    }
-
-    /**
-     * Sets the padding around the text. Useful for chaining operations.
-     * @param padding - The new padding.
-     * @returns This element instance.
-     */
-    public setPadding(padding: number): this {
-        this.padding = padding;
-        return this;
+        mod.SetUIWidgetPadding(this._uiWidget, padding);
     }
 }
 

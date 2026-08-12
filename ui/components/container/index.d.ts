@@ -1,15 +1,27 @@
 import { UI } from '../../index.ts';
 export declare class UIContainer extends UI.Element implements UI.Parent {
-    protected _children: Set<UI.Element>;
+    protected _children?: UI.Element[];
     /**
      * Creates a new container.
      * @param params - The parameters for the container.
      */
     constructor(params: UIContainer.Params);
     /**
-     * The children of the container.
+     * Returns a shallow copy of the list of direct child elements.
+     * @returns Array of direct children.
      */
-    get children(): UI.Element[];
+    get children(): readonly UI.Element[];
+    /**
+     * Retrieves a child element at the specified index.
+     * @param index - Zero-based index of the child.
+     * @returns The child element, or undefined if out of bounds.
+     */
+    getChild(index: number): UI.Element | undefined;
+    /**
+     * Iterates over all direct child elements without allocating an intermediate array.
+     * @param callback - Function invoked for each child.
+     */
+    forEachChild(callback: (child: UI.Element, index: number) => void): void;
     /**
      * @inheritdoc
      */
@@ -28,18 +40,15 @@ export declare class UIContainer extends UI.Element implements UI.Parent {
 export declare namespace UIContainer {
     /**
      * UIContainer children parameters with a 'type' property and the properties required by that element's constructor.
-     * @param T - The type of the element.
-     * @returns The child parameters.
+     * @template T - The type of the element.
      */
     type ChildParams<T extends UI.ElementParams> = T & {
         type: new (params: T) => UI.Element;
     };
     /**
      * The parameters for creating a new container.
-     * @param T - The type of the element.
-     * @returns The container parameters.
      */
     type Params = UI.ElementParams & {
-        childrenParams?: ChildParams<any>[];
+        childrenParams?: ChildParams<UI.ElementParams>[];
     };
 }

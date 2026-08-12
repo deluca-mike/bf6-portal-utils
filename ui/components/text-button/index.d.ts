@@ -2,12 +2,6 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIText } from '../text/index.ts';
 export declare class UITextButton extends UIContentButton<UIText> {
-    message: mod.Message;
-    textAnchor: mod.UIAnchor;
-    textSize: number;
-    setMessage: (message: mod.Message) => this;
-    setTextAnchor: (anchor: mod.UIAnchor) => this;
-    setTextSize: (size: number) => this;
     protected _textDisabledColor: mod.Vector;
     protected _textDisabledAlpha: number;
     /**
@@ -25,11 +19,38 @@ export declare class UITextButton extends UIContentButton<UIText> {
      */
     set enabled(enabled: boolean);
     /**
-     * @inheritdoc
+     * The message of the text.
+     * @returns The message.
      */
-    setEnabled(enabled: boolean): this;
+    get message(): mod.Message;
+    /**
+     * Sets the message of the text.
+     * @param message - The new message.
+     */
+    set message(message: mod.Message);
+    /**
+     * The size of the text.
+     * @returns The text size.
+     */
+    get textSize(): number;
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     */
+    set textSize(size: number);
+    /**
+     * The anchor of the text.
+     * @returns The text anchor alignment.
+     */
+    get textAnchor(): mod.UIAnchor;
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     */
+    set textAnchor(anchor: mod.UIAnchor);
     /**
      * The color of the text when the button is enabled.
+     * @returns The text color vector.
      */
     get textColor(): mod.Vector;
     /**
@@ -38,13 +59,8 @@ export declare class UITextButton extends UIContentButton<UIText> {
      */
     set textColor(color: mod.Vector);
     /**
-     * Sets the color of the text when the button is enabled. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
-     */
-    setTextColor(color: mod.Vector): this;
-    /**
      * The alpha of the text when the button is enabled.
+     * @returns The text alpha opacity.
      */
     get textAlpha(): number;
     /**
@@ -53,13 +69,8 @@ export declare class UITextButton extends UIContentButton<UIText> {
      */
     set textAlpha(alpha: number);
     /**
-     * Sets the alpha of the text when the button is enabled. Useful for chaining operations.
-     * @param alpha - The new alpha.
-     * @returns This element instance.
-     */
-    setTextAlpha(alpha: number): this;
-    /**
      * The color of the text when the button is disabled.
+     * @returns The disabled text color vector.
      */
     get textDisabledColor(): mod.Vector;
     /**
@@ -68,13 +79,8 @@ export declare class UITextButton extends UIContentButton<UIText> {
      */
     set textDisabledColor(color: mod.Vector);
     /**
-     * Sets the color of the text when the button is disabled. Useful for chaining operations.
-     * @param color - The new color.
-     * @returns This element instance.
-     */
-    setTextDisabledColor(color: mod.Vector): this;
-    /**
      * The alpha of the text when the button is disabled.
+     * @returns The disabled text alpha opacity.
      */
     get textDisabledAlpha(): number;
     /**
@@ -82,12 +88,6 @@ export declare class UITextButton extends UIContentButton<UIText> {
      * @param alpha - The new alpha.
      */
     set textDisabledAlpha(alpha: number);
-    /**
-     * Sets the alpha of the text when the button is disabled. Useful for chaining operations.
-     * @param alpha - The new alpha.
-     * @returns This element instance.
-     */
-    setTextDisabledAlpha(alpha: number): this;
 }
 export declare namespace UITextButton {
     /**

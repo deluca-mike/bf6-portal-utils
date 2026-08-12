@@ -1,11 +1,7 @@
 import { UI } from '../../index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIImage extends UI.Element {
-    protected _imageType: mod.UIImageType;
-    protected _imageColor: mod.Vector;
-    protected _imageAlpha: number;
-
     /**
      * Creates a new image.
      * @param params - The parameters for the image.
@@ -13,7 +9,7 @@ export class UIImage extends UI.Element {
     public constructor(params: UIImage.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
 
@@ -76,17 +72,14 @@ export class UIImage extends UI.Element {
         }
 
         super(elementParams);
-
-        this._imageType = params.imageType;
-        this._imageColor = imageColor;
-        this._imageAlpha = imageAlpha;
     }
 
     /**
      * The type of the image.
+     * @returns The image type.
      */
     public get imageType(): mod.UIImageType {
-        return this._imageType;
+        return mod.GetUIImageType(this._uiWidget);
     }
 
     /**
@@ -96,24 +89,15 @@ export class UIImage extends UI.Element {
     public set imageType(imageType: mod.UIImageType) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIImageType(this._uiWidget, (this._imageType = imageType));
-    }
-
-    /**
-     * Sets the type of the image. Useful for chaining operations.
-     * @param imageType - The new type of the image.
-     * @returns This element instance.
-     */
-    public setImageType(imageType: mod.UIImageType): this {
-        this.imageType = imageType;
-        return this;
+        mod.SetUIImageType(this._uiWidget, imageType);
     }
 
     /**
      * The alpha of the image.
+     * @returns The image alpha opacity.
      */
     public get imageAlpha(): number {
-        return this._imageAlpha;
+        return mod.GetUIImageAlpha(this._uiWidget);
     }
 
     /**
@@ -123,24 +107,15 @@ export class UIImage extends UI.Element {
     public set imageAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIImageAlpha(this._uiWidget, (this._imageAlpha = alpha));
-    }
-
-    /**
-     * Sets the alpha of the image. Useful for chaining operations.
-     * @param alpha - The new alpha of the image.
-     * @returns This element instance.
-     */
-    public setImageAlpha(alpha: number): this {
-        this.imageAlpha = alpha;
-        return this;
+        mod.SetUIImageAlpha(this._uiWidget, alpha);
     }
 
     /**
      * The color of the image.
+     * @returns The image color vector.
      */
     public get imageColor(): mod.Vector {
-        return this._imageColor;
+        return mod.GetUIImageColor(this._uiWidget);
     }
 
     /**
@@ -150,17 +125,7 @@ export class UIImage extends UI.Element {
     public set imageColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIImageColor(this._uiWidget, (this._imageColor = color));
-    }
-
-    /**
-     * Sets the color of the image. Useful for chaining operations.
-     * @param color - The new color of the image.
-     * @returns This element instance.
-     */
-    public setImageColor(color: mod.Vector): this {
-        this.imageColor = color;
-        return this;
+        mod.SetUIImageColor(this._uiWidget, color);
     }
 }
 

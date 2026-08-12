@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version: 1.1.0
+// version: 2.0.0
 export namespace Clocks {
     const logging = new Logging('Clocks');
 
@@ -13,7 +13,7 @@ export namespace Clocks {
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
@@ -24,6 +24,16 @@ export namespace Clocks {
     ): void {
         logging.setLogging(log, logLevel, includeRawError);
     }
+
+    /**
+     * Unique generation-encoded identifier for a Clock.
+     */
+    export type ClockID = number & { readonly __brand: 'ClockID' };
+
+    /**
+     * Sentinel value representing an invalid or uninitialized Clock ID.
+     */
+    export const INVALID_CLOCK_ID: ClockID = -1 as ClockID;
 
     /**
      * Options for the clock.
@@ -58,362 +68,507 @@ export namespace Clocks {
      */
     export type CountDownOptions = ClockOptions;
 
+    const MAX_CLOCKS = 256;
+    const GENERATION_MULTIPLIER = 10_000;
+    const INVALID_INDEX = -1;
+    const FLAG_IN_USE = 1 << 0;
+    const FLAG_RUNNING = 1 << 1;
+    const FLAG_COMPLETE = 1 << 2;
+    const FLAG_COUNTDOWN = 1 << 3;
+
+    const _flags = new Uint8Array(MAX_CLOCKS);
+    const _generations = new Uint32Array(MAX_CLOCKS);
+
+    function _isInUse(flags: number): boolean {
+        return (flags & FLAG_IN_USE) !== 0;
+    }
+
+    function _isRunning(flags: number): boolean {
+        return (flags & FLAG_RUNNING) !== 0;
+    }
+
+    function _isComplete(flags: number): boolean {
+        return (flags & FLAG_COMPLETE) !== 0;
+    }
+
+    function _isCountDown(flags: number): boolean {
+        return (flags & FLAG_COUNTDOWN) !== 0;
+    }
+
+    function _setFlag(index: number, flag: number): void {
+        _flags[index] |= flag;
+    }
+
+    function _clearFlag(index: number, flag: number): void {
+        _flags[index] &= ~flag;
+    }
+
+    const SERVER_START_TIME = Date.now();
+
+    const _accumulatedMs = new Uint32Array(MAX_CLOCKS);
+    const _lastResumeTime = new Uint32Array(MAX_CLOCKS);
+    const _limits = new Uint32Array(MAX_CLOCKS);
+
     /**
-     * Abstract BaseClock
-     * Handles the "Elapsed Time Engine": keeping track of how many milliseconds
-     * have theoretically passed while the clock was in a "Running" state.
+     * Intrusive link / integer second array:
+     * - Free slot (!FLAG_IN_USE): Points to the next free slot on the intrusive free list (`_firstFree`).
+     * - In-use slot (FLAG_IN_USE): Stores the last reported integer second (initialized to INVALID_INDEX).
      */
-    abstract class BaseClock {
-        // State
-        private _isRunning: boolean = false;
-        private _isComplete: boolean = false;
-        private _timerId: number | undefined;
-        private _tickQueued: boolean = false;
+    const _lastIntegerSecond = new Int32Array(MAX_CLOCKS);
 
-        // Time tracking
-        // _accumulatedMs: Time gathered during previous running segments (before pauses).
-        // _lastResumeTime: The Date.now() timestamp when we last switched from Paused to Running.
-        private _accumulatedMs: number = 0;
-        private _lastResumeTime: number = 0;
+    for (let i = 0; i < MAX_CLOCKS - 1; ++i) {
+        _lastIntegerSecond[i] = i + 1;
+    }
 
-        // Tracking for callbacks to prevent duplicate firing.
-        private _lastIntegerSecond: number | undefined;
-        private _lastIntegerMinute: number | undefined;
+    _lastIntegerSecond[MAX_CLOCKS - 1] = INVALID_INDEX;
 
-        // Callbacks
-        private _onSecond?: (s: number) => Promise<void> | void;
-        private _onMinute?: (m: number) => Promise<void> | void;
-        private _onComplete?: () => Promise<void> | void;
+    let _firstFree = 0;
 
-        // Rounding function
-        private _round: (value: number) => number;
+    function getUptime(): number {
+        return Date.now() - SERVER_START_TIME;
+    }
 
-        constructor(round: (value: number) => number, options?: ClockOptions) {
-            this._round = round;
-            this._onSecond = options?.onSecond;
-            this._onMinute = options?.onMinute;
-            this._onComplete = options?.onComplete;
+    const _onSecond = new Array<((s: number) => Promise<void> | void) | null>(MAX_CLOCKS);
+    const _onMinute = new Array<((m: number) => Promise<void> | void) | null>(MAX_CLOCKS);
+    const _onComplete = new Array<(() => Promise<void> | void) | null>(MAX_CLOCKS);
+
+    let _activeClockCount = 0;
+    let _tickTimerId: Timers.TimerID = Timers.INVALID_TIMER_ID;
+    let _queueTickPending = false;
+
+    // Reusable static promise for zero-allocation microtask dispatch.
+    const STATIC_PROMISE = Promise.resolve();
+
+    /**
+     * Pops the next available slot from the intrusive free-list in O(1) time.
+     * @returns The index of the allocated slot, or INVALID_INDEX if the pool is full.
+     */
+    function _allocateSlot(): number {
+        if (_firstFree === INVALID_INDEX) {
+            logging.log('Pool is full', LogLevel.Error);
+            return INVALID_INDEX;
         }
 
-        /**
-         * Safely defers the execution of the _tick loop to the microtask queue.
-         * This prevents synchronous state collisions when consumers manipulate the clock.
-         */
-        private _queueTick = (): void => {
-            if (this._tickQueued) return;
+        const index = _firstFree;
+        _firstFree = _lastIntegerSecond[index];
+        _lastIntegerSecond[index] = INVALID_INDEX;
 
-            this._tickQueued = true;
+        return index;
+    }
 
-            Promise.resolve().then(() => {
-                this._tickQueued = false;
-                this._tick();
-            });
-        };
+    function _resolveIndex(id: ClockID): number {
+        if (id < 0) return INVALID_INDEX;
 
-        /**
-         * Returns the logical "Elapsed Time" of the clock in Milliseconds.
-         * For CountUp, this is the value.
-         * For CountDown, this is (Duration - Value).
-         */
-        protected _getElapsedMilliseconds(): number {
-            return this._isRunning ? this._accumulatedMs + (Date.now() - this._lastResumeTime) : this._accumulatedMs;
+        const index = id % GENERATION_MULTIPLIER;
+
+        if (index >= MAX_CLOCKS) return INVALID_INDEX;
+
+        const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
+
+        if (_generations[index] !== expectedGen || !_isInUse(_flags[index])) return INVALID_INDEX;
+
+        return index;
+    }
+
+    function _getElapsedMilliseconds(index: number): number {
+        return _isRunning(_flags[index])
+            ? _accumulatedMs[index] + (getUptime() - _lastResumeTime[index])
+            : _accumulatedMs[index];
+    }
+
+    function _getElapsedSeconds(index: number): number {
+        return _getElapsedMilliseconds(index) / 1000;
+    }
+
+    function _adjustElapsedTime(index: number, seconds: number): void {
+        _accumulatedMs[index] += seconds * 1000;
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Adjusted elapsed time for Clock ${index} by ${seconds}s`, LogLevel.Info);
         }
 
-        /**
-         * Returns the logical "Elapsed Time" of the clock in Seconds.
-         * For CountUp, this is the value.
-         * For CountDown, this is (Duration - Value).
-         */
-        protected _getElapsedSeconds(): number {
-            return this._getElapsedMilliseconds() / 1000;
-        }
+        _queueTick();
+    }
 
-        /**
-         * Modifies the internal elapsed time. Used by add/subtract seconds.
-         */
-        protected _adjustElapsedTime(seconds: number): void {
-            this._accumulatedMs += seconds * 1000;
+    function _processTickQueue(): void {
+        _queueTickPending = false;
+        _tick();
+    }
 
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Adjusted elapsed time by ${seconds}s.`, LogLevel.Info);
+    function _queueTick(): void {
+        if (_queueTickPending) return;
+
+        _queueTickPending = true;
+        STATIC_PROMISE.then(_processTickQueue);
+    }
+
+    function _scheduleTick(): void {
+        Timers.clear(_tickTimerId);
+
+        _tickTimerId = Timers.INVALID_TIMER_ID;
+
+        // Fast exit if no timers are active.
+        if (_activeClockCount === 0) return;
+
+        let closestNextMs = -1;
+
+        for (let id = 0; id < MAX_CLOCKS; ++id) {
+            if (!_isRunning(_flags[id])) continue;
+
+            const nextWholeMs = 1000 - (_getElapsedMilliseconds(id) % 1000);
+
+            if (closestNextMs === -1 || nextWholeMs < closestNextMs) {
+                closestNextMs = nextWholeMs;
             }
-
-            this._queueTick(); // Trigger an immediate check to handle completion (or update UI).
         }
 
-        // Abstract internal methods to be implemented by specific clock types.
-        protected abstract _checkCompletion(): boolean;
+        // This should never happen, but check anyway.
+        if (closestNextMs === -1) return;
 
-        /**
-         * Main Loop: Calculates drift-corrected time and fires callbacks if integers changed.
-         */
-        private _tick = (): void => {
-            if (this._isComplete) return;
+        _tickTimerId = Timers.setTimeout(_tick, Math.max(1, closestNextMs));
+    }
 
-            // Check for completion criteria first
-            if (this._checkCompletion()) {
-                this._isRunning = false;
-                this._isComplete = true;
-                CallbackHandler.invokeNoArgs(this._onComplete, 'onComplete', logging, LogLevel.Error);
+    function _tick(): void {
+        for (let id = 0; id < MAX_CLOCKS; ++id) {
+            const flags = _flags[id];
 
-                if (logging.willLog(LogLevel.Info)) {
-                    logging.log(`Clock completed.`, LogLevel.Info);
+            if (!_isInUse(flags) || _isComplete(flags)) continue;
+
+            const isCountDown = _isCountDown(flags);
+            const elapsedSecs = _getElapsedSeconds(id);
+            const limit = _limits[id];
+
+            let isCompleteNow = false;
+            let currentSeconds = 0;
+            let currentSecondsInt = 0;
+
+            if (isCountDown) {
+                currentSeconds = Math.max(0, limit - elapsedSecs);
+                currentSecondsInt = Math.ceil(currentSeconds);
+
+                if (currentSeconds <= 0) {
+                    isCompleteNow = true;
+                }
+            } else {
+                currentSeconds = Math.min(limit, elapsedSecs);
+                currentSecondsInt = Math.floor(currentSeconds);
+
+                if (currentSeconds >= limit) {
+                    isCompleteNow = true;
                 }
             }
 
-            const currentSecondsInt = this._round(this.seconds);
-            const currentMinutesInt = this._round(currentSecondsInt / 60);
+            if (isCompleteNow) {
+                _clearFlag(id, FLAG_RUNNING);
+                _setFlag(id, FLAG_COMPLETE);
 
-            // Fire `_onSecond` if the integer second has changed (or if `this._lastIntegerSecond` is undefined).
-            if (currentSecondsInt !== this._lastIntegerSecond) {
-                this._lastIntegerSecond = currentSecondsInt;
-                CallbackHandler.invoke(this._onSecond, [currentSecondsInt], 'onSecond', logging, LogLevel.Error);
+                CallbackHandler.invokeNoArgs(_onComplete[id], logging);
+
+                if (logging.willLog(LogLevel.Info)) {
+                    logging.log(`Clock ${id} completed`, LogLevel.Info);
+                }
+
+                currentSecondsInt = isCountDown ? 0 : limit;
             }
 
-            // Fire `_onMinute` if the integer minute has changed (or if `this._lastIntegerMinute` is undefined).
-            if (currentMinutesInt !== this._lastIntegerMinute) {
-                this._lastIntegerMinute = currentMinutesInt;
-                CallbackHandler.invoke(this._onMinute, [currentMinutesInt], 'onMinute', logging, LogLevel.Error);
-            }
+            const prevSecond = _lastIntegerSecond[id];
 
-            // Clean up any existing timeout before calculating the next one.
-            Timers.clear(this._timerId);
-            this._timerId = undefined;
+            if (currentSecondsInt === prevSecond) continue;
 
-            if (this._isRunning) {
-                // Call `_tick` on the next whole second boundary.
-                this._timerId = Timers.setTimeout(this._tick, 1000 - (this._getElapsedMilliseconds() % 1000));
-            }
-        };
+            _lastIntegerSecond[id] = currentSecondsInt;
 
-        // --- Public API ---
+            CallbackHandler.invoke(_onSecond[id], currentSecondsInt, undefined, undefined, undefined, logging);
 
-        // Abstract public methods to be implemented by specific clock types.
-        public abstract get seconds(): number;
-        public abstract addSeconds(seconds: number): this;
-        public abstract subtractSeconds(seconds: number): this;
+            const prevMinute =
+                prevSecond === INVALID_INDEX
+                    ? -1
+                    : isCountDown
+                      ? Math.ceil(prevSecond / 60)
+                      : Math.floor(prevSecond / 60);
 
-        public get isRunning(): boolean {
-            return this._isRunning;
+            const currentMinutesInt = isCountDown
+                ? Math.ceil(currentSecondsInt / 60)
+                : Math.floor(currentSecondsInt / 60);
+
+            if (currentMinutesInt === prevMinute) continue;
+
+            CallbackHandler.invoke(_onMinute[id], currentMinutesInt, undefined, undefined, undefined, logging);
         }
 
-        public get isPaused(): boolean {
-            return !this.isRunning && !this._isComplete;
-        }
+        _scheduleTick();
+    }
 
-        public get isComplete(): boolean {
-            return this._isComplete;
-        }
+    /**
+     * Creates a count up clock.
+     * @param options The options for the clock.
+     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     */
+    export function createCountUp(options?: CountUpOptions): ClockID {
+        const index = _allocateSlot();
 
-        /**
-         * Starts the clock.
-         * @returns The clock instance.
-         */
-        public start(): this {
-            if (this._isRunning || this._isComplete) return this;
+        if (index === INVALID_INDEX) return INVALID_CLOCK_ID;
 
-            this._isRunning = true;
-            this._lastResumeTime = Date.now();
-            this._queueTick();
+        ++_activeClockCount;
+        _setFlag(index, FLAG_IN_USE);
+        _accumulatedMs[index] = 0;
+        _lastResumeTime[index] = 0;
+        _limits[index] = options?.timeLimitSeconds ?? 86400;
 
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Clock started.`, LogLevel.Info);
-            }
+        _onSecond[index] = options?.onSecond ?? null;
+        _onMinute[index] = options?.onMinute ?? null;
+        _onComplete[index] = options?.onComplete ?? null;
 
-            return this;
-        }
+        return (index + GENERATION_MULTIPLIER * _generations[index]) as ClockID;
+    }
 
-        /**
-         * Stops the clock.
-         * @returns The clock instance.
-         */
-        public stop(): this {
-            if (!this._isRunning) return this;
+    /**
+     * Creates a countdown clock.
+     * @param durationSeconds The duration of the clock in seconds.
+     * @param options The options for the clock.
+     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     */
+    export function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID {
+        const index = _allocateSlot();
 
-            this._isRunning = false;
+        if (index === INVALID_INDEX) return INVALID_CLOCK_ID;
 
-            Timers.clear(this._timerId);
-            this._timerId = undefined;
+        ++_activeClockCount;
+        _setFlag(index, FLAG_IN_USE);
+        _setFlag(index, FLAG_COUNTDOWN);
+        _accumulatedMs[index] = 0;
+        _lastResumeTime[index] = 0;
+        _limits[index] = durationSeconds;
 
-            // Calculate the time passed since last resume and bake it into `_accumulatedMs`.
-            this._accumulatedMs += Date.now() - this._lastResumeTime;
-            this._queueTick();
+        _onSecond[index] = options?.onSecond ?? null;
+        _onMinute[index] = options?.onMinute ?? null;
+        _onComplete[index] = options?.onComplete ?? null;
 
-            if (logging.willLog(LogLevel.Info)) {
-                logging.log(`Clock stopped.`, LogLevel.Info);
-            }
+        return (index + GENERATION_MULTIPLIER * _generations[index]) as ClockID;
+    }
 
-            return this;
-        }
+    /**
+     * Destroys a clock.
+     * @param id The ID of the clock.
+     */
+    export function destroy(id: ClockID): void {
+        const index = _resolveIndex(id);
 
-        /**
-         * Resumes the clock (same as start).
-         * @returns The clock instance.
-         */
-        public resume(): this {
-            return this.start();
-        }
+        if (index === INVALID_INDEX) return;
 
-        /**
-         * Pauses the clock (same as stop).
-         * @returns The clock instance.
-         */
-        public pause(): this {
-            return this.stop();
-        }
+        stop(id);
 
-        /**
-         * Resets the clock.
-         * If the clock was running, it stays running and snaps to the starting time (elapsed 0), firing `onSecond`
-         * (and possibly `onMinute`) for that position. If it was stopped or paused, it remains stopped.
-         * @returns The clock instance.
-         */
-        public reset(): this {
-            Timers.clear(this._timerId);
-            this._timerId = undefined;
+        _flags[index] = 0;
+        _onSecond[index] = null;
+        _onMinute[index] = null;
+        _onComplete[index] = null;
+        ++_generations[index];
+        --_activeClockCount;
 
-            this._isComplete = false;
-            this._accumulatedMs = 0;
-            this._lastIntegerSecond = undefined;
-            this._lastIntegerMinute = undefined;
+        _lastIntegerSecond[index] = _firstFree;
+        _firstFree = index;
+    }
 
-            if (this._isRunning) {
-                this._lastResumeTime = Date.now();
-                this._queueTick();
-            }
+    /**
+     * Returns if a clock is running.
+     * @param id The ID of the clock.
+     * @returns True if the clock is running, false otherwise.
+     */
+    export function isRunning(id: ClockID): boolean {
+        const index = _resolveIndex(id);
 
-            return this;
+        return index !== INVALID_INDEX && _isRunning(_flags[index]);
+    }
+
+    /**
+     * Returns if a clock is paused.
+     * @param id The ID of the clock.
+     * @returns True if the clock is paused, false otherwise.
+     */
+    export function isPaused(id: ClockID): boolean {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return false;
+
+        const flags = _flags[index];
+
+        return !_isRunning(flags) && !_isComplete(flags);
+    }
+
+    /**
+     * Returns if a clock has completed.
+     * @param id The ID of the clock.
+     * @returns True if the clock is complete, false otherwise.
+     */
+    export function isComplete(id: ClockID): boolean {
+        const index = _resolveIndex(id);
+
+        return index !== INVALID_INDEX && _isComplete(_flags[index]);
+    }
+
+    /**
+     * Gets the seconds of a clock. For a countdown clock, this is the seconds remaining. For a count up clock, this is the total time elapsed.
+     * @param id The ID of the clock.
+     * @returns The seconds of the clock.
+     */
+    export function getSeconds(id: ClockID): number {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return 0;
+
+        const flags = _flags[index];
+        const isCountDown = _isCountDown(flags);
+        const limit = _limits[index];
+
+        if (_isComplete(flags)) return isCountDown ? 0 : limit;
+
+        const elapsedSecs = _getElapsedSeconds(index);
+
+        return isCountDown ? Math.max(0, limit - elapsedSecs) : Math.min(limit, elapsedSecs);
+    }
+
+    /**
+     * Gets the total duration of the clock that will result in completion.
+     * @param id The ID of the clock.
+     * @returns The duration of the clock in seconds.
+     */
+    export function getDuration(id: ClockID): number {
+        const index = _resolveIndex(id);
+
+        return index !== INVALID_INDEX ? _limits[index] : 0;
+    }
+
+    /**
+     * Sets the total duration of the clock that will result in completion. Will not resume completed clocks.
+     * @param id The ID of the clock.
+     * @param durationSeconds The duration of the clock in seconds.
+     */
+    export function setDuration(id: ClockID, durationSeconds: number): void {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return;
+
+        _limits[index] = durationSeconds;
+        _queueTick();
+    }
+
+    /**
+     * Starts the clock.
+     * @param id The ID of the clock to start.
+     */
+    export function start(id: ClockID): void {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return;
+
+        const flags = _flags[index];
+
+        if (_isRunning(flags) || _isComplete(flags)) return;
+
+        _setFlag(index, FLAG_RUNNING);
+        _lastResumeTime[index] = getUptime();
+        _queueTick();
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Clock ${id} started`, LogLevel.Info);
         }
     }
 
     /**
-     * CountUpClock: Starts at 0, goes up. Optional limit.
+     * Stops the clock.
+     * @param id The ID of the clock to stop.
      */
-    export class CountUpClock extends BaseClock {
-        private _timeLimit: number;
+    export function stop(id: ClockID): void {
+        const index = _resolveIndex(id);
 
-        /**
-         * Creates a new CountUpClock.
-         * @param options - The options for the count up clock.
-         */
-        constructor(options?: CountUpOptions) {
-            // When counting up, the integer should only change when the values crosses an integer boundary going up,
-            // and should start at 0.
-            super(Math.floor, options);
-            this._timeLimit = options?.timeLimitSeconds ?? 86400;
-        }
+        if (index === INVALID_INDEX) return;
 
-        protected _checkCompletion(): boolean {
-            return this.seconds >= this._timeLimit;
-        }
+        if (!_isRunning(_flags[index])) return;
 
-        /**
-         * @returns The time limit of the count up clock in seconds.
-         */
-        public get timeLimit(): number {
-            return this._timeLimit;
-        }
+        _clearFlag(index, FLAG_RUNNING);
+        _accumulatedMs[index] += getUptime() - _lastResumeTime[index];
+        _queueTick();
 
-        /**
-         * @returns The current value of the count up clock in seconds.
-         */
-        public get seconds(): number {
-            // We use Math.min(this._timeLimit, ...) to prevent displaying numbers greater than the time limit.
-            return this.isComplete ? this._timeLimit : Math.min(this._timeLimit, this._getElapsedSeconds());
-        }
-
-        /**
-         * Adds seconds to the count up clock.
-         * @param seconds - The number of seconds to add.
-         * @returns The clock instance.
-         */
-        public addSeconds(seconds: number): this {
-            // Adding seconds to a count up clock increases the elapsed time.
-            this._adjustElapsedTime(seconds);
-            return this;
-        }
-
-        /**
-         * Subtracts seconds from the count up clock.
-         * @param seconds - The number of seconds to subtract.
-         * @returns The clock instance.
-         */
-        public subtractSeconds(seconds: number): this {
-            // Subtracting seconds reduces elapsed time.
-            this._adjustElapsedTime(-seconds);
-            return this;
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Clock ${id} stopped`, LogLevel.Info);
         }
     }
 
     /**
-     * CountDownClock: Starts at Duration, goes down to 0.
+     * Resumes the clock (which is the same as starting it).
+     * @param id The ID of the clock to resume.
      */
-    export class CountDownClock extends BaseClock {
-        private _duration: number;
+    export function resume(id: ClockID): void {
+        start(id);
+    }
 
-        /**
-         * Creates a new CountDownClock.
-         * @param durationSeconds - The duration of the countdown in seconds.
-         * @param options - The options for the countdown clock.
-         */
-        constructor(durationSeconds: number, options?: CountDownOptions) {
-            // When counting down, the integer should only change when the values crosses an integer boundary going
-            // down, and should start at the duration and only be 0 when the clock is complete.
-            super(Math.ceil, options);
-            this._duration = durationSeconds;
-        }
+    /**
+     * Pauses the clock (which is the same as stopping it).
+     * @param id The ID of the clock to pause.
+     */
+    export function pause(id: ClockID): void {
+        stop(id);
+    }
 
-        protected _checkCompletion(): boolean {
-            // In a countdown, we are complete if current value is 0 (or less due to drift)
-            return this.seconds <= 0;
-        }
+    /**
+     * Resets the clock to its initial state. A running clock will continue to run after being reset.
+     * @param id The ID of the clock to reset.
+     */
+    export function reset(id: ClockID): void {
+        const index = _resolveIndex(id);
 
-        /**
-         * @returns The starting duration of the countdown in seconds.
-         */
-        public get duration(): number {
-            return this._duration;
-        }
+        if (index === INVALID_INDEX) return;
 
-        /**
-         * @returns The current value of the countdown in seconds.
-         */
-        public get seconds(): number {
-            // Current Value = Total Duration - Elapsed Time
-            // We use Math.max(0, ...) to prevent displaying negative numbers.
-            return this.isComplete ? 0 : Math.max(0, this._duration - this._getElapsedSeconds());
-        }
+        const flags = _flags[index];
 
-        /**
-         * Adds seconds to the countdown clock, so it wil take longer to complete.
-         * @param seconds - The number of seconds to add.
-         * @returns The clock instance.
-         */
-        public addSeconds(seconds: number): this {
-            // Adding seconds to a countdown means extending the remaining time, thus reducing the "Elapsed" time.
-            this._adjustElapsedTime(-seconds);
-            return this;
-        }
+        _clearFlag(index, FLAG_COMPLETE);
+        _accumulatedMs[index] = 0;
+        _lastIntegerSecond[index] = INVALID_INDEX;
 
-        /**
-         * Subtracts seconds from the countdown clock, so it will complete faster.
-         * @param seconds - The number of seconds to subtract.
-         * @returns The clock instance.
-         */
-        public subtractSeconds(seconds: number): this {
-            // Subtracting seconds from a countdown means reducing remaining time, thus increasing the "Elapsed" time.
-            this._adjustElapsedTime(seconds);
-            return this;
+        if (_isRunning(flags)) {
+            _lastResumeTime[index] = getUptime();
+            _queueTick();
         }
+    }
 
-        /**
-         * Sets the duration of the countdown clock.
-         * @param durationSeconds - The duration of the countdown in seconds.
-         * @returns The clock instance.
-         */
-        public setDuration(durationSeconds: number): this {
-            this._duration = durationSeconds;
-            return this;
-        }
+    /**
+     * Adds seconds to the clock. Will delay the completion of a countdown clock and increase the elapsed time of a countup clock.
+     * @param id The ID of the clock to modify.
+     * @param seconds The number of seconds to add.
+     */
+    export function addSeconds(id: ClockID, seconds: number): void {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return;
+
+        _adjustElapsedTime(index, _isCountDown(_flags[index]) ? -seconds : seconds);
+    }
+
+    /**
+     * Subtracts seconds from the clock. Will advance the completion of a countdown clock and decrease the elapsed time of a countup clock.
+     * @param id The ID of the clock to modify.
+     * @param seconds The number of seconds to subtract.
+     */
+    export function subtractSeconds(id: ClockID, seconds: number): void {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return;
+
+        _adjustElapsedTime(index, _isCountDown(_flags[index]) ? seconds : -seconds);
+    }
+
+    /**
+     * Returns true if the clock is active (allocated).
+     * @param id The ID of the clock.
+     * @returns True if the clock is active, false otherwise.
+     */
+    export function isActive(id: ClockID): boolean {
+        return _resolveIndex(id) !== INVALID_INDEX;
+    }
+
+    /**
+     * @returns The number of active clocks.
+     */
+    export function getActiveClockCount(): number {
+        return _activeClockCount;
     }
 }

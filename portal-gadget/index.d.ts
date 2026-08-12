@@ -17,8 +17,8 @@ export declare namespace PortalGadget {
     ): void;
     /**
      * A handler function for the Portal Gadget's events.
-     * @param player - The player who started the fire.
-     * @param isZooming - Whether the player is zooming.
+     * @param player - The player who started or stopped the fire.
+     * @param isZooming - Whether the player was zooming when the event fired.
      * @param getTarget - An async function that returns the target position.
      */
     type Handler = (player: mod.Player, isZooming: boolean, getTarget: () => Promise<mod.Vector | undefined>) => void;

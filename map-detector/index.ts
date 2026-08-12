@@ -1,7 +1,7 @@
 import { Logging } from '../logging/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version 3.4.0
+// version 4.0.0
 export namespace MapDetector {
     const logging = new Logging('MD');
 
@@ -12,7 +12,7 @@ export namespace MapDetector {
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
@@ -54,109 +54,75 @@ export namespace MapDetector {
         HagentalBase = 'Hagental Base',
     }
 
-    type MapData = {
-        coordinates: Vectors.Vector3;
-        nativeMap: mod.Maps | undefined;
-    };
+    const _mapKeys: Map[] = [
+        Map.Area22B,
+        Map.Bellum1988sOperationMetro,
+        Map.BlackwellFields,
+        Map.CairoBazaar,
+        Map.Complex3,
+        Map.Contaminated,
+        Map.DefenseNexus,
+        Map.Downtown,
+        Map.Eastwood,
+        Map.EmpireState,
+        Map.GolfCourse,
+        Map.HagentalBase,
+        Map.IberianOffensive,
+        Map.LiberationPeak,
+        Map.ManhattanBridge,
+        Map.Marina,
+        Map.MirakValley,
+        Map.NewSobekCity,
+        Map.OperationFirestorm,
+        Map.PortalSandbox,
+        Map.RailwaytoGolmud,
+        Map.RedlineStorage,
+        Map.SaintsQuarter,
+        Map.SiegeOfCairo,
+    ];
 
-    const maps: Record<Map, MapData> = {
-        [Map.Area22B]: {
-            coordinates: { x: 427, y: 177, z: -743 },
-            nativeMap: mod.Maps.Granite_MilitaryRnD,
-        },
-        [Map.Bellum1988sOperationMetro]: {
-            coordinates: { x: -202, y: 217, z: 20 },
-            nativeMap: undefined,
-        },
-        [Map.BlackwellFields]: {
-            coordinates: { x: -164, y: 76, z: -322 },
-            nativeMap: mod.Maps.Badlands,
-        },
-        [Map.CairoBazaar]: {
-            coordinates: { x: -27, y: 64, z: 4 },
-            nativeMap: mod.Maps.Plaza,
-        },
-        [Map.Complex3]: {
-            coordinates: { x: 715, y: 201, z: -343 },
-            nativeMap: mod.Maps.Granite_Underground,
-        },
-        [Map.Contaminated]: {
-            coordinates: { x: -143, y: 323, z: 7 },
-            nativeMap: mod.Maps.Contaminated,
-        },
-        [Map.DefenseNexus]: {
-            coordinates: { x: -274, y: 138, z: 309 },
-            nativeMap: mod.Maps.Granite_TechCampus,
-        },
-        [Map.Downtown]: {
-            coordinates: { x: -1044, y: 122, z: 220 },
-            nativeMap: mod.Maps.Granite_MainStreet,
-        },
-        [Map.Eastwood]: {
-            coordinates: { x: -195, y: 231, z: -41 },
-            nativeMap: mod.Maps.Eastwood,
-        },
-        [Map.EmpireState]: {
-            coordinates: { x: -672, y: 53, z: -115 },
-            nativeMap: mod.Maps.Aftermath,
-        },
-        [Map.GolfCourse]: {
-            coordinates: { x: -299, y: 191, z: -664 },
-            nativeMap: mod.Maps.Granite_ClubHouse,
-        },
-        [Map.HagentalBase]: {
-            coordinates: { x: -103, y: 66, z: 13 },
-            nativeMap: mod.Maps.Subsurface,
-        },
-        [Map.IberianOffensive]: {
-            coordinates: { x: 849, y: 78, z: 116 },
-            nativeMap: mod.Maps.Battery,
-        },
-        [Map.LiberationPeak]: {
-            coordinates: { x: 94, y: 133, z: 77 },
-            nativeMap: mod.Maps.Capstone,
-        },
-        [Map.ManhattanBridge]: {
-            coordinates: { x: -323, y: 52, z: -440 },
-            nativeMap: mod.Maps.Dumbo,
-        },
-        [Map.Marina]: {
-            coordinates: { x: -1474, y: 103, z: -690 },
-            nativeMap: mod.Maps.Granite_Marina,
-        },
-        [Map.MirakValley]: {
-            coordinates: { x: -99, y: 88, z: -253 },
-            nativeMap: mod.Maps.Tungsten,
-        },
-        [Map.NewSobekCity]: {
-            coordinates: { x: -99, y: 92, z: -124 },
-            nativeMap: mod.Maps.Outskirts,
-        },
-        [Map.OperationFirestorm]: {
-            coordinates: { x: -39, y: 124, z: -116 },
-            nativeMap: mod.Maps.Firestorm,
-        },
-        [Map.PortalSandbox]: {
-            coordinates: { x: -30, y: 32, z: 0 },
-            nativeMap: mod.Maps.Sand,
-        },
-        [Map.RailwaytoGolmud]: {
-            coordinates: { x: -120, y: 728, z: 726 },
-            nativeMap: mod.Maps.GolmudRailway,
-        },
-        [Map.RedlineStorage]: {
-            coordinates: { x: 566, y: 144, z: 356 },
-            nativeMap: mod.Maps.Granite_MilitaryStorage,
-        },
-        [Map.SaintsQuarter]: {
-            coordinates: { x: 293, y: 70, z: 134 },
-            nativeMap: mod.Maps.Limestone,
-        },
-        [Map.SiegeOfCairo]: {
-            coordinates: { x: -84, y: 64, z: -58 },
-            nativeMap: mod.Maps.Abbasid,
-        },
-    };
+    const _mapNative: (mod.Maps | null)[] = [
+        mod.Maps.Granite_MilitaryRnD,
+        null,
+        mod.Maps.Badlands,
+        mod.Maps.Plaza,
+        mod.Maps.Granite_Underground,
+        mod.Maps.Contaminated,
+        mod.Maps.Granite_TechCampus,
+        mod.Maps.Granite_MainStreet,
+        mod.Maps.Eastwood,
+        mod.Maps.Aftermath,
+        mod.Maps.Granite_ClubHouse,
+        mod.Maps.Subsurface,
+        mod.Maps.Battery,
+        mod.Maps.Capstone,
+        mod.Maps.Dumbo,
+        mod.Maps.Granite_Marina,
+        mod.Maps.Tungsten,
+        mod.Maps.Outskirts,
+        mod.Maps.Firestorm,
+        mod.Maps.Sand,
+        mod.Maps.GolmudRailway,
+        mod.Maps.Granite_MilitaryStorage,
+        mod.Maps.Limestone,
+        mod.Maps.Abbasid,
+    ];
+
+    const _mapX = new Int32Array([
+        427, -202, -164, -27, 715, -143, -274, -1044, -195, -672, -299, -103, 849, 94, -323, -1474, -99, -99, -39, -30,
+        -120, 566, 293, -84,
+    ]);
+
+    const _mapY = new Int32Array([
+        177, 217, 76, 64, 201, 323, 138, 122, 231, 53, 191, 66, 78, 133, 52, 103, 88, 92, 124, 32, 728, 144, 70, 64,
+    ]);
+
+    const _mapZ = new Int32Array([
+        -743, 20, -322, 4, -343, 7, 309, 220, -41, -115, -664, 13, 116, 77, -440, -690, -253, -124, -116, 0, 726, 356,
+        134, -58,
+    ]);
+
+    let _cachedMapIndex = -1;
 
     /**
      * Sets the coordinates of interest for a map.
@@ -164,56 +130,75 @@ export namespace MapDetector {
      * @param coordinates - The coordinates of interest to set for the map.
      */
     export function setCoordinates(map: Map, coordinates: Vectors.Vector3): void {
-        maps[map].coordinates = coordinates;
+        const index = _mapKeys.indexOf(map);
+
+        if (index === -1) return;
+
+        _mapX[index] = coordinates.x;
+        _mapY[index] = coordinates.y;
+        _mapZ[index] = coordinates.z;
     }
 
     /**
-     * @returns The current map as a `Map` enum value, or `undefined` if the map cannot be determined.
+     * @returns The current map as a `Map` enum value, or `null` if the map cannot be determined.
      */
-    export function currentMap(): Map | undefined {
-        const coords = getCoordinates();
+    export function currentMap(): Map | null {
+        if (_cachedMapIndex !== -1) return _mapKeys[_cachedMapIndex];
 
-        if (!coords) return;
+        let hqPosition: mod.Vector;
 
-        for (const map in maps) {
-            const { coordinates, nativeMap } = maps[map as Map];
+        try {
+            hqPosition = mod.GetObjectPosition(mod.GetHQ(1));
+        } catch (error: unknown) {
+            logging.log('Failed to get HQ or HQ position', LogLevel.Error, error);
+            return null;
+        }
 
-            if (coords.x != ~~coordinates.x || coords.y != ~~coordinates.y || coords.z != ~~coordinates.z) continue;
+        const hqX = ~~mod.XComponentOf(hqPosition);
+        const hqY = ~~mod.YComponentOf(hqPosition);
+        const hqZ = ~~mod.ZComponentOf(hqPosition);
 
-            if (!nativeMap) {
-                logging.log(`Map ${map} is not available in the native mod.Maps enum.`, LogLevel.Warning);
-                continue;
+        for (let i = 0; i < _mapKeys.length; ++i) {
+            if (hqX !== _mapX[i] || hqY !== _mapY[i] || hqZ !== _mapZ[i]) continue;
+
+            if (_mapNative[i] === null) {
+                logging.log(`Map ${_mapKeys[i]} is not available in the native mod.Maps enum`, LogLevel.Warning);
             }
 
-            return map as Map;
+            _cachedMapIndex = i;
+            return _mapKeys[i];
         }
 
-        logging.log('Failed to determine current map.', LogLevel.Warning);
-
-        return;
+        logging.log('Failed to determine current map', LogLevel.Warning);
+        return null;
     }
 
     /**
-     * @returns The current map as a `mod.Maps` enum value, or `undefined` if the map cannot be determined.
+     * @returns The current map as a `mod.Maps` enum value, or `null` if the map cannot be determined.
      */
-    export function currentNativeMap(): mod.Maps | undefined {
-        const map = currentMap();
+    export function currentNativeMap(): mod.Maps | null {
+        currentMap(); // Ensure it is cached
 
-        if (!map) return;
+        if (_cachedMapIndex === -1) return null;
 
-        if (!maps[map].nativeMap) {
-            logging.log(`Map ${map} is not available in the native mod.Maps enum.`, LogLevel.Warning);
-            return;
+        const nativeMap = _mapNative[_cachedMapIndex];
+
+        if (nativeMap === null) {
+            logging.log(
+                `Map ${_mapKeys[_cachedMapIndex]} is not available in the native mod.Maps enum`,
+                LogLevel.Warning
+            );
+            return null;
         }
 
-        return maps[map].nativeMap;
+        return nativeMap;
     }
 
     /**
-     * @returns The current map as a string, or `undefined` if the map cannot be determined.
+     * @returns The current map as a string, or `null` if the map cannot be determined.
      */
-    export function currentMapName(): string | undefined {
-        return currentMap()?.toString();
+    export function currentMapName(): string | null {
+        return currentMap()?.toString() ?? null;
     }
 
     /**
@@ -230,21 +215,5 @@ export namespace MapDetector {
      */
     export function isCurrentNativeMap(map: mod.Maps): boolean {
         return currentNativeMap() === map;
-    }
-
-    /**
-     * @returns The HQ coordinates of the current map (used for finding the HQ coordinates of the current map).
-     */
-    function getCoordinates(): Vectors.Vector3 | undefined {
-        try {
-            const position = mod.GetObjectPosition(mod.GetHQ(1));
-            const x = ~~mod.XComponentOf(position);
-            const y = ~~mod.YComponentOf(position);
-            const z = ~~mod.ZComponentOf(position);
-            return { x, y, z };
-        } catch (error: unknown) {
-            logging.log('Failed to get HQ or HQ position.', LogLevel.Error, error);
-            return;
-        }
     }
 }

@@ -2,10 +2,9 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Raycast } from '../raycast/index.ts';
-import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version: 1.0.1
+// version: 2.0.0
 export namespace PortalGadget {
     const logging = new Logging('PG');
 
@@ -29,20 +28,24 @@ export namespace PortalGadget {
     }
 
     const RAYCAST_DISTANCE = 3_000;
-    const RAYCAST_TIMEOUT_MS = 2_500;
 
-    const AIMING_OFFSET: Vectors.Vector3 = { x: -0.49, y: -0.17, z: 0.2 }; // right positive, up positive, forward positive
-    const AIMING_VERTICAL_ANGLE_DELTA = 0; // up positive
-    const AIMING_HORIZONTAL_ANGLE_DELTA = 0; // left positive
+    // Laser offsets relative to eyes (X=Right, Y=Up, Z=Forward)
+    const AIMING_OFFSET: Vectors.Vector3 = { x: -0.49, y: -0.17, z: 0.2 };
+    const HIP_OFFSET: Vectors.Vector3 = { x: -0.49, y: -0.23, z: 0.4 };
 
-    const HIP_OFFSET: Vectors.Vector3 = { x: -0.49, y: -0.23, z: 0.4 }; // right positive, up positive, forward positive
-    const HIP_VERTICAL_ANGLE_DELTA = 28; // up positive
-    const HIP_HORIZONTAL_ANGLE_DELTA = -13.25; // left positive
+    const HIP_YAW_DEG = -13.25;
+    const HIP_PITCH_DEG = 28;
+
+    const _scratchEye: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+    const _scratchFacing: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+    const _scratchOrigin: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+    const _scratchDirection: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+    const _scratchDestination: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
 
     /**
      * A handler function for the Portal Gadget's events.
-     * @param player - The player who started the fire.
-     * @param isZooming - Whether the player is zooming.
+     * @param player - The player who started or stopped the fire.
+     * @param isZooming - Whether the player was zooming when the event fired.
      * @param getTarget - An async function that returns the target position.
      */
     export type Handler = (
@@ -51,158 +54,81 @@ export namespace PortalGadget {
         getTarget: () => Promise<mod.Vector | undefined>
     ) => void;
 
-    const FIRE_START_HANDLERS: Set<Handler> = new Set();
-    const FIRE_STOP_HANDLERS: Set<Handler> = new Set();
+    const _fireStartHandlers: Handler[] = [];
+    const _fireStopHandlers: Handler[] = [];
 
     Events.OnPortalGadgetFireStart.subscribe(handleFireStart);
     Events.OnPortalGadgetFireStop.subscribe(handleFireStop);
 
-    /**
-     * Computes the absolute tip position and direction of the Portal Gadget's laser pointer.
-     * @param eyePosition Absolute 3D world position of the player's eyes.
-     * @param facingDirection Normalized 3D vector of the player's looking direction.
-     * @param localLaserOffset Offset of the laser relative to the eyes (X=Right, Y=Up, Z=Forward).
-     * @param verticalAngleDelta Deg offset from facing direction (pitch).
-     * @param horizontalAngleDelta Deg offset from facing direction (yaw).
-     */
-    function computeLaserTransform(
-        eyePosition: Vectors.Vector3,
-        facingDirection: Vectors.Vector3,
-        localLaserOffset: Vectors.Vector3,
-        verticalAngleDelta: number,
-        horizontalAngleDelta: number
-    ): { position: Vectors.Vector3; direction: Vectors.Vector3 } {
-        // --- 1. Establish the Local Coordinate Basis ---
-        const forward = Vectors.normalize(facingDirection);
-
-        // Default world up is Y. If looking straight up/down, use X to avoid breaking the cross product.
-        const worldUp = Math.abs(forward.y) > 0.999 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
-
-        // Right = Forward x WorldUp
-        const right = Vectors.normalize(Vectors.cross(forward, worldUp));
-
-        // True Local Up = Right x Forward
-        const up = Vectors.cross(right, forward);
-
-        // --- 2. Calculate Laser Origin (World Space) ---
-        const position: Vectors.Vector3 = {
-            x:
-                eyePosition.x +
-                right.x * localLaserOffset.x +
-                up.x * localLaserOffset.y +
-                forward.x * localLaserOffset.z,
-            y:
-                eyePosition.y +
-                right.y * localLaserOffset.x +
-                up.y * localLaserOffset.y +
-                forward.y * localLaserOffset.z,
-            z:
-                eyePosition.z +
-                right.z * localLaserOffset.x +
-                up.z * localLaserOffset.y +
-                forward.z * localLaserOffset.z,
-        };
-
-        // --- 3. Calculate Laser Direction ---
-        // Convert degrees to radians
-        const hRad = horizontalAngleDelta * (Math.PI / 180);
-        const vRad = verticalAngleDelta * (Math.PI / 180);
-
-        // Apply horizontal offset (Yaw) by rotating around the Local Up axis.
-        // Apply vertical offset (Pitch) by rotating around the Local Right axis.
-        // Ensure the final direction is perfectly normalized.
-        const direction = Vectors.normalize(
-            Vectors.rotateAroundAxis(Vectors.rotateAroundAxis(forward, up, hRad), right, vRad)
-        );
-
-        return { position, direction };
-    }
-
-    async function getRaycastTarget(
-        player: mod.Player,
-        eyePosition: Vectors.Vector3,
-        facingDirection: Vectors.Vector3,
+    function _castLaserRay(
+        eyeVec: mod.Vector,
+        facingVec: mod.Vector,
         isZooming: boolean
     ): Promise<mod.Vector | undefined> {
         return new Promise((resolve) => {
-            const { position, direction } = computeLaserTransform(
-                eyePosition,
-                facingDirection,
-                isZooming ? AIMING_OFFSET : HIP_OFFSET,
-                isZooming ? AIMING_VERTICAL_ANGLE_DELTA : HIP_VERTICAL_ANGLE_DELTA,
-                isZooming ? AIMING_HORIZONTAL_ANGLE_DELTA : HIP_HORIZONTAL_ANGLE_DELTA
-            );
+            Vectors.toVector3(eyeVec, _scratchEye);
+            Vectors.toVector3(facingVec, _scratchFacing);
 
-            const destination = Vectors.add(position, Vectors.multiply(direction, RAYCAST_DISTANCE));
+            const offset = isZooming ? AIMING_OFFSET : HIP_OFFSET;
+            const yaw = isZooming ? 0 : HIP_YAW_DEG;
+            const pitch = isZooming ? 0 : HIP_PITCH_DEG;
 
-            const timeout = Timers.setTimeout(() => {
-                resolve(undefined);
-                logging.log(`Raycast timed out.`, LogLevel.Warning);
-            }, RAYCAST_TIMEOUT_MS);
+            Vectors.transformLocalOffset(_scratchEye, _scratchFacing, offset, _scratchOrigin);
+            Vectors.rotateYawPitch(_scratchFacing, yaw, pitch, _scratchDirection);
+
+            _scratchDestination.x = _scratchOrigin.x + _scratchDirection.x * RAYCAST_DISTANCE;
+            _scratchDestination.y = _scratchOrigin.y + _scratchDirection.y * RAYCAST_DISTANCE;
+            _scratchDestination.z = _scratchOrigin.z + _scratchDirection.z * RAYCAST_DISTANCE;
 
             try {
-                Raycast.cast(player, position, destination, {
-                    onHit: (hitPoint) => {
-                        Timers.clearTimeout(timeout);
-                        resolve(Vectors.toVector(hitPoint));
-                    },
-                    onMiss: () => {
-                        Timers.clearTimeout(timeout);
-                        resolve(undefined);
-                    },
+                Raycast.cast(_scratchOrigin, _scratchDestination, {
+                    onHit: (hitPoint) => resolve(Vectors.toVector(hitPoint)),
+                    onMiss: () => resolve(undefined),
                 });
             } catch (error: unknown) {
-                Timers.clearTimeout(timeout);
-                logging.log('Error casting ray.', LogLevel.Error, error);
+                logging.log('Error casting ray', LogLevel.Error, error);
                 resolve(undefined);
             }
         });
     }
 
-    function getPlayerState(player: mod.Player): {
-        eyePosition: Vectors.Vector3;
-        facingDirection: Vectors.Vector3;
-        isZooming: boolean;
-        getTarget: () => Promise<mod.Vector | undefined>;
-    } {
-        const eyePosition = Vectors.toVector3(mod.GetSoldierState(player, mod.SoldierStateVector.EyePosition));
+    function _dispatchHandlers(handlers: Handler[], player: mod.Player): void {
+        const count = handlers.length;
+
+        if (count === 0) return;
+
+        const eyeVec = mod.GetSoldierState(player, mod.SoldierStateVector.EyePosition);
+        const faceVec = mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection);
         const isZooming = mod.GetSoldierState(player, mod.SoldierStateBool.IsZooming);
 
-        const facingDirection = Vectors.toVector3(
-            mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection)
-        );
+        let cachedPromise: Promise<mod.Vector | undefined> | null = null;
 
-        const getTarget = () => getRaycastTarget(player, eyePosition, facingDirection, isZooming);
+        const getTarget = () => {
+            if (cachedPromise === null) {
+                cachedPromise = _castLaserRay(eyeVec, faceVec, isZooming);
+            }
 
-        return {
-            eyePosition,
-            facingDirection,
-            isZooming,
-            getTarget,
+            return cachedPromise;
         };
+
+        for (let i = 0; i < count; ++i) {
+            CallbackHandler.invoke(handlers[i]!, player, isZooming, getTarget, undefined, logging);
+        }
     }
 
     function handleFireStart(player: mod.Player): void {
         try {
-            const { isZooming, getTarget } = getPlayerState(player);
-
-            for (const handler of FIRE_START_HANDLERS) {
-                CallbackHandler.invoke(handler, [player, isZooming, getTarget], 'onFireStart', logging, LogLevel.Error);
-            }
+            _dispatchHandlers(_fireStartHandlers, player);
         } catch (error: unknown) {
-            logging.log('Error handling fire start event.', LogLevel.Error, error);
+            logging.log('Error handling onFireStart event', LogLevel.Error, error);
         }
     }
 
     function handleFireStop(player: mod.Player): void {
         try {
-            const { isZooming, getTarget } = getPlayerState(player);
-
-            for (const handler of FIRE_STOP_HANDLERS) {
-                CallbackHandler.invoke(handler, [player, isZooming, getTarget], 'onFireStop', logging, LogLevel.Error);
-            }
+            _dispatchHandlers(_fireStopHandlers, player);
         } catch (error: unknown) {
-            logging.log('Error handling fire stop event.', LogLevel.Error, error);
+            logging.log('Error handling onFireStop event', LogLevel.Error, error);
         }
     }
 
@@ -212,8 +138,16 @@ export namespace PortalGadget {
      * @returns A function to unsubscribe from the event.
      */
     export function onFireStart(handler: Handler): () => void {
-        FIRE_START_HANDLERS.add(handler);
-        const unsubscribe = () => FIRE_START_HANDLERS.delete(handler);
+        _fireStartHandlers.push(handler);
+
+        const unsubscribe = () => {
+            const index = _fireStartHandlers.indexOf(handler);
+
+            if (index !== -1) {
+                _fireStartHandlers.splice(index, 1);
+            }
+        };
+
         return unsubscribe;
     }
 
@@ -223,8 +157,16 @@ export namespace PortalGadget {
      * @returns A function to unsubscribe from the event.
      */
     export function onFireStop(handler: Handler): () => void {
-        FIRE_STOP_HANDLERS.add(handler);
-        const unsubscribe = () => FIRE_STOP_HANDLERS.delete(handler);
+        _fireStopHandlers.push(handler);
+
+        const unsubscribe = () => {
+            const index = _fireStopHandlers.indexOf(handler);
+
+            if (index !== -1) {
+                _fireStopHandlers.splice(index, 1);
+            }
+        };
+
         return unsubscribe;
     }
 
@@ -234,6 +176,10 @@ export namespace PortalGadget {
      * @returns The target position (undefined if no target is found).
      */
     export async function getLaserTarget(player: mod.Player): Promise<mod.Vector | undefined> {
-        return getPlayerState(player).getTarget();
+        const eyeVec = mod.GetSoldierState(player, mod.SoldierStateVector.EyePosition);
+        const faceVec = mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection);
+        const isZooming = mod.GetSoldierState(player, mod.SoldierStateBool.IsZooming);
+
+        return _castLaserRay(eyeVec, faceVec, isZooming);
     }
 }

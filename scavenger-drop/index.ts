@@ -1,140 +1,19 @@
 import { CallbackHandler } from '../callback-handler/index.ts';
+import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
-import { Timers } from '../timers/index.ts';
 import { Vectors } from '../vectors/index.ts';
 
-// version: 1.0.3
-export class ScavengerDrop {
-    private static _logging = new Logging('SCAV');
-
-    private static _nextDropId: number = 1;
-
-    /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
-     * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
-     */
-    public static setLogging(
-        log?: (text: string) => Promise<void> | void,
-        logLevel?: Logging.LogLevel,
-        includeRawError?: boolean
-    ): void {
-        ScavengerDrop._logging.setLogging(log, logLevel, includeRawError);
-    }
-
-    /**
-     * Creates a new scavenger drop.
-     * Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid.
-     * @param body - The body of the player that the scavenger drop is on.
-     * @param onScavenge - The callback to invoke when a scavenger is found.
-     * @param options - The options for the scavenger drop.
-     */
-    public constructor(
-        body: mod.Player,
-        onScavenge: (player: mod.Player) => Promise<void> | void,
-        options?: ScavengerDrop.Options
-    ) {
-        const position = mod.GetSoldierState(body, mod.SoldierStateVector.GetPosition);
-        const duration = options?.duration ?? 37_000; // 37 seconds is how long a dead player's bag stays on the ground.
-        const checkInterval = options?.checkInterval ?? 200; // 0.2 seconds between checks.
-
-        this._id = ScavengerDrop._nextDropId++;
-
-        const check = () => this._check(position, onScavenge);
-        this._intervalId = Timers.setInterval(check, checkInterval);
-
-        const expire = () => this._expire();
-        this._endTimeoutId = Timers.setTimeout(expire, duration);
-
-        if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
-            ScavengerDrop._logging.log(
-                `Drop ${this._id} created on P-${mod.GetObjId(body)}'s body at ${Vectors.getVectorString(position)}.`,
-                ScavengerDrop.LogLevel.Debug
-            );
-        }
-    }
-
-    private _id: number;
-
-    private _checkTickDown: number = 1; // First check will be in 1 check interval.'
-
-    private _intervalId: number;
-
-    private _endTimeoutId: number;
-
-    private clearTimers(): void {
-        Timers.clear(this._intervalId);
-        Timers.clear(this._endTimeoutId);
-    }
-
-    private _check(position: mod.Vector, onScavenge: (player: mod.Player) => Promise<void> | void): void {
-        if (--this._checkTickDown > 0) return; // Skip
-
-        const closestScavenger = mod.ClosestPlayerTo(position);
-
-        if (!mod.IsPlayerValid(closestScavenger)) {
-            this._checkTickDown = 10; // Check back in 10 ticks.
-            return;
-        }
-
-        const distance = mod.DistanceBetween(
-            position,
-            mod.GetSoldierState(closestScavenger, mod.SoldierStateVector.GetPosition)
-        );
-
-        // If closest scavenger is too far, check again in a few ticks, scaled by distance.
-        if (distance > 2) {
-            this._checkTickDown = Math.min(10, Math.max(1, Math.floor(distance / 4)));
-            return;
-        }
-
-        this.clearTimers();
-
-        CallbackHandler.invoke(
-            onScavenge,
-            [closestScavenger],
-            `drop ${this._id}`,
-            ScavengerDrop._logging,
-            Logging.LogLevel.Error
-        );
-
-        if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Info)) {
-            ScavengerDrop._logging.log(
-                `P-${mod.GetObjId(closestScavenger)} found drop ${this._id}.`,
-                ScavengerDrop.LogLevel.Info
-            );
-        }
-    }
-
-    private _expire(): void {
-        this.clearTimers();
-
-        if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
-            ScavengerDrop._logging.log(`Drop ${this._id} expired.`, ScavengerDrop.LogLevel.Debug);
-        }
-    }
-
-    /**
-     * Stops the scavenger drop.
-     */
-    public stop(): void {
-        this.clearTimers();
-
-        if (ScavengerDrop._logging.willLog(ScavengerDrop.LogLevel.Debug)) {
-            ScavengerDrop._logging.log(`Drop ${this._id} stopped.`, ScavengerDrop.LogLevel.Debug);
-        }
-    }
-}
-
+// version: 2.0.0
 export namespace ScavengerDrop {
+    const logging = new Logging('SD');
+
     /**
      * A re-export of the `Logging.LogLevel` enum.
      */
     export const LogLevel = Logging.LogLevel;
 
     /**
-     * The options for the ScavengerDrop instance.
+     * The options for a scavenger drop.
      */
     export interface Options {
         /**
@@ -145,5 +24,262 @@ export namespace ScavengerDrop {
          * The interval at which to check for scavengers in milliseconds.
          */
         checkInterval?: number;
+    }
+
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeRawError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeRawError?: boolean
+    ): void {
+        logging.setLogging(log, logLevel, includeRawError);
+    }
+
+    /**
+     * Unique generation-encoded identifier for a Scavenger Drop.
+     */
+    export type DropID = number & { readonly __brand: 'DropID' };
+
+    /**
+     * Sentinel value representing an invalid or uninitialized Drop ID.
+     */
+    export const INVALID_DROP_ID: DropID = -1 as DropID;
+
+    const MAX_DROPS = 128;
+    const SERVER_START_TIME = Date.now();
+    const GENERATION_MULTIPLIER = 10_000;
+    const INVALID_INDEX = -1;
+
+    function getUptime(): number {
+        return Date.now() - SERVER_START_TIME + 1;
+    }
+
+    const _generations = new Uint32Array(MAX_DROPS);
+    const _expirationTimes = new Uint32Array(MAX_DROPS);
+    const _checkIntervalMs = new Uint16Array(MAX_DROPS);
+
+    /**
+     * Intrusive link / next check time array:
+     * - Free slot (!isInUse): Points to the next free slot on the intrusive free list (`_firstFree`).
+     * - In-use slot (isInUse): Stores the next check timestamp in milliseconds uptime.
+     */
+    const _nextCheckTimes = new Int32Array(MAX_DROPS);
+
+    for (let i = 0; i < MAX_DROPS - 1; ++i) {
+        _nextCheckTimes[i] = i + 1;
+    }
+
+    _nextCheckTimes[MAX_DROPS - 1] = INVALID_INDEX;
+
+    let _firstFree = 0;
+
+    const _positions = new Array<mod.Vector | null>(MAX_DROPS).fill(null);
+    const _callbacks = new Array<((player: mod.Player) => Promise<void> | void) | null>(MAX_DROPS).fill(null);
+
+    let _activeDropCount = 0;
+
+    Events.OngoingGlobal.subscribe(_handleOngoingGlobal);
+
+    function _isInUse(index: number): boolean {
+        return _expirationTimes[index] !== 0;
+    }
+
+    /**
+     * Pops the next available slot from the intrusive free-list in O(1) time.
+     * @returns The index of the allocated slot, or INVALID_INDEX if the pool is full.
+     */
+    function _allocateSlot(): number {
+        if (_firstFree === INVALID_INDEX) {
+            logging.log('Pool is full', LogLevel.Error);
+            return INVALID_INDEX;
+        }
+
+        const index = _firstFree;
+        _firstFree = _nextCheckTimes[index];
+        _nextCheckTimes[index] = 0;
+
+        return index;
+    }
+
+    /**
+     * Resolves a public DropID to its internal slot index.
+     * @param id - The public DropID.
+     * @returns The internal slot index, or INVALID_INDEX if invalid or inactive.
+     */
+    function _resolveIndex(id: DropID): number {
+        if (id < 0) return INVALID_INDEX;
+
+        const index = id % GENERATION_MULTIPLIER;
+
+        if (index >= MAX_DROPS) return INVALID_INDEX;
+
+        const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
+
+        if (_generations[index] !== expectedGen || !_isInUse(index)) return INVALID_INDEX;
+
+        return index;
+    }
+
+    function _destroy(index: number): void {
+        _expirationTimes[index] = 0;
+        _positions[index] = null;
+        _callbacks[index] = null;
+        ++_generations[index];
+        --_activeDropCount;
+
+        _nextCheckTimes[index] = _firstFree;
+        _firstFree = index;
+    }
+
+    function _handleOngoingGlobal(): void {
+        if (_activeDropCount === 0) return;
+
+        const now = getUptime();
+
+        for (let i = 0; i < MAX_DROPS; ++i) {
+            if (!_isInUse(i)) continue;
+
+            if (now >= _expirationTimes[i]) {
+                const dropId = (i + GENERATION_MULTIPLIER * _generations[i]) as DropID;
+
+                if (logging.willLog(LogLevel.Info)) {
+                    logging.log(`Drop ${dropId} expired`, LogLevel.Info);
+                }
+
+                _destroy(i);
+                continue;
+            }
+
+            if (now < _nextCheckTimes[i]) continue;
+
+            const position = _positions[i];
+
+            if (position === null) {
+                _destroy(i);
+                continue;
+            }
+
+            const closestPlayer = mod.ClosestPlayerTo(position);
+
+            if (closestPlayer === undefined) {
+                _nextCheckTimes[i] = now + 10 * _checkIntervalMs[i];
+                continue;
+            }
+
+            const distance = mod.DistanceBetween(position, mod.GetObjectPosition(closestPlayer));
+
+            if (distance > 2) {
+                const factor = Math.min(10, Math.max(1, Math.floor(distance / 4)));
+                _nextCheckTimes[i] = now + factor * _checkIntervalMs[i];
+                continue;
+            }
+
+            const callback = _callbacks[i];
+            const dropId = (i + GENERATION_MULTIPLIER * _generations[i]) as DropID;
+
+            _destroy(i);
+
+            CallbackHandler.invoke(callback, closestPlayer, undefined, undefined, undefined, logging);
+
+            if (logging.willLog(LogLevel.Info)) {
+                logging.log(`P-${mod.GetObjId(closestPlayer)} found drop ${dropId}`, LogLevel.Info);
+            }
+        }
+    }
+
+    /**
+     * Creates a new scavenger drop.
+     * Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid.
+     * @param body - The body of the player that the scavenger drop is on.
+     * @param onScavenge - The callback to invoke when a scavenger is found.
+     * @param options - The options for the scavenger drop.
+     * @returns A generational drop ID, or INVALID_DROP_ID if the pre-allocated drop pool is full.
+     */
+    export function create(
+        body: mod.Player,
+        onScavenge: (player: mod.Player) => Promise<void> | void,
+        options?: Options
+    ): DropID {
+        // Do this first to maximize the chances of the body still being valid and on the field.
+        const position = mod.GetObjectPosition(body);
+
+        const index = _allocateSlot();
+
+        if (index === INVALID_INDEX) return INVALID_DROP_ID;
+
+        const duration = options?.duration ?? 37_000; // 37 seconds is how long a dead player's bag stays on the ground.
+        const checkInterval = options?.checkInterval ?? 200; // 0.2 seconds between checks.
+        const now = getUptime();
+
+        _expirationTimes[index] = now + duration;
+        _checkIntervalMs[index] = checkInterval;
+        _nextCheckTimes[index] = now + checkInterval;
+        _positions[index] = position;
+        _callbacks[index] = onScavenge;
+        ++_activeDropCount;
+
+        const dropId = (index + GENERATION_MULTIPLIER * _generations[index]) as DropID;
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(
+                `Drop ${dropId} created on P-${mod.GetObjId(body)}'s body at ${Vectors.getVectorString(Vectors.toVector3(position))}`,
+                LogLevel.Info
+            );
+        }
+
+        return dropId;
+    }
+
+    /**
+     * Stops/cancels an active scavenger drop by ID.
+     * @param id - The drop ID returned by `create`.
+     */
+    export function stop(id: DropID): void {
+        const index = _resolveIndex(id);
+
+        if (index === INVALID_INDEX) return;
+
+        _destroy(index);
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log(`Drop ${id} stopped`, LogLevel.Info);
+        }
+    }
+
+    /**
+     * Stops and cleans up all active scavenger drops.
+     */
+    export function stopAll(): void {
+        for (let i = 0; i < MAX_DROPS; ++i) {
+            if (_isInUse(i)) {
+                _destroy(i);
+            }
+        }
+
+        if (logging.willLog(LogLevel.Info)) {
+            logging.log('All scavenger drops stopped', LogLevel.Info);
+        }
+    }
+
+    /**
+     * Checks if a drop ID is currently active.
+     * @param id - The drop ID to check.
+     * @returns True if the drop is active, false otherwise.
+     */
+    export function isActive(id: DropID): boolean {
+        return _resolveIndex(id) !== INVALID_INDEX;
+    }
+
+    /**
+     * Gets the number of currently active scavenger drops.
+     * @returns The number of active drops.
+     */
+    export function getActiveDropCount(): number {
+        return _activeDropCount;
     }
 }

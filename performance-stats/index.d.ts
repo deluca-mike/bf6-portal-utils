@@ -24,13 +24,13 @@ export declare namespace PerformanceStats {
      */
     function getSmoothedTimeoutLagMs(): number;
     /**
-     * Returns the value that is somewhat analogous to SFT when above 33m.
+     * Returns the value that is somewhat analogous to SFT when above 33ms.
      * @returns The raw delta time between the last two ticks. Good for compute scaling.
      */
     function getSpotDeltaMs(): number;
     /**
      * Returns the value that is analogous to STR.
-     * @returns The tick rate. Good for compute scaling.
+     * @returns The tick rate in Hz. Good for compute scaling.
      */
     function getSpotTickRate(): number;
     /**

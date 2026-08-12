@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 8.0.2
+// version: 9.0.0
 export namespace UI {
     /****** Logging ******/
 
@@ -15,7 +15,7 @@ export namespace UI {
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
@@ -48,10 +48,11 @@ export namespace UI {
      * The parent of an element.
      */
     export type Parent = {
-        name: string;
         uiWidget: mod.UIWidget;
         receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
-        children: Element[];
+        children: readonly Element[];
+        getChild(index: number): Element | undefined;
+        forEachChild(callback: (child: Element, index: number) => void): void;
         attachChild(child: Element): void;
         detachChild(child: Element): void;
     };
@@ -126,7 +127,7 @@ export namespace UI {
 
         protected _nativeReceiver: T;
 
-        protected _inputModeRequesters: Set<Element> = new Set();
+        protected _inputModeRequesterCount: number = 0;
 
         protected constructor(id: string, receiver: T) {
             this._id = id;
@@ -135,6 +136,7 @@ export namespace UI {
 
         /**
          * The ID of the receiver. Used mainly for generating UI Widget names and for debugging purposes.
+         * @returns The ID of the receiver.
          */
         public get id(): string {
             return this._id;
@@ -142,6 +144,7 @@ export namespace UI {
 
         /**
          * The native receiver of the receiver. This is the actual player or team object, not the receiver object.
+         * @returns The native receiver.
          */
         public get nativeReceiver(): T {
             return this._nativeReceiver;
@@ -149,21 +152,17 @@ export namespace UI {
 
         /**
          * Whether input mode is requested for this receiver.
+         * @returns True if input mode is requested, false otherwise.
          */
         public get isInputModeRequested(): boolean {
-            return this._inputModeRequesters.size > 0;
+            return this._inputModeRequesterCount > 0;
         }
 
         /**
-         * Adds an element to the input mode requesters.
-         * @param element - The element to add.
+         * Increments the input mode requester count and enables input mode if transitioning from 0 to 1.
          */
-        public addInputModeRequester(element: Element): void {
-            const wasAlreadyRequested = this.isInputModeRequested;
-            this._inputModeRequesters.add(element);
-
-            // If input mode was already requested, do nothing (there is obviously at least one requester).
-            if (wasAlreadyRequested) return;
+        public addInputModeRequester(): void {
+            if (++this._inputModeRequesterCount !== 1) return;
 
             if (this._nativeReceiver) {
                 mod.EnableUIInputMode(true, this._nativeReceiver);
@@ -173,18 +172,10 @@ export namespace UI {
         }
 
         /**
-         * Removes an element from the input mode requesters.
-         * @param element - The element to remove.
+         * Decrements the input mode requester count and disables input mode if transitioning from 1 to 0.
          */
-        public removeInputModeRequester(element: Element): void {
-            const wasAlreadyRequested = this.isInputModeRequested;
-            this._inputModeRequesters.delete(element);
-
-            // If input mode was not requested, do nothing (there are obviously still no requesters).
-            if (!wasAlreadyRequested) return;
-
-            // If input mode is still requested, do nothing (there is still at least one requester).
-            if (this.isInputModeRequested) return;
+        public removeInputModeRequester(): void {
+            if (this._inputModeRequesterCount <= 0 || --this._inputModeRequesterCount !== 0) return;
 
             if (this._nativeReceiver) {
                 mod.EnableUIInputMode(false, this._nativeReceiver);
@@ -253,7 +244,7 @@ export namespace UI {
     }
 
     /**
-     * The base node class. All elements are nodes, adn all nodes are UI widgets.
+     * The base node class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Node {
         protected readonly _logging: Logging = logging; // Every node has access to the singleton UI logging instance.
@@ -278,14 +269,11 @@ export namespace UI {
         }
 
         /**
-         * The name of the node. This is the name of the UIWidget.
-         */
-        public get name(): string {
-            return this._name;
-        }
-
-        /**
-         * The UIWidget of the node.
+         * The underlying native Battlefield Portal UIWidget handle for this node.
+         *
+         * Warning: Exercise caution when operating on the widget outside of this module/component,
+         * as direct mutations via native `mod.*` APIs can desynchronize internal state and cause runtime errors.
+         * @returns The native UIWidget handle.
          */
         public get uiWidget(): mod.UIWidget {
             return this._uiWidget;
@@ -293,6 +281,7 @@ export namespace UI {
 
         /**
          * The receiver of the node.
+         * @returns The receiver of the node.
          */
         public get receiver(): GlobalReceiver | TeamReceiver | PlayerReceiver {
             return this._receiver;
@@ -308,17 +297,41 @@ export namespace UI {
          */
         public static readonly instance = new Root();
 
-        private _children: Set<Element> = new Set();
+        protected _children?: Element[];
 
         private constructor() {
-            super('root', mod.GetUIRoot(), GlobalReceiver.instance);
+            super('ui_0', mod.GetUIRoot(), GlobalReceiver.instance);
         }
 
         /**
-         * The children of the root node.
+         * Returns a shallow copy of the list of direct child elements.
+         * @returns Array of direct children.
          */
-        public get children(): Element[] {
-            return Array.from(this._children);
+        public get children(): readonly Element[] {
+            return this._children ? this._children.slice() : [];
+        }
+
+        /**
+         * Retrieves a child element at the specified index.
+         * @param index - Zero-based index of the child.
+         * @returns The child element, or undefined if out of bounds.
+         */
+        public getChild(index: number): Element | undefined {
+            return this._children ? this._children[index] : undefined;
+        }
+
+        /**
+         * Iterates over all direct child elements without allocating an intermediate array.
+         * @param callback - Function invoked for each child.
+         */
+        public forEachChild(callback: (child: Element, index: number) => void): void {
+            if (!this._children) return;
+
+            const count = this._children.length;
+
+            for (let i = 0; i < count; ++i) {
+                callback(this._children[i]!, i);
+            }
         }
 
         /**
@@ -326,7 +339,12 @@ export namespace UI {
          * @param child - The child to attach.
          */
         public attachChild(child: Element): void {
-            this._children.add(child);
+            if (!this._children) {
+                this._children = [child];
+                return;
+            }
+
+            this._children.push(child);
         }
 
         /**
@@ -334,7 +352,17 @@ export namespace UI {
          * @param child - The child to detach.
          */
         public detachChild(child: Element): void {
-            this._children.delete(child);
+            if (!this._children) return;
+
+            const idx = this._children.indexOf(child);
+
+            if (idx === -1) return;
+
+            const last = this._children.pop()!;
+
+            if (idx < this._children.length) {
+                this._children[idx] = last;
+            }
         }
     }
 
@@ -343,17 +371,8 @@ export namespace UI {
      */
     export abstract class Element extends Node {
         protected _parent: Parent;
-        protected _visible: boolean;
-        protected _x: number;
-        protected _y: number;
-        protected _width: number;
-        protected _height: number;
-        protected _bgColor: mod.Vector;
-        protected _bgAlpha: number;
-        protected _bgFill: mod.UIBgFill;
-        protected _depth: mod.UIDepth;
-        protected _anchor: mod.UIAnchor;
         protected _uiInputModeWhenVisible: boolean;
+        protected _hasInputMode: boolean = false;
         protected _deleted: boolean = false;
 
         /**
@@ -364,28 +383,19 @@ export namespace UI {
             super(params.name, mod.FindUIWidgetWithName(params.name) as mod.UIWidget, params.receiver);
 
             this._parent = params.parent;
-            this._visible = params.visible;
-            this._x = params.x;
-            this._y = params.y;
-            this._width = params.width;
-            this._height = params.height;
-            this._bgColor = params.bgColor;
-            this._bgAlpha = params.bgAlpha;
-            this._bgFill = params.bgFill;
-            this._depth = params.depth;
-            this._anchor = params.anchor;
             this._uiInputModeWhenVisible = params.uiInputModeWhenVisible;
 
             this._parent.attachChild(this);
 
-            if (this._uiInputModeWhenVisible && this._visible) {
-                this._receiver.addInputModeRequester(this);
+            if (this._uiInputModeWhenVisible && params.visible) {
+                this._hasInputMode = true;
+                this._receiver.addInputModeRequester();
             }
         }
 
         protected _isDeletedCheck(): boolean {
             if (this._deleted) {
-                logging.log(`Element ${this.name} already deleted.`, LogLevel.Warning);
+                logging.log(`Element ${this._name} already deleted`, LogLevel.Warning);
                 return true;
             }
 
@@ -394,6 +404,7 @@ export namespace UI {
 
         /**
          * The parent of the element.
+         * @returns The parent of the element.
          */
         public get parent(): Parent {
             return this._parent;
@@ -409,27 +420,16 @@ export namespace UI {
             mod.SetUIWidgetParent(this._uiWidget, parent.uiWidget);
 
             this._parent.detachChild(this);
-
             this._parent = parent;
-
             this._parent.attachChild(this);
         }
 
         /**
-         * Sets the parent of the element. Useful for chaining operations.
-         * @param parent - The parent to set.
-         * @returns This element instance.
-         */
-        public setParent(parent: Parent): this {
-            this.parent = parent;
-            return this;
-        }
-
-        /**
          * Whether the element is visible.
+         * @returns True if visible, false otherwise.
          */
         public get visible(): boolean {
-            return this._visible;
+            return mod.GetUIWidgetVisible(this._uiWidget);
         }
 
         /**
@@ -439,73 +439,38 @@ export namespace UI {
         public set visible(visible: boolean) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetVisible(this._uiWidget, (this._visible = visible));
+            mod.SetUIWidgetVisible(this._uiWidget, visible);
 
             if (!this._uiInputModeWhenVisible) return;
 
-            if (visible) {
-                this._receiver.addInputModeRequester(this);
-            } else {
-                this._receiver.removeInputModeRequester(this);
+            if (visible && !this._hasInputMode) {
+                this._hasInputMode = true;
+                this._receiver.addInputModeRequester();
+            } else if (!visible && this._hasInputMode) {
+                this._hasInputMode = false;
+                this._receiver.removeInputModeRequester();
             }
         }
 
         /**
-         * Sets the visibility of the element. Useful for chaining operations.
-         * @param visible - The visibility to set.
-         * @returns This element instance.
-         */
-        public setVisible(visible: boolean): this {
-            this.visible = visible;
-            return this;
-        }
-
-        /**
-         * Shows the element.
-         * @returns This element instance.
-         */
-        public show(): this {
-            this.visible = true;
-            return this;
-        }
-
-        /**
-         * Hides the element.
-         * @returns This element instance.
-         */
-        public hide(): this {
-            this.visible = false;
-            return this;
-        }
-
-        /**
-         * Toggles the visibility of the element.
-         * @returns This element instance.
-         */
-        public toggle(): this {
-            this.visible = !this.visible;
-            return this;
-        }
-
-        /**
-         * Whether the element is deleted. This is needed to block all setter operations after the element is deleted
-         * but a reference to the element is still in memory and the experience code is still trying to use it.
+         * Whether the element is deleted.
+         * @returns True if deleted, false otherwise.
          */
         public get deleted(): boolean {
             return this._deleted;
         }
 
         /**
-         * Deletes the element. Does not return `this` for chaining because the element is destroyed and no other calls
-         * on it should be performed.
+         * Deletes the element.
          */
         public delete(): void {
             if (this._isDeletedCheck()) return;
 
             this._deleted = true;
 
-            if (this._uiInputModeWhenVisible) {
-                this._receiver.removeInputModeRequester(this);
+            if (this._hasInputMode) {
+                this._hasInputMode = false;
+                this._receiver.removeInputModeRequester();
             }
 
             this._parent.detachChild(this);
@@ -515,9 +480,10 @@ export namespace UI {
 
         /**
          * The X position of the element.
+         * @returns The X position of the element.
          */
         public get x(): number {
-            return this._x;
+            return mod.XComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
         }
 
         /**
@@ -527,24 +493,17 @@ export namespace UI {
         public set x(x: number) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector((this._x = x), this.y, 0));
-        }
+            const cur = mod.GetUIWidgetPosition(this._uiWidget);
 
-        /**
-         * Sets the X position of the element. Useful for chaining operations.
-         * @param x - The X position to set.
-         * @returns This element instance.
-         */
-        public setX(x: number): this {
-            this.x = x;
-            return this;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, mod.YComponentOf(cur), 0));
         }
 
         /**
          * The Y position of the element.
+         * @returns The Y position of the element.
          */
         public get y(): number {
-            return this._y;
+            return mod.YComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
         }
 
         /**
@@ -554,24 +513,19 @@ export namespace UI {
         public set y(y: number) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(this.x, (this._y = y), 0));
-        }
+            const cur = mod.GetUIWidgetPosition(this._uiWidget);
 
-        /**
-         * Sets the Y position of the element. Useful for chaining operations.
-         * @param y - The Y position to set.
-         * @returns This element instance.
-         */
-        public setY(y: number): this {
-            this.y = y;
-            return this;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(mod.XComponentOf(cur), y, 0));
         }
 
         /**
          * The position of the element.
+         * @returns The position of the element.
          */
         public get position(): Position {
-            return { x: this._x, y: this._y };
+            const pos = mod.GetUIWidgetPosition(this._uiWidget);
+
+            return { x: mod.XComponentOf(pos), y: mod.YComponentOf(pos) };
         }
 
         /**
@@ -581,24 +535,15 @@ export namespace UI {
         public set position(params: Position) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector((this._x = params.x), (this._y = params.y), 0));
-        }
-
-        /**
-         * Sets the position of the element. Useful for chaining operations.
-         * @param params - The position to set.
-         * @returns This element instance.
-         */
-        public setPosition(params: Position): this {
-            this.position = params;
-            return this;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
         }
 
         /**
          * The width of the element.
+         * @returns The width of the element.
          */
         public get width(): number {
-            return this._width;
+            return mod.XComponentOf(mod.GetUIWidgetSize(this._uiWidget));
         }
 
         /**
@@ -608,24 +553,17 @@ export namespace UI {
         public set width(width: number) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector((this._width = width), this.height, 0));
-        }
+            const cur = mod.GetUIWidgetSize(this._uiWidget);
 
-        /**
-         * Sets the width of the element. Useful for chaining operations.
-         * @param width - The width to set.
-         * @returns This element instance.
-         */
-        public setWidth(width: number): this {
-            this.width = width;
-            return this;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, mod.YComponentOf(cur), 0));
         }
 
         /**
          * The height of the element.
+         * @returns The height of the element.
          */
         public get height(): number {
-            return this._height;
+            return mod.YComponentOf(mod.GetUIWidgetSize(this._uiWidget));
         }
 
         /**
@@ -635,24 +573,19 @@ export namespace UI {
         public set height(height: number) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, (this._height = height), 0));
-        }
+            const cur = mod.GetUIWidgetSize(this._uiWidget);
 
-        /**
-         * Sets the height of the element. Useful for chaining operations.
-         * @param height - The height to set.
-         * @returns This element instance.
-         */
-        public setHeight(height: number): this {
-            this.height = height;
-            return this;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(mod.XComponentOf(cur), height, 0));
         }
 
         /**
          * The size of the element.
+         * @returns The size of the element.
          */
         public get size(): Size {
-            return { width: this._width, height: this._height };
+            const s = mod.GetUIWidgetSize(this._uiWidget);
+
+            return { width: mod.XComponentOf(s), height: mod.YComponentOf(s) };
         }
 
         /**
@@ -662,27 +595,15 @@ export namespace UI {
         public set size(params: Size) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetSize(
-                this._uiWidget,
-                mod.CreateVector((this._width = params.width), (this._height = params.height), 0)
-            );
-        }
-
-        /**
-         * Sets the size of the element. Useful for chaining operations.
-         * @param params - The size to set.
-         * @returns This element instance.
-         */
-        public setSize(params: Size): this {
-            this.size = params;
-            return this;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
         }
 
         /**
          * The background color of the element.
+         * @returns The background color of the element.
          */
         public get bgColor(): mod.Vector {
-            return this._bgColor;
+            return mod.GetUIWidgetBgColor(this._uiWidget);
         }
 
         /**
@@ -692,24 +613,15 @@ export namespace UI {
         public set bgColor(color: mod.Vector) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetBgColor(this._uiWidget, (this._bgColor = color));
-        }
-
-        /**
-         * Sets the background color of the element. Useful for chaining operations.
-         * @param color - The background color to set.
-         * @returns This element instance.
-         */
-        public setBgColor(color: mod.Vector): this {
-            this.bgColor = color;
-            return this;
+            mod.SetUIWidgetBgColor(this._uiWidget, color);
         }
 
         /**
          * The background alpha of the element.
+         * @returns The background alpha of the element.
          */
         public get bgAlpha(): number {
-            return this._bgAlpha;
+            return mod.GetUIWidgetBgAlpha(this._uiWidget);
         }
 
         /**
@@ -719,24 +631,15 @@ export namespace UI {
         public set bgAlpha(alpha: number) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetBgAlpha(this._uiWidget, (this._bgAlpha = alpha));
-        }
-
-        /**
-         * Sets the background alpha of the element. Useful for chaining operations.
-         * @param alpha - The background alpha to set.
-         * @returns This element instance.
-         */
-        public setBgAlpha(alpha: number): this {
-            this.bgAlpha = alpha;
-            return this;
+            mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
         }
 
         /**
          * The background fill of the element.
+         * @returns The background fill of the element.
          */
         public get bgFill(): mod.UIBgFill {
-            return this._bgFill;
+            return mod.GetUIWidgetBgFill(this._uiWidget);
         }
 
         /**
@@ -746,24 +649,15 @@ export namespace UI {
         public set bgFill(fill: mod.UIBgFill) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetBgFill(this._uiWidget, (this._bgFill = fill));
-        }
-
-        /**
-         * Sets the background fill of the element. Useful for chaining operations.
-         * @param fill - The background fill to set.
-         * @returns This element instance.
-         */
-        public setBgFill(fill: mod.UIBgFill): this {
-            this.bgFill = fill;
-            return this;
+            mod.SetUIWidgetBgFill(this._uiWidget, fill);
         }
 
         /**
          * The depth of the element.
+         * @returns The depth of the element.
          */
         public get depth(): mod.UIDepth {
-            return this._depth;
+            return mod.GetUIWidgetDepth(this._uiWidget);
         }
 
         /**
@@ -773,24 +667,15 @@ export namespace UI {
         public set depth(depth: mod.UIDepth) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetDepth(this._uiWidget, (this._depth = depth));
-        }
-
-        /**
-         * Sets the depth of the element. Useful for chaining operations.
-         * @param depth - The depth to set.
-         * @returns This element instance.
-         */
-        public setDepth(depth: mod.UIDepth): this {
-            this.depth = depth;
-            return this;
+            mod.SetUIWidgetDepth(this._uiWidget, depth);
         }
 
         /**
          * The anchor of the element.
+         * @returns The anchor of the element.
          */
         public get anchor(): mod.UIAnchor {
-            return this._anchor;
+            return mod.GetUIWidgetAnchor(this._uiWidget);
         }
 
         /**
@@ -800,21 +685,12 @@ export namespace UI {
         public set anchor(anchor: mod.UIAnchor) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetAnchor(this._uiWidget, (this._anchor = anchor));
-        }
-
-        /**
-         * Sets the anchor of the element. Useful for chaining operations.
-         * @param anchor - The anchor to set.
-         * @returns This element instance.
-         */
-        public setAnchor(anchor: mod.UIAnchor): this {
-            this.anchor = anchor;
-            return this;
+            mod.SetUIWidgetAnchor(this._uiWidget, anchor);
         }
 
         /**
          * Whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @returns True if UI input mode is requested when visible, false otherwise.
          */
         public get uiInputModeWhenVisible(): boolean {
             return this._uiInputModeWhenVisible;
@@ -822,38 +698,24 @@ export namespace UI {
 
         /**
          * Sets whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
-         * Has an immediate effect on the receiver's input mode state.
          * @param newValue - The new value.
          */
         public set uiInputModeWhenVisible(newValue: boolean) {
             if (this._isDeletedCheck()) return;
 
-            const previousValue = this._uiInputModeWhenVisible;
-
-            if (previousValue === newValue) return;
+            if (this._uiInputModeWhenVisible === newValue) return;
 
             this._uiInputModeWhenVisible = newValue;
 
-            // If `uiInputModeWhenVisible` is being enabled and the element is visible...
-            if (newValue && this.visible) {
-                // ...add the element as an input mode requester.
-                this._receiver.addInputModeRequester(this);
-            } else {
-                // ...remove the element as an input mode requester.
-                this._receiver.removeInputModeRequester(this);
-            }
-        }
+            const isVisible = mod.GetUIWidgetVisible(this._uiWidget);
 
-        /**
-         * Sets whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
-         * Has an immediate effect on the receiver's input mode state.
-         * Useful for chaining operations.
-         * @param newValue - The new value.
-         * @returns This element instance.
-         */
-        public setUiInputModeWhenVisible(newValue: boolean): this {
-            this.uiInputModeWhenVisible = newValue;
-            return this;
+            if (newValue && isVisible && !this._hasInputMode) {
+                this._hasInputMode = true;
+                this._receiver.addInputModeRequester();
+            } else if ((!newValue || !isVisible) && this._hasInputMode) {
+                this._hasInputMode = false;
+                this._receiver.removeInputModeRequester();
+            }
         }
     }
 
@@ -896,45 +758,12 @@ export namespace UI {
 
     /****** Button Registry ******/
 
-    type HandlerData = {
-        handler?: ButtonHandler;
-        name: string;
-    };
-
     const BUTTONS = new Map<string, Button>();
 
-    function getButtonHandler(button: Button, event: mod.UIButtonEvent): HandlerData {
-        if (mod.Equals(event, mod.UIButtonEvent.ButtonDown)) {
-            return { handler: button.onClickDown, name: 'onClickDown' };
-        }
-
-        if (mod.Equals(event, mod.UIButtonEvent.ButtonUp)) {
-            return { handler: button.onClickUp, name: 'onClickUp' };
-        }
-
-        if (mod.Equals(event, mod.UIButtonEvent.FocusIn)) {
-            return { handler: button.onFocusIn, name: 'onFocusIn' };
-        }
-
-        if (mod.Equals(event, mod.UIButtonEvent.FocusOut)) {
-            return { handler: button.onFocusOut, name: 'onFocusOut' };
-        }
-
-        if (mod.Equals(event, mod.UIButtonEvent.HoverIn)) {
-            return { handler: undefined, name: 'onHoverIn' };
-        }
-
-        if (mod.Equals(event, mod.UIButtonEvent.HoverOut)) {
-            return { handler: undefined, name: 'onHoverOut' };
-        }
-
-        return { handler: undefined, name: 'default' };
-    }
-
     /**
-     * Handles a button event.
-     * @param player - The player who pressed the button.
-     * @param widget - The widget that was pressed.
+     * Handles a button event with zero intermediate object allocations.
+     * @param player - The player who triggered the button event.
+     * @param widget - The widget that was triggered.
      * @param event - The button event.
      */
     function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
@@ -942,18 +771,48 @@ export namespace UI {
         const button = BUTTONS.get(name);
 
         if (!button) {
-            logging.log(`Button ${name} not found.`, LogLevel.Warning);
+            logging.log(`Button ${name} not found`, LogLevel.Warning);
             return;
         }
 
-        const { handler, name: handlerName } = getButtonHandler(button, event);
+        let handler: ButtonHandler | undefined;
+
+        if (mod.Equals(event, mod.UIButtonEvent.ButtonUp)) {
+            handler = button.onClickUp;
+
+            if (!handler) {
+                logging.log(`Button ${name} has no onClickUp handler`, LogLevel.Warning);
+                return;
+            }
+        } else if (mod.Equals(event, mod.UIButtonEvent.ButtonDown)) {
+            handler = button.onClickDown;
+
+            if (!handler) {
+                logging.log(`Button ${name} has no onClickDown handler`, LogLevel.Warning);
+                return;
+            }
+        } else if (mod.Equals(event, mod.UIButtonEvent.FocusIn)) {
+            handler = button.onFocusIn;
+
+            if (!handler) {
+                logging.log(`Button ${name} has no onFocusIn handler`, LogLevel.Warning);
+                return;
+            }
+        } else if (mod.Equals(event, mod.UIButtonEvent.FocusOut)) {
+            handler = button.onFocusOut;
+
+            if (!handler) {
+                logging.log(`Button ${name} has no onFocusOut handler`, LogLevel.Warning);
+                return;
+            }
+        }
 
         if (!handler) {
-            logging.log(`Button ${name} has no ${handlerName} handler.`, LogLevel.Warning);
+            logging.log('HoverIn and HoverOut button events not supported', LogLevel.Warning);
             return;
         }
 
-        CallbackHandler.invoke(handler, [player], `button handler for widget ${name}`, logging, LogLevel.Error);
+        CallbackHandler.invoke(handler, player, undefined, undefined, undefined, logging);
     }
 
     /**
@@ -964,7 +823,7 @@ export namespace UI {
      */
     export function registerButton(name: string, button: Button): () => void {
         if (BUTTONS.has(name)) {
-            logging.log(`Button ${name} already registered.`, LogLevel.Warning);
+            logging.log(`Button ${name} already registered`, LogLevel.Warning);
             return () => {};
         }
 
@@ -992,48 +851,11 @@ export namespace UI {
     }
 
     /**
-     * Makes a deterministic name for a widget given its parent and receiver.
-     * @param parent - The parent of the widget.
-     * @param receiver - The receiver of the widget.
+     * Makes a deterministic, sequential name for a widget in the format `ui_${++counter}`.
      * @returns The name of the widget.
      */
-    export function makeName(parent: Parent, receiver: GlobalReceiver | TeamReceiver | PlayerReceiver): string {
-        return `${parent.name}${parent.receiver !== receiver ? `_${receiver.id}` : ''}_${counter++}`;
-    }
-
-    /**
-     * Delegates properties from a source object to a target object.
-     * Creates getters, setters, and setter methods (e.g., setPropertyName) for each property.
-     * @param target - The object to add properties to (typically `this`)
-     * @param source - The object to delegate to
-     * @param properties - Array of property names to delegate
-     */
-    export function delegateProperties<T extends object, S extends object>(
-        target: T,
-        source: S,
-        properties: readonly string[]
-    ): void {
-        for (const prop of properties) {
-            // Create getter and setter.
-            Object.defineProperty(target, prop, {
-                get() {
-                    return (source as Record<string, unknown>)[prop];
-                },
-                set(value: unknown) {
-                    (source as Record<string, unknown>)[prop] = value;
-                },
-                enumerable: true,
-                configurable: true,
-            });
-
-            // Create setter method (e.g., setBaseAlpha).
-            const setterMethodName = `set${prop.charAt(0).toUpperCase() + prop.slice(1)}`;
-
-            (target as Record<string, unknown>)[setterMethodName] = function (value: unknown) {
-                (source as Record<string, unknown>)[prop] = value;
-                return this;
-            };
-        }
+    export function makeName(): string {
+        return `ui_${++counter}`;
     }
 
     /**
@@ -1070,11 +892,11 @@ export namespace UI {
             const receiver = TeamReceiver.getInstance(receiverParam);
 
             if (parent.receiver instanceof TeamReceiver && parent.receiver !== receiver) {
-                logging.log('Team receiver mismatch with parent.', LogLevel.Warning);
+                logging.log('Team receiver mismatch with parent', LogLevel.Warning);
             }
 
             if (parent.receiver instanceof PlayerReceiver) {
-                logging.log('Parent receiver scope is more narrow.', LogLevel.Warning);
+                logging.log('Parent receiver scope is more narrow', LogLevel.Warning);
             }
 
             return receiver;
@@ -1084,14 +906,14 @@ export namespace UI {
             const receiver = PlayerReceiver.getInstance(receiverParam);
 
             if (parent.receiver instanceof PlayerReceiver && parent.receiver !== receiver) {
-                logging.log('Player receiver mismatch with parent.', LogLevel.Warning);
+                logging.log('Player receiver mismatch with parent', LogLevel.Warning);
             }
 
             if (
                 parent.receiver instanceof TeamReceiver &&
                 !mod.Equals(parent.receiver.nativeReceiver, mod.GetTeam(receiverParam))
             ) {
-                logging.log('Parent receiver is different team.', LogLevel.Warning);
+                logging.log('Parent receiver is different team', LogLevel.Warning);
             }
 
             return receiver;

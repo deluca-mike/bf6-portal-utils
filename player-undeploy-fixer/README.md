@@ -42,9 +42,10 @@ PlayerUndeployFixer.setLogging((text) => console.log(text), PlayerUndeployFixer.
 ## How It Works
 
 1. **Subscriptions** – At load time, the module subscribes to `Events.OnPlayerDied`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`.
-2. **On death** – When a player dies, the fixer records the death time for that player. After a fixed delay (30 seconds), it checks: (a) whether this is still the same death event (no new death since), (b) whether the player has undeployed since that death (using a separate `OnPlayerUndeploy` timestamp), and (c) whether the player is still not alive (`GetSoldierState(..., IsAlive)`). If (a) and (b) and (c) hold, the player is considered stuck in limbo.
-3. **Forced undeploy** – In that case, the fixer logs a warning (if logging is configured) and calls `Events.OnPlayerUndeploy.trigger(player)`. All subscribers to `OnPlayerUndeploy`—including your code—then run as if the engine had fired the event, so your logic can correct the player’s state.
-4. **On undeploy** – When `OnPlayerUndeploy` fires (from the engine or from the fixer), the fixer records the undeploy time for that player so it can tell that the player has properly undeployed and does not need a forced trigger.
+2. **Zero-allocation tracking** – When a player dies, their death timestamp is recorded in a pre-allocated flat typed array (`Uint32Array`), keyed directly by player ID. The `mod.Player` object is retrieved via `mod.GetPlayer(id)` on-demand only when a rescue is needed, avoiding object array storage.
+3. **Periodic watchdog check** – A single recurring 1-second interval scans pending dead players. If a player remains dead past the 30-second window and is not alive (`GetSoldierState(..., IsAlive)`), the player is considered stuck in limbo.
+4. **Forced undeploy** – In that case, the fixer logs a warning (if logging is configured) and calls `Events.OnPlayerUndeploy.trigger(player)`. All subscribers to `OnPlayerUndeploy`—including your code—then run as if the engine had fired the event, so your logic can correct the player’s state.
+5. **On undeploy or leave** – When `OnPlayerUndeploy` or `OnPlayerLeaveGame` fires, the player's tracking state is immediately cleared, ensuring no dangling references or false triggers.
 
 The 30-second window is an internal constant and is not configurable in the current API.
 
@@ -71,7 +72,7 @@ See the [Logging module documentation](../logging/README.md) for details.
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the PlayerUndeployFixer module. When the fixer forces an undeploy, it logs a warning; when checking soldier state fails, it logs an error. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
+| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the PlayerUndeployFixer module. When the fixer forces an undeploy, it logs a warning; when checking soldier state fails, it logs an error. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging](../logging/README.md) module documentation. |
 
 ---
 

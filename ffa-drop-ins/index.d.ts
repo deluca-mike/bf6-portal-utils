@@ -101,10 +101,10 @@ export declare namespace FFADropIns {
         private _player;
         private _playerId;
         private _isAISoldier;
-        private _delayCountdownClock?;
+        private _delayCountdownClockId;
         private _promptUI?;
         private _countdownUI?;
-        private _updatePositionInterval?;
+        private _updatePositionIntervalId;
         private _debugPositionUI?;
         /**
          * @returns The player associated with this `Soldier` instance.

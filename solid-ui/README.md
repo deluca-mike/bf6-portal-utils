@@ -4,7 +4,7 @@
 
 This TypeScript `SolidUI` namespace provides a reactive UI framework for Battlefield Portal, inspired by [SolidJS](https://github.com/solidjs/solid). Unlike traditional frameworks that re-render entire components, `SolidUI` uses fine-grained reactivity to update only the specific UI properties that change, resulting in minimal overhead and maximum performance.
 
-`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield 6 Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. Updates are driven by a logical tick counter (advanced on each `Events.OngoingGlobal` callback), a pending-effect map keyed by tick, and the microtask queue for immediate (`deferTicks: 0`) work. Optional **`deferTicks`** on effects, memos, `h()` bindings, and `Index()` coalesces re-runs to a future logical tick. The module uses the `Logging` module for internal logging, including scheduler safety limits (`MAX_EXECUTIONS_PER_FLUSH`, `MAX_FLUSHES_PER_TICK`).
+`SolidUI` is a from-scratch implementation of reactive primitives (signals, effects, memos, stores) adapted for the Battlefield 6 Portal environment. It uses a HyperScript-like factory function (`h`) instead of JSX/TSX, and integrates seamlessly with the [`UI`](../ui/README.md) module to create dynamic, reactive user interfaces. Updates are driven by a logical tick counter (advanced on each `Events.OngoingGlobal` callback), a two-tier scheduler queue (flat array for immediate microtasks and flat array for deferred ticks), and the microtask queue for immediate (`deferTicks: 0`) work. Optional **`deferTicks`** on effects, memos, `h()` bindings, and `Index()` coalesces re-runs to a future logical tick. The module uses the `Logging` module for internal logging, including scheduler safety limits (`MAX_EXECUTIONS_PER_FLUSH`, `MAX_FLUSHES_PER_TICK`).
 
 > **Note** The `SolidUI` namespace is decoupled from the `UI` module but has been designed and tested with it. It assumes that UI objects have getters and setters for properties that need to be reactive.
 
@@ -193,7 +193,7 @@ Configures logging for the SolidUI module. Effect errors, flush errors, and sche
 
 **Parameters:**
 
-- `log` – The logger function to use. Pass `undefined` to disable logging. Can be synchronous or asynchronous.
+- `log` – The logger function to use. Pass `undefined` (or `null`) to disable logging. Can be synchronous or asynchronous.
 - `logLevel` – The minimum log level to use. Messages below this level will not be logged. Defaults to `LogLevel.Warning`.
 - `includeRawError` – Whether to include the runtime error details in the log message. Defaults to `false`. The runtime error can be very large and may cause issues with UI loggers.
 
@@ -1386,6 +1386,63 @@ All reactive updates are asynchronous. If you need synchronous updates (not reco
 `SolidUI` enforces `MAX_EXECUTIONS_PER_FLUSH` and `MAX_FLUSHES_PER_TICK` to stop pathological effect graphs. If you see those log lines, simplify effects, reduce synchronous churn, or increase `deferTicks` on hot paths. Remember that **`currentTick` is advanced in `Events.OngoingGlobal`**, not via a dedicated engine tick API; semantics are documented in [`solid-ui/index.ts`](index.ts).
 
 </ai>
+
+---
+
+## Potential Future APIs & Behaviors
+
+The following features and patterns from the wider SolidJS reactive ecosystem can be considered for future expansions of `SolidUI`:
+
+### 1. Custom Equality Comparators (`createSignal` / `createMemo`)
+
+Allow passing a custom equality comparison function or `equals: false` to control when a signal or memo notifies downstream subscribers:
+
+```ts
+// Force update on every write (useful for event signals / action triggers):
+const [trigger, setTrigger] = SolidUI.createSignal(0, { equals: false });
+
+// Fast custom comparator by ID (avoids deep object comparison overhead):
+const [player, setPlayer] = SolidUI.createSignal(initialPlayer, {
+    equals: (prev, next) => prev.id === next.id && prev.version === next.version,
+});
+```
+
+### 2. Synchronous `batch(fn)`
+
+While microtasks batch UI rendering at the end of the current call stack, `batch()` groups synchronous state writes so that derived calculations and effects only evaluate once after the batch block finishes:
+
+```ts
+SolidUI.batch(() => {
+    setHealth(100);
+    setArmor(50);
+    // Downstream subscribers observing both health and armor only evaluate once
+});
+```
+
+### 3. Control Flow Components (`Show`, `Switch / Match`)
+
+Ergonomic helpers for conditionally creating, showing/hiding, or swapping UI elements based on reactive conditions:
+
+```ts
+// Conditionally creates/destroys or shows/hides widgets based on an accessor
+SolidUI.Show(
+    () => isPlayerAlive(),
+    () =>
+        SolidUI.h(UI.Container, {
+            /* HUD widgets */
+        }),
+    () => SolidUI.h(UI.Text, { message: 'Respawning...' }) // Fallback
+);
+```
+
+### 4. Keyed `For` List Renderer
+
+While `Index` keys list items by their array position (ideal when widget instances are fixed and only their values change), a keyed `For` component keys elements by item identity/reference:
+
+```ts
+// When items move or are inserted, their specific widget instance moves with them
+SolidUI.For(items, (item, index) => SolidUI.h(UI.Text, { message: () => item.name }));
+```
 
 ---
 

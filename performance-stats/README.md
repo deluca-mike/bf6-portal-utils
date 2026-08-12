@@ -110,7 +110,7 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 1. **Tick tracking** – The module subscribes to `Events.OnGameModeStarted` at load time; when the game mode starts, it subscribes to `Events.OngoingGlobal`. In that handler it records the current time and computes `currentTickDeltaMs` (time since the previous tick) and increments a tick counter. Subscribing early ensures the handler runs near the engine’s tick cadence.
 
-2. **Window loop** – A recurring 1-second timeout (`Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
+2. **Window loop** – A recurring 1-second interval (`Timers.setInterval(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
     - Computes raw server tick rate and raw timeout lag.
     - Updates smoothed values with an exponential moving average (smoothing factor 0.3).
     - Logs a warning if raw timeout lag &gt; 100ms or raw server tick rate &lt; 25.

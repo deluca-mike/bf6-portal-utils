@@ -10,6 +10,7 @@ export declare class UIContainerButton extends UIContentButton<UIContainer> {
     /**
      * The inner container of the container button. Use this as a normal UIContainer that can be used as a parent for
      * other elements.
+     * @returns The inner UIContainer instance.
      */
     get innerContainer(): UIContainer;
 }

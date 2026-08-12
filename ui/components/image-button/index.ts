@@ -2,14 +2,8 @@ import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
 
-// version: 1.0.2
+// version: 2.0.0
 export class UIImageButton extends UIContentButton<UIImage> {
-    // UIImage properties (delegated via delegateProperties)
-    declare public imageType: mod.UIImageType;
-
-    // UIImage setter methods (delegated via delegateProperties)
-    declare public setImageType: (imageType: mod.UIImageType) => this;
-
     protected _imageDisabledColor: mod.Vector;
 
     protected _imageDisabledAlpha: number;
@@ -33,7 +27,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
             return new UIImage(imageParams);
         };
 
-        super(params, createContent, ['imageType'] as readonly string[]);
+        super(params, createContent);
 
         this._imageDisabledColor = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
         this._imageDisabledAlpha = params.imageDisabledAlpha ?? 1;
@@ -71,15 +65,26 @@ export class UIImageButton extends UIContentButton<UIImage> {
     }
 
     /**
-     * @inheritdoc
+     * The type of the image.
+     * @returns The image type.
      */
-    public override setEnabled(enabled: boolean): this {
-        this.enabled = enabled;
-        return this;
+    public get imageType(): mod.UIImageType {
+        return this._content.imageType;
+    }
+
+    /**
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     */
+    public set imageType(imageType: mod.UIImageType) {
+        if (this._isDeletedCheck()) return;
+
+        this._content.imageType = imageType;
     }
 
     /**
      * The color of the image.
+     * @returns The image color vector.
      */
     public get imageColor(): mod.Vector {
         return this._content.imageColor;
@@ -100,17 +105,8 @@ export class UIImageButton extends UIContentButton<UIImage> {
     }
 
     /**
-     * Sets the color of the image. Useful for chaining operations.
-     * @param color - The new color of the image.
-     * @returns This element instance.
-     */
-    public setImageColor(color: mod.Vector): this {
-        this.imageColor = color;
-        return this;
-    }
-
-    /**
      * The alpha of the image.
+     * @returns The image alpha opacity.
      */
     public get imageAlpha(): number {
         return this._content.imageAlpha;
@@ -131,17 +127,8 @@ export class UIImageButton extends UIContentButton<UIImage> {
     }
 
     /**
-     * Sets the alpha of the image. Useful for chaining operations.
-     * @param alpha - The new alpha of the image.
-     * @returns This element instance.
-     */
-    public setImageAlpha(alpha: number): this {
-        this.imageAlpha = alpha;
-        return this;
-    }
-
-    /**
      * The disabled color of the image.
+     * @returns The disabled image color vector.
      */
     public get imageDisabledColor(): mod.Vector {
         return this._imageDisabledColor;
@@ -162,17 +149,8 @@ export class UIImageButton extends UIContentButton<UIImage> {
     }
 
     /**
-     * Sets the disabled color of the image. Useful for chaining operations.
-     * @param color - The new disabled color of the image.
-     * @returns This element instance.
-     */
-    public setImageDisabledColor(color: mod.Vector): this {
-        this.imageDisabledColor = color;
-        return this;
-    }
-
-    /**
      * The disabled alpha of the image.
+     * @returns The disabled image alpha opacity.
      */
     public get imageDisabledAlpha(): number {
         return this._imageDisabledAlpha;
@@ -180,7 +158,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
     /**
      * Sets the disabled alpha of the image.
-     * @param alpha - The new disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
      */
     public set imageDisabledAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
@@ -190,16 +168,6 @@ export class UIImageButton extends UIContentButton<UIImage> {
         if (!this._button.enabled) {
             mod.SetUIImageAlpha(this._content.uiWidget, alpha);
         }
-    }
-
-    /**
-     * Sets the disabled alpha of the image. Useful for chaining operations.
-     * @param alpha - The new disabled alpha of the image.
-     * @returns This element instance.
-     */
-    public setImageDisabledAlpha(alpha: number): this {
-        this.imageDisabledAlpha = alpha;
-        return this;
     }
 }
 

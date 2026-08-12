@@ -1,8 +1,8 @@
 import { UI } from '../../index.ts';
 
-// version: 6.0.1
+// version: 7.0.0
 export class UIContainer extends UI.Element implements UI.Parent {
-    protected _children: Set<UI.Element> = new Set();
+    protected _children?: UI.Element[];
 
     /**
      * Creates a new container.
@@ -11,7 +11,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
     public constructor(params: UIContainer.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
 
@@ -74,18 +74,47 @@ export class UIContainer extends UI.Element implements UI.Parent {
     }
 
     /**
-     * The children of the container.
+     * Returns a shallow copy of the list of direct child elements.
+     * @returns Array of direct children.
      */
-    public get children(): UI.Element[] {
-        return Array.from(this._children);
+    public get children(): readonly UI.Element[] {
+        return this._children ? this._children.slice() : [];
+    }
+
+    /**
+     * Retrieves a child element at the specified index.
+     * @param index - Zero-based index of the child.
+     * @returns The child element, or undefined if out of bounds.
+     */
+    public getChild(index: number): UI.Element | undefined {
+        return this._children ? this._children[index] : undefined;
+    }
+
+    /**
+     * Iterates over all direct child elements without allocating an intermediate array.
+     * @param callback - Function invoked for each child.
+     */
+    public forEachChild(callback: (child: UI.Element, index: number) => void): void {
+        if (!this._children) return;
+
+        const count = this._children.length;
+
+        for (let i = 0; i < count; ++i) {
+            callback(this._children[i]!, i);
+        }
     }
 
     /**
      * @inheritdoc
      */
     public override delete(): void {
-        for (const child of this._children) {
-            child.delete();
+        if (this._children) {
+            const children = this._children;
+            this._children = undefined;
+
+            for (let i = 0; i < children.length; ++i) {
+                children[i].delete();
+            }
         }
 
         super.delete();
@@ -98,7 +127,12 @@ export class UIContainer extends UI.Element implements UI.Parent {
     public attachChild(child: UI.Element): void {
         if (this._deleted) return;
 
-        this._children.add(child);
+        if (!this._children) {
+            this._children = [child];
+            return;
+        }
+
+        this._children.push(child);
     }
 
     /**
@@ -106,15 +140,24 @@ export class UIContainer extends UI.Element implements UI.Parent {
      * @param child - The child to detach.
      */
     public detachChild(child: UI.Element): void {
-        this._children.delete(child);
+        if (!this._children) return;
+
+        const idx = this._children.indexOf(child);
+
+        if (idx === -1) return;
+
+        const last = this._children.pop()!;
+
+        if (idx < this._children.length) {
+            this._children[idx] = last;
+        }
     }
 }
 
 export namespace UIContainer {
     /**
      * UIContainer children parameters with a 'type' property and the properties required by that element's constructor.
-     * @param T - The type of the element.
-     * @returns The child parameters.
+     * @template T - The type of the element.
      */
     export type ChildParams<T extends UI.ElementParams> = T & {
         type: new (params: T) => UI.Element;
@@ -122,10 +165,8 @@ export namespace UIContainer {
 
     /**
      * The parameters for creating a new container.
-     * @param T - The type of the element.
-     * @returns The container parameters.
      */
     export type Params = UI.ElementParams & {
-        childrenParams?: ChildParams<any>[];
+        childrenParams?: ChildParams<UI.ElementParams>[];
     };
 }

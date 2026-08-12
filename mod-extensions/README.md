@@ -2,7 +2,7 @@
 
 <ai>
 
-The Battlefield Portal runtime injects a documented `mod` namespace. Some additional APIs exist at runtime but are not on the default type declarations. The `ModExtensions` namespace wraps those behind typed helpers and provides additional helpers for common tasks: event type comparisons (damage, death, gadget, weapon) and runtime string lookup, without casting `mod` yourself.
+The `ModExtensions` namespace provides helper functions for resolving opaque event payloads (such as `mod.DamageType`, `mod.DeathType`, and `mod.WeaponUnlock`) to their corresponding Battlefield Portal enum values (`mod.PlayerDamageTypes`, `mod.PlayerDeathTypes`, `mod.Gadgets`, and `mod.Weapons`).
 
 </ai>
 
@@ -28,12 +28,22 @@ import { ModExtensions } from 'bf6-portal-utils/mod-extensions';
 import { Events } from 'bf6-portal-utils/events';
 
 Events.OnPlayerDied.subscribe((event: mod.OnPlayerDiedEvent) => {
-    if (ModExtensions.isDeathType(event.deathType, mod.PlayerDeathTypes.Headshot)) {
+    // Resolve opaque event deathType to the PlayerDeathTypes enum value
+    const deathType = ModExtensions.getPlayerDeathType(event.deathType);
+
+    if (deathType === mod.PlayerDeathTypes.Headshot) {
         // Headshot-specific logic
     }
 });
 
-const label = ModExtensions.getString('gameMode.hud.section.label');
+Events.OnPlayerDamaged.subscribe((event: mod.OnPlayerDamagedEvent) => {
+    // Resolve opaque event damageType to the PlayerDamageTypes enum value
+    const damageType = ModExtensions.getPlayerDamageType(event.damageType);
+
+    if (damageType === mod.PlayerDamageTypes.Explosion) {
+        // Explosion-specific logic
+    }
+});
 ```
 
 </ai>
@@ -42,9 +52,8 @@ const label = ModExtensions.getString('gameMode.hud.section.label');
 
 ## Core Concepts
 
-- **Undocumented API** – Helpers call native `mod` functions/properties not on the official types; implementation uses internal casts so your code stays typed.
-- **Event types** – Payloads use opaque types (`mod.DamageType`, `mod.DeathType`, `mod.WeaponUnlock`). This module exposes compare APIs as `isDamageType`, `isDeathType`, `isGadget`, `isWeapon`, plus resolvers that map to enum values where needed.
-- **Runtime strings** – `getString(key)` reads `mod.strings` populated from your `string.json`.
+- **Opaque Event Payload Resolution** – Battlefield Portal events emit opaque types (`mod.DamageType`, `mod.DeathType`, `mod.WeaponUnlock`) that require engine comparison calls (`mod.EventDamageTypeCompare`, `mod.EventDeathTypeCompare`, `mod.EventWeaponCompare`). This module resolves them to concrete enum values when you need to inspect or branch across unknown event types.
+- **Zero Runtime Allocations** – Enum values are cached in static reference arrays on load and scanned via index loops, generating **0 heap allocations** and **0 GC pressure** during gameplay.
 
 ---
 
@@ -54,23 +63,16 @@ const label = ModExtensions.getString('gameMode.hud.section.label');
 
 | Method | Description |
 | --- | --- |
-| `isDamageType(eventDamageType, playerDamageType)` | Whether the event damage type matches the given `mod.PlayerDamageTypes`. Uses `EventDamageTypeCompare`. |
-| `isDeathType(eventDeathType, playerDeathType)` | Whether the event death type matches the given `mod.PlayerDeathTypes`. Uses `EventDeathTypeCompare`. |
-| `isGadget(weaponUnlock, gadget)` | Whether the weapon unlock matches the given `mod.Gadgets`. Uses `EventWeaponCompare`. |
-| `isWeapon(weaponUnlock, weapon)` | Whether the weapon unlock matches the given `mod.Weapons`. Uses `EventWeaponCompare`. |
-| `getPlayerDamageType(damageType)` | Resolves to `mod.PlayerDamageTypes` or `undefined`. |
-| `getPlayerDeathType(deathType)` | Resolves to `mod.PlayerDeathTypes` or `undefined`. |
-| `getGadget(weaponUnlock)` | Resolves to `mod.Gadgets` or `undefined`. **Iterates all gadgets** — avoid hot paths. |
-| `getWeapon(weaponUnlock)` | Resolves to `mod.Weapons` or `undefined`. **Iterates all weapons** — avoid hot paths. |
-| `getString(key)` | Runtime string for the key from the experience’s `string.json` / `mod.strings`. |
+| `getPlayerDamageType(eventDamageType: mod.DamageType): mod.PlayerDamageTypes \| undefined` | Resolves an opaque event `DamageType` to its corresponding `mod.PlayerDamageTypes` enum value, or `undefined` if not matched. |
+| `getPlayerDeathType(eventDeathType: mod.DeathType): mod.PlayerDeathTypes \| undefined` | Resolves an opaque event `DeathType` to its corresponding `mod.PlayerDeathTypes` enum value, or `undefined` if not matched. |
+| `getGadget(weaponUnlock: mod.WeaponUnlock): mod.Gadgets \| undefined` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Gadgets` enum value, or `undefined` if not matched. |
+| `getWeapon(weaponUnlock: mod.WeaponUnlock): mod.Weapons \| undefined` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Weapons` enum value, or `undefined` if not matched. |
 
 ---
 
 ## Limitations
 
-- Undocumented APIs may change in future game updates.
-- Prefer `isGadget` / `isWeapon` over `getGadget` / `getWeapon` when you only need to test a known enum value.
-- Missing or unexposed keys return `undefined` from `getString`.
+- If you only need to check against a single specific known enum value, calling `mod.EventDamageTypeCompare(damageType, mod.PlayerDamageTypes.Headshot)` directly is faster than resolving the full enum. Use `ModExtensions` when you need to discover or switch over unknown event types.
 
 ---
 
@@ -83,6 +85,4 @@ const label = ModExtensions.getString('gameMode.hud.section.label');
 
 ## Feedback
 
-This module is under **active development**. Issues and suggestions for additional safe wrappers are welcome.
-
----
+This module is under **active development**. Issues and suggestions for additional helper functions that improve base API ergonomics or that expose hidden functionality are welcome.

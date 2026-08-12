@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 1.0.2
+// version: 2.0.0
 export class UIGadgetImage extends UI.Element {
     protected _gadget: mod.Gadgets;
 
@@ -11,7 +11,7 @@ export class UIGadgetImage extends UI.Element {
     public constructor(params: UIGadgetImage.Params) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
 
@@ -60,12 +60,13 @@ export class UIGadgetImage extends UI.Element {
 
         // `mod.AddUIGadgetImage` lacks the ability to define starting invisibility, so we have to set it manually.
         if (!elementParams.visible) {
-            this.setVisible(false);
+            this.visible = false;
         }
     }
 
     /**
      * The gadget of the gadget image.
+     * @returns The gadget.
      */
     public get gadget(): mod.Gadgets {
         return this._gadget;
@@ -80,19 +81,7 @@ export class UIGadgetImage extends UI.Element {
     public set gadget(gadget: mod.Gadgets) {
         if (this._isDeletedCheck()) return;
 
-        this._logging.log('Setting UIGadgetImage gadget not supported.', UI.LogLevel.Warning);
-    }
-
-    /**
-     * Sets the gadget of the gadget image.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
-     * been created.
-     * @param gadget - The new gadget.
-     * @returns This element instance.
-     */
-    public setGadget(gadget: mod.Gadgets): this {
-        this._gadget = gadget;
-        return this;
+        this._logging.log('Setting UIGadgetImage gadget not supported', UI.LogLevel.Warning);
     }
 }
 

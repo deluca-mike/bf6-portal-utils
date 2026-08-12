@@ -2,9 +2,16 @@
 
 <ai>
 
-The `Vectors` namespace provides a small set of helpers for working with 3D vectors in Battlefield Portal experiences. Because `mod.Vector` is opaque—you must use the functional `mod` API (`mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf`, `mod.CreateVector`, `mod.VectorAdd`, etc.) to read or build vectors—it can be clunky to write and reason about vector math. This module defines a transparent `Vector3` type (`{ x, y, z }`) and complementary functions so you can work with plain objects when convenient, and convert to or from `mod.Vector` only when calling Portal APIs.
+The `Vectors` namespace provides lightweight, high-performance utilities for working with 3D vectors in Battlefield Portal experiences. Because `mod.Vector` is an opaque engine type requiring functional Portal API calls (`mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf`, `mod.CreateVector`), performing vector math can be cumbersome. This module defines a transparent, mutable `Vector3` type (`{ x, y, z }`) and a comprehensive suite of math operations.
 
-Key features include conversion between `Vector3` and `mod.Vector`, arithmetic (add, subtract, multiply, divide), advanced operations (`cross`, `normalize`, `rotateAroundAxis`), distance, truncation, degree/radian and rotation helpers, string formatting for debugging, and a type guard `isVector3()`. The namespace is self-contained and has no dependencies on other `bf6-portal-utils` modules.
+Key features include:
+
+- **Transparent Vector3 Type** – Plain `{ x: number, y: number, z: number }` structures for clear, intuitive math.
+- **Zero-Allocation `out` Parameters** – Every transformative and arithmetic function accepts an optional `out?: Vector3` target destination to eliminate intermediate heap allocations in high-frequency game loops.
+- **Engine Boundary Conversions** – Seamless bridging to and from opaque `mod.Vector` via `toVector()` and `toVector3()`.
+- **Comprehensive Vector Math** – Addition, subtraction, multiplication, division, dot product, cross product, normalization, linear interpolation (`lerp`), axis rotation (Rodrigues' formula), and distance calculations.
+- **Fast Squared Comparisons** – `distanceSquared()` and `lengthSquared()` avoid costly `Math.sqrt()` invocations in proximity and threshold checks.
+- **String Formatting & Type Guards** – Safe runtime validation with `isVector3()` and debugging string formatting via `getVectorString()`.
 
 </ai>
 
@@ -17,8 +24,8 @@ Key features include conversion between `Vector3` and `mod.Vector`, arithmetic (
     ```ts
     import { Vectors } from 'bf6-portal-utils/vectors';
     ```
-3. Use `Vectors.Vector3` for transparent vector values and `Vectors.toVector()` / `Vectors.toVector3()` at the boundary with `mod` APIs.
-4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
+3. Use `Vectors.Vector3` for math and `Vectors.toVector()` / `Vectors.toVector3()` at engine boundaries.
+4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod.
 
 <ai>
 
@@ -27,30 +34,35 @@ Key features include conversion between `Vector3` and `mod.Vector`, arithmetic (
 ```ts
 import { Vectors } from 'bf6-portal-utils/vectors';
 
-// Work with transparent Vector3 for math
-const playerPos: Vectors.Vector3 = {
-    x: 100,
-    y: 0,
-    z: 200,
-};
-
+// Work with transparent Vector3 objects
+const playerPos: Vectors.Vector3 = { x: 100, y: 0, z: 200 };
 const offset: Vectors.Vector3 = { x: 10, y: 0, z: 0 };
-const newPos = Vectors.add(playerPos, offset);
+
+// Standard immutable math
+const targetPos = Vectors.add(playerPos, offset);
+
+// Zero-allocation in-place math (reuses targetPos)
+Vectors.multiply(offset, 2, targetPos);
 
 // Convert to mod.Vector when calling Portal APIs
-mod.SpawnObject(asset, Vectors.toVector(newPos), Vectors.ZERO_VECTOR);
+mod.SpawnObject(asset, Vectors.toVector(targetPos), Vectors.toVector(Vectors.ZERO));
 
-// Or convert from mod.Vector when reading from the engine
-const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
-const pos3 = Vectors.toVector3(position);
-const distance = Vectors.distance(pos3, targetPos3);
+// Fast distance check without square roots
+const distSq = Vectors.distanceSquared(playerPos, targetPos);
+if (distSq <= 4) {
+    // Within 2 meters (2^2 = 4)
+}
 
 // Rotation from compass degrees (e.g. spawner orientation)
-const rotation = Vectors.getRotationVector(90);
-mod.SetVehicleSpawnerRotation(spawner, rotation);
+mod.SetVehicleSpawnerRotation(spawner, Vectors.toVector(Vectors.getRotationVector(90)));
 
-// Debug string
-console.log(Vectors.getVector3String(pos3, 2)); // e.g. "<100.00, 0.00, 200.00>"
+// Convert from mod.Vector with zero-allocation target reuse
+const scratch: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+const soldierPos = mod.GetObjectPosition(player);
+Vectors.toVector3(soldierPos, scratch);
+
+// Debug formatting
+console.log(Vectors.getVectorString(scratch, 2)); // "<100.00, 0.00, 200.00>"
 ```
 
 </ai>
@@ -61,69 +73,86 @@ console.log(Vectors.getVector3String(pos3, 2)); // e.g. "<100.00, 0.00, 200.00>"
 
 ### `namespace Vectors`
 
-The namespace is not instantiated; all members are types, constants, or functions.
+All members are types, constants, or static functions.
 
 #### Types
 
-| Type | Description |
-| --- | --- |
-| `Vector3` | A simple transparent 3D vector: `{ x: number; y: number; z: number }`. Mutable; use for local math and convert to/from `mod.Vector` at API boundaries. |
+| Type      | Description                                                     |
+| --------- | --------------------------------------------------------------- |
+| `Vector3` | A transparent 3D vector: `{ x: number; y: number; z: number }`. |
 
 #### Constants
 
-| Constant | Type | Description |
-| --- | --- | --- |
-| `ZERO_VECTOR3` | `Vector3` | `{ x: 0, y: 0, z: 0 }`. |
-| `ONE_VECTOR3` | `Vector3` | `{ x: 1, y: 1, z: 1 }`. |
-| `ZERO_VECTOR` | `mod.Vector` | Zero vector from `mod.CreateVector(0, 0, 0)`. Useful when a Portal API requires a vector (e.g. spawn position/orientation). |
-| `ONE_VECTOR` | `mod.Vector` | One vector from `mod.CreateVector(1, 1, 1)`. |
+| Constant | Type                | Description                                   |
+| -------- | ------------------- | --------------------------------------------- |
+| `ZERO`   | `Readonly<Vector3>` | Immutable zero vector `{ x: 0, y: 0, z: 0 }`. |
+| `ONE`    | `Readonly<Vector3>` | Immutable one vector `{ x: 1, y: 1, z: 1 }`.  |
 
-#### Conversion
+#### Conversions
 
 | Method | Description |
 | --- | --- |
-| `toVector(vector: Vector3): mod.Vector` | Converts a `Vector3` to a `mod.Vector` via `mod.CreateVector(vector.x, vector.y, vector.z)`. |
-| `toVector3(vector: mod.Vector): Vector3` | Converts a `mod.Vector` to a `Vector3` using `mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf`. |
+| `toVector(vector: Vector3): mod.Vector` | Converts a `Vector3` to an engine `mod.Vector` via `mod.CreateVector(x, y, z)`. |
+| `toVector3(vector: mod.Vector, out?: Vector3): Vector3` | Converts an engine `mod.Vector` to `Vector3`. Writes into `out` if provided. |
 
-#### Arithmetic (Vector3)
-
-All arithmetic functions take `Vector3` arguments and return a new `Vector3`; they do not mutate inputs.
+#### Mutators & Helpers
 
 | Method | Description |
-| --- | --- |
-| `add(a: Vector3, b: Vector3): Vector3` | Returns the sum of the vectors. |
-| `subtract(a: Vector3, b: Vector3): Vector3` | Returns the difference of the vectors. |
-| `multiply(vector: Vector3, scalar: number): Vector3` | Multiplies the vector by the scalar. |
-| `divide(vector: Vector3, scalar: number): Vector3` | Divides the vector by the scalar. |
-| `cross(a: Vector3, b: Vector3): Vector3` | Returns the cross product of the vectors. |
-| `normalize(vector: Vector3): Vector3` | Returns the normalized vector. If the input is a zero-length vector, returns `{ x: 0, y: 0, z: 0 }`. |
+| :-- | :-- |
+| `set(target: Vector3, x: number, y: number, z: number): Vector3` | Sets components on `target` and returns it. |
+| `copy(target: Vector3, source: Vector3): Vector3` | Copies components from `source` into `target` and returns `target`. |
+| `clone(source: Vector3): Vector3` | Returns a new `Vector3` cloned from `source`. |
+| `equals(a: Vector3, b: Vector3, tolerance?: number): boolean` | Checks if two vectors are equal within an optional per-component tolerance (default: `0`). |
+| `isZero(vector: Vector3, tolerance?: number): boolean` | Checks if all vector components are zero within an optional tolerance (default: `0`). |
 
-#### Utilities
+#### Arithmetic & Transformations
+
+All transformation functions accept an optional `out?: Vector3` destination parameter. When provided, calculations are written directly to `out` and returned without allocating a new object. When omitted, a new `{ x, y, z }` object is returned.
 
 | Method | Description |
-| --- | --- |
-| `truncate(vector: Vector3, decimalPlaces?: number): Vector3` | Truncates each component to the given number of decimal places (default `2`). Returns a new `Vector3`. |
-| `rotateAroundAxis(vector: Vector3, axis: Vector3, angleRad: number): Vector3` | Rotates a vector around a unit axis by `angleRad` radians using Rodrigues' rotation formula. |
-| `degreesToRadians(degrees: number): number` | Converts degrees to radians: `(degrees * Math.PI) / 180`. |
-| `getRotationVector(orientation: number): mod.Vector` | Returns a rotation vector for the given compass orientation (degrees). Uses `mod.CreateVector(0, radians(180 - orientation), 0)`. |
-| `getRotationVector3(orientation: number): Vector3` | Same as `getRotationVector` but returns a `Vector3` with `x: 0`, `y: degreesToRadians(180 - orientation)`, `z: 0`. |
-| `distance(a: Vector3, b: Vector3): number` | Returns the Euclidean distance between the two vectors. |
-| `isVector3(v: unknown): v is Vector3` | Type guard: returns `true` if `v` is a non-null object with numeric `x`, `y`, and `z` properties. |
-| `getVectorString(vector: mod.Vector, precision?: number): string` | Returns a string like `"<x, y, z>"` with the given decimal precision (default `2`). |
-| `getVector3String(vector: Vector3, precision?: number): string` | Same as `getVectorString` for a `Vector3`. |
+| :-- | :-- |
+| `add(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Returns the sum of `a + b`. |
+| `subtract(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Returns the difference of `a - b`. |
+| `multiply(vector: Vector3, scalar: number, out?: Vector3): Vector3` | Multiplies `vector` by `scalar`. |
+| `divide(vector: Vector3, scalar: number, out?: Vector3): Vector3` | Divides `vector` by `scalar`. |
+| `hadamardMultiply(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Computes the element-wise Hadamard product $a \odot b$. |
+| `hadamardDivide(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Computes the element-wise Hadamard division $a \oslash b$ ($a_i / b_i$). |
+| `dot(a: Vector3, b: Vector3): number` | Computes the scalar dot product `a · b`. |
+| `cross(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Computes the cross product `a × b`. |
+| `normalize(vector: Vector3, out?: Vector3): Vector3` | Returns a unit-length direction vector (or `{ x: 0, y: 0, z: 0 }` if zero-length). |
+| `direction(from: Vector3, to: Vector3, out?: Vector3): Vector3` | Calculates the normalized unit direction vector pointing from `from` to `to` (or `{ x: 0, y: 0, z: 0 }` if identical). |
+| `lerp(a: Vector3, b: Vector3, t: number, out?: Vector3): Vector3` | Linearly interpolates between `a` and `b` by factor `t`. |
+| `midpoint(a: Vector3, b: Vector3, out?: Vector3): Vector3` | Calculates the midpoint between `a` and `b`. |
+| `clampLength(vector: Vector3, maxLength: number, out?: Vector3): Vector3` | Clamps the magnitude/length of `vector` so it does not exceed `maxLength`. |
+| `truncate(vector: Vector3, decimalPlaces?: number, out?: Vector3): Vector3` | Truncates components to the given decimal places (default: `2`). |
+| `rotateAroundAxis(vector: Vector3, axis: Vector3, angleRad: number, out?: Vector3): Vector3` | Rotates `vector` around `axis` by `angleRad` radians using Rodrigues' rotation formula. |
+| `rotateYawPitch(forward: Vector3, yawDeg: number, pitchDeg: number, out?: Vector3): Vector3` | Rotates `forward` by relative yaw (left positive) and pitch (up positive) angle deltas in degrees. |
+| `transformLocalOffset(origin: Vector3, forward: Vector3, localOffset: Vector3, out?: Vector3): Vector3` | Transforms a local offset (X=Right, Y=Up, Z=Forward) into world space relative to `origin` and `forward`. |
+| `getRotationVector(orientation: number, out?: Vector3): Vector3` | Returns a rotation vector for compass degrees (with y-axis in radians). |
+
+#### Measurements & Utilities
+
+| Method | Description |
+| :-- | :-- |
+| `length(vector: Vector3): number` | Returns the Euclidean magnitude $\sqrt{x^2 + y^2 + z^2}$. |
+| `lengthSquared(vector: Vector3): number` | Returns the squared magnitude $x^2 + y^2 + z^2$ (avoids `Math.sqrt`). |
+| `distance(a: Vector3, b: Vector3): number` | Returns the Euclidean distance between `a` and `b`. |
+| `distanceSquared(a: Vector3, b: Vector3): number` | Returns the squared Euclidean distance (avoids `Math.sqrt`). |
+| `degreesToRadians(degrees: number): number` | Converts degrees to radians `(degrees * Math.PI) / 180`. |
+| `isVector3(v: unknown): v is Vector3` | Type guard checking if `v` is a non-null object with numeric `x`, `y`, `z` properties. |
+| `getVectorString(vector: Vector3, precision?: number): string` | Formats the vector as `"<x, y, z>"` with specified decimal precision (default: `2`). |
 
 ---
 
 ## How It Works
 
-- **Transparent vs opaque** – `Vector3` is a plain object; you can read and write `x`, `y`, `z` directly. Portal’s `mod.Vector` is opaque: you must use `mod.XComponentOf`, `mod.YComponentOf`, `mod.ZComponentOf` to read and `mod.CreateVector` (or `mod.VectorAdd`, etc.) to build. The module bridges the two with `toVector()` and `toVector3()`.
-- **Immutability** – All arithmetic and `truncate()` return new values; they do not mutate the input vectors.
-- **Advanced operations** – `cross()` computes a perpendicular vector, `normalize()` returns a unit-length direction vector (or zero vector for zero-length input), and `rotateAroundAxis()` rotates using Rodrigues' formula around a provided unit axis.
-- **Rotation** – `getRotationVector` and `getRotationVector3` interpret `orientation` as compass degrees and produce a rotation vector suitable for APIs that expect a rotation (e.g. vehicle spawner orientation). The conversion uses `180 - orientation` so that compass degrees match the expected convention.
+- **Transparent vs Opaque** – `Vector3` is a mutable JavaScript object with direct property access (`v.x = 10`), avoiding engine wrapper overhead for internal math. Conversion to and from `mod.Vector` occurs only at Portal API boundaries.
+- **Zero-Allocation Optimization** – In high-frequency loops (such as raycasting, collision checks, or per-tick movement), passing a pre-allocated `out` vector to arithmetic operations completely eliminates garbage collection pauses in QuickJS.
+- **Squared Distance Checks** – Proximity checks (e.g., checking if a player is within $R$ meters) should prefer `Vectors.distanceSquared(a, b) <= R * R` to eliminate square root computation.
 
 ---
 
 ## Further Reference
 
-- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations consumed by this module.
+- [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations.
 - [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) – The bundler tool used to package TypeScript code for Portal experiences.

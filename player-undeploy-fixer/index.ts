@@ -2,7 +2,7 @@ import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 import { Timers } from '../timers/index.ts';
 
-// version 1.0.2
+// version 2.0.0
 export namespace PlayerUndeployFixer {
     const logging = new Logging('PUF');
 
@@ -13,7 +13,7 @@ export namespace PlayerUndeployFixer {
 
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
@@ -26,51 +26,79 @@ export namespace PlayerUndeployFixer {
     }
 
     const MAX_TIME_TO_UNDEPLOY_MS: number = 30_000;
+    const MAX_PLAYERS = 100;
+    const SERVER_START_TIME = Date.now();
 
-    const lastPlayerDeathTime: Map<number, number> = new Map();
-    const lastPlayerUndeployTime: Map<number, number> = new Map();
+    /**
+     * @returns The current server uptime in milliseconds (guaranteed >= 1).
+     */
+    function getUptime(): number {
+        return Date.now() - SERVER_START_TIME + 1;
+    }
+
+    const deathTimes = new Uint32Array(MAX_PLAYERS);
+
+    let pendingDeadCount = 0;
 
     Events.OnPlayerDied.subscribe(handlePlayerDied);
     Events.OnPlayerUndeploy.subscribe(handlePlayerUndeployed);
     Events.OnPlayerLeaveGame.subscribe(handlePlayerLeaveGame);
 
+    Timers.setInterval(checkPendingUndeploys, 1000);
+
     function handlePlayerDied(player: mod.Player): void {
         const playerId = mod.GetObjId(player);
-        const thisDeathTime = Date.now();
 
-        lastPlayerDeathTime.set(playerId, thisDeathTime);
+        if (playerId < 0 || playerId >= MAX_PLAYERS) return;
 
-        const tryUndeploy = () => {
-            const isSameDeathEvent = lastPlayerDeathTime.get(playerId) === thisDeathTime;
-            const hasUndeployed = (lastPlayerUndeployTime.get(playerId) || 0) >= thisDeathTime;
+        if (deathTimes[playerId] === 0) {
+            ++pendingDeadCount;
+        }
 
-            if (!isSameDeathEvent || hasUndeployed) return;
-
-            try {
-                if (!mod.IsPlayerValid(player) || mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return;
-            } catch (error) {
-                logging.log(
-                    `Error checking soldier state for P_${playerId} potentially stuck in limbo.`,
-                    LogLevel.Error,
-                    error
-                );
-                return;
-            }
-
-            logging.log(`P_${playerId} stuck in limbo. Forcing undeployment.`, LogLevel.Warning);
-
-            Events.OnPlayerUndeploy.trigger(player);
-        };
-
-        Timers.setTimeout(tryUndeploy, MAX_TIME_TO_UNDEPLOY_MS);
+        deathTimes[playerId] = getUptime();
     }
 
     function handlePlayerUndeployed(player: mod.Player): void {
-        lastPlayerUndeployTime.set(mod.GetObjId(player), Date.now());
+        const playerId = mod.GetObjId(player);
+
+        if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+
+        if (deathTimes[playerId] !== 0) {
+            deathTimes[playerId] = 0;
+            --pendingDeadCount;
+        }
     }
 
     function handlePlayerLeaveGame(playerId: number): void {
-        lastPlayerDeathTime.delete(playerId);
-        lastPlayerUndeployTime.delete(playerId);
+        if (playerId < 0 || playerId >= MAX_PLAYERS) return;
+
+        if (deathTimes[playerId] !== 0) {
+            deathTimes[playerId] = 0;
+            --pendingDeadCount;
+        }
+    }
+
+    function checkPendingUndeploys(): void {
+        if (pendingDeadCount === 0) return;
+
+        const now = getUptime();
+
+        for (let i = 0; i < MAX_PLAYERS; ++i) {
+            const deathTime = deathTimes[i];
+
+            if (deathTime === 0 || now - deathTime < MAX_TIME_TO_UNDEPLOY_MS) continue;
+
+            // NOTE: Might need to handle clearing this only after fetching soldier state does not throw.
+            deathTimes[i] = 0;
+            --pendingDeadCount;
+
+            const player = mod.GetPlayer(i);
+
+            if (player === undefined || mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) continue;
+
+            logging.log(`P_${i} stuck in limbo; forcing undeployment`, LogLevel.Warning);
+
+            Events.OnPlayerUndeploy.trigger(player);
+        }
     }
 }

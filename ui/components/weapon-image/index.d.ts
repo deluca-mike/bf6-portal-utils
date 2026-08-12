@@ -9,6 +9,7 @@ export declare class UIWeaponImage extends UI.Element {
     constructor(params: UIWeaponImage.Params);
     /**
      * The weapon of the weapon image.
+     * @returns The weapon.
      */
     get weapon(): mod.Weapons;
     /**
@@ -19,15 +20,8 @@ export declare class UIWeaponImage extends UI.Element {
      */
     set weapon(weapon: mod.Weapons);
     /**
-     * Sets the weapon of the weapon image. Useful for chaining operations.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
-     * been created.
-     * @param weapon - The weapon to set.
-     * @returns This element instance.
-     */
-    setWeapon(weapon: mod.Weapons): this;
-    /**
      * The weapon package of the weapon image.
+     * @returns The weapon package.
      */
     get weaponPackage(): mod.WeaponPackage;
     /**
@@ -37,14 +31,6 @@ export declare class UIWeaponImage extends UI.Element {
      * @param weaponPackage - The new weapon package.
      */
     set weaponPackage(weaponPackage: mod.WeaponPackage);
-    /**
-     * Sets the weapon package of the weapon image. Useful for chaining operations.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
-     * after it has been created.
-     * @param weaponPackage - The weapon package to set.
-     * @returns This element instance.
-     */
-    setWeaponPackage(weaponPackage: mod.WeaponPackage): this;
 }
 export declare namespace UIWeaponImage {
     /**

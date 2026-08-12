@@ -2,7 +2,7 @@
 
 <ai>
 
-The `UIGadgetImageButton` component creates a button with an integrated gadget image. It combines `UIButton` and `UIGadgetImage` functionality into a single element, wrapping both in a container and delegating properties appropriately.
+The `UIGadgetImageButton` component creates a button with an integrated gadget image. It combines `UIButton` and `UIGadgetImage` functionality into a single element, wrapping both in a container and forwarding properties cleanly.
 
 </ai>
 
@@ -30,7 +30,8 @@ const button = new UIGadgetImageButton({
 });
 
 // Update button properties
-button.setEnabled(false).setBaseColor(UI.COLORS.BLUE);
+button.enabled = false;
+button.baseColor = UI.COLORS.BLUE;
 ```
 
 </ai>
@@ -53,53 +54,41 @@ For a complete list of `UIButton.Params`, see the [UIButton documentation](../bu
 
 ### Inherited from `UI.Element`
 
-`UIGadgetImageButton` inherits all properties and methods from `UI.Element`, including:
+`UIGadgetImageButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
-All button properties are delegated from the internal `UIButton` instance:
+All button properties are forwarded from the internal `UIButton` instance:
 
-- **Button State**: `enabled`, `setEnabled()`
-- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
+- **Button State**: `enabled`
+- **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Gadget Image
 
-Gadget image properties are delegated from the internal `UIGadgetImage` instance:
-
 - **`gadget: mod.Gadgets`** (getter) – The gadget being displayed (read-only).
-
-- **`gadget: mod.Gadgets`** (setter) – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the gadget image after it has been created. Setting this property will log a warning and have no effect.
-
-- **`setGadget(gadget: mod.Gadgets): UIGadgetImageButton`** – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the gadget image after it has been created. Returns `this` for method chaining but has no effect.
 
 ### GadgetImageButton-Specific
 
 - **`padding: number`** (getter/setter) – Container padding. The gadget image's size is automatically adjusted to account for padding.
 
-- **`setPadding(padding: number): UIGadgetImageButton`** – Sets padding and returns `this` for method chaining.
-
 ### Overrides
 
 - **`width: number`** (getter/setter) – Setting width also updates the button widget and gadget image width, accounting for padding.
-
 - **`height: number`** (getter/setter) – Setting height also updates the button widget and gadget image height, accounting for padding.
-
 - **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and gadget image size, accounting for padding.
-
-- **`setSize(params: UI.Size): UIGadgetImageButton`** – Sets size for container, button, and gadget image, returns `this`.
 
 ---
 
@@ -115,13 +104,9 @@ type Params = UIButton.Params & UIGadgetImage.Params;
 
 ## Usage Notes
 
-- **Gadget Immutability**: Once a `UIGadgetImageButton` is created, the gadget cannot be changed. The `gadget` setter and `setGadget()` method are deprecated and will log a warning if used. To change the displayed gadget, create a new `UIGadgetImageButton` instance.
-
+- **Gadget Immutability**: Once a `UIGadgetImageButton` is created, the gadget cannot be changed. To change the displayed gadget, create a new `UIGadgetImageButton` instance.
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and gadget image size, accounting for padding.
-
 - **Padding**: The component supports padding, which creates space between the button border and the gadget image. The gadget image size is automatically adjusted to account for padding.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 ---
 

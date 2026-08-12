@@ -1,31 +1,42 @@
 import { UI } from '../ui/index.ts';
 import { UIContainer } from '../ui/components/container/index.ts';
 export declare class Logger {
+    private static readonly _ROW_HEIGHT;
     private static readonly _PADDING;
+    private static readonly _STATIC_PROMISE;
+    private static readonly _CHAR_WIDTHS_TENTHS;
     private static _getParts;
-    private static _getCharacterWidth;
     private static _buildMessage;
     private static _getChar;
     /**
      * Creates a new logger with specific options.
-     * @param player - The player to to draw the logger for.
+     * @param player - The player to draw the logger for.
      * @param options - The options for the logger.
      */
     constructor(player: mod.Player, options?: Logger.Options);
     private _window;
     private _staticRows;
     private _truncate;
-    private _rows;
-    private _nextRowIndex;
+    private _staticRowsList;
+    private _dynamicRows;
     private _width;
     private _height;
     private _textColor;
-    private _scaleFactor;
-    private _rowHeight;
     private _maxRows;
+    /**
+     * The maximum number of rows in the logger.
+     * @returns The maximum row count.
+     */
     get maxRows(): number;
-    get name(): string;
+    /**
+     * Whether the logger window is visible.
+     * @returns True if visible, false otherwise.
+     */
     get visible(): boolean;
+    /**
+     * Sets whether the logger window is visible.
+     * @param visible - The new visibility state.
+     */
     set visible(visible: boolean);
     /**
      * Show the logger.
@@ -68,12 +79,11 @@ export declare class Logger {
     private _logInRow;
     private _logNext;
     private _logNextParts;
+    private _prepareNextRow;
     private _fillRow;
     private _rowLimitReached;
-    private _prepareNextRow;
-    private _createRow;
-    private _deleteRow;
-    private _createPartText;
+    private _setPartText;
+    private _hideRemainingWidgets;
     private _getTextWidth;
 }
 export declare namespace Logger {
@@ -129,10 +139,6 @@ export declare namespace Logger {
          * The text color of the logger.
          */
         textColor?: mod.Vector;
-        /**
-         * The text scale of the logger.
-         */
-        textScale?: 'small' | 'medium' | 'large';
         /**
          * Whether to show the logger.
          */

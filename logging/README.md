@@ -125,7 +125,7 @@ export namespace MyModule {
 | --- | --- |
 | `log(text: string, logLevel?: LogLevel, error?: unknown): void` | Logs a message with the specified log level and optional error. The message is only logged if a logger is attached and the log level meets the minimum threshold. If `includeRawError` is enabled and an error is provided, it will be appended to the message. Default log level is `Warning`. |
 | `willLog(logLevel: LogLevel): boolean` | Checks if a message with the given log level would actually be logged. Use this to avoid building expensive log messages when logging is disabled or below the threshold. Returns `true` if logging will occur, `false` otherwise. |
-| `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger function and configures the minimum log level and error suffix on the formatted text. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. The callback always receives the formatted message as the first argument; the second is the optional `error` passed to `log()` (same reference/value, not re-stringified by the class beyond the optional suffix in `text`). |
+| `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger function and configures the minimum log level and error suffix on the formatted text. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. The callback always receives the formatted message as the first argument; the second is the optional `error` passed to `log()` (same reference/value, not re-stringified by the class beyond the optional suffix in `text`). |
 
 ### `namespace Logging`
 
@@ -246,8 +246,8 @@ export async function OnGameModeStarted(): Promise<void> {
 
     logging.log('This will be logged', Logging.LogLevel.Info);
 
-    // Disable logging by passing undefined
-    logging.setLogging(undefined);
+    // Disable logging by passing undefined (or null)
+    logging.setLogging(null);
 
     logging.log('This will not be logged', Logging.LogLevel.Info);
 }

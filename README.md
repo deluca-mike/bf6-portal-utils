@@ -34,6 +34,8 @@ This repository is organized into focused modules, each addressing specific deve
 
 - **[Portal Gadget Module](./portal-gadget/)** – Provides enriched Portal Gadget fire start/stop callbacks that include zoom state plus a lazy async target resolver. Handles the undocumented laser origin/angle differences between zoomed and hip states and abstracts asynchronous hit/miss attribution through the Raycast module.
 
+- **[Quaternions Module](./quaternions/)** – High-performance, zero-allocation 4D Hamiltonian quaternion mathematics for 3D spatial rotations. Provides SLERP interpolation, ZYX Euler angle conversions, vector rotation, and arbitrary-axis rotation construction without gimbal lock or runtime heap allocations.
+
 - **[Raycast Module](./raycast/)** – Abstracts Battlefield Portal's raycasting functionality with automatic hit/miss attribution to the correct rays. Handles attribution mechanics, manages time-to-live for rays, and provides a clean callback-based API to make it easier to perform mass obstacle detection, line of sight checks, and interactive object detection.
 
 - **[Scavenger Drop Module](./scavenger-drop/)** – Detects when a player scavenges a dead player's kit bag by monitoring proximity to dead bodies. Provides automatic detection with performance-optimized checking that scales frequency based on distance, configurable callbacks for custom actions (such as ammo resupply), and automatic cleanup when drops expire or are scavenged.
@@ -41,6 +43,8 @@ This repository is organized into focused modules, each addressing specific deve
 - **[SolidUI Module](./solid-ui/)** – A reactive UI framework inspired by SolidJS, providing fine-grained reactivity for Battlefield Portal UIs. Uses signals, effects, memos, and stores to create dynamic interfaces that update only the specific properties that change, resulting in minimal overhead and maximum performance. Integrates seamlessly with the UI Module.
 
 - **[Sounds Module](./sounds/)** – Abstracts away the nuance, oddities, and pitfalls of playing sounds at runtime in Battlefield Portal experiences. Provides efficient sound object management through automatic pooling and reuse, handles different playback scenarios (2D global, 2D per-player/squad/team, and 3D positional), and manages sound durations automatically.
+
+- **[Spatial Module](./spatial/)** – A zero-allocation 3D scene graph and hierarchical transformation system. Virtualizes compound parent-child relationships, arbitrary-axis rotations, in-game model pivot offsets, external parent tracking (players, vehicles, spatial objects), and multi-object orbital kinematics (such as items orbiting a moving player or vehicle).
 
 - **[Timers Module](./timers/)** – Reintroduces `setTimeout` and `setInterval` functionality into BF6 Portal; the familiar JavaScript API makes code more readable and maintainable. It offers significant advantages over `mod.Wait()` since timers can be cancelled and multiple timers can run concurrently without blocking. Ideal for periodic tasks, delayed actions, debouncing, etc.
 

@@ -5,57 +5,39 @@ import { UIButton } from '../button/index.ts';
  * Base class for buttons that contain content elements (Text, Image, etc.).
  * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @version 7.0.0
+ * @version 8.0.0
  */
 export abstract class UIContentButton<TContent extends UI.Element> extends UI.Element {
+    private static readonly _scratchParent: UI.Parent = {
+        uiWidget: undefined as unknown as mod.UIWidget,
+        receiver: undefined as unknown as UI.Parent['receiver'],
+        children: [],
+        getChild(): UI.Element | undefined {
+            return undefined;
+        },
+        forEachChild(): void {},
+        attachChild(): void {},
+        detachChild(): void {},
+    };
+
     protected _padding: number;
 
     protected _button: UIButton;
 
     protected _content: TContent;
 
-    // UIButton properties (delegated via delegateProperties).
-    declare public baseColor: mod.Vector;
-    declare public baseAlpha: number;
-    declare public disabledColor: mod.Vector;
-    declare public disabledAlpha: number;
-    declare public pressedColor: mod.Vector;
-    declare public pressedAlpha: number;
-    declare public focusedColor: mod.Vector;
-    declare public focusedAlpha: number;
-    declare public onClickDown?: UI.ButtonHandler;
-    declare public onClickUp?: UI.ButtonHandler;
-    declare public onFocusIn?: UI.ButtonHandler;
-    declare public onFocusOut?: UI.ButtonHandler;
-
-    // UIButton setter methods (delegated via delegateProperties).
-    declare public setBaseColor: (color: mod.Vector) => this;
-    declare public setBaseAlpha: (alpha: number) => this;
-    declare public setDisabledColor: (color: mod.Vector) => this;
-    declare public setDisabledAlpha: (alpha: number) => this;
-    declare public setPressedColor: (color: mod.Vector) => this;
-    declare public setPressedAlpha: (alpha: number) => this;
-    declare public setFocusedColor: (color: mod.Vector) => this;
-    declare public setFocusedAlpha: (alpha: number) => this;
-    declare public setOnClickDown: (onClickDown?: UI.ButtonHandler) => this;
-    declare public setOnClickUp: (onClickUp?: UI.ButtonHandler) => this;
-    declare public setOnFocusIn: (onFocusIn?: UI.ButtonHandler) => this;
-    declare public setOnFocusOut: (onFocusOut?: UI.ButtonHandler) => this;
-
     /**
      * Creates a new content button.
      * @param params - The parameters for the content button.
      * @param createContent - A function to create the content element.
-     * @param contentProperties - The properties to delegate from the content element.
      */
     protected constructor(
         params: UIContentButton.Params,
-        createContent: (parent: UI.Parent, width: number, height: number) => TContent,
-        contentProperties: readonly string[]
+        createContent: (parent: UI.Parent, width: number, height: number) => TContent
     ) {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName(parent, receiver);
+        const name = UI.makeName();
         const { x, y } = UI.getPosition(params);
         const { width, height } = UI.getSize(params);
         const depth = params.depth ?? mod.UIDepth.AboveGameUI;
@@ -114,20 +96,13 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
 
         this._padding = padding;
 
-        // Mock parent needed to allow proper wiring of the button and content elements, and we do not want `this` to
-        // need to expose `children`, `attachChild`, and `detachChild`.
-        const mockParent: UI.Parent = {
-            name: this._name,
-            uiWidget: this._uiWidget,
-            receiver: this._receiver,
-            children: [],
-            attachChild(child: UI.Element): void {},
-            detachChild(child: UI.Element): void {},
-        };
+        // Scratch parent temporarily routes underlying widget and receiver to child button and content
+        // elements during synchronous construction without exposing parent methods on this element.
+        UIContentButton._scratchParent.uiWidget = this._uiWidget;
+        UIContentButton._scratchParent.receiver = this._receiver;
 
-        // Defaults will from from `UIButton` constructor.
         const buttonParams: UIButton.Params = {
-            parent: mockParent,
+            parent: UIContentButton._scratchParent,
             width,
             height,
             bgColor: params.bgColor,
@@ -154,29 +129,10 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
         const widthNetOfPadding = Math.max(0, width - padding * 2);
         const heightNetOfPadding = Math.max(0, height - padding * 2);
 
-        this._content = createContent(mockParent, widthNetOfPadding, heightNetOfPadding);
+        this._content = createContent(UIContentButton._scratchParent, widthNetOfPadding, heightNetOfPadding);
 
-        // Delegate UIButton properties.
-        UI.delegateProperties(this, this._button, [
-            'bgColor',
-            'bgAlpha',
-            'bgFill',
-            'baseColor',
-            'baseAlpha',
-            'disabledColor',
-            'disabledAlpha',
-            'pressedColor',
-            'pressedAlpha',
-            'focusedAlpha',
-            'focusedColor',
-            'onClickDown',
-            'onClickUp',
-            'onFocusIn',
-            'onFocusOut',
-        ]);
-
-        // Delegate content properties.
-        UI.delegateProperties(this, this._content, contentProperties);
+        UIContentButton._scratchParent.uiWidget = undefined as unknown as mod.UIWidget;
+        UIContentButton._scratchParent.receiver = undefined as unknown as UI.Parent['receiver'];
     }
 
     /**
@@ -203,16 +159,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
         if (this._isDeletedCheck()) return;
 
         mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, this.height, 0));
-        this._button.setWidth(width);
-        this._content.setWidth(Math.max(0, width - this._padding * 2));
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override setWidth(width: number): this {
-        this.width = width;
-        return this;
+        this._button.width = width;
+        this._content.width = Math.max(0, width - this._padding * 2);
     }
 
     /**
@@ -229,16 +177,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
         if (this._isDeletedCheck()) return;
 
         mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, height, 0));
-        this._button.setHeight(height);
-        this._content.setHeight(Math.max(0, height - this._padding * 2));
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override setHeight(height: number): this {
-        this.height = height;
-        return this;
+        this._button.height = height;
+        this._content.height = Math.max(0, height - this._padding * 2);
     }
 
     /**
@@ -255,24 +195,17 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
         if (this._isDeletedCheck()) return;
 
         mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
-        this._button.setSize(params);
+        this._button.size = params;
 
-        this._content.setSize({
+        this._content.size = {
             width: Math.max(0, params.width - this._padding * 2),
             height: Math.max(0, params.height - this._padding * 2),
-        });
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override setSize(params: UI.Size): this {
-        this.size = params;
-        return this;
+        };
     }
 
     /**
      * Whether the button is enabled.
+     * @returns True if enabled, false otherwise.
      */
     public get enabled(): boolean {
         return this._button.enabled;
@@ -289,17 +222,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     }
 
     /**
-     * Sets whether the button is enabled. Useful for chaining operations.
-     * @param enabled - The new enabled state.
-     * @returns This element instance.
-     */
-    public setEnabled(enabled: boolean): this {
-        this.enabled = enabled;
-        return this;
-    }
-
-    /**
      * The padding of the content button.
+     * @returns The padding in pixels.
      */
     public get padding(): number {
         return this._padding;
@@ -316,13 +240,219 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     }
 
     /**
-     * Sets the padding of the content button. Useful for chaining operations.
-     * @param padding - The new padding.
-     * @returns This element instance.
+     * The base color of the button.
+     * @returns The base color vector.
      */
-    public setPadding(padding: number): this {
-        this.padding = padding;
-        return this;
+    public get baseColor(): mod.Vector {
+        return this._button.baseColor;
+    }
+
+    /**
+     * Sets the base color of the button.
+     * @param color - The new base color.
+     */
+    public set baseColor(color: mod.Vector) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.baseColor = color;
+    }
+
+    /**
+     * The base alpha of the button.
+     * @returns The base alpha opacity.
+     */
+    public get baseAlpha(): number {
+        return this._button.baseAlpha;
+    }
+
+    /**
+     * Sets the base alpha of the button.
+     * @param alpha - The new base alpha.
+     */
+    public set baseAlpha(alpha: number) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.baseAlpha = alpha;
+    }
+
+    /**
+     * The disabled color of the button.
+     * @returns The disabled color vector.
+     */
+    public get disabledColor(): mod.Vector {
+        return this._button.disabledColor;
+    }
+
+    /**
+     * Sets the disabled color of the button.
+     * @param color - The new disabled color.
+     */
+    public set disabledColor(color: mod.Vector) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.disabledColor = color;
+    }
+
+    /**
+     * The disabled alpha of the button.
+     * @returns The disabled alpha opacity.
+     */
+    public get disabledAlpha(): number {
+        return this._button.disabledAlpha;
+    }
+
+    /**
+     * Sets the disabled alpha of the button.
+     * @param alpha - The new disabled alpha.
+     */
+    public set disabledAlpha(alpha: number) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.disabledAlpha = alpha;
+    }
+
+    /**
+     * The pressed color of the button.
+     * @returns The pressed color vector.
+     */
+    public get pressedColor(): mod.Vector {
+        return this._button.pressedColor;
+    }
+
+    /**
+     * Sets the pressed color of the button.
+     * @param color - The new pressed color.
+     */
+    public set pressedColor(color: mod.Vector) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.pressedColor = color;
+    }
+
+    /**
+     * The pressed alpha of the button.
+     * @returns The pressed alpha opacity.
+     */
+    public get pressedAlpha(): number {
+        return this._button.pressedAlpha;
+    }
+
+    /**
+     * Sets the pressed alpha of the button.
+     * @param alpha - The new pressed alpha.
+     */
+    public set pressedAlpha(alpha: number) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.pressedAlpha = alpha;
+    }
+
+    /**
+     * The focused color of the button.
+     * @returns The focused color vector.
+     */
+    public get focusedColor(): mod.Vector {
+        return this._button.focusedColor;
+    }
+
+    /**
+     * Sets the focused color of the button.
+     * @param color - The new focused color.
+     */
+    public set focusedColor(color: mod.Vector) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.focusedColor = color;
+    }
+
+    /**
+     * The focused alpha of the button.
+     * @returns The focused alpha opacity.
+     */
+    public get focusedAlpha(): number {
+        return this._button.focusedAlpha;
+    }
+
+    /**
+     * Sets the focused alpha of the button.
+     * @param alpha - The new focused alpha.
+     */
+    public set focusedAlpha(alpha: number) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.focusedAlpha = alpha;
+    }
+
+    /**
+     * The click down handler of the button.
+     * @returns The click down handler, or undefined.
+     */
+    public get onClickDown(): UI.ButtonHandler | undefined {
+        return this._button.onClickDown;
+    }
+
+    /**
+     * Sets the click down handler of the button.
+     * @param onClickDown - The new click down handler.
+     */
+    public set onClickDown(onClickDown: UI.ButtonHandler | undefined) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.onClickDown = onClickDown;
+    }
+
+    /**
+     * The click up handler of the button.
+     * @returns The click up handler, or undefined.
+     */
+    public get onClickUp(): UI.ButtonHandler | undefined {
+        return this._button.onClickUp;
+    }
+
+    /**
+     * Sets the click up handler of the button.
+     * @param onClickUp - The new click up handler.
+     */
+    public set onClickUp(onClickUp: UI.ButtonHandler | undefined) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.onClickUp = onClickUp;
+    }
+
+    /**
+     * The focus in handler of the button.
+     * @returns The focus in handler, or undefined.
+     */
+    public get onFocusIn(): UI.ButtonHandler | undefined {
+        return this._button.onFocusIn;
+    }
+
+    /**
+     * Sets the focus in handler of the button.
+     * @param onFocusIn - The new focus in handler.
+     */
+    public set onFocusIn(onFocusIn: UI.ButtonHandler | undefined) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.onFocusIn = onFocusIn;
+    }
+
+    /**
+     * The focus out handler of the button.
+     * @returns The focus out handler, or undefined.
+     */
+    public get onFocusOut(): UI.ButtonHandler | undefined {
+        return this._button.onFocusOut;
+    }
+
+    /**
+     * Sets the focus out handler of the button.
+     * @param onFocusOut - The new focus out handler.
+     */
+    public set onFocusOut(onFocusOut: UI.ButtonHandler | undefined) {
+        if (this._isDeletedCheck()) return;
+
+        this._button.onFocusOut = onFocusOut;
     }
 }
 

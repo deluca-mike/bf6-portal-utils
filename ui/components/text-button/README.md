@@ -2,7 +2,7 @@
 
 <ai>
 
-The `UITextButton` component creates a button with integrated text content. It combines `UIButton` and `UIText` functionality into a single element, wrapping both in a container and delegating properties appropriately. The text automatically updates its appearance when the button is enabled or disabled.
+The `UITextButton` component creates a button with integrated text content. It combines `UIButton` and `UIText` functionality into a single element, wrapping both in a container and forwarding properties cleanly. The text automatically updates its appearance when the button is enabled or disabled.
 
 </ai>
 
@@ -30,10 +30,9 @@ const button = new UITextButton({
 });
 
 // Update button and text properties
-button
-    .setMessage(mod.Message(mod.stringkeys.labels.updated)) // 'Updated'
-    .setTextColor(UI.COLORS.WHITE)
-    .setEnabled(false);
+button.message = mod.Message(mod.stringkeys.labels.updated);
+button.textColor = UI.COLORS.WHITE;
+button.enabled = false;
 ```
 
 </ai>
@@ -62,58 +61,47 @@ For a complete list of `UIButton.Params`, see the [UIButton documentation](../bu
 
 ### Inherited from `UI.Element`
 
-`UITextButton` inherits all properties and methods from `UI.Element`, including:
+`UITextButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### Delegated from Internal Button
 
-All button properties are delegated from the internal `UIButton` instance:
+All button properties are forwarded from the internal `UIButton` instance:
 
-- **Button State**: `enabled`, `setEnabled()`
-- **Button handlers**: `onClickDown`, `setOnClickDown()`, `onClickUp`, `setOnClickUp()`, `onFocusIn`, `setOnFocusIn()`, `onFocusOut`, `setOnFocusOut()`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor` (with setter methods)
-- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha` (with setter methods)
+- **Button State**: `enabled`
+- **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
+- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 - **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Text
 
-Text properties are delegated from the internal `UIText` instance:
-
 - **`message: mod.Message`** (getter/setter) – The text content.
-- **`setMessage(message: mod.Message): UITextButton`** – Sets the message and returns `this` for method chaining.
 - **`textSize: number`** (getter/setter) – Font size.
-- **`setTextSize(size: number): UITextButton`** – Sets font size and returns `this` for method chaining.
 - **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
-- **`setTextAnchor(anchor: mod.UIAnchor): UITextButton`** – Sets text anchor and returns `this` for method chaining.
 
 ### TextButton-Specific
 
 - **`textColor: mod.Vector`** (getter/setter) – Text color (used when button is enabled).
-- **`setTextColor(color: mod.Vector): UITextButton`** – Sets text color and returns `this` for method chaining.
 - **`textAlpha: number`** (getter/setter) – Text opacity (used when button is enabled).
-- **`setTextAlpha(alpha: number): UITextButton`** – Sets text opacity and returns `this` for method chaining.
 - **`textDisabledColor: mod.Vector`** (getter/setter) – Text color when button is disabled.
-- **`setTextDisabledColor(color: mod.Vector): UITextButton`** – Sets disabled text color and returns `this` for method chaining.
 - **`textDisabledAlpha: number`** (getter/setter) – Text opacity when button is disabled.
-- **`setTextDisabledAlpha(alpha: number): UITextButton`** – Sets disabled text opacity and returns `this` for method chaining.
 - **`padding: number`** (getter/setter) – Container padding.
-- **`setPadding(padding: number): UITextButton`** – Sets padding and returns `this` for method chaining.
 
 ### Overrides
 
 - **`width: number`** (getter/setter) – Setting width also updates the button widget and text width.
 - **`height: number`** (getter/setter) – Setting height also updates the button widget and text height.
 - **`size: UI.Size`** (getter/setter) – Setting size also updates the button widget and text size.
-- **`setSize(params: UI.Size): UITextButton`** – Sets size for container, button, and text, returns `this`.
 - **`enabled: boolean`** (getter/setter) – Overrides to also update text appearance when enabled/disabled.
 
 ---
@@ -137,12 +125,8 @@ type Params = UIButton.Params &
 ## Usage Notes
 
 - **Automatic Text State Management**: When the button's `enabled` state changes, the text automatically switches between `textColor`/`textAlpha` (enabled) and `textDisabledColor`/`textDisabledAlpha` (disabled).
-
 - **Size Synchronization**: Setting `width`, `height`, or `size` automatically updates the button widget and text size, accounting for padding.
-
 - **Padding**: The component supports padding, which creates space between the button border and the text content. The text size is automatically adjusted to account for padding.
-
-- **Method Chaining**: All setter methods return `this`, allowing you to chain multiple operations together.
 
 </ai>
 

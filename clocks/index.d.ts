@@ -3,22 +3,32 @@ export declare namespace Clocks {
     /**
      * Log levels for controlling logging verbosity.
      */
-    export const LogLevel: typeof Logging.LogLevel;
+    const LogLevel: typeof Logging.LogLevel;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
-    export function setLogging(
+    function setLogging(
         log?: (text: string) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
     /**
+     * Unique generation-encoded identifier for a Clock.
+     */
+    type ClockID = number & {
+        readonly __brand: 'ClockID';
+    };
+    /**
+     * Sentinel value representing an invalid or uninitialized Clock ID.
+     */
+    const INVALID_CLOCK_ID: ClockID;
+    /**
      * Options for the clock.
      */
-    export type ClockOptions = {
+    type ClockOptions = {
         /**
          * Callback fired when the second integer changes.
          */
@@ -35,7 +45,7 @@ export declare namespace Clocks {
     /**
      * Options for the count up clock.
      */
-    export type CountUpOptions = ClockOptions & {
+    type CountUpOptions = ClockOptions & {
         /**
          * Optional limit. If set, clock stops and fires onComplete when reached.
          */
@@ -44,156 +54,106 @@ export declare namespace Clocks {
     /**
      * Options for the countdown clock.
      */
-    export type CountDownOptions = ClockOptions;
+    type CountDownOptions = ClockOptions;
     /**
-     * Abstract BaseClock
-     * Handles the "Elapsed Time Engine": keeping track of how many milliseconds
-     * have theoretically passed while the clock was in a "Running" state.
+     * Creates a count up clock.
+     * @param options The options for the clock.
+     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
-    abstract class BaseClock {
-        private _isRunning;
-        private _isComplete;
-        private _timerId;
-        private _tickQueued;
-        private _accumulatedMs;
-        private _lastResumeTime;
-        private _lastIntegerSecond;
-        private _lastIntegerMinute;
-        private _onSecond?;
-        private _onMinute?;
-        private _onComplete?;
-        private _round;
-        constructor(round: (value: number) => number, options?: ClockOptions);
-        /**
-         * Safely defers the execution of the _tick loop to the microtask queue.
-         * This prevents synchronous state collisions when consumers manipulate the clock.
-         */
-        private _queueTick;
-        /**
-         * Returns the logical "Elapsed Time" of the clock in Milliseconds.
-         * For CountUp, this is the value.
-         * For CountDown, this is (Duration - Value).
-         */
-        protected _getElapsedMilliseconds(): number;
-        /**
-         * Returns the logical "Elapsed Time" of the clock in Seconds.
-         * For CountUp, this is the value.
-         * For CountDown, this is (Duration - Value).
-         */
-        protected _getElapsedSeconds(): number;
-        /**
-         * Modifies the internal elapsed time. Used by add/subtract seconds.
-         */
-        protected _adjustElapsedTime(seconds: number): void;
-        protected abstract _checkCompletion(): boolean;
-        /**
-         * Main Loop: Calculates drift-corrected time and fires callbacks if integers changed.
-         */
-        private _tick;
-        abstract get seconds(): number;
-        abstract addSeconds(seconds: number): this;
-        abstract subtractSeconds(seconds: number): this;
-        get isRunning(): boolean;
-        get isPaused(): boolean;
-        get isComplete(): boolean;
-        /**
-         * Starts the clock.
-         * @returns The clock instance.
-         */
-        start(): this;
-        /**
-         * Stops the clock.
-         * @returns The clock instance.
-         */
-        stop(): this;
-        /**
-         * Resumes the clock (same as start).
-         * @returns The clock instance.
-         */
-        resume(): this;
-        /**
-         * Pauses the clock (same as stop).
-         * @returns The clock instance.
-         */
-        pause(): this;
-        /**
-         * Resets the clock.
-         * If the clock was running, it stays running and snaps to the starting time (elapsed 0), firing `onSecond`
-         * (and possibly `onMinute`) for that position. If it was stopped or paused, it remains stopped.
-         * @returns The clock instance.
-         */
-        reset(): this;
-    }
+    function createCountUp(options?: CountUpOptions): ClockID;
     /**
-     * CountUpClock: Starts at 0, goes up. Optional limit.
+     * Creates a countdown clock.
+     * @param durationSeconds The duration of the clock in seconds.
+     * @param options The options for the clock.
+     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
-    export class CountUpClock extends BaseClock {
-        private _timeLimit;
-        /**
-         * Creates a new CountUpClock.
-         * @param options - The options for the count up clock.
-         */
-        constructor(options?: CountUpOptions);
-        protected _checkCompletion(): boolean;
-        /**
-         * @returns The time limit of the count up clock in seconds.
-         */
-        get timeLimit(): number;
-        /**
-         * @returns The current value of the count up clock in seconds.
-         */
-        get seconds(): number;
-        /**
-         * Adds seconds to the count up clock.
-         * @param seconds - The number of seconds to add.
-         * @returns The clock instance.
-         */
-        addSeconds(seconds: number): this;
-        /**
-         * Subtracts seconds from the count up clock.
-         * @param seconds - The number of seconds to subtract.
-         * @returns The clock instance.
-         */
-        subtractSeconds(seconds: number): this;
-    }
+    function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID;
     /**
-     * CountDownClock: Starts at Duration, goes down to 0.
+     * Destroys a clock.
+     * @param id The ID of the clock.
      */
-    export class CountDownClock extends BaseClock {
-        private _duration;
-        /**
-         * Creates a new CountDownClock.
-         * @param durationSeconds - The duration of the countdown in seconds.
-         * @param options - The options for the countdown clock.
-         */
-        constructor(durationSeconds: number, options?: CountDownOptions);
-        protected _checkCompletion(): boolean;
-        /**
-         * @returns The starting duration of the countdown in seconds.
-         */
-        get duration(): number;
-        /**
-         * @returns The current value of the countdown in seconds.
-         */
-        get seconds(): number;
-        /**
-         * Adds seconds to the countdown clock, so it wil take longer to complete.
-         * @param seconds - The number of seconds to add.
-         * @returns The clock instance.
-         */
-        addSeconds(seconds: number): this;
-        /**
-         * Subtracts seconds from the countdown clock, so it will complete faster.
-         * @param seconds - The number of seconds to subtract.
-         * @returns The clock instance.
-         */
-        subtractSeconds(seconds: number): this;
-        /**
-         * Sets the duration of the countdown clock.
-         * @param durationSeconds - The duration of the countdown in seconds.
-         * @returns The clock instance.
-         */
-        setDuration(durationSeconds: number): this;
-    }
-    export {};
+    function destroy(id: ClockID): void;
+    /**
+     * Returns if a clock is running.
+     * @param id The ID of the clock.
+     * @returns True if the clock is running, false otherwise.
+     */
+    function isRunning(id: ClockID): boolean;
+    /**
+     * Returns if a clock is paused.
+     * @param id The ID of the clock.
+     * @returns True if the clock is paused, false otherwise.
+     */
+    function isPaused(id: ClockID): boolean;
+    /**
+     * Returns if a clock has completed.
+     * @param id The ID of the clock.
+     * @returns True if the clock is complete, false otherwise.
+     */
+    function isComplete(id: ClockID): boolean;
+    /**
+     * Gets the seconds of a clock. For a countdown clock, this is the seconds remaining. For a count up clock, this is the total time elapsed.
+     * @param id The ID of the clock.
+     * @returns The seconds of the clock.
+     */
+    function getSeconds(id: ClockID): number;
+    /**
+     * Gets the total duration of the clock that will result in completion.
+     * @param id The ID of the clock.
+     * @returns The duration of the clock in seconds.
+     */
+    function getDuration(id: ClockID): number;
+    /**
+     * Sets the total duration of the clock that will result in completion. Will not resume completed clocks.
+     * @param id The ID of the clock.
+     * @param durationSeconds The duration of the clock in seconds.
+     */
+    function setDuration(id: ClockID, durationSeconds: number): void;
+    /**
+     * Starts the clock.
+     * @param id The ID of the clock to start.
+     */
+    function start(id: ClockID): void;
+    /**
+     * Stops the clock.
+     * @param id The ID of the clock to stop.
+     */
+    function stop(id: ClockID): void;
+    /**
+     * Resumes the clock (which is the same as starting it).
+     * @param id The ID of the clock to resume.
+     */
+    function resume(id: ClockID): void;
+    /**
+     * Pauses the clock (which is the same as stopping it).
+     * @param id The ID of the clock to pause.
+     */
+    function pause(id: ClockID): void;
+    /**
+     * Resets the clock to its initial state. A running clock will continue to run after being reset.
+     * @param id The ID of the clock to reset.
+     */
+    function reset(id: ClockID): void;
+    /**
+     * Adds seconds to the clock. Will delay the completion of a countdown clock and increase the elapsed time of a countup clock.
+     * @param id The ID of the clock to modify.
+     * @param seconds The number of seconds to add.
+     */
+    function addSeconds(id: ClockID, seconds: number): void;
+    /**
+     * Subtracts seconds from the clock. Will advance the completion of a countdown clock and decrease the elapsed time of a countup clock.
+     * @param id The ID of the clock to modify.
+     * @param seconds The number of seconds to subtract.
+     */
+    function subtractSeconds(id: ClockID, seconds: number): void;
+    /**
+     * Returns true if the clock is active (allocated).
+     * @param id The ID of the clock.
+     * @returns True if the clock is active, false otherwise.
+     */
+    function isActive(id: ClockID): boolean;
+    /**
+     * @returns The number of active clocks.
+     */
+    function getActiveClockCount(): number;
 }

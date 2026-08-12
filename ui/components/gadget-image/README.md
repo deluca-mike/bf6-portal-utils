@@ -52,24 +52,21 @@ const gadgetImage = new UIGadgetImage({
 
 ### Inherited from `UI.Element`
 
-`UIGadgetImage` inherits all properties and methods from `UI.Element`, including:
+`UIGadgetImage` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size` (with getters/setters and method chaining)
-- **Visibility**: `visible`, `show()`, `hide()`, `toggle()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Visibility**: `visible`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `deleted`
-- **Parent Management**: `parent`, `setParent()`
+- **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).
 
 ### GadgetImage-Specific
 
 - **`gadget: mod.Gadgets`** (getter) – The gadget being displayed (read-only).
-
-- **`gadget: mod.Gadgets`** (setter) – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the gadget image after it has been created. Setting this property will log a warning and have no effect.
-
-- **`setGadget(gadget: mod.Gadgets): UIGadgetImage`** – **Deprecated.** Currently not supported as the underlying Portal API lacks the ability to set the gadget image after it has been created. Returns `this` for method chaining but has no effect.
+- **`gadget: mod.Gadgets`** (setter) – **Deprecated.** Setting this property logs a warning and has no effect because the Portal API lacks the ability to change a gadget image post-creation.
 
 ---
 
@@ -87,11 +84,8 @@ type Params = UI.ElementParams & {
 
 ## Usage Notes
 
-- **Gadget Immutability**: Once a `UIGadgetImage` is created, the gadget cannot be changed. The `gadget` setter and `setGadget()` method are deprecated and will log a warning if used. To change the displayed gadget, create a new `UIGadgetImage` instance.
-
-- **Initial Visibility Limitation**: The underlying Portal API (`mod.AddUIGadgetImage`) lacks the ability to define starting invisibility. If you set `visible: false` in the constructor parameters, the component will automatically set visibility to `false` after construction, which may result in the image showing very briefly, unless it is a child of a parent that is already not visible.
-
-- **Method Chaining**: The `setGadget()` method returns `this` for method chaining, but note that it has no effect due to API limitations.
+- **Gadget Immutability**: Once a `UIGadgetImage` is created, the gadget cannot be changed. To change the displayed gadget, create a new `UIGadgetImage` instance.
+- **Initial Visibility Limitation**: The underlying Portal API (`mod.AddUIGadgetImage`) lacks the ability to define starting invisibility. If you set `visible: false` in constructor params, the component sets visibility to `false` immediately after construction.
 
 ---
 

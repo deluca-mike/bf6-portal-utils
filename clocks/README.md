@@ -2,7 +2,7 @@
 
 <ai>
 
-The `Clocks` namespace provides **CountUpClock** (stopwatch) and **CountDownClock** (timer) classes for Battlefield Portal experiences. Both are efficient, drift-resistant, and well-suited to UIs that need to update every second, every minute, or when the clock completes—e.g. match timers, round timers, or bomb fuse countdowns. Time is tracked internally as accumulated milliseconds while the clock is running; the next tick is scheduled to align with whole-second boundaries, minimizing drift. Callbacks (`onSecond`, `onMinute`, `onComplete`) are invoked only when the corresponding integer value changes, and errors in callbacks are caught and logged so they cannot break the clock.
+The `Clocks` namespace provides high-performance **CountUp** (stopwatch) and **CountDown** (timer) functionality for Battlefield Portal experiences. The clocks are efficient, drift-resistant, and well-suited to UIs that need to update every second, every minute, or when the clock completes—e.g. match timers, round timers, or bomb fuse countdowns. Time is tracked internally as accumulated milliseconds while the clock is running; the next tick is scheduled to align with whole-second boundaries, minimizing drift. Callbacks (`onSecond`, `onMinute`, `onComplete`) are invoked only when the corresponding integer value changes, and errors in callbacks are caught and logged so they cannot break the clock.
 
 </ai>
 
@@ -16,9 +16,14 @@ The module uses the `Timers` and `CallbackHandler` modules internally and the `L
 2. Import the module:
     ```ts
     import { Clocks } from 'bf6-portal-utils/clocks';
+    import { Logging } from 'bf6-portal-utils/logging';
     ```
-3. Create a clock with optional callbacks, then `start()` it. Use the `seconds` getter or callbacks to drive your UI.
-4. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
+3. Initialize the global clock logger in your setup script:
+    ```ts
+    Clocks.setLogging(mod.Message, Logging.LogLevel.Info);
+    ```
+4. Create a clock using `Clocks.createCountUp` or `Clocks.createCountDown` and control it using the returned integer ID.
+5. Use [`bf6-portal-bundler`](https://www.npmjs.com/package/bf6-portal-bundler) to bundle your mod (it will automatically inline the code).
 
 <ai>
 
@@ -30,33 +35,35 @@ import { Events } from 'bf6-portal-utils/events';
 
 Clocks.setLogging((text) => console.log(text), Clocks.LogLevel.Info);
 
-let roundClock: Clocks.CountDownClock;
+let roundClockId: Clocks.ClockID = Clocks.INVALID_CLOCK_ID;
 
 Events.OnGameModeStarted.subscribe(() => {
     // 5-minute round timer; update UI every second, voice over every minute, and end round when time runs out
-    roundClock = new Clocks.CountDownClock(5 * 60, {
+    roundClockId = Clocks.createCountDown(5 * 60, {
         onSecond: (seconds) => updateTimerDisplay(seconds),
         onMinute: (minutes) => announceMinute(minutes),
         onComplete: () => endRound(),
     });
-    roundClock.start();
+
+    Clocks.start(roundClockId);
 });
 
 Events.OnPlayerDeployed.subscribe((player: mod.Player) => {
     // Stopwatch for a single player (e.g. lap time), with 1-hour limit
-    const stopwatch = new Clocks.CountUpClock({
+    const stopwatchId = Clocks.createCountUp({
         timeLimitSeconds: 3600,
         onSecond: (seconds) => setHudSeconds(seconds),
         onComplete: () => showTimeLimitReached(),
     });
-    stopwatch.start();
-});
 
-Events.OnPlayerDied.subscribe(
-    (victim: mod.Player, killer: mod.Player, deathType: mod.DeathType, weapon: mod.WeaponUnlock) => {
-        stopwatch.stop();
-    }
-);
+    Clocks.start(stopwatchId);
+
+    Events.OnPlayerDied.subscribe(
+        (victim: mod.Player, killer: mod.Player, deathType: mod.DeathType, weapon: mod.WeaponUnlock) => {
+            Clocks.stop(stopwatchId);
+        }
+    );
+});
 ```
 
 </ai>
@@ -88,10 +95,10 @@ Follows the same rules as `onSecond`, but for integer **minute** boundaries (der
 
 Fires at most once per clock when the completion condition is met during a tick:
 
-- **CountDownClock:** when remaining time reaches 0.
-- **CountUpClock:** when elapsed time reaches the optional `timeLimitSeconds` (default 86400 if not set).
+- **CountDown:** when remaining time reaches 0.
+- **CountUp:** when elapsed time reaches the optional `timeLimitSeconds` (default 86400 if not set).
 
-That can happen when time elapses normally while running, or when `stop()` or `pause()` commits elapsed time and the clock is then in a completed state. `reset()` never fires `onComplete` as the clocks internal state is immediately reset before a tick can run to check for completion. In the tick where a CountDownClock reaches 0, `onComplete()` is invoked first, then `onSecond(0)` (and possibly `onMinute(0)`) in the same tick.
+That can happen when time elapses normally while running, or when `stop()` or `pause()` commits elapsed time and the clock is then in a completed state. `reset()` never fires `onComplete` as the clock's internal state is immediately reset before a tick can run to check for completion. In the tick where a CountDown clock reaches 0, `onComplete()` is invoked first, then `onSecond(0)` (and possibly `onMinute(0)`) in the same tick.
 
 ### Synchronous vs asynchronous callbacks
 
@@ -105,16 +112,16 @@ Synchronous callbacks run inside the tick and **block** the clock logic: the nex
 
 The clock uses an internal “elapsed time” in milliseconds. The value you see (and the one passed to `onSecond`/`onMinute`) is a **rounded integer** so that the display and callbacks only change on clear boundaries.
 
-### CountUpClock (stopwatch) — `Math.floor`
+### CountUp (stopwatch) — `Math.floor`
 
 - **Rule:** The integer second is `floor(elapsedSeconds)`.
 - **Rationale:** You should show “1” only after a **full** second has passed. So at 0.9s we still show 0; at 1.0s we show 1. Floor gives that behavior and avoids the display ever “jumping” ahead before the boundary.
 - **Effect:** The displayed second increases only when the clock crosses the next whole second (1.0, 2.0, 3.0, …).
 
-### CountDownClock (timer) — `Math.ceil`
+### CountDown (timer) — `Math.ceil`
 
 - **Rule:** The integer second is `ceil(remainingSeconds)` where remaining = duration − elapsed.
-- **Rationale:** You should show “N” until the clock has **actually** crossed below N. So with 60s duration, we show 60 until 1 second has elapsed, then 59, and so on. For example, at 45.2s, we show 45, and at at 0.7s remaining we still show 1. When remaining reaches 0, the clock completes; in that same tick `onComplete` runs first, then `onSecond(0)` and `onMinute(0)` (see [When Callbacks Fire](#when-callbacks-fire-lifecycle)). Ceil gives that behavior and ensures the displayed value never “drops” to the next number before the boundary.
+- **Rationale:** You should show “N” until the clock has **actually** crossed below N. So with 60s duration, we show 60 until 1 second has elapsed, then 59, and so on. For example, at 45.2s, we show 45, and at 0.7s remaining we still show 1. When remaining reaches 0, the clock completes; in that same tick `onComplete` runs first, then `onSecond(0)` and `onMinute(0)` (see [When Callbacks Fire](#when-callbacks-fire-lifecycle)). Ceil gives that behavior and ensures the displayed value never “drops” to the next number before the boundary.
 - **Effect:** The displayed second decreases only when the clock crosses the previous whole second (e.g. 60 → 59 at 1s elapsed, 1 → complete at duration elapsed).
 
 Using floor for count-up and ceil for count-down keeps both clocks consistent with user expectation: one full second must pass before the displayed second changes in either direction.
@@ -123,106 +130,81 @@ Using floor for count-up and ceil for count-down keeps both clocks consistent wi
 
 ## API Reference
 
-### `namespace Clocks`
+Clocks are represented by lightweight integers (`ClockID`) and the API is functional instead of object-oriented for performance and memory savings.
 
-#### `Clocks.LogLevel`
+### Core Creation Methods
 
-Enum re-exported from the `Logging` module. Use with `Clocks.setLogging()` to set the minimum log level.
+| Method | Description |
+| --- | --- |
+| `createCountUp(options?: CountUpOptions): ClockID` | Allocates a new count-up clock. Returns the allocated ID, or `INVALID_CLOCK_ID` if the clock pool is full. Optional `timeLimitSeconds` stops the clock when reached. |
+| `createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID` | Allocates a new count-down clock starting from `durationSeconds`. Returns the allocated ID, or `INVALID_CLOCK_ID` if the clock pool is full. |
 
-- `Debug` (0), `Info` (1), `Warning` (2), `Error` (3). See [Logging](../logging/README.md).
+### Clock Management Methods
+
+All management methods accept the target clock ID as their first argument.
+
+| Method | Description |
+| --- | --- |
+| `start(id: ClockID): void` | Starts the clock. If already running or complete, does nothing. |
+| `stop(id: ClockID): void` | Stops the clock. It retains its elapsed time and can be resumed later. |
+| `resume(id: ClockID): void` | Alias for `start(id)`. |
+| `pause(id: ClockID): void` | Alias for `stop(id)`. |
+| `reset(id: ClockID): void` | Resets the elapsed time back to 0 (or duration). If the clock was running, it stays running. If complete, clears completion state. |
+| `destroy(id: ClockID): void` | Stops the clock and deallocates its ID back to the internal pool. Callbacks are wiped. |
+| `addSeconds(id: ClockID, seconds: number): void` | Advances the clock time by the specified number of seconds. |
+| `subtractSeconds(id: ClockID, seconds: number): void` | Reverses the clock time by the specified number of seconds. |
+| `setDuration(id: ClockID, durationSeconds: number): void` | Changes the duration limit of the clock. |
+
+### State Inspectors
+
+| Method | Description |
+| --- | --- |
+| `getSeconds(id: ClockID): number` | Returns the current time of the clock in fractional seconds. |
+| `getDuration(id: ClockID): number` | Returns the duration (or time limit) of the clock. |
+| `isRunning(id: ClockID): boolean` | Returns `true` if the clock is actively ticking. |
+| `isPaused(id: ClockID): boolean` | Returns `true` if the clock has been stopped and is not complete. |
+| `isComplete(id: ClockID): boolean` | Returns `true` if the clock reached its end boundary (0 for CountDown, limit for CountUp). |
+| `isActive(id: ClockID): boolean` | Returns `true` if the clock is active (allocated). |
+| `getActiveClockCount(): number` | Returns the number of active (allocated) clocks. |
+
+### Constants
+
+| Constant           | Type      | Description                                                              |
+| ------------------ | --------- | ------------------------------------------------------------------------ |
+| `INVALID_CLOCK_ID` | `ClockID` | `-1` (Sentinel value representing an invalid or uninitialized Clock ID). |
+
+### Configuration
 
 #### Static method
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?, logLevel?, includeRawError?): void` | Configures logging for the Clocks module (start, stop, completion, time adjustments). Pass `undefined` for `log` to disable. See [Logging](../logging/README.md). |
+| `setLogging(log?, logLevel?, includeRawError?): void` | Configures logging for the Clocks module (start, stop, completion, time adjustments). Pass `null` for `log` to disable. See [Logging](../logging/README.md). |
 
 #### Types
 
 | Type | Description |
 | --- | --- |
+| `ClockID` | `number` (Unique generation-encoded identifier for a Clock). |
 | `ClockOptions` | `{ onSecond?: (currentSeconds: number) => void \| Promise<void>; onMinute?: (currentMinutes: number) => void \| Promise<void>; onComplete?: () => void \| Promise<void>; }` |
 | `CountUpOptions` | `ClockOptions & { timeLimitSeconds?: number }` |
 | `CountDownOptions` | Same as `ClockOptions`. |
 
----
-
-### `class Clocks.CountUpClock`
-
-Stopwatch: starts at 0, counts up. Optional `timeLimitSeconds`; when reached, the clock completes and `onComplete` fires.
-
-#### Constructor
-
-| Signature                                    | Description                                                 |
-| -------------------------------------------- | ----------------------------------------------------------- |
-| `new CountUpClock(options?: CountUpOptions)` | `timeLimitSeconds` defaults to 86400 (24 hours) if omitted. |
-
-#### Properties (read-only)
-
-| Property | Description |
-| --- | --- |
-| `seconds: number` | Current value in seconds (0 and up; capped at `timeLimit` and, when complete, returns `timeLimit`). |
-| `timeLimit: number \| null` | The limit in seconds, or null. |
-| `isRunning: boolean` | True when the clock is running. |
-| `isPaused: boolean` | True when not running and not complete. |
-| `isComplete: boolean` | True when the clock has reached its time limit. |
-
-#### Methods
-
-| Method | Description |
-| --- | --- |
-| `start(): this` | Starts (or resumes) the clock. No-op if already running or complete. |
-| `stop(): this` | Stops the clock and commits elapsed time. One more tick may run (see [When Callbacks Fire](#when-callbacks-fire-lifecycle)). |
-| `resume(): this` | Same as `start()`. |
-| `pause(): this` | Same as `stop()`. |
-| `reset(): this` | Clears the scheduled tick, completion state, and elapsed time. If **running**, stays running at elapsed 0 and runs a tick so `onSecond` / `onMinute` reflect the start (e.g. 0 for count-up, initial duration for count-down). If **stopped** or **paused**, stays stopped; no callbacks until `start()`. |
-| `addSeconds(seconds: number): this` | Adds time (increases displayed value). May trigger tick and callbacks. |
-| `subtractSeconds(seconds: number): this` | Subtracts time (decreases displayed value). May trigger tick and callbacks. |
-
----
-
-### `class Clocks.CountDownClock`
-
-Timer: starts at the given duration and counts down to 0. When remaining time reaches 0, the clock completes and `onComplete` fires.
-
-#### Constructor
-
-| Signature | Description |
-| --- | --- |
-| `new CountDownClock(durationSeconds: number, options?: CountDownOptions)` | `durationSeconds` is the initial (and, until changed, current) duration. |
-
-#### Properties (read-only)
-
-| Property              | Description                                                                      |
-| --------------------- | -------------------------------------------------------------------------------- |
-| `seconds: number`     | Current remaining time in seconds (duration down to 0; returns 0 when complete). |
-| `duration: number`    | The countdown duration in seconds.                                               |
-| `isRunning: boolean`  | True when the clock is running.                                                  |
-| `isPaused: boolean`   | True when not running and not complete.                                          |
-| `isComplete: boolean` | True when the clock has reached 0.                                               |
-
-#### Methods
-
-| Method | Description |
-| --- | --- |
-| `start(): this` | Starts (or resumes) the clock. No-op if already running or complete. |
-| `stop(): this` | Stops the clock and commits elapsed time. One more tick may run. |
-| `resume(): this` | Same as `start()`. |
-| `pause(): this` | Same as `stop()`. |
-| `reset(): this` | Clears the scheduled tick, completion state, and elapsed time. If **running**, stays running with remaining time equal to `duration` and runs a tick so `onSecond` / `onMinute` reflect that starting position. If **stopped** or **paused**, stays stopped; no callbacks until `start()`. |
-| `addSeconds(seconds: number): this` | Adds time to the countdown (longer until complete). |
-| `subtractSeconds(seconds: number): this` | Subtracts time (sooner completion). |
-| `setDuration(durationSeconds: number): this` | Sets a new duration (in seconds). Does not start or tick the clock. |
-
----
-
 ## How It Works
 
-1. **Elapsed time** – While the clock is running, elapsed time is `accumulatedMs + (Date.now() - lastResumeTime)`. When stopped, the current run is added to `accumulatedMs` and the timer is cleared. So total elapsed time is preserved across start/stop/resume.
-2. **Count-up value** – `seconds` = elapsed seconds (capped by `timeLimit` for CountUpClock). **Count-down value** – `seconds` = `max(0, duration - elapsed)` (0 when complete).
-3. **Tick loop** – A single `_tick` run: (1) if complete, return; (2) if completion condition is met, mark complete, call `onComplete`, and do not schedule the next tick; (3) compute integer second/minute with the clock’s rounding; (4) if they changed, update last values and call `onSecond`/`onMinute`; (5) if still running, schedule the next `_tick` with `Timers.setTimeout` for `1000 - (elapsedMs % 1000)` ms so the next tick lands on a whole-second boundary. That alignment reduces drift over long runs.
-4. **Deferred tick** – Start, stop, time adjustments, and `reset()` (when running) schedule `_tick` via `Promise.resolve().then(...)` so the tick runs in a microtask. That avoids re-entrancy and ordering issues when you start/stop/adjust/reset in the same synchronous block.
-5. **Callback errors** – Callbacks are invoked through `CallbackHandler`; sync and async errors are caught and logged and do not stop the clock.
+1. **Structure of Arrays** – The module pre-allocates flat `TypedArrays` (like `Float64Array`, `Uint8Array`, `Int32Array`) for clock state up to a maximum limit of 256 (`MAX_CLOCKS`). Slots are allocated in $O(1)$ time via an intrusive free list (`_lastIntegerSecond`). If the pool is full, `createCountUp` and `createCountDown` log an error via `Logging` and return `INVALID_CLOCK_ID` without throwing an exception.
+2. **Elapsed time** – While a clock is running, elapsed time is `accumulatedMs[id] + (Date.now() - lastResumeTime[id])`. When stopped, the current run is added to `accumulatedMs` and the timer is cleared. Total elapsed time is seamlessly preserved.
+3. **Tick loop** – There is exactly **one** global `_tick` loop managed by `Timers.setTimeout`. It iterates over all active clocks and checks completion conditions. For running clocks, it schedules the next tick exactly at `1000 - (elapsedMs % 1000)` ms to align exactly on the next closest whole-second boundary across _all_ active clocks.
+4. **Deferred tick processing** – Start, stop, and adjustments schedule the global tick queue via a reusable static `Promise.resolve()` microtask handler (`STATIC_PROMISE.then(_processTickQueue)`). This strictly avoids Promise and closure allocations on every state change, while preventing re-entrancy issues.
+5. **Callback handling** – Callbacks are invoked via `CallbackHandler.invoke` which bypasses rest-parameter array creations for zero-allocation tick events.
+
+---
+
+## Known Limitations & Caveats
+
+- **Pool Capacity** – The clock pool is pre-allocated to 256 concurrent slots (`MAX_CLOCKS`). If the pool is full when calling `createCountUp()` or `createCountDown()`, it logs an error via `Logging` and returns `INVALID_CLOCK_ID` without throwing an exception.
+- **Tick Frequency** – Callbacks are dispatched on whole-second / whole-minute boundaries based on server uptime. Precision is bounded by the tick alignment timer.
+- **Async Callbacks** – Async callbacks are invoked without blocking the tick loop; rejections and errors are automatically caught and logged via `CallbackHandler`.
 
 ---
 

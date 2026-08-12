@@ -8,6 +8,7 @@ export declare class UIGadgetImage extends UI.Element {
     constructor(params: UIGadgetImage.Params);
     /**
      * The gadget of the gadget image.
+     * @returns The gadget.
      */
     get gadget(): mod.Gadgets;
     /**
@@ -17,14 +18,6 @@ export declare class UIGadgetImage extends UI.Element {
      * @param gadget - The new gadget.
      */
     set gadget(gadget: mod.Gadgets);
-    /**
-     * Sets the gadget of the gadget image.
-     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
-     * been created.
-     * @param gadget - The new gadget.
-     * @returns This element instance.
-     */
-    setGadget(gadget: mod.Gadgets): this;
 }
 export declare namespace UIGadgetImage {
     /**

@@ -209,7 +209,7 @@ export namespace FFADropIns {
         const spawnPoint = mod.SpawnObject(
             mod.RuntimeSpawn_Common.PlayerSpawner,
             location,
-            Vectors.ZERO_VECTOR
+            Vectors.toVector(Vectors.ZERO)
         ) as mod.SpawnPoint;
 
         return {
@@ -255,7 +255,7 @@ export namespace FFADropIns {
 
             if (logging.willLog(LogLevel.Debug)) {
                 logging.log(
-                    `Spawning P_${soldier.playerId} at ${Vectors.getVectorString(spawn.location)}.`,
+                    `Spawning P_${soldier.playerId} at ${Vectors.getVectorString(Vectors.toVector3(spawn.location))}.`,
                     LogLevel.Debug
                 );
             }
@@ -298,9 +298,9 @@ export namespace FFADropIns {
         }
 
         private static _getPosition(player: mod.Player): Vectors.Vector3 {
-            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO_VECTOR3;
+            if (!mod.GetSoldierState(player, mod.SoldierStateBool.IsAlive)) return Vectors.ZERO;
 
-            const position = mod.GetSoldierState(player, mod.SoldierStateVector.GetPosition);
+            const position = mod.GetObjectPosition(player);
 
             return Vectors.truncate(Vectors.multiply(Vectors.toVector3(position), 100), 0);
         }
@@ -328,9 +328,11 @@ export namespace FFADropIns {
          * @param player - The player to force into the queue.
          */
         public static forceIntoQueue(player: mod.Player): void {
-            if (!mod.IsPlayerValid(player)) return;
+            const playerId = mod.GetObjId(player);
 
-            const soldier = Soldier._ALL_SOLDIERS.get(mod.GetObjId(player));
+            if (playerId === undefined) return;
+
+            const soldier = Soldier._ALL_SOLDIERS.get(playerId);
 
             if (!soldier || soldier.deleteIfNotValid()) return;
 
@@ -423,24 +425,31 @@ export namespace FFADropIns {
                 receiver: player,
             });
 
-            this._delayCountdownClock = new Clocks.CountDownClock(initialPromptDelay, {
+            this._delayCountdownClockId = Clocks.createCountDown(initialPromptDelay, {
                 onSecond: (seconds: number) => {
-                    if (this._delayCountdownClock?.isComplete) {
-                        this._countdownUI?.hide();
-                        this._promptUI?.show();
+                    if (Clocks.isComplete(this._delayCountdownClockId)) {
+                        if (this._countdownUI) {
+                            this._countdownUI.visible = false;
+                        }
+
+                        if (this._promptUI) {
+                            this._promptUI.visible = true;
+                        }
                     }
 
-                    if (this._delayCountdownClock?.isRunning) {
+                    if (Clocks.isRunning(this._delayCountdownClockId)) {
                         if (this._promptUI?.visible) {
-                            this._promptUI?.hide();
+                            this._promptUI.visible = false;
                         }
 
-                        if (!this._countdownUI?.visible) {
-                            this._countdownUI?.show();
+                        if (!this._countdownUI?.visible && this._countdownUI) {
+                            this._countdownUI.visible = true;
                         }
                     }
 
-                    this._countdownUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds));
+                    if (this._countdownUI) {
+                        this._countdownUI.message = mod.Message(mod.stringkeys.ffaDropIns.countdown, seconds);
+                    }
                 },
             });
 
@@ -460,10 +469,13 @@ export namespace FFADropIns {
 
                 const updatePosition = () => {
                     const { x, y, z } = Soldier._getPosition(player);
-                    this._debugPositionUI?.setMessage(mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z));
+
+                    if (this._debugPositionUI) {
+                        this._debugPositionUI.message = mod.Message(mod.stringkeys.ffaDropIns.debug.position, x, y, z);
+                    }
                 };
 
-                this._updatePositionInterval = Timers.setInterval(updatePosition, 1_000);
+                this._updatePositionIntervalId = Timers.setInterval(updatePosition, 1_000);
             }
         }
 
@@ -473,13 +485,13 @@ export namespace FFADropIns {
 
         private _isAISoldier: boolean;
 
-        private _delayCountdownClock?: Clocks.CountDownClock;
+        private _delayCountdownClockId: Clocks.ClockID = Clocks.INVALID_CLOCK_ID;
 
         private _promptUI?: UIContainer;
 
         private _countdownUI?: UIText;
 
-        private _updatePositionInterval?: number;
+        private _updatePositionIntervalId: Timers.TimerID = Timers.INVALID_TIMER_ID;
 
         private _debugPositionUI?: UIText;
 
@@ -512,7 +524,8 @@ export namespace FFADropIns {
 
             if (delay <= 0) return this._addToQueue();
 
-            this._delayCountdownClock?.setDuration(delay).start();
+            Clocks.setDuration(this._delayCountdownClockId, delay);
+            Clocks.start(this._delayCountdownClockId);
         }
 
         /**
@@ -524,8 +537,8 @@ export namespace FFADropIns {
 
             logging.log(`P_${this._playerId} is no longer valid.`, LogLevel.Warning);
 
-            this._delayCountdownClock?.stop();
-            Timers.clearInterval(this._updatePositionInterval);
+            Clocks.stop(this._delayCountdownClockId);
+            Timers.clearInterval(this._updatePositionIntervalId);
 
             this._promptUI?.delete();
             this._countdownUI?.delete();
@@ -538,8 +551,11 @@ export namespace FFADropIns {
 
         private _addToQueue(): void {
             if (!this._isAISoldier) {
-                this._delayCountdownClock?.reset();
-                this._promptUI?.hide();
+                Clocks.reset(this._delayCountdownClockId);
+
+                if (this._promptUI) {
+                    this._promptUI.visible = false;
+                }
             }
 
             spawnQueue.push(this);

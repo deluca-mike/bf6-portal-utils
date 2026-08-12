@@ -7,7 +7,7 @@ export declare namespace MapDetector {
     const LogLevel: typeof Logging.LogLevel;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param log - The logger function to use. Pass undefined (or null) to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
@@ -52,17 +52,17 @@ export declare namespace MapDetector {
      */
     function setCoordinates(map: Map, coordinates: Vectors.Vector3): void;
     /**
-     * @returns The current map as a `Map` enum value, or `undefined` if the map cannot be determined.
+     * @returns The current map as a `Map` enum value, or `null` if the map cannot be determined.
      */
-    function currentMap(): Map | undefined;
+    function currentMap(): Map | null;
     /**
-     * @returns The current map as a `mod.Maps` enum value, or `undefined` if the map cannot be determined.
+     * @returns The current map as a `mod.Maps` enum value, or `null` if the map cannot be determined.
      */
-    function currentNativeMap(): mod.Maps | undefined;
+    function currentNativeMap(): mod.Maps | null;
     /**
-     * @returns The current map as a string, or `undefined` if the map cannot be determined.
+     * @returns The current map as a string, or `null` if the map cannot be determined.
      */
-    function currentMapName(): string | undefined;
+    function currentMapName(): string | null;
     /**
      * @param map - The map to check.
      * @returns True if the current map is the given `Map` enum value.
