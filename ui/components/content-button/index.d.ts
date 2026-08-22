@@ -2,14 +2,14 @@ import { UI } from '../../index.ts';
 import { UIButton } from '../button/index.ts';
 /**
  * Base class for buttons that contain content elements (Text, Image, etc.).
- * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
+ * Handles the pattern of wrapping a button and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @version 8.0.0
+ * @version 9.0.0
  */
-export declare abstract class UIContentButton<TContent extends UI.Element> extends UI.Element {
+export declare abstract class UIContentButton<TContent extends UI.Element> extends UI.Element implements UI.Button {
     private static readonly _scratchParent;
     protected _padding: number;
-    protected _button: UIButton;
+    protected _buttonWidget: mod.UIWidget;
     protected _content: TContent;
     /**
      * Creates a new content button.

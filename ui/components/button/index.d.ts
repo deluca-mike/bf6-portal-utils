@@ -1,10 +1,5 @@
 import { UI } from '../../index.ts';
 export declare class UIButton extends UI.Element implements UI.Button {
-    protected _onClickDown?: UI.ButtonHandler;
-    protected _onClickUp?: UI.ButtonHandler;
-    protected _onFocusIn?: UI.ButtonHandler;
-    protected _onFocusOut?: UI.ButtonHandler;
-    protected _unregisterAsButton: () => void;
     /**
      * Creates a new button.
      * @param params - The parameters for the button.
@@ -12,10 +7,6 @@ export declare class UIButton extends UI.Element implements UI.Button {
      * Similarly, alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
      */
     constructor(params: UIButton.Params);
-    /**
-     * @inheritdoc
-     */
-    delete(): void;
     /**
      * Whether the button is enabled.
      * @returns True if enabled, false otherwise.

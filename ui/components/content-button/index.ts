@@ -3,26 +3,42 @@ import { UIButton } from '../button/index.ts';
 
 /**
  * Base class for buttons that contain content elements (Text, Image, etc.).
- * Handles the common pattern of wrapping a UIButton and content element in a UIContainer.
+ * Handles the pattern of wrapping a button and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @version 8.0.0
+ * @version 9.0.0
  */
-export abstract class UIContentButton<TContent extends UI.Element> extends UI.Element {
-    private static readonly _scratchParent: UI.Parent = {
-        uiWidget: undefined as unknown as mod.UIWidget,
+export abstract class UIContentButton<TContent extends UI.Element> extends UI.Element implements UI.Button {
+    private static readonly _scratchParent: {
+        id: number;
+        receiver: UI.Parent['receiver'];
+        children: readonly UI.Element[];
+        getChild(index: number): UI.Element | undefined;
+        forEachChild(callback: (child: UI.Element, index: number) => void): void;
+        attachChild(child: UI.Element): void;
+        detachChild(child: UI.Element): void;
+    } = {
+        id: 0,
         receiver: undefined as unknown as UI.Parent['receiver'],
         children: [],
         getChild(): UI.Element | undefined {
             return undefined;
         },
         forEachChild(): void {},
-        attachChild(): void {},
-        detachChild(): void {},
+        attachChild(child: UI.Element): void {
+            if (this.id !== 0 && child.id !== UI.INVALID_INDEX) {
+                UI.Element._attachChild(this.id, child.id);
+            }
+        },
+        detachChild(child: UI.Element): void {
+            if (this.id !== 0 && child.id !== UI.INVALID_INDEX) {
+                UI.Element._detachChild(this.id, child.id);
+            }
+        },
     };
 
     protected _padding: number;
 
-    protected _button: UIButton;
+    protected _buttonWidget: mod.UIWidget;
 
     protected _content: TContent;
 
@@ -35,103 +51,171 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
         params: UIContentButton.Params,
         createContent: (parent: UI.Parent, width: number, height: number) => TContent
     ) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
         const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const padding = params.padding ?? 0;
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
 
-        const containerElementParams: UI.FinalElementParams = {
+        if (!receiver.nativeReceiver) {
+            mod.AddUIContainer(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                padding,
+                UI.COLORS.WHITE,
+                0,
+                mod.UIBgFill.None,
+                depth
+            );
+        } else {
+            mod.AddUIContainer(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                padding,
+                UI.COLORS.WHITE,
+                0,
+                mod.UIBgFill.None,
+                depth,
+                receiver.nativeReceiver
+            );
+        }
+
+        super(id, {
             name,
             parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
+            anchor,
+            visible,
             bgColor: UI.COLORS.WHITE,
             bgAlpha: 0,
             bgFill: mod.UIBgFill.None,
             depth,
+            x,
+            y,
+            width,
+            height,
             receiver,
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const containerArgs: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            containerElementParams.anchor,
-            parent.uiWidget,
-            containerElementParams.visible,
-            padding,
-            containerElementParams.bgColor,
-            containerElementParams.bgAlpha,
-            containerElementParams.bgFill,
-            containerElementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIContainer(...containerArgs);
-        } else {
-            mod.AddUIContainer(...containerArgs, receiver.nativeReceiver);
-        }
-
-        super(containerElementParams);
+        });
 
         this._padding = padding;
 
-        // Scratch parent temporarily routes underlying widget and receiver to child button and content
-        // elements during synchronous construction without exposing parent methods on this element.
-        UIContentButton._scratchParent.uiWidget = this._uiWidget;
-        UIContentButton._scratchParent.receiver = this._receiver;
+        const buttonName = `${name}_b`;
+        const enabled = params.enabled ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 1;
+        const bgFill = params.bgFill ?? mod.UIBgFill.Solid;
+        const baseColor = params.baseColor ?? UI.COLORS.BF_GREY_2;
+        const baseAlpha = params.baseAlpha ?? 1;
+        const disabledColor = params.disabledColor ?? UI.COLORS.BF_GREY_3;
+        const disabledAlpha = params.disabledAlpha ?? 1;
+        const pressedColor = params.pressedColor ?? UI.COLORS.BF_GREEN_BRIGHT;
+        const pressedAlpha = params.pressedAlpha ?? 1;
+        const focusedColor = params.focusedColor ?? UI.COLORS.BF_GREY_1;
+        const focusedAlpha = params.focusedAlpha ?? 1;
 
-        const buttonParams: UIButton.Params = {
-            parent: UIContentButton._scratchParent,
-            width,
-            height,
-            bgColor: params.bgColor,
-            bgAlpha: params.bgAlpha,
-            bgFill: params.bgFill,
-            enabled: params.enabled,
-            baseColor: params.baseColor,
-            baseAlpha: params.baseAlpha,
-            disabledColor: params.disabledColor,
-            disabledAlpha: params.disabledAlpha,
-            pressedColor: params.pressedColor,
-            pressedAlpha: params.pressedAlpha,
-            focusedColor: params.focusedColor,
-            focusedAlpha: params.focusedAlpha,
-            depth,
-            onClickDown: params.onClickDown,
-            onClickUp: params.onClickUp,
-            onFocusIn: params.onFocusIn,
-            onFocusOut: params.onFocusOut,
-        };
+        if (!receiver.nativeReceiver) {
+            mod.AddUIButton(
+                buttonName,
+                mod.CreateVector(0, 0, 0),
+                mod.CreateVector(width, height, 0),
+                mod.UIAnchor.Center,
+                this._uiWidget,
+                true,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth
+            );
+        } else {
+            mod.AddUIButton(
+                buttonName,
+                mod.CreateVector(0, 0, 0),
+                mod.CreateVector(width, height, 0),
+                mod.UIAnchor.Center,
+                this._uiWidget,
+                true,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth,
+                receiver.nativeReceiver
+            );
+        }
 
-        this._button = new UIButton(buttonParams);
+        this._buttonWidget = mod.FindUIWidgetWithName(buttonName) as mod.UIWidget;
+
+        const btnSlot = this._allocateButtonSlot();
+
+        if (params.onClickDown) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonDown, true);
+            this._setButtonOnClickDown(btnSlot, params.onClickDown);
+        }
+
+        if (params.onClickUp) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonUp, true);
+            this._setButtonOnClickUp(btnSlot, params.onClickUp);
+        }
+
+        if (params.onFocusIn) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusIn, true);
+            this._setButtonOnFocusIn(btnSlot, params.onFocusIn);
+        }
+
+        if (params.onFocusOut) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusOut, true);
+            this._setButtonOnFocusOut(btnSlot, params.onFocusOut);
+        }
 
         const widthNetOfPadding = Math.max(0, width - padding * 2);
         const heightNetOfPadding = Math.max(0, height - padding * 2);
 
-        this._content = createContent(UIContentButton._scratchParent, widthNetOfPadding, heightNetOfPadding);
+        UIContentButton._scratchParent.id = id;
+        UIContentButton._scratchParent.receiver = this.receiver;
 
-        UIContentButton._scratchParent.uiWidget = undefined as unknown as mod.UIWidget;
+        this._content = createContent(
+            UIContentButton._scratchParent as unknown as UI.Parent,
+            widthNetOfPadding,
+            heightNetOfPadding
+        );
+
+        UIContentButton._scratchParent.id = 0;
         UIContentButton._scratchParent.receiver = undefined as unknown as UI.Parent['receiver'];
     }
 
@@ -139,8 +223,15 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @inheritdoc
      */
     public override delete(): void {
-        this._button.delete();
-        this._content.delete();
+        if (this._isDeletedCheck()) return;
+
+        if (this._content) {
+            this._content.delete();
+        }
+
+        if (this._buttonWidget) {
+            mod.DeleteUIWidget(this._buttonWidget);
+        }
 
         super.delete();
     }
@@ -149,7 +240,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @inheritdoc
      */
     public override get width(): number {
-        return this._button.width;
+        return super.width;
     }
 
     /**
@@ -158,8 +249,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public override set width(width: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, this.height, 0));
-        this._button.width = width;
+        super.width = width;
+        mod.SetUIWidgetSize(this._buttonWidget, mod.CreateVector(width, this.height, 0));
         this._content.width = Math.max(0, width - this._padding * 2);
     }
 
@@ -167,7 +258,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @inheritdoc
      */
     public override get height(): number {
-        return this._button.height;
+        return super.height;
     }
 
     /**
@@ -176,8 +267,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public override set height(height: number) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(this.width, height, 0));
-        this._button.height = height;
+        super.height = height;
+        mod.SetUIWidgetSize(this._buttonWidget, mod.CreateVector(this.width, height, 0));
         this._content.height = Math.max(0, height - this._padding * 2);
     }
 
@@ -185,7 +276,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @inheritdoc
      */
     public override get size(): UI.Size {
-        return { width: this._button.width, height: this._button.height };
+        return super.size;
     }
 
     /**
@@ -194,8 +285,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public override set size(params: UI.Size) {
         if (this._isDeletedCheck()) return;
 
-        mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
-        this._button.size = params;
+        super.size = params;
+        mod.SetUIWidgetSize(this._buttonWidget, mod.CreateVector(params.width, params.height, 0));
 
         this._content.size = {
             width: Math.max(0, params.width - this._padding * 2),
@@ -208,7 +299,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns True if enabled, false otherwise.
      */
     public get enabled(): boolean {
-        return this._button.enabled;
+        return this._isDeletedCheck() ? false : mod.GetUIButtonEnabled(this._buttonWidget);
     }
 
     /**
@@ -218,7 +309,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set enabled(enabled: boolean) {
         if (this._isDeletedCheck()) return;
 
-        this._button.enabled = enabled;
+        mod.SetUIButtonEnabled(this._buttonWidget, enabled);
     }
 
     /**
@@ -244,7 +335,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The base color vector.
      */
     public get baseColor(): mod.Vector {
-        return this._button.baseColor;
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorBase(this._buttonWidget);
     }
 
     /**
@@ -254,7 +345,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set baseColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        this._button.baseColor = color;
+        mod.SetUIButtonColorBase(this._buttonWidget, color);
     }
 
     /**
@@ -262,7 +353,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The base alpha opacity.
      */
     public get baseAlpha(): number {
-        return this._button.baseAlpha;
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaBase(this._buttonWidget);
     }
 
     /**
@@ -272,7 +363,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set baseAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        this._button.baseAlpha = alpha;
+        mod.SetUIButtonAlphaBase(this._buttonWidget, alpha);
     }
 
     /**
@@ -280,7 +371,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The disabled color vector.
      */
     public get disabledColor(): mod.Vector {
-        return this._button.disabledColor;
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorDisabled(this._buttonWidget);
     }
 
     /**
@@ -290,7 +381,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set disabledColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        this._button.disabledColor = color;
+        mod.SetUIButtonColorDisabled(this._buttonWidget, color);
     }
 
     /**
@@ -298,7 +389,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The disabled alpha opacity.
      */
     public get disabledAlpha(): number {
-        return this._button.disabledAlpha;
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaDisabled(this._buttonWidget);
     }
 
     /**
@@ -308,7 +399,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set disabledAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        this._button.disabledAlpha = alpha;
+        mod.SetUIButtonAlphaDisabled(this._buttonWidget, alpha);
     }
 
     /**
@@ -316,7 +407,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The pressed color vector.
      */
     public get pressedColor(): mod.Vector {
-        return this._button.pressedColor;
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorPressed(this._buttonWidget);
     }
 
     /**
@@ -326,7 +417,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set pressedColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        this._button.pressedColor = color;
+        mod.SetUIButtonColorPressed(this._buttonWidget, color);
     }
 
     /**
@@ -334,7 +425,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The pressed alpha opacity.
      */
     public get pressedAlpha(): number {
-        return this._button.pressedAlpha;
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaPressed(this._buttonWidget);
     }
 
     /**
@@ -344,7 +435,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set pressedAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        this._button.pressedAlpha = alpha;
+        mod.SetUIButtonAlphaPressed(this._buttonWidget, alpha);
     }
 
     /**
@@ -352,7 +443,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The focused color vector.
      */
     public get focusedColor(): mod.Vector {
-        return this._button.focusedColor;
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorFocused(this._buttonWidget);
     }
 
     /**
@@ -362,7 +453,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set focusedColor(color: mod.Vector) {
         if (this._isDeletedCheck()) return;
 
-        this._button.focusedColor = color;
+        mod.SetUIButtonColorFocused(this._buttonWidget, color);
     }
 
     /**
@@ -370,7 +461,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The focused alpha opacity.
      */
     public get focusedAlpha(): number {
-        return this._button.focusedAlpha;
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaFocused(this._buttonWidget);
     }
 
     /**
@@ -380,7 +471,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set focusedAlpha(alpha: number) {
         if (this._isDeletedCheck()) return;
 
-        this._button.focusedAlpha = alpha;
+        mod.SetUIButtonAlphaFocused(this._buttonWidget, alpha);
     }
 
     /**
@@ -388,7 +479,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The click down handler, or undefined.
      */
     public get onClickDown(): UI.ButtonHandler | undefined {
-        return this._button.onClickDown;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnClickDown(this._getButtonSlot());
     }
 
     /**
@@ -398,7 +489,16 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set onClickDown(onClickDown: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        this._button.onClickDown = onClickDown;
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnClickDown(btnSlot);
+
+        if (onClickDown && !prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonDown, true);
+        } else if (!onClickDown && prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonDown, false);
+        }
+
+        this._setButtonOnClickDown(btnSlot, onClickDown);
     }
 
     /**
@@ -406,7 +506,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The click up handler, or undefined.
      */
     public get onClickUp(): UI.ButtonHandler | undefined {
-        return this._button.onClickUp;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnClickUp(this._getButtonSlot());
     }
 
     /**
@@ -416,7 +516,16 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set onClickUp(onClickUp: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        this._button.onClickUp = onClickUp;
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnClickUp(btnSlot);
+
+        if (onClickUp && !prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonUp, true);
+        } else if (!onClickUp && prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.ButtonUp, false);
+        }
+
+        this._setButtonOnClickUp(btnSlot, onClickUp);
     }
 
     /**
@@ -424,7 +533,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The focus in handler, or undefined.
      */
     public get onFocusIn(): UI.ButtonHandler | undefined {
-        return this._button.onFocusIn;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnFocusIn(this._getButtonSlot());
     }
 
     /**
@@ -434,7 +543,16 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set onFocusIn(onFocusIn: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        this._button.onFocusIn = onFocusIn;
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnFocusIn(btnSlot);
+
+        if (onFocusIn && !prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusIn, true);
+        } else if (!onFocusIn && prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusIn, false);
+        }
+
+        this._setButtonOnFocusIn(btnSlot, onFocusIn);
     }
 
     /**
@@ -442,7 +560,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
      * @returns The focus out handler, or undefined.
      */
     public get onFocusOut(): UI.ButtonHandler | undefined {
-        return this._button.onFocusOut;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnFocusOut(this._getButtonSlot());
     }
 
     /**
@@ -452,7 +570,16 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UI.El
     public set onFocusOut(onFocusOut: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        this._button.onFocusOut = onFocusOut;
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnFocusOut(btnSlot);
+
+        if (onFocusOut && !prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusOut, true);
+        } else if (!onFocusOut && prev) {
+            mod.EnableUIButtonEvent(this._buttonWidget, mod.UIButtonEvent.FocusOut, false);
+        }
+
+        this._setButtonOnFocusOut(btnSlot, onFocusOut);
     }
 }
 

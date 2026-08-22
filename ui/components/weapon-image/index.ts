@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIWeaponImage extends UI.Element {
     protected _weapon: mod.Weapons;
     protected _weaponPackage: mod.WeaponPackage;
@@ -10,62 +10,62 @@ export class UIWeaponImage extends UI.Element {
      * @param params - The parameters for the weapon image.
      */
     public constructor(params: UIWeaponImage.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const weaponPackage = params.weaponPackage ?? mod.CreateNewWeaponPackage();
 
-        const elementParams: UI.FinalElementParams = {
+        if (!receiver.nativeReceiver) {
+            mod.AddUIWeaponImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.weapon,
+                UI.Element._getNativeWidget(parent.id)!,
+                weaponPackage
+            );
+        } else {
+            mod.AddUIWeaponImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.weapon,
+                UI.Element._getNativeWidget(parent.id)!,
+                weaponPackage,
+                receiver.nativeReceiver
+            );
+        }
+
+        super(id, {
             name,
             parent,
-            visible: params.visible ?? true,
+            anchor,
+            visible,
+            bgColor: UI.COLORS.WHITE,
+            bgAlpha: 0,
+            bgFill: mod.UIBgFill.None,
+            depth,
             x,
             y,
             width,
             height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: UI.COLORS.WHITE,
-            bgAlpha: 0,
-            bgFill: mod.UIBgFill.None,
-            depth: mod.UIDepth.AboveGameUI,
             receiver,
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const weaponPackage = params.weaponPackage ?? mod.CreateNewWeaponPackage();
-
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.Weapons, // weapon,
-            mod.UIWidget, // parent
-            mod.WeaponPackage, // weaponPackage
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            params.weapon,
-            parent.uiWidget,
-            weaponPackage,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIWeaponImage(...args);
-        } else {
-            mod.AddUIWeaponImage(...args, receiver.nativeReceiver);
-        }
-
-        super(elementParams);
+        });
 
         this._weapon = params.weapon;
         this._weaponPackage = weaponPackage;
 
         // `mod.AddUIWeaponImage` lacks the ability to define starting invisibility, so we have to set it manually.
-        if (!elementParams.visible) {
+        if (!visible) {
             this.visible = false;
         }
     }

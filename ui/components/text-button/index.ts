@@ -3,7 +3,7 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIText } from '../text/index.ts';
 
-// version: 7.0.0
+// version: 8.0.0
 export class UITextButton extends UIContentButton<UIText> {
     protected _textDisabledColor: mod.Vector;
 
@@ -35,18 +35,22 @@ export class UITextButton extends UIContentButton<UIText> {
         this._textDisabledColor = params.textDisabledColor ?? UI.COLORS.BF_GREY_2;
         this._textDisabledAlpha = params.textDisabledAlpha ?? 1;
 
-        if (!this._button.enabled) {
+        if (!this.enabled) {
             this._setContentEnabled(false);
         }
     }
 
     private _setContentEnabled(enabled: boolean): void {
+        const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+        if (!contentWidget) return;
+
         if (enabled) {
-            mod.SetUITextColor(this._content.uiWidget, this._content.textColor);
-            mod.SetUITextAlpha(this._content.uiWidget, this._content.textAlpha);
+            mod.SetUITextColor(contentWidget, this._content.textColor);
+            mod.SetUITextAlpha(contentWidget, this._content.textAlpha);
         } else {
-            mod.SetUITextColor(this._content.uiWidget, this._textDisabledColor);
-            mod.SetUITextAlpha(this._content.uiWidget, this._textDisabledAlpha);
+            mod.SetUITextColor(contentWidget, this._textDisabledColor);
+            mod.SetUITextAlpha(contentWidget, this._textDisabledAlpha);
         }
     }
 
@@ -54,7 +58,7 @@ export class UITextButton extends UIContentButton<UIText> {
      * @inheritdoc
      */
     public override get enabled(): boolean {
-        return this._button.enabled;
+        return super.enabled;
     }
 
     /**
@@ -63,7 +67,7 @@ export class UITextButton extends UIContentButton<UIText> {
     public override set enabled(enabled: boolean) {
         if (this._isDeletedCheck()) return;
 
-        this._button.enabled = enabled;
+        super.enabled = enabled;
         this._setContentEnabled(enabled);
     }
 
@@ -138,8 +142,12 @@ export class UITextButton extends UIContentButton<UIText> {
 
         this._content.textColor = color;
 
-        if (this._button.enabled) {
-            mod.SetUITextColor(this._content.uiWidget, color);
+        if (this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUITextColor(contentWidget, color);
+            }
         }
     }
 
@@ -160,8 +168,12 @@ export class UITextButton extends UIContentButton<UIText> {
 
         this._content.textAlpha = alpha;
 
-        if (this._button.enabled) {
-            mod.SetUITextAlpha(this._content.uiWidget, alpha);
+        if (this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUITextAlpha(contentWidget, alpha);
+            }
         }
     }
 
@@ -182,8 +194,12 @@ export class UITextButton extends UIContentButton<UIText> {
 
         this._textDisabledColor = color;
 
-        if (!this._button.enabled) {
-            mod.SetUITextColor(this._content.uiWidget, color);
+        if (!this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUITextColor(contentWidget, color);
+            }
         }
     }
 
@@ -204,8 +220,12 @@ export class UITextButton extends UIContentButton<UIText> {
 
         this._textDisabledAlpha = alpha;
 
-        if (!this._button.enabled) {
-            mod.SetUITextAlpha(this._content.uiWidget, alpha);
+        if (!this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUITextAlpha(contentWidget, alpha);
+            }
         }
     }
 }

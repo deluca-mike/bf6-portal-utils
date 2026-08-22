@@ -1,70 +1,73 @@
+import { CallbackHandler } from '../../../callback-handler/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 7.0.0
+// version: 8.0.0
 export class UIContainer extends UI.Element implements UI.Parent {
-    protected _children?: UI.Element[];
-
     /**
      * Creates a new container.
      * @param params - The parameters for the container.
      */
     public constructor(params: UIContainer.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 0;
+        const bgFill = params.bgFill ?? mod.UIBgFill.None;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
 
-        const elementParams: UI.FinalElementParams = {
+        if (!receiver.nativeReceiver) {
+            mod.AddUIContainer(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                depth
+            );
+        } else {
+            mod.AddUIContainer(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                depth,
+                receiver.nativeReceiver
+            );
+        }
+
+        super(id, {
             name,
             parent,
-            visible: params.visible ?? true,
+            anchor,
+            visible,
+            bgColor,
+            bgAlpha,
+            bgFill,
+            depth,
             x,
             y,
             width,
             height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 0,
-            bgFill: params.bgFill ?? mod.UIBgFill.None,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
             receiver,
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            0,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIContainer(...args);
-        } else {
-            mod.AddUIContainer(...args, receiver.nativeReceiver);
-        }
-
-        super(elementParams);
+        });
 
         for (const childParams of params.childrenParams ?? []) {
             childParams.parent = this;
@@ -74,11 +77,26 @@ export class UIContainer extends UI.Element implements UI.Parent {
     }
 
     /**
-     * Returns a shallow copy of the list of direct child elements.
+     * Returns a snapshot array of direct child elements.
      * @returns Array of direct children.
      */
     public get children(): readonly UI.Element[] {
-        return this._children ? this._children.slice() : [];
+        if (this._isDeletedCheck()) return [];
+
+        const list: UI.Element[] = [];
+        let curr = UI.Element._getFirstChild(this._id);
+
+        while (curr !== UI.INVALID_INDEX) {
+            const inst = UI.Element._getInstance(curr);
+
+            if (inst) {
+                list.push(inst);
+            }
+
+            curr = UI.Element._getNextSibling(curr);
+        }
+
+        return list;
     }
 
     /**
@@ -87,7 +105,19 @@ export class UIContainer extends UI.Element implements UI.Parent {
      * @returns The child element, or undefined if out of bounds.
      */
     public getChild(index: number): UI.Element | undefined {
-        return this._children ? this._children[index] : undefined;
+        if (this._isDeletedCheck()) return undefined;
+
+        let curr = UI.Element._getFirstChild(this._id);
+        let idx = 0;
+
+        while (curr !== UI.INVALID_INDEX) {
+            if (idx === index) return UI.Element._getInstance(curr);
+
+            curr = UI.Element._getNextSibling(curr);
+            idx++;
+        }
+
+        return undefined;
     }
 
     /**
@@ -95,29 +125,21 @@ export class UIContainer extends UI.Element implements UI.Parent {
      * @param callback - Function invoked for each child.
      */
     public forEachChild(callback: (child: UI.Element, index: number) => void): void {
-        if (!this._children) return;
+        if (this._isDeletedCheck()) return;
 
-        const count = this._children.length;
+        let curr = UI.Element._getFirstChild(this._id);
+        let idx = 0;
 
-        for (let i = 0; i < count; ++i) {
-            callback(this._children[i]!, i);
-        }
-    }
+        while (curr !== UI.INVALID_INDEX) {
+            const next = UI.Element._getNextSibling(curr);
+            const inst = UI.Element._getInstance(curr);
 
-    /**
-     * @inheritdoc
-     */
-    public override delete(): void {
-        if (this._children) {
-            const children = this._children;
-            this._children = undefined;
-
-            for (let i = 0; i < children.length; ++i) {
-                children[i].delete();
+            if (inst) {
+                CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, this._logging);
             }
-        }
 
-        super.delete();
+            curr = next;
+        }
     }
 
     /**
@@ -125,14 +147,9 @@ export class UIContainer extends UI.Element implements UI.Parent {
      * @param child - The child to attach.
      */
     public attachChild(child: UI.Element): void {
-        if (this._deleted) return;
+        if (this._isDeletedCheck() || child.id === UI.INVALID_INDEX) return;
 
-        if (!this._children) {
-            this._children = [child];
-            return;
-        }
-
-        this._children.push(child);
+        UI.Element._attachChild(this._id, child.id);
     }
 
     /**
@@ -140,17 +157,9 @@ export class UIContainer extends UI.Element implements UI.Parent {
      * @param child - The child to detach.
      */
     public detachChild(child: UI.Element): void {
-        if (!this._children) return;
+        if (this._isDeletedCheck() || child.id === UI.INVALID_INDEX) return;
 
-        const idx = this._children.indexOf(child);
-
-        if (idx === -1) return;
-
-        const last = this._children.pop()!;
-
-        if (idx < this._children.length) {
-            this._children[idx] = last;
-        }
+        UI.Element._detachChild(this._id, child.id);
     }
 }
 

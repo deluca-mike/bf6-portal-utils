@@ -2,7 +2,7 @@ import { CallbackHandler } from '../callback-handler/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export namespace UI {
     /****** Logging ******/
 
@@ -27,6 +27,240 @@ export namespace UI {
         logging.setLogging(log, logLevel, includeRawError);
     }
 
+    /****** Constants & Limits ******/
+
+    /**
+     * Maximum number of UI widgets supported simultaneously.
+     */
+    export const MAX_WIDGETS = 2048;
+
+    /**
+     * Maximum number of interactive UI buttons supported simultaneously.
+     */
+    export const MAX_BUTTONS = 512;
+
+    /**
+     * Sentinel value representing an invalid or uninitialized widget index.
+     */
+    export const INVALID_INDEX = -1;
+
+    /**
+     * Unique identifier for a UI widget.
+     */
+    export type WidgetID = number & { readonly __brand: 'WidgetID' };
+
+    /**
+     * Sentinel value representing an invalid widget ID.
+     */
+    export const INVALID_WIDGET_ID = -1 as WidgetID;
+
+    // Bitflags (lower 5 bits of _flags)
+    const FLAG_IN_USE = 1 << 0; // 0x01
+    const FLAG_VISIBLE = 1 << 1; // 0x02
+    const FLAG_HAS_INPUT_MODE = 1 << 2; // 0x04
+    const FLAG_UI_INPUT_MODE_WHEN_VISIBLE = 1 << 3; // 0x08
+    // Bit 4 (0x10) is reserved for future use
+
+    const FLAGS_MASK = 0x1f;
+    const BUTTON_ID_SHIFT = 5;
+    const BUTTON_ID_MASK = 0x7ff; // 11 bits (up to 2047 buttons)
+
+    /****** SoA Buffers ******/
+
+    const _flags = new Uint16Array(MAX_WIDGETS);
+    const _parents = new Int16Array(MAX_WIDGETS);
+    const _firstChild = new Int16Array(MAX_WIDGETS);
+    const _nextSibling = new Int16Array(MAX_WIDGETS);
+
+    const _x = new Float32Array(MAX_WIDGETS);
+    const _y = new Float32Array(MAX_WIDGETS);
+    const _width = new Float32Array(MAX_WIDGETS);
+    const _height = new Float32Array(MAX_WIDGETS);
+
+    const _nativeWidgets = new Array<mod.UIWidget | null>(MAX_WIDGETS);
+    const _receivers = new Array<Receiver<mod.Player | mod.Team | undefined> | null>(MAX_WIDGETS);
+    const _instances = new Array<Element | null>(MAX_WIDGETS);
+
+    // Intrusive free-list initialization for widgets (IDs start at 1; 0 is Root.instance)
+    for (let i = 1; i < MAX_WIDGETS - 1; ++i) {
+        _nextSibling[i] = i + 1;
+    }
+    _nextSibling[MAX_WIDGETS - 1] = INVALID_INDEX;
+
+    _parents.fill(INVALID_INDEX);
+    _firstChild.fill(INVALID_INDEX);
+    _nativeWidgets.fill(null);
+    _receivers.fill(null);
+    _instances.fill(null);
+
+    let _firstFree = 1;
+
+    // Button Storage (1-indexed, slot 0 = not a button)
+    const _buttonWidgetId = new Int16Array(MAX_BUTTONS + 1);
+    const _buttonOnClickUp = new Array<ButtonHandler | null>(MAX_BUTTONS + 1);
+    const _buttonOnClickDown = new Array<ButtonHandler | null>(MAX_BUTTONS + 1);
+    const _buttonOnFocusIn = new Array<ButtonHandler | null>(MAX_BUTTONS + 1);
+    const _buttonOnFocusOut = new Array<ButtonHandler | null>(MAX_BUTTONS + 1);
+
+    for (let i = 1; i < MAX_BUTTONS; ++i) {
+        _buttonWidgetId[i] = i + 1;
+    }
+    _buttonWidgetId[MAX_BUTTONS] = INVALID_INDEX;
+
+    _buttonOnClickUp.fill(null);
+    _buttonOnClickDown.fill(null);
+    _buttonOnFocusIn.fill(null);
+    _buttonOnFocusOut.fill(null);
+
+    let _firstFreeButton = 1;
+
+    /****** Flag & Bit Helper Functions ******/
+
+    function _isInUse(flags: number): boolean {
+        return (flags & FLAG_IN_USE) !== 0;
+    }
+
+    function _isVisible(flags: number): boolean {
+        return (flags & FLAG_VISIBLE) !== 0;
+    }
+
+    function _hasInputMode(flags: number): boolean {
+        return (flags & FLAG_HAS_INPUT_MODE) !== 0;
+    }
+
+    function _isUIInputModeWhenVisible(flags: number): boolean {
+        return (flags & FLAG_UI_INPUT_MODE_WHEN_VISIBLE) !== 0;
+    }
+
+    function _setFlag(index: number, flag: number): void {
+        _flags[index] |= flag;
+    }
+
+    function _clearFlag(index: number, flag: number): void {
+        _flags[index] &= ~flag;
+    }
+
+    function _getButtonId(flags: number): number {
+        return (flags >> BUTTON_ID_SHIFT) & BUTTON_ID_MASK;
+    }
+
+    function _setButtonId(index: number, btnId: number): void {
+        _flags[index] = (_flags[index] & FLAGS_MASK) | ((btnId & BUTTON_ID_MASK) << BUTTON_ID_SHIFT);
+    }
+
+    /****** Internal SoA Slot Allocators ******/
+
+    function _allocateSlot(): number {
+        if (_firstFree === INVALID_INDEX) {
+            logging.log('UI widget pool full', LogLevel.Error);
+            return INVALID_INDEX;
+        }
+
+        const index = _firstFree;
+        _firstFree = _nextSibling[index];
+        _nextSibling[index] = INVALID_INDEX;
+        _firstChild[index] = INVALID_INDEX;
+        _parents[index] = INVALID_INDEX;
+        _flags[index] = FLAG_IN_USE;
+
+        return index;
+    }
+
+    function _freeSlot(index: number): void {
+        if (index <= 0 || index >= MAX_WIDGETS) return;
+
+        _flags[index] = 0;
+        _nativeWidgets[index] = null;
+        _receivers[index] = null;
+        _instances[index] = null;
+        _parents[index] = INVALID_INDEX;
+        _firstChild[index] = INVALID_INDEX;
+        _x[index] = 0;
+        _y[index] = 0;
+        _width[index] = 0;
+        _height[index] = 0;
+
+        _nextSibling[index] = _firstFree;
+        _firstFree = index;
+    }
+
+    function _allocateButtonSlot(widgetIndex: number): number {
+        if (_firstFreeButton === INVALID_INDEX) {
+            logging.log('UI button pool full', LogLevel.Error);
+            return 0;
+        }
+
+        const slot = _firstFreeButton;
+        _firstFreeButton = _buttonWidgetId[slot];
+        _buttonWidgetId[slot] = widgetIndex;
+        _buttonOnClickUp[slot] = null;
+        _buttonOnClickDown[slot] = null;
+        _buttonOnFocusIn[slot] = null;
+        _buttonOnFocusOut[slot] = null;
+
+        _setButtonId(widgetIndex, slot);
+
+        return slot;
+    }
+
+    function _freeButtonSlot(widgetIndex: number): void {
+        const slot = _getButtonId(_flags[widgetIndex]);
+
+        if (slot === 0 || slot >= _buttonWidgetId.length) return;
+
+        _buttonOnClickUp[slot] = null;
+        _buttonOnClickDown[slot] = null;
+        _buttonOnFocusIn[slot] = null;
+        _buttonOnFocusOut[slot] = null;
+
+        _buttonWidgetId[slot] = _firstFreeButton;
+        _firstFreeButton = slot;
+
+        _setButtonId(widgetIndex, 0);
+    }
+
+    function _attachChild(parentId: number, childId: number): void {
+        if (parentId < 0 || parentId >= MAX_WIDGETS || childId < 0 || childId >= MAX_WIDGETS) return;
+
+        _parents[childId] = parentId;
+        _nextSibling[childId] = _firstChild[parentId];
+        _firstChild[parentId] = childId;
+    }
+
+    function _detachChild(parentId: number, childId: number): void {
+        if (parentId < 0 || parentId >= MAX_WIDGETS || childId < 0 || childId >= MAX_WIDGETS) return;
+
+        if (_firstChild[parentId] === childId) {
+            _firstChild[parentId] = _nextSibling[childId];
+            _nextSibling[childId] = INVALID_INDEX;
+            _parents[childId] = INVALID_INDEX;
+            return;
+        }
+
+        let curr = _firstChild[parentId];
+
+        while (curr !== INVALID_INDEX) {
+            const next = _nextSibling[curr];
+
+            if (next === childId) {
+                _nextSibling[curr] = _nextSibling[childId];
+                _nextSibling[childId] = INVALID_INDEX;
+                _parents[childId] = INVALID_INDEX;
+                return;
+            }
+
+            curr = next;
+        }
+    }
+
+    function isTeam(receiver?: mod.Player | mod.Team): receiver is mod.Team {
+        return receiver !== undefined && mod.IsType(receiver, mod.Types.Team);
+    }
+
+    function isPlayer(receiver?: mod.Player | mod.Team): receiver is mod.Player {
+        return receiver !== undefined && mod.IsType(receiver, mod.Types.Player);
+    }
+
     /****** Types ******/
 
     /**
@@ -48,9 +282,9 @@ export namespace UI {
      * The parent of an element.
      */
     export type Parent = {
-        uiWidget: mod.UIWidget;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
-        children: readonly Element[];
+        readonly id: number;
+        readonly receiver: mod.Player | mod.Team | undefined;
+        readonly children: readonly Element[];
         getChild(index: number): Element | undefined;
         forEachChild(callback: (child: Element, index: number) => void): void;
         attachChild(child: Element): void;
@@ -116,30 +350,19 @@ export namespace UI {
         y: number;
         width: number;
         height: number;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        receiver: Receiver<mod.Player | mod.Team | undefined>;
         uiInputModeWhenVisible: boolean;
     };
 
     /****** Classes ******/
 
     abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
-        protected _id: string;
-
         protected _nativeReceiver: T;
 
         protected _inputModeRequesterCount: number = 0;
 
-        protected constructor(id: string, receiver: T) {
-            this._id = id;
+        protected constructor(receiver: T) {
             this._nativeReceiver = receiver;
-        }
-
-        /**
-         * The ID of the receiver. Used mainly for generating UI Widget names and for debugging purposes.
-         * @returns The ID of the receiver.
-         */
-        public get id(): string {
-            return this._id;
         }
 
         /**
@@ -188,27 +411,22 @@ export namespace UI {
     /**
      * The global receiver. This is the receiver for all players and teams.
      */
-    export class GlobalReceiver extends Receiver<undefined> {
-        /**
-         * The singleton instance of the global receiver.
-         */
+    class GlobalReceiver extends Receiver<undefined> {
         public static readonly instance = new GlobalReceiver();
 
         private constructor() {
-            super('g', undefined);
+            super(undefined);
         }
     }
 
     /**
      * The team receiver. This is the receiver for a single team.
      */
-    export class TeamReceiver extends Receiver<mod.Team> {
-        private static _instances = new Map<number, TeamReceiver>();
+    class TeamReceiver extends Receiver<mod.Team> {
+        private static readonly _instances = new Array<TeamReceiver | null>(64).fill(null);
 
         private constructor(receiver: mod.Team) {
-            const id = mod.GetObjId(receiver);
-            super(`t${id}`, receiver);
-            TeamReceiver._instances.set(id, this);
+            super(receiver);
         }
 
         /**
@@ -217,20 +435,31 @@ export namespace UI {
          * @returns The instance of the team receiver.
          */
         public static getInstance(receiver: mod.Team): TeamReceiver {
-            return TeamReceiver._instances.get(mod.GetObjId(receiver)) ?? new TeamReceiver(receiver);
+            const id = mod.GetObjId(receiver);
+            const existing = TeamReceiver._instances[id];
+
+            if (existing && mod.Equals(existing.nativeReceiver, receiver)) return existing;
+
+            return (TeamReceiver._instances[id] = new TeamReceiver(receiver));
+        }
+
+        /**
+         * Clears the cached receiver for a given team ID.
+         * @param id - The team object ID.
+         */
+        public static clear(id: number): void {
+            TeamReceiver._instances[id] = null;
         }
     }
 
     /**
      * The player receiver. This is the receiver for a single player.
      */
-    export class PlayerReceiver extends Receiver<mod.Player> {
-        private static _instances = new Map<number, PlayerReceiver>();
+    class PlayerReceiver extends Receiver<mod.Player> {
+        private static readonly _instances = new Array<PlayerReceiver | null>(100).fill(null);
 
         private constructor(receiver: mod.Player) {
-            const id = mod.GetObjId(receiver);
-            super(`p${id}`, receiver);
-            PlayerReceiver._instances.set(id, this);
+            super(receiver);
         }
 
         /**
@@ -239,7 +468,20 @@ export namespace UI {
          * @returns The instance of the player receiver.
          */
         public static getInstance(receiver: mod.Player): PlayerReceiver {
-            return PlayerReceiver._instances.get(mod.GetObjId(receiver)) ?? new PlayerReceiver(receiver);
+            const id = mod.GetObjId(receiver);
+            const existing = PlayerReceiver._instances[id];
+
+            if (existing && mod.Equals(existing.nativeReceiver, receiver)) return existing;
+
+            return (PlayerReceiver._instances[id] = new PlayerReceiver(receiver));
+        }
+
+        /**
+         * Clears the cached receiver for a given player ID.
+         * @param id - The player object ID.
+         */
+        public static clear(id: number): void {
+            PlayerReceiver._instances[id] = null;
         }
     }
 
@@ -248,43 +490,38 @@ export namespace UI {
      */
     export abstract class Node {
         protected readonly _logging: Logging = logging; // Every node has access to the singleton UI logging instance.
-        protected _name: string;
-        protected _uiWidget: mod.UIWidget;
-        protected _receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        protected _id: number;
 
         /**
          * The constructor for a node.
-         * @param name - The name of the node.
-         * @param uiWidget - The UI widget of the node.
-         * @param receiver - The receiver of the node.
+         * @param id - The internal widget ID.
          */
-        public constructor(
-            name: string,
-            uiWidget: mod.UIWidget,
-            receiver: GlobalReceiver | TeamReceiver | PlayerReceiver
-        ) {
-            this._name = name;
-            this._uiWidget = uiWidget;
-            this._receiver = receiver;
+        public constructor(id: number) {
+            this._id = id;
+        }
+
+        /**
+         * The unique widget ID.
+         * @returns The widget ID.
+         */
+        public get id(): number {
+            return this._id;
         }
 
         /**
          * The underlying native Battlefield Portal UIWidget handle for this node.
-         *
-         * Warning: Exercise caution when operating on the widget outside of this module/component,
-         * as direct mutations via native `mod.*` APIs can desynchronize internal state and cause runtime errors.
          * @returns The native UIWidget handle.
          */
-        public get uiWidget(): mod.UIWidget {
-            return this._uiWidget;
+        protected get _uiWidget(): mod.UIWidget {
+            return _nativeWidgets[this._id]!;
         }
 
         /**
-         * The receiver of the node.
-         * @returns The receiver of the node.
+         * The target audience receiver for the node (player or team, or undefined if global).
+         * @returns The native receiver.
          */
-        public get receiver(): GlobalReceiver | TeamReceiver | PlayerReceiver {
-            return this._receiver;
+        public get receiver(): mod.Player | mod.Team | undefined {
+            return _receivers[this._id]?.nativeReceiver;
         }
     }
 
@@ -297,18 +534,45 @@ export namespace UI {
          */
         public static readonly instance = new Root();
 
-        protected _children?: Element[];
-
         private constructor() {
-            super('ui_0', mod.GetUIRoot(), GlobalReceiver.instance);
+            super(0);
+            _flags[0] = FLAG_IN_USE | FLAG_VISIBLE;
+            _parents[0] = INVALID_INDEX;
+            _firstChild[0] = INVALID_INDEX;
+            _nextSibling[0] = INVALID_INDEX;
+            _receivers[0] = GlobalReceiver.instance;
         }
 
         /**
-         * Returns a shallow copy of the list of direct child elements.
+         * @inheritdoc
+         */
+        protected override get _uiWidget(): mod.UIWidget {
+            if (!_nativeWidgets[0]) {
+                _nativeWidgets[0] = mod.GetUIRoot();
+            }
+
+            return _nativeWidgets[0]!;
+        }
+
+        /**
+         * Returns a snapshot array of direct child elements.
          * @returns Array of direct children.
          */
         public get children(): readonly Element[] {
-            return this._children ? this._children.slice() : [];
+            const list: Element[] = [];
+            let curr = _firstChild[0];
+
+            while (curr !== INVALID_INDEX) {
+                const inst = _instances[curr];
+
+                if (inst) {
+                    list.push(inst);
+                }
+
+                curr = _nextSibling[curr];
+            }
+
+            return list;
         }
 
         /**
@@ -317,7 +581,17 @@ export namespace UI {
          * @returns The child element, or undefined if out of bounds.
          */
         public getChild(index: number): Element | undefined {
-            return this._children ? this._children[index] : undefined;
+            let curr = _firstChild[0];
+            let idx = 0;
+
+            while (curr !== INVALID_INDEX) {
+                if (idx === index) return _instances[curr] ?? undefined;
+
+                curr = _nextSibling[curr];
+                idx++;
+            }
+
+            return undefined;
         }
 
         /**
@@ -325,12 +599,18 @@ export namespace UI {
          * @param callback - Function invoked for each child.
          */
         public forEachChild(callback: (child: Element, index: number) => void): void {
-            if (!this._children) return;
+            let curr = _firstChild[0];
+            let idx = 0;
 
-            const count = this._children.length;
+            while (curr !== INVALID_INDEX) {
+                const next = _nextSibling[curr];
+                const inst = _instances[curr];
 
-            for (let i = 0; i < count; ++i) {
-                callback(this._children[i]!, i);
+                if (inst) {
+                    CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, logging);
+                }
+
+                curr = next;
             }
         }
 
@@ -339,12 +619,9 @@ export namespace UI {
          * @param child - The child to attach.
          */
         public attachChild(child: Element): void {
-            if (!this._children) {
-                this._children = [child];
-                return;
-            }
+            if (child.id === INVALID_INDEX) return;
 
-            this._children.push(child);
+            _attachChild(0, child.id);
         }
 
         /**
@@ -352,17 +629,9 @@ export namespace UI {
          * @param child - The child to detach.
          */
         public detachChild(child: Element): void {
-            if (!this._children) return;
+            if (child.id === INVALID_INDEX) return;
 
-            const idx = this._children.indexOf(child);
-
-            if (idx === -1) return;
-
-            const last = this._children.pop()!;
-
-            if (idx < this._children.length) {
-                this._children[idx] = last;
-            }
+            _detachChild(0, child.id);
         }
     }
 
@@ -370,31 +639,215 @@ export namespace UI {
      * The base element class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Element extends Node {
-        protected _parent: Parent;
-        protected _uiInputModeWhenVisible: boolean;
-        protected _hasInputMode: boolean = false;
-        protected _deleted: boolean = false;
+        protected _name: string;
 
         /**
          * The constructor for an element.
+         * @param id - The allocated slot index.
          * @param params - The parameters for the element.
          */
-        public constructor(params: FinalElementParams) {
-            super(params.name, mod.FindUIWidgetWithName(params.name) as mod.UIWidget, params.receiver);
+        public constructor(id: number, params: FinalElementParams) {
+            super(id);
+            this._name = params.name;
 
-            this._parent = params.parent;
-            this._uiInputModeWhenVisible = params.uiInputModeWhenVisible;
+            _nativeWidgets[id] = mod.FindUIWidgetWithName(params.name) as mod.UIWidget;
+            _receivers[id] = params.receiver;
+            _instances[id] = this;
 
-            this._parent.attachChild(this);
+            _x[id] = params.x;
+            _y[id] = params.y;
+            _width[id] = params.width;
+            _height[id] = params.height;
 
-            if (this._uiInputModeWhenVisible && params.visible) {
-                this._hasInputMode = true;
-                this._receiver.addInputModeRequester();
+            let flags = FLAG_IN_USE;
+
+            if (params.visible) {
+                flags |= FLAG_VISIBLE;
+            }
+
+            if (params.uiInputModeWhenVisible) {
+                flags |= FLAG_UI_INPUT_MODE_WHEN_VISIBLE;
+            }
+
+            if (params.uiInputModeWhenVisible && params.visible) {
+                flags |= FLAG_HAS_INPUT_MODE;
+                params.receiver.addInputModeRequester();
+            }
+
+            _flags[id] = flags;
+
+            _attachChild(params.parent.id, id);
+        }
+
+        /****** Protected Static Helpers for Subclasses ******/
+
+        protected static _allocateSlot(): number {
+            return _allocateSlot();
+        }
+
+        protected static _freeSlot(id: number): void {
+            _freeSlot(id);
+        }
+
+        protected static _attachChild(parentId: number, childId: number): void {
+            _attachChild(parentId, childId);
+        }
+
+        protected static _detachChild(parentId: number, childId: number): void {
+            _detachChild(parentId, childId);
+        }
+
+        protected static _getFirstChild(id: number): number {
+            return id >= 0 && id < MAX_WIDGETS ? _firstChild[id] : INVALID_INDEX;
+        }
+
+        protected static _getNextSibling(id: number): number {
+            return id >= 0 && id < MAX_WIDGETS ? _nextSibling[id] : INVALID_INDEX;
+        }
+
+        protected static _getInstance(id: number): Element | undefined {
+            return id >= 0 && id < MAX_WIDGETS ? (_instances[id] ?? undefined) : undefined;
+        }
+
+        protected static _getNativeWidget(id: number): mod.UIWidget | undefined {
+            return id >= 0 && id < MAX_WIDGETS ? (_nativeWidgets[id] ?? undefined) : undefined;
+        }
+
+        /**
+         * Makes a deterministic, sequential name for a widget in the format `ui_${id}`.
+         * @param id - The widget slot ID.
+         * @returns The name of the widget.
+         */
+        protected static _makeName(id: number): string {
+            return `ui_${id}`;
+        }
+
+        /**
+         * Gets the position from the parameters, given either x/y or position.
+         * @param params - The parameters.
+         * @returns The position.
+         */
+        protected static _getPosition(params: ElementParams): Position {
+            return { x: params.x ?? params.position?.x ?? 0, y: params.y ?? params.position?.y ?? 0 };
+        }
+
+        /**
+         * Gets the size from the parameters, given either width/height or size.
+         * @param params - The parameters.
+         * @returns The size.
+         */
+        protected static _getSize(params: ElementParams): Size {
+            return {
+                width: params.width ?? params.size?.width ?? 0,
+                height: params.height ?? params.size?.height ?? 0,
+            };
+        }
+
+        /**
+         * Gets the receiver from the parameters, given either player, team, or neither.
+         * @param parent - The parent of the widget.
+         * @param receiverParam - The receiver parameter.
+         * @returns The receiver.
+         */
+        protected static _getReceiver(
+            parent: Parent,
+            receiverParam?: mod.Player | mod.Team
+        ): Receiver<mod.Player | mod.Team | undefined> {
+            if (!receiverParam) return _receivers[parent.id] ?? GlobalReceiver.instance;
+
+            const parentReceiver = _receivers[parent.id];
+
+            if (isTeam(receiverParam)) {
+                const receiver = TeamReceiver.getInstance(receiverParam);
+
+                if (parentReceiver instanceof TeamReceiver && parentReceiver !== receiver) {
+                    logging.log('Team receiver mismatch with parent', LogLevel.Warning);
+                }
+
+                if (parentReceiver instanceof PlayerReceiver) {
+                    logging.log('Parent receiver scope is more narrow', LogLevel.Warning);
+                }
+
+                return receiver;
+            }
+
+            if (isPlayer(receiverParam)) {
+                const receiver = PlayerReceiver.getInstance(receiverParam);
+
+                if (parentReceiver instanceof PlayerReceiver && parentReceiver !== receiver) {
+                    logging.log('Player receiver mismatch with parent', LogLevel.Warning);
+                }
+
+                if (
+                    parentReceiver instanceof TeamReceiver &&
+                    parentReceiver.nativeReceiver &&
+                    !mod.Equals(parentReceiver.nativeReceiver, mod.GetTeam(receiverParam))
+                ) {
+                    logging.log('Parent receiver is different team', LogLevel.Warning);
+                }
+
+                return receiver;
+            }
+
+            return GlobalReceiver.instance;
+        }
+
+        /****** Protected Button Slot Accessors for Subclasses ******/
+
+        protected _allocateButtonSlot(): number {
+            return _allocateButtonSlot(this._id);
+        }
+
+        protected _freeButtonSlot(): void {
+            _freeButtonSlot(this._id);
+        }
+
+        protected _getButtonSlot(): number {
+            return _getButtonId(_flags[this._id]);
+        }
+
+        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | undefined): void {
+            if (slot > 0 && slot <= MAX_BUTTONS) {
+                _buttonOnClickUp[slot] = handler ?? null;
             }
         }
 
+        protected _getButtonOnClickUp(slot: number): ButtonHandler | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickUp[slot] ?? undefined) : undefined;
+        }
+
+        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | undefined): void {
+            if (slot > 0 && slot <= MAX_BUTTONS) {
+                _buttonOnClickDown[slot] = handler ?? null;
+            }
+        }
+
+        protected _getButtonOnClickDown(slot: number): ButtonHandler | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickDown[slot] ?? undefined) : undefined;
+        }
+
+        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | undefined): void {
+            if (slot > 0 && slot <= MAX_BUTTONS) {
+                _buttonOnFocusIn[slot] = handler ?? null;
+            }
+        }
+
+        protected _getButtonOnFocusIn(slot: number): ButtonHandler | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusIn[slot] ?? undefined) : undefined;
+        }
+
+        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | undefined): void {
+            if (slot > 0 && slot <= MAX_BUTTONS) {
+                _buttonOnFocusOut[slot] = handler ?? null;
+            }
+        }
+
+        protected _getButtonOnFocusOut(slot: number): ButtonHandler | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusOut[slot] ?? undefined) : undefined;
+        }
+
         protected _isDeletedCheck(): boolean {
-            if (this._deleted) {
+            if (this._id === INVALID_INDEX) {
                 logging.log(`Element ${this._name} already deleted`, LogLevel.Warning);
                 return true;
             }
@@ -407,7 +860,11 @@ export namespace UI {
          * @returns The parent of the element.
          */
         public get parent(): Parent {
-            return this._parent;
+            const parentId = _parents[this._id];
+
+            if (parentId === 0) return Root.instance;
+
+            return (_instances[parentId] as unknown as Parent) ?? Root.instance;
         }
 
         /**
@@ -417,11 +874,15 @@ export namespace UI {
         public set parent(parent: Parent) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetParent(this._uiWidget, parent.uiWidget);
+            mod.SetUIWidgetParent(this._uiWidget, _nativeWidgets[parent.id]!);
 
-            this._parent.detachChild(this);
-            this._parent = parent;
-            this._parent.attachChild(this);
+            const oldParentId = _parents[this._id];
+
+            if (oldParentId !== INVALID_INDEX) {
+                _detachChild(oldParentId, this._id);
+            }
+
+            _attachChild(parent.id, this._id);
         }
 
         /**
@@ -429,7 +890,9 @@ export namespace UI {
          * @returns True if visible, false otherwise.
          */
         public get visible(): boolean {
-            return mod.GetUIWidgetVisible(this._uiWidget);
+            if (this._isDeletedCheck()) return false;
+
+            return _isVisible(_flags[this._id]);
         }
 
         /**
@@ -441,14 +904,24 @@ export namespace UI {
 
             mod.SetUIWidgetVisible(this._uiWidget, visible);
 
-            if (!this._uiInputModeWhenVisible) return;
+            if (visible) {
+                _setFlag(this._id, FLAG_VISIBLE);
+            } else {
+                _clearFlag(this._id, FLAG_VISIBLE);
+            }
 
-            if (visible && !this._hasInputMode) {
-                this._hasInputMode = true;
-                this._receiver.addInputModeRequester();
-            } else if (!visible && this._hasInputMode) {
-                this._hasInputMode = false;
-                this._receiver.removeInputModeRequester();
+            const flags = _flags[this._id];
+            const uiInputModeWhenVisible = _isUIInputModeWhenVisible(flags);
+            const hasInputMode = _hasInputMode(flags);
+
+            if (!uiInputModeWhenVisible) return;
+
+            if (visible && !hasInputMode) {
+                _setFlag(this._id, FLAG_HAS_INPUT_MODE);
+                _receivers[this._id]?.addInputModeRequester();
+            } else if (!visible && hasInputMode) {
+                _clearFlag(this._id, FLAG_HAS_INPUT_MODE);
+                _receivers[this._id]?.removeInputModeRequester();
             }
         }
 
@@ -457,7 +930,7 @@ export namespace UI {
          * @returns True if deleted, false otherwise.
          */
         public get deleted(): boolean {
-            return this._deleted;
+            return this._id === INVALID_INDEX;
         }
 
         /**
@@ -466,16 +939,59 @@ export namespace UI {
         public delete(): void {
             if (this._isDeletedCheck()) return;
 
-            this._deleted = true;
+            const id = this._id;
+            this._id = INVALID_INDEX; // Nullify element ID so it no longer maps to SoA buffers
 
-            if (this._hasInputMode) {
-                this._hasInputMode = false;
-                this._receiver.removeInputModeRequester();
+            this._deleteRecursive(id);
+        }
+
+        private _deleteRecursive(id: number): void {
+            if (!_isInUse(_flags[id])) return;
+
+            // 1. Recursively delete all children
+            let child = _firstChild[id];
+
+            while (child !== INVALID_INDEX) {
+                const next = _nextSibling[child];
+                const childInstance = _instances[child];
+
+                if (childInstance) {
+                    childInstance.delete();
+                } else {
+                    this._deleteRecursive(child);
+                }
+
+                child = next;
             }
 
-            this._parent.detachChild(this);
+            // 2. Detach from parent
+            const parentId = _parents[id];
 
-            mod.DeleteUIWidget(this._uiWidget);
+            if (parentId !== INVALID_INDEX) {
+                _detachChild(parentId, id);
+            }
+
+            // 3. Free button slot if allocated
+            const flags = _flags[id];
+
+            if (_getButtonId(flags) !== 0) {
+                _freeButtonSlot(id);
+            }
+
+            // 4. Remove input mode requester if active
+            if (_hasInputMode(flags)) {
+                _receivers[id]?.removeInputModeRequester();
+            }
+
+            // 5. Delete native widget
+            const nativeWidget = _nativeWidgets[id];
+
+            if (nativeWidget) {
+                mod.DeleteUIWidget(nativeWidget);
+            }
+
+            // 6. Free slot
+            _freeSlot(id);
         }
 
         /**
@@ -483,7 +999,7 @@ export namespace UI {
          * @returns The X position of the element.
          */
         public get x(): number {
-            return mod.XComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+            return this._isDeletedCheck() ? 0 : _x[this._id];
         }
 
         /**
@@ -493,9 +1009,8 @@ export namespace UI {
         public set x(x: number) {
             if (this._isDeletedCheck()) return;
 
-            const cur = mod.GetUIWidgetPosition(this._uiWidget);
-
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, mod.YComponentOf(cur), 0));
+            _x[this._id] = x;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, _y[this._id], 0));
         }
 
         /**
@@ -503,7 +1018,7 @@ export namespace UI {
          * @returns The Y position of the element.
          */
         public get y(): number {
-            return mod.YComponentOf(mod.GetUIWidgetPosition(this._uiWidget));
+            return this._isDeletedCheck() ? 0 : _y[this._id];
         }
 
         /**
@@ -513,9 +1028,8 @@ export namespace UI {
         public set y(y: number) {
             if (this._isDeletedCheck()) return;
 
-            const cur = mod.GetUIWidgetPosition(this._uiWidget);
-
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(mod.XComponentOf(cur), y, 0));
+            _y[this._id] = y;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(_x[this._id], y, 0));
         }
 
         /**
@@ -523,9 +1037,7 @@ export namespace UI {
          * @returns The position of the element.
          */
         public get position(): Position {
-            const pos = mod.GetUIWidgetPosition(this._uiWidget);
-
-            return { x: mod.XComponentOf(pos), y: mod.YComponentOf(pos) };
+            return this._isDeletedCheck() ? { x: 0, y: 0 } : { x: _x[this._id], y: _y[this._id] };
         }
 
         /**
@@ -535,6 +1047,8 @@ export namespace UI {
         public set position(params: Position) {
             if (this._isDeletedCheck()) return;
 
+            _x[this._id] = params.x;
+            _y[this._id] = params.y;
             mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
         }
 
@@ -543,7 +1057,7 @@ export namespace UI {
          * @returns The width of the element.
          */
         public get width(): number {
-            return mod.XComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+            return this._isDeletedCheck() ? 0 : _width[this._id];
         }
 
         /**
@@ -553,9 +1067,8 @@ export namespace UI {
         public set width(width: number) {
             if (this._isDeletedCheck()) return;
 
-            const cur = mod.GetUIWidgetSize(this._uiWidget);
-
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, mod.YComponentOf(cur), 0));
+            _width[this._id] = width;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, _height[this._id], 0));
         }
 
         /**
@@ -563,7 +1076,7 @@ export namespace UI {
          * @returns The height of the element.
          */
         public get height(): number {
-            return mod.YComponentOf(mod.GetUIWidgetSize(this._uiWidget));
+            return this._isDeletedCheck() ? 0 : _height[this._id];
         }
 
         /**
@@ -573,9 +1086,8 @@ export namespace UI {
         public set height(height: number) {
             if (this._isDeletedCheck()) return;
 
-            const cur = mod.GetUIWidgetSize(this._uiWidget);
-
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(mod.XComponentOf(cur), height, 0));
+            _height[this._id] = height;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(_width[this._id], height, 0));
         }
 
         /**
@@ -583,9 +1095,9 @@ export namespace UI {
          * @returns The size of the element.
          */
         public get size(): Size {
-            const s = mod.GetUIWidgetSize(this._uiWidget);
-
-            return { width: mod.XComponentOf(s), height: mod.YComponentOf(s) };
+            return this._isDeletedCheck()
+                ? { width: 0, height: 0 }
+                : { width: _width[this._id], height: _height[this._id] };
         }
 
         /**
@@ -595,6 +1107,8 @@ export namespace UI {
         public set size(params: Size) {
             if (this._isDeletedCheck()) return;
 
+            _width[this._id] = params.width;
+            _height[this._id] = params.height;
             mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
         }
 
@@ -603,7 +1117,7 @@ export namespace UI {
          * @returns The background color of the element.
          */
         public get bgColor(): mod.Vector {
-            return mod.GetUIWidgetBgColor(this._uiWidget);
+            return this._isDeletedCheck() ? COLORS.WHITE : mod.GetUIWidgetBgColor(this._uiWidget);
         }
 
         /**
@@ -621,7 +1135,7 @@ export namespace UI {
          * @returns The background alpha of the element.
          */
         public get bgAlpha(): number {
-            return mod.GetUIWidgetBgAlpha(this._uiWidget);
+            return this._isDeletedCheck() ? 0 : mod.GetUIWidgetBgAlpha(this._uiWidget);
         }
 
         /**
@@ -639,7 +1153,7 @@ export namespace UI {
          * @returns The background fill of the element.
          */
         public get bgFill(): mod.UIBgFill {
-            return mod.GetUIWidgetBgFill(this._uiWidget);
+            return this._isDeletedCheck() ? mod.UIBgFill.None : mod.GetUIWidgetBgFill(this._uiWidget);
         }
 
         /**
@@ -657,7 +1171,7 @@ export namespace UI {
          * @returns The depth of the element.
          */
         public get depth(): mod.UIDepth {
-            return mod.GetUIWidgetDepth(this._uiWidget);
+            return this._isDeletedCheck() ? mod.UIDepth.AboveGameUI : mod.GetUIWidgetDepth(this._uiWidget);
         }
 
         /**
@@ -675,7 +1189,7 @@ export namespace UI {
          * @returns The anchor of the element.
          */
         public get anchor(): mod.UIAnchor {
-            return mod.GetUIWidgetAnchor(this._uiWidget);
+            return this._isDeletedCheck() ? mod.UIAnchor.Center : mod.GetUIWidgetAnchor(this._uiWidget);
         }
 
         /**
@@ -693,7 +1207,7 @@ export namespace UI {
          * @returns True if UI input mode is requested when visible, false otherwise.
          */
         public get uiInputModeWhenVisible(): boolean {
-            return this._uiInputModeWhenVisible;
+            return this._isDeletedCheck() ? false : _isUIInputModeWhenVisible(_flags[this._id]);
         }
 
         /**
@@ -703,18 +1217,21 @@ export namespace UI {
         public set uiInputModeWhenVisible(newValue: boolean) {
             if (this._isDeletedCheck()) return;
 
-            if (this._uiInputModeWhenVisible === newValue) return;
+            const isVisible = _isVisible(_flags[this._id]);
+            const hasInputMode = _hasInputMode(_flags[this._id]);
 
-            this._uiInputModeWhenVisible = newValue;
+            if (newValue) {
+                _setFlag(this._id, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
+            } else {
+                _clearFlag(this._id, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
+            }
 
-            const isVisible = mod.GetUIWidgetVisible(this._uiWidget);
-
-            if (newValue && isVisible && !this._hasInputMode) {
-                this._hasInputMode = true;
-                this._receiver.addInputModeRequester();
-            } else if ((!newValue || !isVisible) && this._hasInputMode) {
-                this._hasInputMode = false;
-                this._receiver.removeInputModeRequester();
+            if (newValue && isVisible && !hasInputMode) {
+                _setFlag(this._id, FLAG_HAS_INPUT_MODE);
+                _receivers[this._id]?.addInputModeRequester();
+            } else if ((!newValue || !isVisible) && hasInputMode) {
+                _clearFlag(this._id, FLAG_HAS_INPUT_MODE);
+                _receivers[this._id]?.removeInputModeRequester();
             }
         }
     }
@@ -756,9 +1273,7 @@ export namespace UI {
      */
     export const ROOT_NODE = Root.instance;
 
-    /****** Button Registry ******/
-
-    const BUTTONS = new Map<string, Button>();
+    /****** Button Event Handler ******/
 
     /**
      * Handles a button event with zero intermediate object allocations.
@@ -768,38 +1283,42 @@ export namespace UI {
      */
     function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
         const name = mod.GetUIWidgetName(widget);
-        const button = BUTTONS.get(name);
+        const widgetIndex = parseInt(name.slice(3), 10);
 
-        if (!button) {
-            logging.log(`Button ${name} not found`, LogLevel.Warning);
+        if (isNaN(widgetIndex) || widgetIndex <= 0 || widgetIndex >= MAX_WIDGETS) return;
+
+        const btnSlot = _getButtonId(_flags[widgetIndex]);
+
+        if (btnSlot === 0 || btnSlot > MAX_BUTTONS) {
+            logging.log(`Button ${name} not found or slot unassigned`, LogLevel.Warning);
             return;
         }
 
-        let handler: ButtonHandler | undefined;
+        let handler: ButtonHandler | null = null;
 
         if (mod.Equals(event, mod.UIButtonEvent.ButtonUp)) {
-            handler = button.onClickUp;
+            handler = _buttonOnClickUp[btnSlot];
 
             if (!handler) {
                 logging.log(`Button ${name} has no onClickUp handler`, LogLevel.Warning);
                 return;
             }
         } else if (mod.Equals(event, mod.UIButtonEvent.ButtonDown)) {
-            handler = button.onClickDown;
+            handler = _buttonOnClickDown[btnSlot];
 
             if (!handler) {
                 logging.log(`Button ${name} has no onClickDown handler`, LogLevel.Warning);
                 return;
             }
         } else if (mod.Equals(event, mod.UIButtonEvent.FocusIn)) {
-            handler = button.onFocusIn;
+            handler = _buttonOnFocusIn[btnSlot];
 
             if (!handler) {
                 logging.log(`Button ${name} has no onFocusIn handler`, LogLevel.Warning);
                 return;
             }
         } else if (mod.Equals(event, mod.UIButtonEvent.FocusOut)) {
-            handler = button.onFocusOut;
+            handler = _buttonOnFocusOut[btnSlot];
 
             if (!handler) {
                 logging.log(`Button ${name} has no onFocusOut handler`, LogLevel.Warning);
@@ -815,110 +1334,9 @@ export namespace UI {
         CallbackHandler.invoke(handler, player, undefined, undefined, undefined, logging);
     }
 
-    /**
-     * Registers a button and returns a function to unregister it.
-     * @param name - The name of the button.
-     * @param button - The button to register.
-     * @returns A function to unregister the button.
-     */
-    export function registerButton(name: string, button: Button): () => void {
-        if (BUTTONS.has(name)) {
-            logging.log(`Button ${name} already registered`, LogLevel.Warning);
-            return () => {};
-        }
-
-        BUTTONS.set(name, button);
-
-        const unregister = () => {
-            BUTTONS.delete(name);
-        };
-
-        return unregister;
-    }
-
     Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);
 
-    /****** Utils ******/
-
-    let counter: number = 0;
-
-    function isTeam(receiver?: mod.Player | mod.Team): receiver is mod.Team {
-        return receiver !== undefined && mod.IsType(receiver, mod.Types.Team);
-    }
-
-    function isPlayer(receiver?: mod.Player | mod.Team): receiver is mod.Player {
-        return receiver !== undefined && mod.IsType(receiver, mod.Types.Player);
-    }
-
-    /**
-     * Makes a deterministic, sequential name for a widget in the format `ui_${++counter}`.
-     * @returns The name of the widget.
-     */
-    export function makeName(): string {
-        return `ui_${++counter}`;
-    }
-
-    /**
-     * Gets the position from the parameters, given either x/y or position.
-     * @param params - The parameters.
-     * @returns The position.
-     */
-    export function getPosition(params: ElementParams): Position {
-        return { x: params.x ?? params.position?.x ?? 0, y: params.y ?? params.position?.y ?? 0 };
-    }
-
-    /**
-     * Gets the size from the parameters, given either width/height or size.
-     * @param params - The parameters.
-     * @returns The size.
-     */
-    export function getSize(params: ElementParams): Size {
-        return { width: params.width ?? params.size?.width ?? 0, height: params.height ?? params.size?.height ?? 0 };
-    }
-
-    /**
-     * Gets the receiver from the parameters, given either player, team, or neither.
-     * @param parent - The parent of the widget.
-     * @param receiverParam - The receiver parameter.
-     * @returns The receiver.
-     */
-    export function getReceiver(
-        parent: Parent,
-        receiverParam?: mod.Player | mod.Team
-    ): GlobalReceiver | TeamReceiver | PlayerReceiver {
-        if (!receiverParam) return parent.receiver;
-
-        if (isTeam(receiverParam)) {
-            const receiver = TeamReceiver.getInstance(receiverParam);
-
-            if (parent.receiver instanceof TeamReceiver && parent.receiver !== receiver) {
-                logging.log('Team receiver mismatch with parent', LogLevel.Warning);
-            }
-
-            if (parent.receiver instanceof PlayerReceiver) {
-                logging.log('Parent receiver scope is more narrow', LogLevel.Warning);
-            }
-
-            return receiver;
-        }
-
-        if (isPlayer(receiverParam)) {
-            const receiver = PlayerReceiver.getInstance(receiverParam);
-
-            if (parent.receiver instanceof PlayerReceiver && parent.receiver !== receiver) {
-                logging.log('Player receiver mismatch with parent', LogLevel.Warning);
-            }
-
-            if (
-                parent.receiver instanceof TeamReceiver &&
-                !mod.Equals(parent.receiver.nativeReceiver, mod.GetTeam(receiverParam))
-            ) {
-                logging.log('Parent receiver is different team', LogLevel.Warning);
-            }
-
-            return receiver;
-        }
-
-        return GlobalReceiver.instance;
-    }
+    Events.OnPlayerLeaveGame.subscribe((player: mod.Player) => {
+        PlayerReceiver.clear(mod.GetObjId(player));
+    });
 }

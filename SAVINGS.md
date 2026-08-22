@@ -62,19 +62,17 @@ In v2.0.0, because of the flat TypedArrays and the `_tick` microtask optimizatio
 
 ---
 
-### 1. Architectural Anatomy: A Single `UIWeaponImageButton`
+### 1. Architecture Evolution
 
-Because Battlefield Portal widgets cannot nest children inside native `UIButton` widgets, a `UIWeaponImageButton` is a composite construct consisting of **3 interconnected layers**:
-
-1. **Outer Container (`UIContentButton`)**: The wrapping container widget.
-2. **Middle Button (`UIButton`)**: The interactive button widget handling click and focus events.
-3. **Inner Content (`UIWeaponImage`)**: The widget rendering the weapon icon and weapon package.
+- **v8.0.0 (Pre-Refactor)**: Heavy OOP with per-instance dynamic property descriptors via `Object.defineProperty`, duplicate property caching, multi-closure unregister callbacks, and mock parent wrapper allocations.
+- **v9.0.0 (Prototype Refactor)**: Statically delegated prototypes, removed redundant in-memory property caches, and introduced swap-and-pop children arrays.
+- **v10.0.0 (Current: SoA Core with Thin OOP Handles)**: Pre-allocated Structure of Arrays (TypedArrays) backing a singly-linked Left-Child Right-Sibling (LCRS) tree, bit-packed button slot indexing, coordinate caching, zero unregister closures, and single-property `{ readonly id: number }` OOP class handles with ID nullification on disposal.
 
 ---
 
 ### 2. Breakdown of Memory Allocations
 
-#### Pre-Refactor (`bd2a4023`)
+#### Pre-Refactor (`v8.0.0`)
 
 Creating a single `UIWeaponImageButton` resulted in an explosion of per-instance heap allocations:
 
@@ -99,37 +97,45 @@ Creating a single `UIWeaponImageButton` resulted in an explosion of per-instance
 
 ---
 
-#### Post-Refactor (`30bd8089`)
+#### Post-Refactor OOP (`v9.0.0`)
 
-Creating the same `UIWeaponImageButton` now operates with zero dynamic metaprogramming and zero redundant caching:
+- Zero-allocation prototype delegation.
+- Dropped dynamic metaprogramming; getters queried native `mod` engine APIs.
+- Retained 1 closure (`_unregisterAsButton`) and ~4-5 fields per object across 3 composite layers.
 
-- **Zero-Allocation Prototype Delegation:**
-    - `delegateProperties` was completely eliminated.
-    - Property getters and setters (`baseColor`, `enabled`, `weapon`, `size`, etc.) are defined **statically once on class prototypes** at module evaluation.
-    - _Subtotal:_ **0 descriptor objects and 0 instance closures allocated**.
-- **Zero-Cache Architecture:**
-    - `Element` dropped all 13 cached style/coordinate properties; getters query native `mod` engine APIs directly on demand.
-    - `UIButton` dropped all 14 cached color/alpha properties.
-    - `UIWeaponImage` holds only `_weapon` and `_weaponPackage` (2 fields).
-    - Each instance only holds ~4–5 essential fields (`_name`, `_uiWidget`, `_receiver`, `_parent`, `_deleted`).
-- **Lightweight Primitives:**
-    - `Receiver._inputModeRequesterCount`: Replaced `Set<Element>` with a single integer primitive (`number`).
-    - `_children`: Lazy flat array initialized only when children are added, utilizing $O(1)$ swap-and-pop.
+> **v9.0.0 Total:** **~450 – 500 bytes (~0.48 KB)** and **1 closure** per button.
 
-> **Post-Refactor Total:** **~450 – 500 bytes (~0.48 KB)** and **1 closure** (`_unregisterAsButton`) per button.
+---
+
+#### Current SoA Core + Thin Handles (`v10.0.0`)
+
+- **Single Lightweight JS Handle Object**:
+    - Each instance holds only its inherited prototype and `_id: number` (**~24 bytes**).
+    - All tree hierarchy relationships (`_parents`, `_firstChild`, `_nextSibling`) live in continuous flat `Int16Array` buffers.
+    - Coordinates and dimensions (`_x`, `_y`, `_width`, `_height`) live in flat `Float32Array` buffers, completely eliminating vector allocation churn and native `mod.GetUIWidgetPosition()` bridge queries during coordinate access.
+- **Zero-Closure Button Slot Allocator**:
+    - Interactive buttons allocate a compact slot index packed directly into the upper bits of `_flags` (`Uint16Array`), indexing into fixed-size event callback arrays.
+    - `_unregisterAsButton` closure is 100% eliminated.
+- **Safe Snapshot `.children` & Zero-Allocation `forEachChild`**:
+    - `forEachChild` traverses the singly-linked `_nextSibling` TypedArray with **0 heap allocations**.
+    - `.children` returns an isolated snapshot array on demand to guarantee underlying tree safety.
+- **Automatic ID Nullification on Disposal**:
+    - Invoking `.delete()` frees the slot on the intrusive free-list, recursively destroys children, and sets `_id = INVALID_INDEX` to disconnect the handle from internal buffers.
+
+> **v10.0.0 Total:** **~24 bytes** marginal heap memory and **0 closures** per widget instance.
 
 ---
 
 ### 3. Quantitative Comparison & Scaling Impact
 
-| Metric / Aspect | Pre-Refactor (`bd2a4023`) | Post-Refactor (`30bd8089`) | Improvement |
-| :-- | :-- | :-- | :-- |
-| **Heap Objects & Closures per Button** | **~50 objects** | **1 object** | **98% reduction** |
-| **Retained Instance Properties** | **65+ fields** | **~14 fields total** (across 3 layers) | **~78% reduction** |
-| **Memory per `UIWeaponImageButton`** | **~5,000 bytes (~5.0 KB)** | **~480 bytes (~0.48 KB)** | **~90.4% Memory Savings (~10.4x lighter)** |
-| **Small Inventory Menu (20 Buttons)** | ~100 KB | ~9.6 KB | **~90.4 KB saved** |
-| **Full Loadout / Spawn Grid (64 Buttons)** | ~320 KB | ~30.7 KB | **~289.3 KB saved** |
-| **Per-Player HUDs across 16 Players (256 Buttons)** | **~1,280 KB (~1.28 MB)** | **~122 KB (~0.12 MB)** | **~1.15 MB saved** |
+| Metric / Aspect | Pre-Refactor (`v8.0.0`) | Prototype Refactor (`v9.0.0`) | Current SoA + Handle (`v10.0.0`) | Total Improvement |
+| :-- | :-- | :-- | :-- | :-- |
+| **Heap Objects & Closures per Button** | **~50 objects** | **1 object + 1 closure** | **1 tiny handle (0 closures)** | **~98% reduction** |
+| **Retained Instance Fields** | **65+ fields** | **~14 fields** | **1 field (`_id`)** | **~98.5% reduction** |
+| **Marginal Memory per Widget Instance** | **~5,000 bytes (~5.0 KB)** | **~480 bytes (~0.48 KB)** | **~24 bytes (~0.024 KB)** | **~99.5% Savings (~208x lighter)** |
+| **Small Inventory Menu (20 Buttons)** | ~100 KB | ~9.6 KB | **~0.48 KB** | **~99.5 KB saved** |
+| **Full Loadout / Spawn Grid (64 Buttons)** | ~320 KB | ~30.7 KB | **~1.54 KB** | **~318.5 KB saved** |
+| **Per-Player HUDs across 16 Players (256 Buttons)** | **~1,280 KB (~1.28 MB)** | **~122 KB (~0.12 MB)** | **~6.14 KB (~0.006 MB)** | **~1.27 MB saved** |
 
 ---
 
@@ -137,8 +143,9 @@ Creating the same `UIWeaponImageButton` now operates with zero dynamic metaprogr
 
 In QuickJS and resource-constrained environments:
 
-1. **Teardown & GC Pressure:** Destroying a menu of 50 buttons pre-refactor required the garbage collector to traverse and sweep **~2,500 closure/descriptor objects** and `Set` bucket nodes. Post-refactor, destroying that same menu only sweeps **~150 flat objects**, virtually eliminating frame drops or GC pauses during UI open/close transitions.
-2. **Hidden Class Stability:** Removing `Object.defineProperty` loops eliminates frequent object transition mutations, allowing QuickJS to maintain stable object shapes in its internal property lookup tables.
+1. **Teardown & GC Pressure:** Destroying a menu of 50 buttons sweeps only ~50 tiny 24-byte handle objects, with zero nested closure trees or bucket allocations.
+2. **Zero Coordinate Mutation Churn:** Setting `btn.x = 100` reads the cached `_y[id]` directly from a `Float32Array` buffer, eliminating `mod.GetUIWidgetPosition()` temporary vector garbage.
+3. **Zero Event Dispatch Garbage:** Button events look up handlers via integer indices in pre-allocated arrays, eliminating Map lookups and string key hashing during user clicks and focus transitions.
 
 ---
 

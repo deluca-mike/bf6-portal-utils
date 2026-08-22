@@ -87,7 +87,11 @@ For complete documentation of these properties, see the [main UI documentation](
 
 ### Container-Specific
 
-- **`children: UI.Element[]`** (getter) – Array of child elements. Automatically maintained when children are created, moved, or deleted. Elements are automatically added when created with this container as their parent, and automatically removed when deleted or moved to another parent.
+- **`children: readonly UI.Element[]`** (getter) – Snapshot array of child elements. Automatically maintained when children are created, moved, or deleted.
+- **`getChild(index: number): UI.Element | undefined`** – Retrieves a child element at the specified index without allocating a new array.
+- **`forEachChild(callback: (child: UI.Element, index: number) => void): void`** – Iterates over all direct child elements without allocating an intermediate array (protected by `CallbackHandler`).
+- **`attachChild(child: UI.Element): void`** – Attaches a child element to the container.
+- **`detachChild(child: UI.Element): void`** – Detaches a child element from the container.
 - **`delete(): void`** – Overrides `Element.delete()` to recursively delete all children before deleting the container itself.
 
 ---

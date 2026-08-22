@@ -1,13 +1,12 @@
 import { UI } from '../../index.ts';
 export declare class UIContainer extends UI.Element implements UI.Parent {
-    protected _children?: UI.Element[];
     /**
      * Creates a new container.
      * @param params - The parameters for the container.
      */
     constructor(params: UIContainer.Params);
     /**
-     * Returns a shallow copy of the list of direct child elements.
+     * Returns a snapshot array of direct child elements.
      * @returns Array of direct children.
      */
     get children(): readonly UI.Element[];
@@ -22,10 +21,6 @@ export declare class UIContainer extends UI.Element implements UI.Parent {
      * @param callback - Function invoked for each child.
      */
     forEachChild(callback: (child: UI.Element, index: number) => void): void;
-    /**
-     * @inheritdoc
-     */
-    delete(): void;
     /**
      * Attaches a child to the container.
      * @param child - The child to attach.

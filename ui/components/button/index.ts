@@ -1,17 +1,7 @@
 import { UI } from '../../index.ts';
 
-// version: 8.0.0
+// version: 9.0.0
 export class UIButton extends UI.Element implements UI.Button {
-    protected _onClickDown?: UI.ButtonHandler;
-
-    protected _onClickUp?: UI.ButtonHandler;
-
-    protected _onFocusIn?: UI.ButtonHandler;
-
-    protected _onFocusOut?: UI.ButtonHandler;
-
-    protected _unregisterAsButton: () => void;
-
     /**
      * Creates a new button.
      * @param params - The parameters for the button.
@@ -19,29 +9,18 @@ export class UIButton extends UI.Element implements UI.Button {
      * Similarly, alphas are also multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect.
      */
     public constructor(params: UIButton.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 1,
-            bgFill: params.bgFill ?? mod.UIBgFill.Solid,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 1;
+        const bgFill = params.bgFill ?? mod.UIBgFill.Solid;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const enabled = params.enabled ?? true;
         const baseColor = params.baseColor ?? UI.COLORS.BF_GREY_2;
         const baseAlpha = params.baseAlpha ?? 1;
@@ -52,91 +31,97 @@ export class UIButton extends UI.Element implements UI.Button {
         const focusedColor = params.focusedColor ?? UI.COLORS.BF_GREY_1;
         const focusedAlpha = params.focusedAlpha ?? 1;
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            boolean, // enabled
-            mod.Vector, // baseColor
-            number, // baseAlpha
-            mod.Vector, // disabledColor
-            number, // disabledAlpha
-            mod.Vector, // pressedColor
-            number, // pressedAlpha
-            mod.Vector, // hoverColor
-            number, // hoverAlpha
-            mod.Vector, // focusedColor
-            number, // focusedAlpha
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            0,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            enabled,
-            baseColor,
-            baseAlpha,
-            disabledColor,
-            disabledAlpha,
-            pressedColor,
-            pressedAlpha,
-            focusedColor,
-            focusedAlpha,
-            focusedColor,
-            focusedAlpha,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIButton(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIButton(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth
+            );
         } else {
-            mod.AddUIButton(...args, receiver.nativeReceiver);
+            mod.AddUIButton(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                enabled,
+                baseColor,
+                baseAlpha,
+                disabledColor,
+                disabledAlpha,
+                pressedColor,
+                pressedAlpha,
+                focusedColor,
+                focusedAlpha,
+                focusedColor,
+                focusedAlpha,
+                depth,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
+        super(id, {
+            name,
+            parent,
+            anchor,
+            visible,
+            bgColor,
+            bgAlpha,
+            bgFill,
+            depth,
+            x,
+            y,
+            width,
+            height,
+            receiver,
+            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+        });
+
+        const btnSlot = this._allocateButtonSlot();
 
         if (params.onClickDown) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, true);
-            this._onClickDown = params.onClickDown;
+            this._setButtonOnClickDown(btnSlot, params.onClickDown);
         }
 
         if (params.onClickUp) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, true);
-            this._onClickUp = params.onClickUp;
+            this._setButtonOnClickUp(btnSlot, params.onClickUp);
         }
 
         if (params.onFocusIn) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, true);
-            this._onFocusIn = params.onFocusIn;
+            this._setButtonOnFocusIn(btnSlot, params.onFocusIn);
         }
 
         if (params.onFocusOut) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, true);
-            this._onFocusOut = params.onFocusOut;
+            this._setButtonOnFocusOut(btnSlot, params.onFocusOut);
         }
-
-        this._unregisterAsButton = UI.registerButton(this._name, this);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override delete(): void {
-        this._unregisterAsButton();
-        super.delete();
     }
 
     /**
@@ -144,7 +129,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns True if enabled, false otherwise.
      */
     public get enabled(): boolean {
-        return mod.GetUIButtonEnabled(this._uiWidget);
+        return this._isDeletedCheck() ? false : mod.GetUIButtonEnabled(this._uiWidget);
     }
 
     /**
@@ -162,7 +147,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The base color vector.
      */
     public get baseColor(): mod.Vector {
-        return mod.GetUIButtonColorBase(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorBase(this._uiWidget);
     }
 
     /**
@@ -180,7 +165,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The base alpha opacity.
      */
     public get baseAlpha(): number {
-        return mod.GetUIButtonAlphaBase(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaBase(this._uiWidget);
     }
 
     /**
@@ -198,7 +183,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The disabled color vector.
      */
     public get disabledColor(): mod.Vector {
-        return mod.GetUIButtonColorDisabled(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorDisabled(this._uiWidget);
     }
 
     /**
@@ -216,7 +201,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The disabled alpha opacity.
      */
     public get disabledAlpha(): number {
-        return mod.GetUIButtonAlphaDisabled(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaDisabled(this._uiWidget);
     }
 
     /**
@@ -234,7 +219,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The pressed color vector.
      */
     public get pressedColor(): mod.Vector {
-        return mod.GetUIButtonColorPressed(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorPressed(this._uiWidget);
     }
 
     /**
@@ -252,7 +237,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The pressed alpha opacity.
      */
     public get pressedAlpha(): number {
-        return mod.GetUIButtonAlphaPressed(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaPressed(this._uiWidget);
     }
 
     /**
@@ -270,7 +255,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The focused color vector.
      */
     public get focusedColor(): mod.Vector {
-        return mod.GetUIButtonColorFocused(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIButtonColorFocused(this._uiWidget);
     }
 
     /**
@@ -288,7 +273,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The focused alpha opacity.
      */
     public get focusedAlpha(): number {
-        return mod.GetUIButtonAlphaFocused(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUIButtonAlphaFocused(this._uiWidget);
     }
 
     /**
@@ -306,7 +291,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The click down handler, or undefined.
      */
     public get onClickDown(): UI.ButtonHandler | undefined {
-        return this._onClickDown;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnClickDown(this._getButtonSlot());
     }
 
     /**
@@ -316,13 +301,16 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onClickDown(onClickDown: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        if (onClickDown && !this._onClickDown) {
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnClickDown(btnSlot);
+
+        if (onClickDown && !prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, true);
-        } else if (!onClickDown && this._onClickDown) {
+        } else if (!onClickDown && prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonDown, false);
         }
 
-        this._onClickDown = onClickDown;
+        this._setButtonOnClickDown(btnSlot, onClickDown);
     }
 
     /**
@@ -330,7 +318,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The click up handler, or undefined.
      */
     public get onClickUp(): UI.ButtonHandler | undefined {
-        return this._onClickUp;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnClickUp(this._getButtonSlot());
     }
 
     /**
@@ -340,13 +328,16 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onClickUp(onClickUp: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        if (onClickUp && !this._onClickUp) {
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnClickUp(btnSlot);
+
+        if (onClickUp && !prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, true);
-        } else if (!onClickUp && this._onClickUp) {
+        } else if (!onClickUp && prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.ButtonUp, false);
         }
 
-        this._onClickUp = onClickUp;
+        this._setButtonOnClickUp(btnSlot, onClickUp);
     }
 
     /**
@@ -354,7 +345,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The focus in handler, or undefined.
      */
     public get onFocusIn(): UI.ButtonHandler | undefined {
-        return this._onFocusIn;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnFocusIn(this._getButtonSlot());
     }
 
     /**
@@ -364,13 +355,16 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onFocusIn(onFocusIn: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        if (onFocusIn && !this._onFocusIn) {
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnFocusIn(btnSlot);
+
+        if (onFocusIn && !prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, true);
-        } else if (!onFocusIn && this._onFocusIn) {
+        } else if (!onFocusIn && prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusIn, false);
         }
 
-        this._onFocusIn = onFocusIn;
+        this._setButtonOnFocusIn(btnSlot, onFocusIn);
     }
 
     /**
@@ -378,7 +372,7 @@ export class UIButton extends UI.Element implements UI.Button {
      * @returns The focus out handler, or undefined.
      */
     public get onFocusOut(): UI.ButtonHandler | undefined {
-        return this._onFocusOut;
+        return this._isDeletedCheck() ? undefined : this._getButtonOnFocusOut(this._getButtonSlot());
     }
 
     /**
@@ -388,13 +382,16 @@ export class UIButton extends UI.Element implements UI.Button {
     public set onFocusOut(onFocusOut: UI.ButtonHandler | undefined) {
         if (this._isDeletedCheck()) return;
 
-        if (onFocusOut && !this._onFocusOut) {
+        const btnSlot = this._getButtonSlot();
+        const prev = this._getButtonOnFocusOut(btnSlot);
+
+        if (onFocusOut && !prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, true);
-        } else if (!onFocusOut && this._onFocusOut) {
+        } else if (!onFocusOut && prev) {
             mod.EnableUIButtonEvent(this._uiWidget, mod.UIButtonEvent.FocusOut, false);
         }
 
-        this._onFocusOut = onFocusOut;
+        this._setButtonOnFocusOut(btnSlot, onFocusOut);
     }
 }
 

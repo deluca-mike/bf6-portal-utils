@@ -1,77 +1,80 @@
 import { UI } from '../../index.ts';
 
-// version: 3.0.0
+// version: 4.0.0
 export class UIImage extends UI.Element {
     /**
      * Creates a new image.
      * @param params - The parameters for the image.
      */
     public constructor(params: UIImage.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 0;
+        const bgFill = params.bgFill ?? mod.UIBgFill.None;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const imageColor = params.imageColor ?? UI.COLORS.WHITE;
+        const imageAlpha = params.imageAlpha ?? 1;
 
-        const elementParams: UI.FinalElementParams = {
+        if (!receiver.nativeReceiver) {
+            mod.AddUIImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.imageType,
+                imageColor,
+                imageAlpha,
+                depth
+            );
+        } else {
+            mod.AddUIImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                0,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.imageType,
+                imageColor,
+                imageAlpha,
+                depth,
+                receiver.nativeReceiver
+            );
+        }
+
+        super(id, {
             name,
             parent,
-            visible: params.visible ?? true,
+            anchor,
+            visible,
+            bgColor,
+            bgAlpha,
+            bgFill,
+            depth,
             x,
             y,
             width,
             height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 0,
-            bgFill: params.bgFill ?? mod.UIBgFill.None,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
             receiver,
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const imageColor = params.imageColor ?? UI.COLORS.WHITE;
-        const imageAlpha = params.imageAlpha ?? 1;
-
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.UIImageType, // imageType
-            mod.Vector, // imageColor
-            number, // imageAlpha
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            0,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            params.imageType,
-            imageColor,
-            imageAlpha,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIImage(...args);
-        } else {
-            mod.AddUIImage(...args, receiver.nativeReceiver);
-        }
-
-        super(elementParams);
+        });
     }
 
     /**
@@ -79,7 +82,7 @@ export class UIImage extends UI.Element {
      * @returns The image type.
      */
     public get imageType(): mod.UIImageType {
-        return mod.GetUIImageType(this._uiWidget);
+        return this._isDeletedCheck() ? mod.UIImageType.None : mod.GetUIImageType(this._uiWidget);
     }
 
     /**
@@ -97,7 +100,7 @@ export class UIImage extends UI.Element {
      * @returns The image alpha opacity.
      */
     public get imageAlpha(): number {
-        return mod.GetUIImageAlpha(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUIImageAlpha(this._uiWidget);
     }
 
     /**
@@ -115,7 +118,7 @@ export class UIImage extends UI.Element {
      * @returns The image color vector.
      */
     public get imageColor(): mod.Vector {
-        return mod.GetUIImageColor(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIImageColor(this._uiWidget);
     }
 
     /**

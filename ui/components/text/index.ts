@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 7.0.0
+// version: 8.0.0
 export class UIText extends UI.Element {
     protected _message: mod.Message;
 
@@ -9,78 +9,81 @@ export class UIText extends UI.Element {
      * @param params - The parameters for the text.
      */
     public constructor(params: UIText.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
         const padding = params.padding ?? 0;
-
-        const elementParams: UI.FinalElementParams = {
-            name,
-            parent,
-            visible: params.visible ?? true,
-            x,
-            y,
-            width,
-            height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: params.bgColor ?? UI.COLORS.WHITE,
-            bgAlpha: params.bgAlpha ?? 0,
-            bgFill: params.bgFill ?? mod.UIBgFill.None,
-            depth: params.depth ?? mod.UIDepth.AboveGameUI,
-            receiver,
-            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const bgColor = params.bgColor ?? UI.COLORS.WHITE;
+        const bgAlpha = params.bgAlpha ?? 0;
+        const bgFill = params.bgFill ?? mod.UIBgFill.None;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
         const textSize = params.textSize ?? 36;
         const textColor = params.textColor ?? UI.COLORS.BLACK;
         const textAlpha = params.textAlpha ?? 1;
         const textAnchor = params.textAnchor ?? mod.UIAnchor.Center;
 
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.UIWidget, // parent
-            boolean, // visible
-            number, // padding
-            mod.Vector, // bgColor
-            number, // bgAlpha
-            mod.UIBgFill, // bgFill
-            mod.Message, // message
-            number, // textSize
-            mod.Vector, // textColor
-            number, // textAlpha
-            mod.UIAnchor, // textAnchor
-            mod.UIDepth, // depth
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            parent.uiWidget,
-            elementParams.visible,
-            padding,
-            elementParams.bgColor,
-            elementParams.bgAlpha,
-            elementParams.bgFill,
-            params.message,
-            textSize,
-            textColor,
-            textAlpha,
-            textAnchor,
-            elementParams.depth,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIText(...args);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIText(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                padding,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.message,
+                textSize,
+                textColor,
+                textAlpha,
+                textAnchor,
+                depth
+            );
         } else {
-            mod.AddUIText(...args, receiver.nativeReceiver);
+            mod.AddUIText(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                UI.Element._getNativeWidget(parent.id)!,
+                visible,
+                padding,
+                bgColor,
+                bgAlpha,
+                bgFill,
+                params.message,
+                textSize,
+                textColor,
+                textAlpha,
+                textAnchor,
+                depth,
+                receiver.nativeReceiver
+            );
         }
 
-        super(elementParams);
+        super(id, {
+            name,
+            parent,
+            anchor,
+            visible,
+            bgColor,
+            bgAlpha,
+            bgFill,
+            depth,
+            x,
+            y,
+            width,
+            height,
+            receiver,
+            uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
+        });
 
         this._message = params.message;
     }
@@ -108,7 +111,7 @@ export class UIText extends UI.Element {
      * @returns The text alpha opacity.
      */
     public get textAlpha(): number {
-        return mod.GetUITextAlpha(this._uiWidget);
+        return this._isDeletedCheck() ? 1 : mod.GetUITextAlpha(this._uiWidget);
     }
 
     /**
@@ -126,7 +129,7 @@ export class UIText extends UI.Element {
      * @returns The text anchor alignment.
      */
     public get textAnchor(): mod.UIAnchor {
-        return mod.GetUITextAnchor(this._uiWidget);
+        return this._isDeletedCheck() ? mod.UIAnchor.Center : mod.GetUITextAnchor(this._uiWidget);
     }
 
     /**
@@ -144,7 +147,7 @@ export class UIText extends UI.Element {
      * @returns The text color vector.
      */
     public get textColor(): mod.Vector {
-        return mod.GetUITextColor(this._uiWidget);
+        return this._isDeletedCheck() ? UI.COLORS.BLACK : mod.GetUITextColor(this._uiWidget);
     }
 
     /**
@@ -162,7 +165,7 @@ export class UIText extends UI.Element {
      * @returns The text size.
      */
     public get textSize(): number {
-        return mod.GetUITextSize(this._uiWidget);
+        return this._isDeletedCheck() ? 36 : mod.GetUITextSize(this._uiWidget);
     }
 
     /**
@@ -180,7 +183,7 @@ export class UIText extends UI.Element {
      * @returns The padding.
      */
     public get padding(): number {
-        return mod.GetUIWidgetPadding(this._uiWidget);
+        return this._isDeletedCheck() ? 0 : mod.GetUIWidgetPadding(this._uiWidget);
     }
 
     /**

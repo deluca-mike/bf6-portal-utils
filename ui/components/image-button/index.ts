@@ -2,7 +2,7 @@ import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIImageButton extends UIContentButton<UIImage> {
     protected _imageDisabledColor: mod.Vector;
 
@@ -32,18 +32,22 @@ export class UIImageButton extends UIContentButton<UIImage> {
         this._imageDisabledColor = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
         this._imageDisabledAlpha = params.imageDisabledAlpha ?? 1;
 
-        if (!this._button.enabled) {
+        if (!this.enabled) {
             this._setContentEnabled(false);
         }
     }
 
     private _setContentEnabled(enabled: boolean): void {
+        const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+        if (!contentWidget) return;
+
         if (enabled) {
-            mod.SetUIImageColor(this._content.uiWidget, this._content.imageColor);
-            mod.SetUIImageAlpha(this._content.uiWidget, this._content.imageAlpha);
+            mod.SetUIImageColor(contentWidget, this._content.imageColor);
+            mod.SetUIImageAlpha(contentWidget, this._content.imageAlpha);
         } else {
-            mod.SetUIImageColor(this._content.uiWidget, this._imageDisabledColor);
-            mod.SetUIImageAlpha(this._content.uiWidget, this._imageDisabledAlpha);
+            mod.SetUIImageColor(contentWidget, this._imageDisabledColor);
+            mod.SetUIImageAlpha(contentWidget, this._imageDisabledAlpha);
         }
     }
 
@@ -51,7 +55,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @inheritdoc
      */
     public override get enabled(): boolean {
-        return this._button.enabled;
+        return super.enabled;
     }
 
     /**
@@ -60,7 +64,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
     public override set enabled(enabled: boolean) {
         if (this._isDeletedCheck()) return;
 
-        this._button.enabled = enabled;
+        super.enabled = enabled;
         this._setContentEnabled(enabled);
     }
 
@@ -99,8 +103,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         this._content.imageColor = color;
 
-        if (this._button.enabled) {
-            mod.SetUIImageColor(this._content.uiWidget, color);
+        if (this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUIImageColor(contentWidget, color);
+            }
         }
     }
 
@@ -121,8 +129,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         this._content.imageAlpha = alpha;
 
-        if (this._button.enabled) {
-            mod.SetUIImageAlpha(this._content.uiWidget, alpha);
+        if (this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUIImageAlpha(contentWidget, alpha);
+            }
         }
     }
 
@@ -143,8 +155,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         this._imageDisabledColor = color;
 
-        if (!this._button.enabled) {
-            mod.SetUIImageColor(this._content.uiWidget, color);
+        if (!this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUIImageColor(contentWidget, color);
+            }
         }
     }
 
@@ -165,8 +181,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         this._imageDisabledAlpha = alpha;
 
-        if (!this._button.enabled) {
-            mod.SetUIImageAlpha(this._content.uiWidget, alpha);
+        if (!this.enabled) {
+            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+
+            if (contentWidget) {
+                mod.SetUIImageAlpha(contentWidget, alpha);
+            }
         }
     }
 }

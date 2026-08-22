@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIGadgetImage extends UI.Element {
     protected _gadget: mod.Gadgets;
 
@@ -9,57 +9,58 @@ export class UIGadgetImage extends UI.Element {
      * @param params - The parameters for the gadget image.
      */
     public constructor(params: UIGadgetImage.Params) {
+        const id = UI.Element._allocateSlot();
         const parent = params.parent ?? UI.ROOT_NODE;
-        const receiver = UI.getReceiver(parent, params.receiver);
-        const name = UI.makeName();
-        const { x, y } = UI.getPosition(params);
-        const { width, height } = UI.getSize(params);
+        const receiver = UI.Element._getReceiver(parent, params.receiver);
+        const name = UI.Element._makeName(id);
+        const { x, y } = UI.Element._getPosition(params);
+        const { width, height } = UI.Element._getSize(params);
+        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const visible = params.visible ?? true;
+        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
 
-        const elementParams: UI.FinalElementParams = {
+        if (!receiver.nativeReceiver) {
+            mod.AddUIGadgetImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.gadget,
+                UI.Element._getNativeWidget(parent.id)!
+            );
+        } else {
+            mod.AddUIGadgetImage(
+                name,
+                mod.CreateVector(x, y, 0),
+                mod.CreateVector(width, height, 0),
+                anchor,
+                params.gadget,
+                UI.Element._getNativeWidget(parent.id)!,
+                receiver.nativeReceiver
+            );
+        }
+
+        super(id, {
             name,
             parent,
-            visible: params.visible ?? true,
+            anchor,
+            visible,
+            bgColor: UI.COLORS.WHITE,
+            bgAlpha: 0,
+            bgFill: mod.UIBgFill.None,
+            depth,
             x,
             y,
             width,
             height,
-            anchor: params.anchor ?? mod.UIAnchor.Center,
-            bgColor: UI.COLORS.WHITE,
-            bgAlpha: 0,
-            bgFill: mod.UIBgFill.None,
-            depth: mod.UIDepth.AboveGameUI,
             receiver,
             uiInputModeWhenVisible: params.uiInputModeWhenVisible ?? false,
-        };
-
-        const args: [
-            string, // name
-            mod.Vector, // position
-            mod.Vector, // size
-            mod.UIAnchor, // anchor
-            mod.Gadgets, // gadget,
-            mod.UIWidget, // parent
-        ] = [
-            name,
-            mod.CreateVector(x, y, 0),
-            mod.CreateVector(width, height, 0),
-            elementParams.anchor,
-            params.gadget,
-            parent.uiWidget,
-        ];
-
-        if (receiver instanceof UI.GlobalReceiver) {
-            mod.AddUIGadgetImage(...args);
-        } else {
-            mod.AddUIGadgetImage(...args, receiver.nativeReceiver);
-        }
-
-        super(elementParams);
+        });
 
         this._gadget = params.gadget;
 
         // `mod.AddUIGadgetImage` lacks the ability to define starting invisibility, so we have to set it manually.
-        if (!elementParams.visible) {
+        if (!visible) {
             this.visible = false;
         }
     }

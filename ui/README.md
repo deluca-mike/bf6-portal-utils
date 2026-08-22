@@ -2,7 +2,7 @@
 
 <ai>
 
-This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an object-oriented interface, providing strongly typed helpers, convenient defaults, ergonomic getters/setters, and automatic management of various UI mechanics for building complex HUDs, panels, and interactive buttons. The module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button events are dispatched automatically and you must use the `Events` module for all other game event subscription.
+This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an ergonomic, object-oriented interface backed by a high-performance **Structure-of-Arrays (SoA)** core. It provides strongly typed helpers, convenient defaults, ergonomic getters/setters, pre-allocated coordinate/dimension buffers, and automatic management of UI mechanics for building complex HUDs, panels, and interactive buttons with near-zero garbage collection overhead. The module subscribes to `OnPlayerUIButtonEvent` via the `Events` module at load time, so button events are dispatched automatically and you must use the `Events` module for all other game event subscription.
 
 > **Note** You **must** use the `Events` module as your only mechanism to subscribe to game events. Do not implement or export any Battlefield Portal event handler functions (`OnPlayerUIButtonEvent`, `OnPlayerDeployed`, etc.) in your code. The `Events` module owns those hooks and this module relies on it; only one implementation of each event handler can exist per project. See the [Events module — Known Limitations & Caveats](../events/README.md#known-limitations--caveats).
 
@@ -143,7 +143,7 @@ text.visible = true;
 
 ### Parent-Child Management Example
 
-Elements automatically manage parent-child relationships. When you create an element with a parent, move it between parents, or delete it, the parent's `children` array is automatically updated:
+Elements automatically manage parent-child relationships. When you create an element with a parent, move it between parents, or delete it, the hierarchy is automatically maintained in the Left-Child Right-Sibling (LCRS) tree:
 
 ```ts
 import { UIContainer } from 'bf6-portal-utils/ui/components/container';
@@ -178,35 +178,29 @@ console.log(container2.children.length); // 0 (automatically removed)
 
 ---
 
-## Core Concepts
+## Core Concepts & Architecture
 
-- **`UI` namespace** – Wraps `mod.*` UI functions and maintains active button/handler registrations. Provides logging via the `Logging` module for debugging and runtime error reporting.
-- **`UI.Node` base class** – Root of the UI hierarchy with `uiWidget` and `receiver` getters. Use `instanceof` to check node types (e.g., `element instanceof UIContainer`).
-- **`UI.Parent` interface** – Implemented by nodes that hold children (`Root` and `Container`). Exposes `children: readonly Element[]`, `getChild()`, `forEachChild()`, `attachChild()`, and `detachChild()`. Children are stored internally in a zero-overhead lazy flat array and exposed as a shallow copy.
-- **`UI.Root` class** – Singleton wrapping `mod.GetUIRoot()` available as `UI.ROOT_NODE`. All elements default to this parent unless a custom `parent` is supplied.
-- **`UI.Element` base class** – Abstract base class for all UI components. Property getters and setters delegate directly to native `mod` engine APIs without duplicate in-memory caching, eliminating runtime heap overhead. Includes built-in safety (`_deleted` flag and `_isDeletedCheck()`) to block operations on destroyed elements.
-- **Parent-Child & Hierarchy Rules**:
+- **Structure-of-Arrays (SoA) Core** – Pre-allocated flat `TypedArrays` (`Uint16Array`, `Int16Array`, `Float32Array`) manage tree relationships, bitflags, and coordinates up to 2048 widgets and 512 interactive buttons with zero per-widget array allocations.
+- **Thin OOP Handles (~24B)** – All classes (`UIButton`, `UIContainer`, `UIText`, etc.) are lightweight facade handles referencing an integer `id` slot in the SoA buffers.
+- **`UI` namespace** – Central container for UI constants, limits (`MAX_WIDGETS`, `MAX_BUTTONS`), types, receivers, and singleton logging.
+- **`UI.Node` base class** – Root of the UI hierarchy exposing `id: number` and `receiver`. The native widget handle (`_uiWidget`) is protected internally to prevent unsafe external mutations.
+- **`UI.Parent` interface** – Implemented by parent nodes (`Root` and `UIContainer`). Exposes `children: readonly Element[]` (safe snapshot array), `getChild()`, `forEachChild()` (zero-allocation iteration with `CallbackHandler` protection), `attachChild()`, and `detachChild()`.
+- **`UI.Root` class** – Singleton wrapping `mod.GetUIRoot()` at slot `0`, available as `UI.ROOT_NODE`. All elements default to this parent unless a custom `parent` is supplied.
+- **`UI.Element` base class** – Abstract base class for all UI components. Coordinates (`x`, `y`, `width`, `height`) are cached in `Float32Array` buffers to eliminate temporary vector allocations during coordinate mutations. Includes built-in safety (`_id = INVALID_INDEX`) to nullify handles and block operations on destroyed elements.
+- **Singly-Linked LCRS Tree**:
     - Elements created with a parent are automatically attached via `attachChild()`.
     - Mutating `element.parent = newParent` automatically detaches from the previous parent and attaches to the new one.
-    - Calling `delete()` on an element detaches it from its parent. For containers, `delete()` recursively deletes all child elements before deleting the container widget itself.
+    - Calling `delete()` recursively deletes all child elements, frees the button slot, removes active input mode requesters, and returns the slot to the intrusive free-list.
 - **Receiver Routing & Inheritance**:
-    - Every element has a target audience (`mod.Player | mod.Team`). When omitted, elements automatically inherit their parent's receiver (or global if parent is `UI.ROOT_NODE`).
-    - The `receiver` property (`GlobalReceiver | TeamReceiver | PlayerReceiver`) is exposed on `Node`. Access `receiver.nativeReceiver` for the raw engine handle. Warnings are logged if a child's receiver is incompatible with its parent's receiver.
-- **`UI.Button` interface** – Button-like elements register themselves with `UI.registerButton()` to route native engine button events (`ButtonDown`, `ButtonUp`, `FocusIn`, `FocusOut`) to their respective handlers (`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`).
-- **Widget Naming Scheme (`ui_${++counter}`)**:
-    - The root node is named `'ui_0'`.
-    - All elements created by the `UI` module are sequentially assigned names in the format `'ui_1'`, `'ui_2'`, `'ui_3'`, etc. via `UI.makeName()`.
-    - **Avoid Naming Collisions**: If you create UI widgets manually via native `mod.AddUI*` APIs or other modules/libraries, avoid using the `'ui_<number>'` naming pattern to prevent ID collisions in the Battlefield Portal UI engine.
+    - Every element has an optional target audience receiver (`mod.Player | mod.Team`). When omitted, elements automatically inherit their parent's receiver (or global `undefined` if parent is `UI.ROOT_NODE`).
+    - The `receiver` property (`mod.Player | mod.Team | undefined`) is exposed on `Node`.
+    - UI input mode reference counting is automatically managed internally per-receiver scope without exposing internal receiver objects.
+- **`UI.Button` interface** – Button-like elements allocate a compact 1-indexed button slot in the upper bits of `_flags` (`Uint16Array`), routing native engine events (`ButtonDown`, `ButtonUp`, `FocusIn`, `FocusOut`) with $\mathcal{O}(1)$ direct array indexing.
+- **Sequential Widget Naming Scheme (`ui_${id}`)**:
+    - The root node is reserved at ID `0` (`'ui_0'`).
+    - All elements created by the `UI` module are sequentially assigned names in the format `'ui_1'`, `'ui_2'`, etc., based on their slot ID.
 - **Default colors** – `UI.COLORS` provides prebuilt `mod.Vector` constants for standard colors and BF6 palette colors.
 - **Position & Size parameters** – Constructor params support either `x`/`y` or `position` (mutually exclusive), and either `width`/`height` or `size` (mutually exclusive).
-
-<ai>
-
-### Custom UI Elements
-
-Custom elements can be built by extending `Element` and accepting a parameter object extending `ElementParams`. They can access protected `_logging` for UI-scoped logs and `_isDeletedCheck()` to protect operations. Custom interactive components should implement the `Button` interface and call `UI.registerButton(this._name, this)` during construction.
-
-</ai>
 
 ---
 
@@ -299,18 +293,18 @@ Prebuilt `mod.Vector` colors for basic and Battlefield UI palettes.
 
 ### `UI.ROOT_NODE`
 
-The singleton root node wrapping `mod.GetUIRoot()`.
+The singleton root node wrapping `mod.GetUIRoot()` at slot `0`.
 
 ### `UI.Node`
 
 Base class for all UI nodes.
 
-- `uiWidget: mod.UIWidget` (getter) – The underlying native Portal widget handle. Take caution when operating on the widget outside of this module/component, as direct mutations via native `mod.*` APIs can desynchronize internal state and cause runtime errors.
-- `receiver: GlobalReceiver | TeamReceiver | PlayerReceiver` (getter) – Target audience receiver. Use `receiver.nativeReceiver` for the raw `mod.Player | mod.Team | undefined`.
+- `id: number` (getter) – The internal slot index for this node.
+- `receiver: mod.Player | mod.Team | undefined` (getter) – Target audience receiver handle.
 
 ### `UI.Button` (interface)
 
-Interface defining button-like behavior. Handlers may be sync or async and are invoked via `CallbackHandler`.
+Interface defining button-like behavior. Handlers may be sync or async and are invoked safely via `CallbackHandler`.
 
 - `onClickDown?: UI.ButtonHandler` – Press event (`mod.UIButtonEvent.ButtonDown`).
 - `onClickUp?: UI.ButtonHandler` – Release event (`mod.UIButtonEvent.ButtonUp`). Primary click handler.
@@ -323,11 +317,11 @@ Battlefield Portal supports `HoverIn` and `HoverOut` button events, but **this m
 
 ### `UI.Parent` (interface)
 
-Interface for parent nodes (`Root` and `Container`).
+Interface for parent nodes (`Root` and `UIContainer`).
 
-- `children: readonly Element[]` (getter) – Shallow copy array of attached child elements.
+- `children: readonly Element[]` (getter) – Snapshot copy array of attached child elements.
 - `getChild(index: number): Element | undefined` – Retrieves a child element at the specified index without allocating a new array.
-- `forEachChild(callback: (child: Element, index: number) => void): void` – Iterates over direct child elements without allocating an intermediate array.
+- `forEachChild(callback: (child: Element, index: number) => void): void` – Iterates over direct child elements without allocating an intermediate array (protected by `CallbackHandler`).
 - `attachChild(child: Element): void` – Adds a child element.
 - `detachChild(child: Element): void` – Removes a child element.
 
@@ -352,10 +346,6 @@ Base class for all created widgets.
 | `deleted`                | `boolean` (get)          | `true` if element has been destroyed.                    |
 | `delete()`               | `void`                   | Recursively deletes widget from Portal & unlinks parent. |
 
-### `UI.registerButton(name: string, button: Button): () => void`
-
-Registers a button instance with the central UI event router. The UI module subscribes to `OnPlayerUIButtonEvent` via `Events` at load time and dispatches events to registered buttons. Returns an unregister cleanup function.
-
 ---
 
 ## Types & Interfaces
@@ -365,19 +355,6 @@ Registers a button instance with the central UI event router. The UI module subs
 - **`UI.ButtonHandler`**: `(player: mod.Player) => Promise<void> | void`
 - **`UI.BaseParams`**: Common widget parameters (`parent`, `anchor`, `visible`, `bgColor`, `bgAlpha`, `bgFill`, `depth`, `receiver`, `uiInputModeWhenVisible`).
 - **`UI.ElementParams`**: Extends `BaseParams` with mutually exclusive `x`/`y` or `position`, and `width`/`height` or `size`.
-
----
-
-<ai>
-
-## Event Wiring & Lifecycle Summary
-
-- **Event Subscription**: `UI` subscribes to `OnPlayerUIButtonEvent` automatically via `Events`. Do not export Portal event handlers directly.
-- **Hierarchy Lifecycle**: Elements attach on creation, switch on `parent` reassignment, and detach on `delete()`. Containers delete children recursively.
-- **Safe Teardown**: Calling `delete()` destroys the native widget and permanently locks setters to prevent stale mutations.
-- **Zero-Cache Queries**: Getters query native `mod` API state directly, avoiding memory bloat and stale cache synchronization issues.
-
-</ai>
 
 ---
 

@@ -131,7 +131,7 @@ Battlefield Portal supports **hover in** and **hover out** button events (`mod.U
 
 - **Sync vs async handlers**: Each handler may be synchronous or asynchronous. In other parts of the UI/event system, async handlers are often preferred so that long-running work does not block the event stack. For `UIButton`, the engine delivers each UI button event to a single handler identified by the button's unique global reference, so only this button's matching handler runs for that event. Synchronous callbacks—including long-running ones—are therefore safe and will not block other button or event handlers.
 
-- **Button Registration**: Buttons automatically register themselves with the UI system during construction using `UI.registerButton()`. When a button is deleted, it automatically unregisters itself.
+- **Button Slot Allocation**: Buttons automatically allocate a button slot in the SoA button table during construction. When a button is deleted, its slot is automatically freed back to the button pool.
 
 - **Color Multiplication**: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white) to get the expected color results.
 

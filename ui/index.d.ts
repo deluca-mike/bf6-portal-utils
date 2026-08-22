@@ -15,6 +15,29 @@ export declare namespace UI {
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
+    /****** Constants & Limits ******/
+    /**
+     * Maximum number of UI widgets supported simultaneously.
+     */
+    export const MAX_WIDGETS = 2048;
+    /**
+     * Maximum number of interactive UI buttons supported simultaneously.
+     */
+    export const MAX_BUTTONS = 512;
+    /**
+     * Sentinel value representing an invalid or uninitialized widget index.
+     */
+    export const INVALID_INDEX = -1;
+    /**
+     * Unique identifier for a UI widget.
+     */
+    export type WidgetID = number & {
+        readonly __brand: 'WidgetID';
+    };
+    /**
+     * Sentinel value representing an invalid widget ID.
+     */
+    export const INVALID_WIDGET_ID: WidgetID;
     /****** Types ******/
     /**
      * The type of a button handler.
@@ -33,9 +56,9 @@ export declare namespace UI {
      * The parent of an element.
      */
     export type Parent = {
-        uiWidget: mod.UIWidget;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
-        children: readonly Element[];
+        readonly id: number;
+        readonly receiver: mod.Player | mod.Team | undefined;
+        readonly children: readonly Element[];
         getChild(index: number): Element | undefined;
         forEachChild(callback: (child: Element, index: number) => void): void;
         attachChild(child: Element): void;
@@ -112,20 +135,14 @@ export declare namespace UI {
         y: number;
         width: number;
         height: number;
-        receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        receiver: Receiver<mod.Player | mod.Team | undefined>;
         uiInputModeWhenVisible: boolean;
     };
     /****** Classes ******/
     abstract class Receiver<T extends mod.Player | mod.Team | undefined> {
-        protected _id: string;
         protected _nativeReceiver: T;
         protected _inputModeRequesterCount: number;
-        protected constructor(id: string, receiver: T);
-        /**
-         * The ID of the receiver. Used mainly for generating UI Widget names and for debugging purposes.
-         * @returns The ID of the receiver.
-         */
-        get id(): string;
+        protected constructor(receiver: T);
         /**
          * The native receiver of the receiver. This is the actual player or team object, not the receiver object.
          * @returns The native receiver.
@@ -146,69 +163,31 @@ export declare namespace UI {
         removeInputModeRequester(): void;
     }
     /**
-     * The global receiver. This is the receiver for all players and teams.
-     */
-    export class GlobalReceiver extends Receiver<undefined> {
-        /**
-         * The singleton instance of the global receiver.
-         */
-        static readonly instance: GlobalReceiver;
-        private constructor();
-    }
-    /**
-     * The team receiver. This is the receiver for a single team.
-     */
-    export class TeamReceiver extends Receiver<mod.Team> {
-        private static _instances;
-        private constructor();
-        /**
-         * Gets or creates the instance of the team receiver for a given team.
-         * @param receiver - The team to get the instance for.
-         * @returns The instance of the team receiver.
-         */
-        static getInstance(receiver: mod.Team): TeamReceiver;
-    }
-    /**
-     * The player receiver. This is the receiver for a single player.
-     */
-    export class PlayerReceiver extends Receiver<mod.Player> {
-        private static _instances;
-        private constructor();
-        /**
-         * Gets or creates the instance of the player receiver for a given player.
-         * @param receiver - The player to get the instance for.
-         * @returns The instance of the player receiver.
-         */
-        static getInstance(receiver: mod.Player): PlayerReceiver;
-    }
-    /**
      * The base node class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Node {
         protected readonly _logging: Logging;
-        protected _name: string;
-        protected _uiWidget: mod.UIWidget;
-        protected _receiver: GlobalReceiver | TeamReceiver | PlayerReceiver;
+        protected _id: number;
         /**
          * The constructor for a node.
-         * @param name - The name of the node.
-         * @param uiWidget - The UI widget of the node.
-         * @param receiver - The receiver of the node.
+         * @param id - The internal widget ID.
          */
-        constructor(name: string, uiWidget: mod.UIWidget, receiver: GlobalReceiver | TeamReceiver | PlayerReceiver);
+        constructor(id: number);
+        /**
+         * The unique widget ID.
+         * @returns The widget ID.
+         */
+        get id(): number;
         /**
          * The underlying native Battlefield Portal UIWidget handle for this node.
-         *
-         * Warning: Exercise caution when operating on the widget outside of this module/component,
-         * as direct mutations via native `mod.*` APIs can desynchronize internal state and cause runtime errors.
          * @returns The native UIWidget handle.
          */
-        get uiWidget(): mod.UIWidget;
+        protected get _uiWidget(): mod.UIWidget;
         /**
-         * The receiver of the node.
-         * @returns The receiver of the node.
+         * The target audience receiver for the node (player or team, or undefined if global).
+         * @returns The native receiver.
          */
-        get receiver(): GlobalReceiver | TeamReceiver | PlayerReceiver;
+        get receiver(): mod.Player | mod.Team | undefined;
     }
     /**
      * The root node. This is the root of the UI tree for the entire server.
@@ -218,10 +197,13 @@ export declare namespace UI {
          * The singleton instance of the root node.
          */
         static readonly instance: Root;
-        protected _children?: Element[];
         private constructor();
         /**
-         * Returns a shallow copy of the list of direct child elements.
+         * @inheritdoc
+         */
+        protected get _uiWidget(): mod.UIWidget;
+        /**
+         * Returns a snapshot array of direct child elements.
          * @returns Array of direct children.
          */
         get children(): readonly Element[];
@@ -251,15 +233,62 @@ export declare namespace UI {
      * The base element class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Element extends Node {
-        protected _parent: Parent;
-        protected _uiInputModeWhenVisible: boolean;
-        protected _hasInputMode: boolean;
-        protected _deleted: boolean;
+        protected _name: string;
         /**
          * The constructor for an element.
+         * @param id - The allocated slot index.
          * @param params - The parameters for the element.
          */
-        constructor(params: FinalElementParams);
+        constructor(id: number, params: FinalElementParams);
+        /****** Protected Static Helpers for Subclasses ******/
+        protected static _allocateSlot(): number;
+        protected static _freeSlot(id: number): void;
+        protected static _attachChild(parentId: number, childId: number): void;
+        protected static _detachChild(parentId: number, childId: number): void;
+        protected static _getFirstChild(id: number): number;
+        protected static _getNextSibling(id: number): number;
+        protected static _getInstance(id: number): Element | undefined;
+        protected static _getNativeWidget(id: number): mod.UIWidget | undefined;
+        /**
+         * Makes a deterministic, sequential name for a widget in the format `ui_${id}`.
+         * @param id - The widget slot ID.
+         * @returns The name of the widget.
+         */
+        protected static _makeName(id: number): string;
+        /**
+         * Gets the position from the parameters, given either x/y or position.
+         * @param params - The parameters.
+         * @returns The position.
+         */
+        protected static _getPosition(params: ElementParams): Position;
+        /**
+         * Gets the size from the parameters, given either width/height or size.
+         * @param params - The parameters.
+         * @returns The size.
+         */
+        protected static _getSize(params: ElementParams): Size;
+        /**
+         * Gets the receiver from the parameters, given either player, team, or neither.
+         * @param parent - The parent of the widget.
+         * @param receiverParam - The receiver parameter.
+         * @returns The receiver.
+         */
+        protected static _getReceiver(
+            parent: Parent,
+            receiverParam?: mod.Player | mod.Team
+        ): Receiver<mod.Player | mod.Team | undefined>;
+        /****** Protected Button Slot Accessors for Subclasses ******/
+        protected _allocateButtonSlot(): number;
+        protected _freeButtonSlot(): void;
+        protected _getButtonSlot(): number;
+        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | undefined): void;
+        protected _getButtonOnClickUp(slot: number): ButtonHandler | undefined;
+        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | undefined): void;
+        protected _getButtonOnClickDown(slot: number): ButtonHandler | undefined;
+        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | undefined): void;
+        protected _getButtonOnFocusIn(slot: number): ButtonHandler | undefined;
+        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | undefined): void;
+        protected _getButtonOnFocusOut(slot: number): ButtonHandler | undefined;
         protected _isDeletedCheck(): boolean;
         /**
          * The parent of the element.
@@ -290,6 +319,7 @@ export declare namespace UI {
          * Deletes the element.
          */
         delete(): void;
+        private _deleteRecursive;
         /**
          * The X position of the element.
          * @returns The X position of the element.
@@ -445,39 +475,5 @@ export declare namespace UI {
      * The root node. This is the root of the UI tree and the default parent for all elements.
      */
     export const ROOT_NODE: Root;
-    /**
-     * Registers a button and returns a function to unregister it.
-     * @param name - The name of the button.
-     * @param button - The button to register.
-     * @returns A function to unregister the button.
-     */
-    export function registerButton(name: string, button: Button): () => void;
-    /**
-     * Makes a deterministic, sequential name for a widget in the format `ui_${++counter}`.
-     * @returns The name of the widget.
-     */
-    export function makeName(): string;
-    /**
-     * Gets the position from the parameters, given either x/y or position.
-     * @param params - The parameters.
-     * @returns The position.
-     */
-    export function getPosition(params: ElementParams): Position;
-    /**
-     * Gets the size from the parameters, given either width/height or size.
-     * @param params - The parameters.
-     * @returns The size.
-     */
-    export function getSize(params: ElementParams): Size;
-    /**
-     * Gets the receiver from the parameters, given either player, team, or neither.
-     * @param parent - The parent of the widget.
-     * @param receiverParam - The receiver parameter.
-     * @returns The receiver.
-     */
-    export function getReceiver(
-        parent: Parent,
-        receiverParam?: mod.Player | mod.Team
-    ): GlobalReceiver | TeamReceiver | PlayerReceiver;
     export {};
 }
