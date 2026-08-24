@@ -78,8 +78,6 @@ export declare namespace PlayerLocations {
     }
     /** Maximum supported player slots in Battlefield 6 Portal (0-99). */
     const MAX_PLAYERS = 100;
-    /** Scale factor to convert world meters to millimeter integers (3 decimal places). */
-    const SCALE_FACTOR = 1000;
     /**
      * Gets world coordinates in meters for an active player.
      * Pass an `out` vector for zero-allocation reuse.

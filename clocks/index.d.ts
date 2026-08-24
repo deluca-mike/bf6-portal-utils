@@ -47,7 +47,8 @@ export declare namespace Clocks {
      */
     type CountUpOptions = ClockOptions & {
         /**
-         * Optional limit. If set, clock stops and fires onComplete when reached.
+         * Optional limit in seconds (clamped between 0 and 32,767). If set, clock stops and fires onComplete when reached.
+         * Defaults to MAX_CLOCK_SECONDS (32,767 seconds / ~9.1 hours) if omitted.
          */
         timeLimitSeconds?: number;
     };
@@ -56,14 +57,18 @@ export declare namespace Clocks {
      */
     type CountDownOptions = ClockOptions;
     /**
+     * Maximum duration or time limit in seconds supported by clocks (signed 16-bit integer limit).
+     */
+    const MAX_CLOCK_SECONDS = 32767;
+    /**
      * Creates a count up clock.
-     * @param options The options for the clock.
+     * @param options The options for the clock. `timeLimitSeconds` is clamped to [0, MAX_CLOCK_SECONDS].
      * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
     function createCountUp(options?: CountUpOptions): ClockID;
     /**
      * Creates a countdown clock.
-     * @param durationSeconds The duration of the clock in seconds.
+     * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      * @param options The options for the clock.
      * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
@@ -106,7 +111,7 @@ export declare namespace Clocks {
     /**
      * Sets the total duration of the clock that will result in completion. Will not resume completed clocks.
      * @param id The ID of the clock.
-     * @param durationSeconds The duration of the clock in seconds.
+     * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      */
     function setDuration(id: ClockID, durationSeconds: number): void;
     /**

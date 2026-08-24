@@ -167,13 +167,20 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
+#### Constants
+
+| Constant | Type | Value | Description |
+| --- | --- | --- | --- |
+| `INVALID_TIMER_ID` | `TimerID` | `-1` | Sentinel value representing an invalid or uninitialized Timer ID. |
+| `MAX_TIMER_DELAY_MS` | `number` | `2_147_483_647` | Maximum timer delay in milliseconds (signed 32-bit positive limit). |
+
 #### Static Methods
 
 | Method | Description |
 | --- | --- |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the Timers module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. This allows you to monitor and debug timer callback failures without breaking your mod. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
-| `setTimeout(callback: () => Promise<void> \| void, ms: number): TimerID` | Schedules a one-time execution of `callback` after `ms` milliseconds delay. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
-| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): TimerID` | Schedules repeated execution of `callback` every `ms` milliseconds. Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. If `immediate` is `true`, the callback runs immediately. Defaults to `false`. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
+| `setTimeout(callback: () => Promise<void> \| void, ms: number): TimerID` | Schedules a one-time execution of `callback` after `ms` milliseconds delay (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
+| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): TimerID` | Schedules repeated execution of `callback` every `ms` milliseconds (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. If `immediate` is `true`, the callback runs immediately. Defaults to `false`. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
 | `clearTimeout(id: TimerID): void` | Cancels a timeout or interval identified by `id`. Silently ignores invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearInterval()`. |
 | `clearInterval(id: TimerID): void` | Cancels an interval or timeout identified by `id`. Silently ignores invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearTimeout()`. |
 | `clear(id: TimerID): void` | Generic function to cancel a timeout or interval identified by `id`. Silently ignores invalid IDs. Since timer and interval IDs are indistinguishable under the hood, this function can be used for simplicity instead of `clearTimeout()` or `clearInterval()`. |
@@ -285,8 +292,8 @@ export async function OnGameModeStarted(): Promise<void> {
 1. **Pre-allocated Fixed Pool** – State is stored using flat, contiguous data structures of size 512 (`MAX_TIMERS`):
     - `_expirationTimes`: `Uint32Array` (4 bytes per slot)
     - `_intervalMs`: `Int32Array` (4 bytes per slot, storing the interval or intrusive free-list link)
-    - `_generations`: `Uint32Array` (4 bytes per slot)
-    - `_callbacks`: A pre-allocated array initialized with `null` references (8 bytes per slot/pointer) This design results in a highly predictable, contiguous footprint of **20 bytes per timer slot**, plus a negligible, fixed overhead for the array object headers themselves. Memory is reserved upfront at initialization. So whether there are 0 active timers or the pool is entirely maxed out, the total memory overhead of the state tracking remains perfectly flat.
+    - `_generations`: `Uint16Array` (2 bytes per slot). When a slot reaches the maximum generation of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
+    - `_callbacks`: A pre-allocated array initialized with `null` references (8 bytes per slot/pointer) This design results in a highly predictable, contiguous footprint of **18 bytes per timer slot**, plus a negligible, fixed overhead for the array object headers themselves. Memory is reserved upfront at initialization. So whether there are 0 active timers or the pool is entirely maxed out, the total memory overhead of the state tracking remains perfectly flat.
 
 2. **Ongoing Tick Evaluation** – The namespace registers a single callback to the engine's global tick loop (`Events.OngoingGlobal`). To resolve load-time circular import loops between the `Timers` and `Events` modules, this subscription is established lazily when the first timer is created. On each game tick:
     - If no timers are active, the tick handler exits immediately.

@@ -169,9 +169,10 @@ All management methods accept the target clock ID as their first argument.
 
 ### Constants
 
-| Constant           | Type      | Description                                                              |
-| ------------------ | --------- | ------------------------------------------------------------------------ |
-| `INVALID_CLOCK_ID` | `ClockID` | `-1` (Sentinel value representing an invalid or uninitialized Clock ID). |
+| Constant | Type | Value | Description |
+| --- | --- | --- | --- |
+| `INVALID_CLOCK_ID` | `ClockID` | `-1` | Sentinel value representing an invalid or uninitialized Clock ID. |
+| `MAX_CLOCK_SECONDS` | `number` | `32_767` | Maximum time limit and duration in seconds (signed 16-bit integer limit). |
 
 ### Configuration
 
@@ -185,24 +186,26 @@ All management methods accept the target clock ID as their first argument.
 
 | Type | Description |
 | --- | --- |
-| `ClockID` | `number` (Unique generation-encoded identifier for a Clock). |
+| `ClockID` | `number` (Unique generation-encoded identifier for a Clock: `index + 10_000 * generation`). |
 | `ClockOptions` | `{ onSecond?: (currentSeconds: number) => void \| Promise<void>; onMinute?: (currentMinutes: number) => void \| Promise<void>; onComplete?: () => void \| Promise<void>; }` |
-| `CountUpOptions` | `ClockOptions & { timeLimitSeconds?: number }` |
-| `CountDownOptions` | Same as `ClockOptions`. |
+| `CountUpOptions` | `ClockOptions & { timeLimitSeconds?: number }` (clamped to `[0, MAX_CLOCK_SECONDS]`, default `MAX_CLOCK_SECONDS`). |
+| `CountDownOptions` | Same as `ClockOptions` (`durationSeconds` is clamped to `[0, MAX_CLOCK_SECONDS]`). |
 
 ## How It Works
 
-1. **Structure of Arrays** – The module pre-allocates flat `TypedArrays` (like `Float64Array`, `Uint8Array`, `Int32Array`) for clock state up to a maximum limit of 256 (`MAX_CLOCKS`). Slots are allocated in $O(1)$ time via an intrusive free list (`_lastIntegerSecond`). If the pool is full, `createCountUp` and `createCountDown` log an error via `Logging` and return `INVALID_CLOCK_ID` without throwing an exception.
-2. **Elapsed time** – While a clock is running, elapsed time is `accumulatedMs[id] + (Date.now() - lastResumeTime[id])`. When stopped, the current run is added to `accumulatedMs` and the timer is cleared. Total elapsed time is seamlessly preserved.
-3. **Tick loop** – There is exactly **one** global `_tick` loop managed by `Timers.setTimeout`. It iterates over all active clocks and checks completion conditions. For running clocks, it schedules the next tick exactly at `1000 - (elapsedMs % 1000)` ms to align exactly on the next closest whole-second boundary across _all_ active clocks.
-4. **Deferred tick processing** – Start, stop, and adjustments schedule the global tick queue via a reusable static `Promise.resolve()` microtask handler (`STATIC_PROMISE.then(_processTickQueue)`). This strictly avoids Promise and closure allocations on every state change, while preventing re-entrancy issues.
-5. **Callback handling** – Callbacks are invoked via `CallbackHandler.invoke` which bypasses rest-parameter array creations for zero-allocation tick events.
+1. **Structure of Arrays** – The module pre-allocates flat `TypedArrays` (`Float64Array` for `accumulatedMs`, `lastResumeTime`, and `limits`; `Int16Array` for `_lastIntegerSecond`; `Uint16Array` for `_generations`; `Uint8Array` for `_flags`) for clock state up to a maximum limit of 256 (`MAX_CLOCKS`). Slots are allocated in $O(1)$ time via an intrusive free list (`_lastIntegerSecond`). If the pool is full, `createCountUp` and `createCountDown` log an error via `Logging` and return `INVALID_CLOCK_ID` without throwing an exception.
+2. **Generational Safety & Exhaustion** – Clock IDs encode generation (`index + 10_000 * generation`) using a `Uint16Array`. When a slot reaches the maximum generation of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
+3. **Elapsed time** – While a clock is running, elapsed time is `accumulatedMs[id] + (Date.now() - lastResumeTime[id])`. When stopped, the current run is added to `accumulatedMs` and the timer is cleared. Total elapsed time is seamlessly preserved.
+4. **Tick loop** – There is exactly **one** global `_tick` loop managed by `Timers.setTimeout`. It iterates over all active clocks and checks completion conditions. For running clocks, it schedules the next tick exactly at `1000 - (elapsedMs % 1000)` ms to align exactly on the next closest whole-second boundary across _all_ active clocks.
+5. **Deferred tick processing** – Start, stop, and adjustments schedule the global tick queue via a reusable static `Promise.resolve()` microtask handler (`STATIC_PROMISE.then(_processTickQueue)`). This strictly avoids Promise and closure allocations on every state change, while preventing re-entrancy issues.
+6. **Callback handling** – Callbacks are invoked via `CallbackHandler.invoke` which bypasses rest-parameter array creations for zero-allocation tick events.
 
 ---
 
 ## Known Limitations & Caveats
 
 - **Pool Capacity** – The clock pool is pre-allocated to 256 concurrent slots (`MAX_CLOCKS`). If the pool is full when calling `createCountUp()` or `createCountDown()`, it logs an error via `Logging` and returns `INVALID_CLOCK_ID` without throwing an exception.
+- **Duration Limits** – Clocks support a maximum duration / time limit of 32,767 seconds (~9.1 hours, `MAX_CLOCK_SECONDS`). Values exceeding this are clamped automatically.
 - **Tick Frequency** – Callbacks are dispatched on whole-second / whole-minute boundaries based on server uptime. Precision is bounded by the tick alignment timer.
 - **Async Callbacks** – Async callbacks are invoked without blocking the tick loop; rejections and errors are automatically caught and logged via `CallbackHandler`.
 

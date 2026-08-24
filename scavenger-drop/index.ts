@@ -17,11 +17,11 @@ export namespace ScavengerDrop {
      */
     export interface Options {
         /**
-         * The duration of the scavenger drop in milliseconds.
+         * The duration of the scavenger drop in milliseconds (clamped to positive integer range, max 2,147,483,647 ms).
          */
         duration?: number;
         /**
-         * The interval at which to check for scavengers in milliseconds.
+         * The interval at which to check for scavengers in milliseconds (clamped between 1 and 65,535 ms).
          */
         checkInterval?: number;
     }
@@ -50,7 +50,18 @@ export namespace ScavengerDrop {
      */
     export const INVALID_DROP_ID: DropID = -1 as DropID;
 
+    /**
+     * Maximum check interval in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
+     */
+    export const MAX_CHECK_INTERVAL_MS = 65_535;
+
+    /**
+     * Maximum drop duration in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
+     */
+    export const MAX_DURATION_MS = 2_147_483_647;
+
     const MAX_DROPS = 128;
+    const MAX_GENERATIONS = 65_535;
     const SERVER_START_TIME = Date.now();
     const GENERATION_MULTIPLIER = 10_000;
     const INVALID_INDEX = -1;
@@ -59,7 +70,7 @@ export namespace ScavengerDrop {
         return Date.now() - SERVER_START_TIME + 1;
     }
 
-    const _generations = new Uint32Array(MAX_DROPS);
+    const _generations = new Uint16Array(MAX_DROPS);
     const _expirationTimes = new Uint32Array(MAX_DROPS);
     const _checkIntervalMs = new Uint16Array(MAX_DROPS);
 
@@ -129,11 +140,15 @@ export namespace ScavengerDrop {
         _expirationTimes[index] = 0;
         _positions[index] = null;
         _callbacks[index] = null;
-        ++_generations[index];
         --_activeDropCount;
 
-        _nextCheckTimes[index] = _firstFree;
-        _firstFree = index;
+        if (_generations[index] < MAX_GENERATIONS) {
+            ++_generations[index];
+            _nextCheckTimes[index] = _firstFree;
+            _firstFree = index;
+        } else if (logging.willLog(LogLevel.Warning)) {
+            logging.log(`Slot ${index} exhausted max generations and was retired`, LogLevel.Warning);
+        }
     }
 
     function _handleOngoingGlobal(): void {
@@ -212,8 +227,8 @@ export namespace ScavengerDrop {
 
         if (index === INVALID_INDEX) return INVALID_DROP_ID;
 
-        const duration = options?.duration ?? 37_000; // 37 seconds is how long a dead player's bag stays on the ground.
-        const checkInterval = options?.checkInterval ?? 200; // 0.2 seconds between checks.
+        const duration = Math.min(MAX_DURATION_MS, Math.max(0, options?.duration ?? 37_000)); // 37 seconds is how long a dead player's bag stays on the ground.
+        const checkInterval = Math.min(MAX_CHECK_INTERVAL_MS, Math.max(1, options?.checkInterval ?? 200)); // 0.2 seconds between checks.
         const now = getUptime();
 
         _expirationTimes[index] = now + duration;

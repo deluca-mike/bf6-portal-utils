@@ -75,12 +75,19 @@ Available log levels:
 
 For more details on log levels, see the [`Logging` module documentation](../logging/README.md).
 
+#### Constants
+
+| Constant             | Type     | Value     | Description                                                 |
+| -------------------- | -------- | --------- | ----------------------------------------------------------- |
+| `MIN_MAP_COORDINATE` | `number` | `-32_768` | Minimum coordinate supported (signed 16-bit integer limit). |
+| `MAX_MAP_COORDINATE` | `number` | `32_767`  | Maximum coordinate supported (signed 16-bit integer limit). |
+
 #### Static Methods
 
 | Method | Description |
 | --- | --- |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the MapDetector module. The map detector logs warnings when map detection fails or when maps are not available in the native enum, and errors when HQ coordinate retrieval fails. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [`Logging` module documentation](../logging/README.md). |
-| `setCoordinates(map: MapDetector.Map, coordinates: Vectors.Vector3): void` | Sets the expected HQ1 coordinates used for detecting the given map. Call this for **each map** where your experience uses custom spatial data that moves Team 1's HQ—at the **top of your file** (after imports), not in an event handler, so coordinates are set before any detection runs. Only the **integer parts** of the coordinates are used for matching (decimals are ignored); this is sufficient because map HQ positions differ significantly. |
+| `setCoordinates(map: MapDetector.Map, coordinates: Vectors.Vector3): void` | Sets the expected HQ1 coordinates used for detecting the given map. Coordinates are rounded to nearest integers and clamped to `[-32,768, 32,767]`. Call this for **each map** where your experience uses custom spatial data that moves Team 1's HQ—at the **top of your file** (after imports), not in an event handler, so coordinates are set before any detection runs. Only the **integer parts** of the coordinates are used for matching (decimals are ignored); this is sufficient because map HQ positions differ significantly. |
 | `currentMap(): MapDetector.Map \| null` | Returns the current map as a `MapDetector.Map` enum value, or `null` if the map cannot be determined. |
 | `currentNativeMap(): mod.Maps \| null` | Returns the current map as a `mod.Maps` enum value (native Battlefield Portal API), or `null` if the map cannot be determined or is not available in the native enum. |
 | `currentMapName(): string \| null` | Returns the current map as a string (e.g., `"Downtown"`), or `null` if the map cannot be determined. |
@@ -124,7 +131,7 @@ The `MapDetector` namespace supports detection of the following maps via the `Ma
 
 ## Custom map spatial layouts
 
-If your experience uses **custom spatial data** that moves Team 1's HQ from its default position on one or more maps, detection would otherwise fail. Call **`MapDetector.setCoordinates(map, coordinates)`** for **each map** where HQ1 has a non-default position. Do this **at the top of your file** (after imports), **not** inside an event handler—your code does not know the current map until the detector runs, so you must pre-configure every map whose layout you have changed. Pass the (x, y, z) position of HQ1 for that layout; only the **integer parts** of the coordinates are used when matching (decimal parts are ignored). That is sufficient because HQ positions differ widely between maps, so integer comparison is enough to distinguish them.
+If your experience uses **custom spatial data** that moves Team 1's HQ from its default position on one or more maps, detection would otherwise fail. Call **`MapDetector.setCoordinates(map, coordinates)`** for **each map** where HQ1 has a non-default position. Do this **at the top of your file** (after imports), **not** inside an event handler—your code does not know the current map until the detector runs, so you must pre-configure every map whose layout you have changed. Pass the (x, y, z) position of HQ1 for that layout; coordinates are rounded to integers and clamped to `[-32,768, 32,767]`. That is sufficient because HQ positions differ widely between maps, so integer comparison is enough to distinguish them.
 
 ---
 
@@ -152,7 +159,7 @@ The detector identifies maps by comparing the **integer parts** of Team 1's HQ p
 
 The `MapDetector` uses a coordinate-based detection system:
 
-1. **Structure of Arrays** – The module stores all map coordinates and native map equivalents in flat, parallel arrays (`_mapKeys`, `_mapX`, `_mapY`, `_mapZ`, `_mapNative`).
+1. **Structure of Arrays** – The module stores all map coordinates and native map equivalents in flat, parallel arrays (`_mapKeys`, `_mapX: Int16Array`, `_mapY: Int16Array`, `_mapZ: Int16Array`, `_mapNative`).
 2. **Coordinate Matching** – The detector reads Team 1's HQ position and compares only the **integer parts** of x, y, and z to the known arrays (decimal parts are ignored). You can override stored coordinates via `setCoordinates()` when using custom spatial layouts that move the HQ.
 3. **Memoization (Caching)** – Because the map does not dynamically change during a single run of a Portal script, the detector caches the index after the first successful map detection. All subsequent calls to `currentMap()` or `currentNativeMap()` return the cached result instantly in `O(1)` time without polling the HQ position again.
 4. **Enum Mapping** – Detected maps can be returned as either `MapDetector.Map` enum values or mapped to the native `mod.Maps` enum where available (some maps are not in the native enum).

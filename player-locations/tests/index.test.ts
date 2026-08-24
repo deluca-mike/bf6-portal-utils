@@ -107,7 +107,7 @@ describe('PlayerLocations Integration Tests', () => {
             const expectedDistSq = dx * dx + dy * dy + dz * dz;
             const expectedDist = Math.sqrt(expectedDistSq);
 
-            expect(PlayerLocations.getDistanceSq(p1, p2)).toBeCloseTo(expectedDistSq, 1);
+            expect(PlayerLocations.getDistanceSq(p1, p2)).toBeCloseTo(expectedDistSq, -1);
             expect(PlayerLocations.getDistance(p1, p2)).toBeCloseTo(expectedDist, 2);
         });
 
@@ -122,7 +122,7 @@ describe('PlayerLocations Integration Tests', () => {
             const expectedDistSqXZ = dx * dx + dz * dz;
             const expectedDistXZ = Math.sqrt(expectedDistSqXZ);
 
-            expect(PlayerLocations.getDistanceSqXZ(p1, p2)).toBeCloseTo(expectedDistSqXZ, 1);
+            expect(PlayerLocations.getDistanceSqXZ(p1, p2)).toBeCloseTo(expectedDistSqXZ, -1);
             expect(PlayerLocations.getDistanceXZ(p1, p2)).toBeCloseTo(expectedDistXZ, 2);
         });
 

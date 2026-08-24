@@ -117,6 +117,14 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | `destroy(id: DetectorID): void` | Removes the detector from tracking. Call when the detector is no longer needed. Detectors for a player are also cleaned up automatically when that player leaves the game (via the internal `OnPlayerLeaveGame` subscription). |
 | `isActive(id: DetectorID): boolean` | Returns `true` if the detector identified by `id` is active, `false` otherwise. |
 
+#### Constants
+
+| Constant | Type | Value | Description |
+| --- | --- | --- | --- |
+| `INVALID_DETECTOR_ID` | `DetectorID` | `-1` | Sentinel value representing an invalid or uninitialized Detector ID. |
+| `MAX_WINDOW_MS` | `number` | `65_535` | Maximum multi-click time window in milliseconds (unsigned 16-bit limit). |
+| `MAX_REQUIRED_CLICKS` | `number` | `255` | Maximum required click count to trigger sequence (unsigned 8-bit limit). |
+
 #### `MultiClickDetector.Options`
 
 Interface for configuring detector behavior:
@@ -124,8 +132,8 @@ Interface for configuring detector behavior:
 | Property | Type | Default | Description |
 | --- | --- | --- | --- |
 | `soldierState` | `mod.SoldierStateBool` | `mod.SoldierStateBool.IsInteracting` | The soldier state boolean to monitor for multi-click sequences. Can be any member of `mod.SoldierStateBool`. See [Choosing a Soldier State](#choosing-a-soldier-state) for guidance. |
-| `windowMs` | `number` | `1_000` | Time window in milliseconds for a valid multi-click sequence. If the time between the first state change and subsequent changes exceeds this value, the sequence is reset. |
-| `requiredClicks` | `number` | `3` | Number of state changes required to trigger a multi-click sequence. The callback will be called when this many state changes are detected within the time window. |
+| `windowMs` | `number` | `1_000` | Time window in milliseconds for a valid multi-click sequence (clamped to `[1, MAX_WINDOW_MS]`). If the time between the first state change and subsequent changes exceeds this value, the sequence is reset. |
+| `requiredClicks` | `number` | `3` | Number of state changes required to trigger a multi-click sequence (clamped to `[1, MAX_REQUIRED_CLICKS]`). The callback will be called when this many state changes are detected within the time window. |
 
 ---
 
@@ -159,19 +167,21 @@ The `MultiClickDetector` uses a Structure of Arrays (SoA) data-oriented model wi
 
 1. **Instance Creation** – When a detector is created via `MultiClickDetector.create()`, a slot is allocated in $O(1)$ time from the intrusive free list (`_sequenceStartTimes`). The maximum number of concurrent detectors is capped at 300 to eliminate runtime memory allocations. If the pool is full, it logs an error and returns `INVALID_DETECTOR_ID`.
 
-2. **Automatic Event Subscriptions** – At load time, the module subscribes to `Events.OngoingGlobal`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. When the player **deploys**, a player-level bitflag is set so that detector logic runs for that player. When they **undeploy**, that flag is cleared so soldier state is never read for an undeployed player.
+2. **Generational Safety & Exhaustion** – Detector IDs encode generation (`index + 10_000 * generation`) using a `Uint16Array`. When a slot reaches the maximum generation count of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
 
-3. **Event Handling** – When `OngoingGlobal` fires, the module rapidly iterates over the flat parallel arrays, checking bitflags (active, enabled, player deployed). This executes in `O(n)` but performs zero allocations.
+3. **Automatic Event Subscriptions** – At load time, the module subscribes to `Events.OngoingGlobal`, `Events.OnPlayerDeployed`, `Events.OnPlayerUndeploy`, and `Events.OnPlayerLeaveGame`. When the player **deploys**, a player-level bitflag is set so that detector logic runs for that player. When they **undeploy**, that flag is cleared so soldier state is never read for an undeployed player.
 
-4. **Fast Exit Optimization** – For each detector, if the current soldier state matches the last known state bit, the loop continues immediately. This handles the vast majority of ticks where no state change occurred.
+4. **Event Handling** – When `OngoingGlobal` fires, the module rapidly iterates over the flat parallel arrays, checking bitflags (active, enabled, player deployed). This executes in `O(n)` but performs zero allocations.
 
-5. **Edge Detection** – The detector only processes rising edges (transitions from `false` to `true`) of the configured soldier state. Falling edges are ignored.
+5. **Fast Exit Optimization** – For each detector, if the current soldier state matches the last known state bit, the loop continues immediately. This handles the vast majority of ticks where no state change occurred.
 
-6. **Time Window Check** – If a sequence is in progress and the time window has expired, the sequence is reset.
+6. **Edge Detection** – The detector only processes rising edges (transitions from `false` to `true`) of the configured soldier state. Falling edges are ignored.
 
-7. **Click Counting** – On a rising edge: if first click, record start time and set count to 1; otherwise increment. When the count matches `requiredClicks`, the callback is invoked via `CallbackHandler.invokeNoArgs()` and the sequence is reset. **Synchronous callbacks run inline and block the entire `OngoingGlobal` stack; asynchronous callbacks are preferred.**
+7. **Time Window Check** – If a sequence is in progress and the time window has expired, the sequence is reset.
 
-8. **Error Isolation** – Callback errors (sync and async) are caught and logged by `CallbackHandler` and do not stop other detectors or your mod.
+8. **Click Counting** – On a rising edge: if first click, record start time and set count to 1; otherwise increment. When the count matches `requiredClicks`, the callback is invoked via `CallbackHandler.invokeNoArgs()` and the sequence is reset. **Synchronous callbacks run inline and block the entire `OngoingGlobal` stack; asynchronous callbacks are preferred.**
+
+9. **Error Isolation** – Callback errors (sync and async) are caught and logged by `CallbackHandler` and do not stop other detectors or your mod.
 
 ---
 

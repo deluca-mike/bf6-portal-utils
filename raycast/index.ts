@@ -60,17 +60,17 @@ export namespace Raycast {
     const FLAG_NATIVE_VECTOR = 1 << 1;
     const FLAG_PLAYER_CONNECTED = 1 << 2;
 
-    // --- Circular Ring Buffer for Queued Requests (Fixed-point 1/1000 precision) ---
+    // --- Circular Ring Buffer for Queued Requests (32-bit Float Coordinate Storage) ---
     let _queueHead = 0;
     let _queueTail = 0;
     let _queueCount = 0;
 
-    const _queueStartX = new Int32Array(QUEUE_CAPACITY);
-    const _queueStartY = new Int32Array(QUEUE_CAPACITY);
-    const _queueStartZ = new Int32Array(QUEUE_CAPACITY);
-    const _queueEndX = new Int32Array(QUEUE_CAPACITY);
-    const _queueEndY = new Int32Array(QUEUE_CAPACITY);
-    const _queueEndZ = new Int32Array(QUEUE_CAPACITY);
+    const _queueStartX = new Float32Array(QUEUE_CAPACITY);
+    const _queueStartY = new Float32Array(QUEUE_CAPACITY);
+    const _queueStartZ = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndX = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndY = new Float32Array(QUEUE_CAPACITY);
+    const _queueEndZ = new Float32Array(QUEUE_CAPACITY);
     const _queueFlags = new Uint8Array(QUEUE_CAPACITY);
     const _queueOnHit = new Array<HitCallback<mod.Vector | Vector3> | null>(QUEUE_CAPACITY);
     const _queueOnMiss = new Array<MissCallback | null>(QUEUE_CAPACITY);
@@ -182,12 +182,12 @@ export namespace Raycast {
         if (_queueCount === 0) return false;
 
         const head = _queueHead;
-        const startX = _queueStartX[head] / 1000;
-        const startY = _queueStartY[head] / 1000;
-        const startZ = _queueStartZ[head] / 1000;
-        const endX = _queueEndX[head] / 1000;
-        const endY = _queueEndY[head] / 1000;
-        const endZ = _queueEndZ[head] / 1000;
+        const startX = _queueStartX[head];
+        const startY = _queueStartY[head];
+        const startZ = _queueStartZ[head];
+        const endX = _queueEndX[head];
+        const endY = _queueEndY[head];
+        const endZ = _queueEndZ[head];
         const flags = _queueFlags[head];
         const onHit = _queueOnHit[head];
         const onMiss = _queueOnMiss[head];
@@ -360,12 +360,12 @@ export namespace Raycast {
         }
 
         const tail = _queueTail;
-        _queueStartX[tail] = Math.round(startX * 1000);
-        _queueStartY[tail] = Math.round(startY * 1000);
-        _queueStartZ[tail] = Math.round(startZ * 1000);
-        _queueEndX[tail] = Math.round(endX * 1000);
-        _queueEndY[tail] = Math.round(endY * 1000);
-        _queueEndZ[tail] = Math.round(endZ * 1000);
+        _queueStartX[tail] = startX;
+        _queueStartY[tail] = startY;
+        _queueStartZ[tail] = startZ;
+        _queueEndX[tail] = endX;
+        _queueEndY[tail] = endY;
+        _queueEndZ[tail] = endZ;
         _queueFlags[tail] = isV3 ? 0 : FLAG_NATIVE_VECTOR;
         _queueOnHit[tail] = (callbacks.onHit as HitCallback<mod.Vector | Vector3>) ?? null;
         _queueOnMiss[tail] = callbacks.onMiss ?? null;

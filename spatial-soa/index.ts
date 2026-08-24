@@ -95,6 +95,7 @@ export namespace SpatialSOA {
 
     // Module-Level Configuration
     const MAX_NODES = 1024;
+    const MAX_GENERATIONS = 65_535;
     const GENERATION_MULTIPLIER = 100_000;
     const INVALID_INDEX = -1;
 
@@ -208,7 +209,7 @@ export namespace SpatialSOA {
 
     // Flags & Generations
     const _flags = new Uint8Array(MAX_NODES);
-    const _generations = new Uint32Array(MAX_NODES);
+    const _generations = new Uint16Array(MAX_NODES);
 
     // Left-Child Right-Sibling (LCRS) Hierarchy in 16-bit integers
     const _parent = new Int16Array(MAX_NODES).fill(INVALID_INDEX);
@@ -475,14 +476,18 @@ export namespace SpatialSOA {
         _firstChild[index] = INVALID_INDEX;
         _objects[index] = undefined;
         _controllers[index] = undefined;
-
-        // Invalidate any outstanding handle IDs
-        ++_generations[index];
-
-        // Intrusive push to free list
-        _nextSibling[index] = _firstFree;
-        _firstFree = index;
         --_activeNodeCount;
+
+        if (_generations[index] < MAX_GENERATIONS) {
+            // Invalidate any outstanding handle IDs
+            ++_generations[index];
+
+            // Intrusive push to free list
+            _nextSibling[index] = _firstFree;
+            _firstFree = index;
+        } else if (logging.willLog(LogLevel.Warning)) {
+            logging.log(`Slot ${index} exhausted max generations and was retired`, LogLevel.Warning);
+        }
     }
 
     /**

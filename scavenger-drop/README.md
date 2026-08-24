@@ -100,14 +100,22 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | `isActive(id: DropID): boolean` | Checks whether the given drop ID is currently active. |
 | `getActiveDropCount(): number` | Returns the number of currently active scavenger drops. |
 
+#### Constants
+
+| Constant | Type | Value | Description |
+| --- | --- | --- | --- |
+| `INVALID_DROP_ID` | `DropID` | `-1` | Sentinel value representing an invalid or uninitialized Drop ID. |
+| `MAX_CHECK_INTERVAL_MS` | `number` | `65_535` | Maximum check interval in milliseconds (unsigned 16-bit limit). |
+| `MAX_DURATION_MS` | `number` | `2_147_483_647` | Maximum drop duration in milliseconds (signed 32-bit positive limit). |
+
 #### `ScavengerDrop.Options`
 
 An interface for configuring scavenger drop behavior.
 
 | Property | Type | Default | Description |
 | --- | --- | --- | --- |
-| `duration` | `number` | `37000` | The duration of the scavenger drop in milliseconds. After this time, the drop expires and stops checking for players. Defaults to 37 seconds to match the game's bag despawn time. |
-| `checkInterval` | `number` | `200` | The base interval at which to check for scavengers in milliseconds. The actual check frequency adapts based on player proximity (see [How It Works](#how-it-works)). Defaults to 0.2 seconds (200ms). |
+| `duration` | `number` | `37000` | The duration of the scavenger drop in milliseconds (clamped to `[0, MAX_DURATION_MS]`). After this time, the drop expires and stops checking for players. Defaults to 37 seconds to match the game's bag despawn time. |
+| `checkInterval` | `number` | `200` | The base interval at which to check for scavengers in milliseconds (clamped to `[1, MAX_CHECK_INTERVAL_MS]`). The actual check frequency adapts based on player proximity (see [How It Works](#how-it-works)). Defaults to 0.2 seconds (200ms). |
 
 ---
 
@@ -167,7 +175,7 @@ export function OnPlayerDied(
 The `ScavengerDrop` module implements scavenger detection using Battlefield Portal's `mod.ClosestPlayerTo()` API and `Events.OngoingGlobal` for centralized zero-allocation tick processing:
 
 1. **Pre-allocated Zero-Allocation Pool** – State is stored across flat, contiguous typed arrays (Struct of Arrays) for up to 128 concurrent drops:
-    - `_generations` (`Uint32Array`) – Generational counters for ABA safety.
+    - `_generations` (`Uint16Array`) – Generational counters for ABA safety. When a slot reaches the maximum generation of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
     - `_expirationTimes` (`Uint32Array`) – Expiration timestamps based on server uptime (with `0` indicating an inactive slot).
     - `_checkIntervalMs` (`Uint16Array`) – Configured check interval.
     - `_nextCheckTimes` (`Int32Array`) – Next scheduled proximity check timestamp, or link in the intrusive free list (`_firstFree`).

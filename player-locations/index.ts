@@ -160,14 +160,8 @@ export namespace PlayerLocations {
     /** Maximum supported player slots in Battlefield 6 Portal (0-99). */
     export const MAX_PLAYERS = 100;
 
-    /** Scale factor to convert world meters to millimeter integers (3 decimal places). */
-    export const SCALE_FACTOR = 1000;
-
-    /** Squared scale factor for millimeter squared to meters squared conversions. */
-    const SCALE_FACTOR_SQ = SCALE_FACTOR * SCALE_FACTOR;
-
-    /** Spatial Grid Voxel Size (25 meters = 25,000 scaled millimeter units). */
-    const VOXEL_SIZE = 25000;
+    /** Spatial Grid Voxel Size in world meters (25 meters). */
+    const VOXEL_SIZE = 25;
 
     /** Hash table bucket count for the spatial grid (must be a power of 2). */
     const GRID_TABLE_SIZE = 512;
@@ -176,13 +170,7 @@ export namespace PlayerLocations {
     const GRID_MASK = GRID_TABLE_SIZE - 1;
 
     /** Sentinel coordinate value indicating an unspawned, dead, or inactive player. */
-    const INVALID_POS = -99999999;
-
-    /** Minimum 32-bit signed integer value used for unbounded lower coordinate limits. */
-    const INT32_MIN = -2147483648;
-
-    /** Maximum 32-bit signed integer value used for unbounded upper coordinate limits. */
-    const INT32_MAX = 2147483647;
+    const INVALID_POS = -99999.0;
 
     /** Tolerance in meters (1 millimeter) for filtering out unspawned/inactive players near origin. */
     const ORIGIN_TOLERANCE_METERS = 0.001;
@@ -191,10 +179,10 @@ export namespace PlayerLocations {
     const FLAG_CONNECTED = 1 << 0; // 1 = Connected / In-Game slot
     const FLAG_ACTIVE = 1 << 1; // 2 = Spawned / Alive with valid 3D coordinates
 
-    // --- 1. Struct of Arrays (SoA) Buffers ---
-    const posX = new Int32Array(MAX_PLAYERS);
-    const posY = new Int32Array(MAX_PLAYERS);
-    const posZ = new Int32Array(MAX_PLAYERS);
+    // --- 1. Struct of Arrays (SoA) Buffers (32-bit Float Coordinates in Meters) ---
+    const posX = new Float32Array(MAX_PLAYERS);
+    const posY = new Float32Array(MAX_PLAYERS);
+    const posZ = new Float32Array(MAX_PLAYERS);
     const stateFlags = new Uint8Array(MAX_PLAYERS);
 
     // --- 2. Zero-GC Linked-List Spatial Grid ---
@@ -605,18 +593,18 @@ export namespace PlayerLocations {
 
             _setFlag(id, FLAG_ACTIVE);
 
-            const sX = (_scratchPos.x * SCALE_FACTOR) | 0;
-            const sY = (_scratchPos.y * SCALE_FACTOR) | 0;
-            const sZ = (_scratchPos.z * SCALE_FACTOR) | 0;
+            const x = _scratchPos.x;
+            const y = _scratchPos.y;
+            const z = _scratchPos.z;
 
-            posX[id] = sX;
-            posY[id] = sY;
-            posZ[id] = sZ;
+            posX[id] = x;
+            posY[id] = y;
+            posZ[id] = z;
 
             // Insert into 3D Linked Voxel Grid
-            const gx = Math.floor(sX / VOXEL_SIZE);
-            const gy = Math.floor(sY / VOXEL_SIZE);
-            const gz = Math.floor(sZ / VOXEL_SIZE);
+            const gx = Math.floor(x / VOXEL_SIZE) | 0;
+            const gy = Math.floor(y / VOXEL_SIZE) | 0;
+            const gz = Math.floor(z / VOXEL_SIZE) | 0;
             const cellHash = _hashVoxel(gx, gy, gz);
 
             nextPlayer[id] = gridHead[cellHash];
@@ -649,7 +637,7 @@ export namespace PlayerLocations {
         return ((gx * 73856093) ^ (gy * 19349663) ^ (gz * 83492791)) & GRID_MASK;
     }
 
-    function _insertionSort(sortedArray: Uint8Array, posArray: Int32Array): void {
+    function _insertionSort(sortedArray: Uint8Array, posArray: Float32Array): void {
         for (let i = 1; i < MAX_PLAYERS; ++i) {
             const keyId = sortedArray[i];
             const keyVal = posArray[keyId];
@@ -664,7 +652,7 @@ export namespace PlayerLocations {
         }
     }
 
-    function _findLowerBound(sortedArray: Uint8Array, posArray: Int32Array, targetVal: number): number {
+    function _findLowerBound(sortedArray: Uint8Array, posArray: Float32Array, targetVal: number): number {
         let low = 0;
         let high = MAX_PLAYERS - 1;
         let ans = MAX_PLAYERS;
@@ -683,7 +671,7 @@ export namespace PlayerLocations {
         return ans;
     }
 
-    function _findUpperBound(sortedArray: Uint8Array, posArray: Int32Array, targetVal: number): number {
+    function _findUpperBound(sortedArray: Uint8Array, posArray: Float32Array, targetVal: number): number {
         let low = 0;
         let high = MAX_PLAYERS - 1;
         let ans = -1;
@@ -704,14 +692,13 @@ export namespace PlayerLocations {
 
     function _getPlayersGte(
         sortedArray: Uint8Array,
-        posArray: Int32Array,
+        posArray: Float32Array,
         valMeters: number,
         outArray: number[]
     ): number[] {
         outArray.length = 0;
 
-        const sVal = (valMeters * SCALE_FACTOR) | 0;
-        const lx = _findLowerBound(sortedArray, posArray, sVal);
+        const lx = _findLowerBound(sortedArray, posArray, valMeters);
 
         for (let i = lx; i < MAX_PLAYERS; ++i) {
             const id = sortedArray[i];
@@ -726,14 +713,13 @@ export namespace PlayerLocations {
 
     function _getPlayersLte(
         sortedArray: Uint8Array,
-        posArray: Int32Array,
+        posArray: Float32Array,
         valMeters: number,
         outArray: number[]
     ): number[] {
         outArray.length = 0;
 
-        const sVal = (valMeters * SCALE_FACTOR) | 0;
-        const ux = _findUpperBound(sortedArray, posArray, sVal);
+        const ux = _findUpperBound(sortedArray, posArray, valMeters);
 
         for (let i = 0; i <= ux; ++i) {
             const id = sortedArray[i];
@@ -811,19 +797,15 @@ export namespace PlayerLocations {
         findClosest: boolean,
         filterFn?: (id: number) => boolean
     ): number {
-        const sX = (x * SCALE_FACTOR) | 0;
-        const sY = (y * SCALE_FACTOR) | 0;
-        const sZ = (z * SCALE_FACTOR) | 0;
-
         let bestId = -1;
         let bestDistSq = findClosest ? Infinity : -1;
 
         for (let id = 0; id < MAX_PLAYERS; ++id) {
             if (!_isActive(id) || (filterFn && !filterFn(id))) continue;
 
-            const dx = posX[id] - sX;
-            const dy = posY[id] - sY;
-            const dz = posZ[id] - sZ;
+            const dx = posX[id] - x;
+            const dy = posY[id] - y;
+            const dz = posZ[id] - z;
             const distSq = dx * dx + dy * dy + dz * dz;
 
             if (findClosest ? distSq < bestDistSq : distSq > bestDistSq) {
@@ -849,18 +831,14 @@ export namespace PlayerLocations {
         if (k <= 0) return outArray;
 
         const targetK = k > MAX_PLAYERS ? MAX_PLAYERS : k;
-        const sX = (x * SCALE_FACTOR) | 0;
-        const sY = (y * SCALE_FACTOR) | 0;
-        const sZ = (z * SCALE_FACTOR) | 0;
-
         let heapSize = 0;
 
         for (let id = 0; id < MAX_PLAYERS; ++id) {
             if (!_isActive(id) || (filterFn && !filterFn(id))) continue;
 
-            const dx = posX[id] - sX;
-            const dy = posY[id] - sY;
-            const dz = posZ[id] - sZ;
+            const dx = posX[id] - x;
+            const dy = posY[id] - y;
+            const dz = posZ[id] - z;
             const distSq = dx * dx + dy * dy + dz * dz;
 
             if (heapSize < targetK) {
@@ -942,9 +920,9 @@ export namespace PlayerLocations {
         if (!_isActive(id)) return null;
 
         const res = out || { x: 0, y: 0, z: 0 };
-        res.x = posX[id] / SCALE_FACTOR;
-        res.y = posY[id] / SCALE_FACTOR;
-        res.z = posZ[id] / SCALE_FACTOR;
+        res.x = posX[id];
+        res.y = posY[id];
+        res.z = posZ[id];
 
         return res;
     }
@@ -1022,7 +1000,7 @@ export namespace PlayerLocations {
         const dy = posY[idA] - posY[idB];
         const dz = posZ[idA] - posZ[idB];
 
-        return (dx * dx + dy * dy + dz * dz) / SCALE_FACTOR_SQ;
+        return dx * dx + dy * dy + dz * dz;
     }
 
     /**
@@ -1052,7 +1030,7 @@ export namespace PlayerLocations {
         const dx = posX[idA] - posX[idB];
         const dz = posZ[idA] - posZ[idB];
 
-        return (dx * dx + dz * dz) / SCALE_FACTOR_SQ;
+        return dx * dx + dz * dz;
     }
 
     /**
@@ -1092,18 +1070,13 @@ export namespace PlayerLocations {
 
         if (radiusMeters <= 0) return outArray;
 
-        const sX = (x * SCALE_FACTOR) | 0;
-        const sY = (y * SCALE_FACTOR) | 0;
-        const sZ = (z * SCALE_FACTOR) | 0;
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-        const sRadiusSq = sRadius * sRadius;
-
-        const minGx = Math.floor((sX - sRadius) / VOXEL_SIZE);
-        const maxGx = Math.floor((sX + sRadius) / VOXEL_SIZE);
-        const minGy = Math.floor((sY - sRadius) / VOXEL_SIZE);
-        const maxGy = Math.floor((sY + sRadius) / VOXEL_SIZE);
-        const minGz = Math.floor((sZ - sRadius) / VOXEL_SIZE);
-        const maxGz = Math.floor((sZ + sRadius) / VOXEL_SIZE);
+        const radiusSq = radiusMeters * radiusMeters;
+        const minGx = Math.floor((x - radiusMeters) / VOXEL_SIZE);
+        const maxGx = Math.floor((x + radiusMeters) / VOXEL_SIZE);
+        const minGy = Math.floor((y - radiusMeters) / VOXEL_SIZE);
+        const maxGy = Math.floor((y + radiusMeters) / VOXEL_SIZE);
+        const minGz = Math.floor((z - radiusMeters) / VOXEL_SIZE);
+        const maxGz = Math.floor((z + radiusMeters) / VOXEL_SIZE);
 
         // Advance query token for visit stamping
         ++queryToken;
@@ -1126,11 +1099,11 @@ export namespace PlayerLocations {
                             queryVisited[pId] = currentToken;
 
                             if (_isActive(pId)) {
-                                const dx = posX[pId] - sX;
-                                const dy = posY[pId] - sY;
-                                const dz = posZ[pId] - sZ;
+                                const dx = posX[pId] - x;
+                                const dy = posY[pId] - y;
+                                const dz = posZ[pId] - z;
 
-                                if (dx * dx + dy * dy + dz * dz <= sRadiusSq) {
+                                if (dx * dx + dy * dy + dz * dz <= radiusSq) {
                                     outArray.push(pId);
                                 }
                             }
@@ -1163,20 +1136,16 @@ export namespace PlayerLocations {
     ): number[] {
         outArray.length = 0;
 
-        const sX = (x * SCALE_FACTOR) | 0;
-        const sY = (y * SCALE_FACTOR) | 0;
-        const sZ = (z * SCALE_FACTOR) | 0;
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-        const sRadiusSq = sRadius * sRadius;
+        const radiusSq = radiusMeters * radiusMeters;
 
         for (let id = 0; id < MAX_PLAYERS; ++id) {
             if (!_isActive(id)) continue;
 
-            const dx = posX[id] - sX;
-            const dy = posY[id] - sY;
-            const dz = posZ[id] - sZ;
+            const dx = posX[id] - x;
+            const dy = posY[id] - y;
+            const dz = posZ[id] - z;
 
-            if (dx * dx + dy * dy + dz * dz > sRadiusSq) {
+            if (dx * dx + dy * dy + dz * dz > radiusSq) {
                 outArray.push(id);
             }
         }
@@ -1207,23 +1176,16 @@ export namespace PlayerLocations {
 
         if (radiusMeters <= 0) return outArray;
 
-        const sCenterX = (centerX * SCALE_FACTOR) | 0;
-        const sCenterZ = (centerZ * SCALE_FACTOR) | 0;
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-        const sRadiusSq = sRadius * sRadius;
+        const radiusSq = radiusMeters * radiusMeters;
+        const minX = centerX - radiusMeters;
+        const maxX = centerX + radiusMeters;
+        const minZ = centerZ - radiusMeters;
+        const maxZ = centerZ + radiusMeters;
 
-        const sMinY = isFinite(minY) ? (minY * SCALE_FACTOR) | 0 : INT32_MIN;
-        const sMaxY = isFinite(maxY) ? (maxY * SCALE_FACTOR) | 0 : INT32_MAX;
-
-        const sMinX = sCenterX - sRadius;
-        const sMaxX = sCenterX + sRadius;
-        const sMinZ = sCenterZ - sRadius;
-        const sMaxZ = sCenterZ + sRadius;
-
-        const lx = _findLowerBound(sortedX, posX, sMinX);
-        const ux = _findUpperBound(sortedX, posX, sMaxX);
-        const lz = _findLowerBound(sortedZ, posZ, sMinZ);
-        const uz = _findUpperBound(sortedZ, posZ, sMaxZ);
+        const lx = _findLowerBound(sortedX, posX, minX);
+        const ux = _findUpperBound(sortedX, posX, maxX);
+        const lz = _findLowerBound(sortedZ, posZ, minZ);
+        const uz = _findUpperBound(sortedZ, posZ, maxZ);
 
         const countX = ux >= lx ? ux - lx + 1 : 0;
         const countZ = uz >= lz ? uz - lz + 1 : 0;
@@ -1235,12 +1197,12 @@ export namespace PlayerLocations {
         for (let i = start; i <= end; ++i) {
             const id = bestSorted[i];
 
-            if (!_isActive(id) || posY[id] < sMinY || posY[id] > sMaxY) continue;
+            if (!_isActive(id) || posY[id] < minY || posY[id] > maxY) continue;
 
-            const dx = posX[id] - sCenterX;
-            const dz = posZ[id] - sCenterZ;
+            const dx = posX[id] - centerX;
+            const dz = posZ[id] - centerZ;
 
-            if (dx * dx + dz * dz <= sRadiusSq) {
+            if (dx * dx + dz * dz <= radiusSq) {
                 outArray.push(id);
             }
         }
@@ -1268,28 +1230,22 @@ export namespace PlayerLocations {
     ): number[] {
         outArray.length = 0;
 
-        const sCenterX = (centerX * SCALE_FACTOR) | 0;
-        const sCenterZ = (centerZ * SCALE_FACTOR) | 0;
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-        const sRadiusSq = sRadius * sRadius;
-
-        const sMinY = isFinite(minY) ? (minY * SCALE_FACTOR) | 0 : INT32_MIN;
-        const sMaxY = isFinite(maxY) ? (maxY * SCALE_FACTOR) | 0 : INT32_MAX;
+        const radiusSq = radiusMeters * radiusMeters;
 
         for (let id = 0; id < MAX_PLAYERS; ++id) {
             if (!_isActive(id)) continue;
 
             const y = posY[id];
 
-            if (y < sMinY || y > sMaxY) {
+            if (y < minY || y > maxY) {
                 outArray.push(id);
                 continue;
             }
 
-            const dx = posX[id] - sCenterX;
-            const dz = posZ[id] - sCenterZ;
+            const dx = posX[id] - centerX;
+            const dz = posZ[id] - centerZ;
 
-            if (dx * dx + dz * dz > sRadiusSq) {
+            if (dx * dx + dz * dz > radiusSq) {
                 outArray.push(id);
             }
         }
@@ -1320,24 +1276,15 @@ export namespace PlayerLocations {
     ): number[] {
         outArray.length = 0;
 
-        const sMinX = (minX * SCALE_FACTOR) | 0;
-        const sMaxX = (maxX * SCALE_FACTOR) | 0;
-
-        const sMinY = (minY * SCALE_FACTOR) | 0;
-        const sMaxY = (maxY * SCALE_FACTOR) | 0;
-
-        const sMinZ = (minZ * SCALE_FACTOR) | 0;
-        const sMaxZ = (maxZ * SCALE_FACTOR) | 0;
-
         // Binary search bounds across all 3 sorted axes
-        const lx = _findLowerBound(sortedX, posX, sMinX);
-        const ux = _findUpperBound(sortedX, posX, sMaxX);
+        const lx = _findLowerBound(sortedX, posX, minX);
+        const ux = _findUpperBound(sortedX, posX, maxX);
 
-        const ly = _findLowerBound(sortedY, posY, sMinY);
-        const uy = _findUpperBound(sortedY, posY, sMaxY);
+        const ly = _findLowerBound(sortedY, posY, minY);
+        const uy = _findUpperBound(sortedY, posY, maxY);
 
-        const lz = _findLowerBound(sortedZ, posZ, sMinZ);
-        const uz = _findUpperBound(sortedZ, posZ, sMaxZ);
+        const lz = _findLowerBound(sortedZ, posZ, minZ);
+        const uz = _findUpperBound(sortedZ, posZ, maxZ);
 
         const countX = ux >= lx ? ux - lx + 1 : 0;
         const countY = uy >= ly ? uy - ly + 1 : 0;
@@ -1348,7 +1295,7 @@ export namespace PlayerLocations {
             for (let i = lx; i <= ux; ++i) {
                 const id = sortedX[i];
 
-                if (_isActive(id) && posY[id] >= sMinY && posY[id] <= sMaxY && posZ[id] >= sMinZ && posZ[id] <= sMaxZ) {
+                if (_isActive(id) && posY[id] >= minY && posY[id] <= maxY && posZ[id] >= minZ && posZ[id] <= maxZ) {
                     outArray.push(id);
                 }
             }
@@ -1356,7 +1303,7 @@ export namespace PlayerLocations {
             for (let i = ly; i <= uy; ++i) {
                 const id = sortedY[i];
 
-                if (_isActive(id) && posX[id] >= sMinX && posX[id] <= sMaxX && posZ[id] >= sMinZ && posZ[id] <= sMaxZ) {
+                if (_isActive(id) && posX[id] >= minX && posX[id] <= maxX && posZ[id] >= minZ && posZ[id] <= maxZ) {
                     outArray.push(id);
                 }
             }
@@ -1364,7 +1311,7 @@ export namespace PlayerLocations {
             for (let i = lz; i <= uz; ++i) {
                 const id = sortedZ[i];
 
-                if (_isActive(id) && posX[id] >= sMinX && posX[id] <= sMaxX && posY[id] >= sMinY && posY[id] <= sMaxY) {
+                if (_isActive(id) && posX[id] >= minX && posX[id] <= maxX && posY[id] >= minY && posY[id] <= maxY) {
                     outArray.push(id);
                 }
             }
@@ -1395,15 +1342,6 @@ export namespace PlayerLocations {
     ): number[] {
         outArray.length = 0;
 
-        const sMinX = (minX * SCALE_FACTOR) | 0;
-        const sMaxX = (maxX * SCALE_FACTOR) | 0;
-
-        const sMinY = (minY * SCALE_FACTOR) | 0;
-        const sMaxY = (maxY * SCALE_FACTOR) | 0;
-
-        const sMinZ = (minZ * SCALE_FACTOR) | 0;
-        const sMaxZ = (maxZ * SCALE_FACTOR) | 0;
-
         for (let id = 0; id < MAX_PLAYERS; ++id) {
             if (!_isActive(id)) continue;
 
@@ -1411,7 +1349,7 @@ export namespace PlayerLocations {
             const y = posY[id];
             const z = posZ[id];
 
-            if (x < sMinX || x > sMaxX || y < sMinY || y > sMaxY || z < sMinZ || z > sMaxZ) {
+            if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ) {
                 outArray.push(id);
             }
         }
@@ -1637,17 +1575,14 @@ export namespace PlayerLocations {
 
         if (!_isActive(id)) return false;
 
-        const sY = posY[id];
-        const sMinY = isFinite(minY) ? (minY * SCALE_FACTOR) | 0 : INT32_MIN;
-        const sMaxY = isFinite(maxY) ? (maxY * SCALE_FACTOR) | 0 : INT32_MAX;
+        const y = posY[id];
 
-        if (sY < sMinY || sY > sMaxY) return false;
+        if (y < minY || y > maxY) return false;
 
-        const dx = posX[id] - ((centerX * SCALE_FACTOR) | 0);
-        const dz = posZ[id] - ((centerZ * SCALE_FACTOR) | 0);
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
+        const dx = posX[id] - centerX;
+        const dz = posZ[id] - centerZ;
 
-        return dx * dx + dz * dz <= sRadius * sRadius;
+        return dx * dx + dz * dz <= radiusMeters * radiusMeters;
     }
 
     /**
@@ -1693,12 +1628,11 @@ export namespace PlayerLocations {
 
         if (!_isActive(id)) return false;
 
-        const dx = posX[id] - ((centerX * SCALE_FACTOR) | 0);
-        const dy = posY[id] - ((centerY * SCALE_FACTOR) | 0);
-        const dz = posZ[id] - ((centerZ * SCALE_FACTOR) | 0);
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
+        const dx = posX[id] - centerX;
+        const dy = posY[id] - centerY;
+        const dz = posZ[id] - centerZ;
 
-        return dx * dx + dy * dy + dz * dz <= sRadius * sRadius;
+        return dx * dx + dy * dy + dz * dz <= radiusMeters * radiusMeters;
     }
 
     /**
@@ -1746,18 +1680,11 @@ export namespace PlayerLocations {
 
         if (!_isActive(id)) return false;
 
-        const sX = posX[id];
-        const sY = posY[id];
-        const sZ = posZ[id];
+        const x = posX[id];
+        const y = posY[id];
+        const z = posZ[id];
 
-        return (
-            sX >= ((minX * SCALE_FACTOR) | 0) &&
-            sX <= ((maxX * SCALE_FACTOR) | 0) &&
-            sY >= ((minY * SCALE_FACTOR) | 0) &&
-            sY <= ((maxY * SCALE_FACTOR) | 0) &&
-            sZ >= ((minZ * SCALE_FACTOR) | 0) &&
-            sZ <= ((maxZ * SCALE_FACTOR) | 0)
-        );
+        return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
     }
 
     /**
@@ -1844,13 +1771,11 @@ export namespace PlayerLocations {
         onEnter?: PlayerZoneCallback,
         onExit?: PlayerZoneCallback
     ): SphereHandle {
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-
         const listener: SphereListener = {
-            centerX: (x * SCALE_FACTOR) | 0,
-            centerY: (y * SCALE_FACTOR) | 0,
-            centerZ: (z * SCALE_FACTOR) | 0,
-            radiusSq: sRadius * sRadius,
+            centerX: x,
+            centerY: y,
+            centerZ: z,
+            radiusSq: radiusMeters * radiusMeters,
             onEnter,
             onExit,
             mask0: 0,
@@ -1870,13 +1795,12 @@ export namespace PlayerLocations {
                 }
             },
             update(newX: number, newY: number, newZ: number, newRadius?: number): void {
-                listener.centerX = (newX * SCALE_FACTOR) | 0;
-                listener.centerY = (newY * SCALE_FACTOR) | 0;
-                listener.centerZ = (newZ * SCALE_FACTOR) | 0;
+                listener.centerX = newX;
+                listener.centerY = newY;
+                listener.centerZ = newZ;
 
                 if (newRadius !== undefined) {
-                    const sr = (newRadius * SCALE_FACTOR) | 0;
-                    listener.radiusSq = sr * sr;
+                    listener.radiusSq = newRadius * newRadius;
                 }
             },
         };
@@ -1943,14 +1867,12 @@ export namespace PlayerLocations {
         onEnter?: PlayerZoneCallback,
         onExit?: PlayerZoneCallback
     ): CylinderHandle {
-        const sRadius = (radiusMeters * SCALE_FACTOR) | 0;
-
         const listener: CylinderListener = {
-            centerX: (centerX * SCALE_FACTOR) | 0,
-            centerZ: (centerZ * SCALE_FACTOR) | 0,
-            radiusSq: sRadius * sRadius,
-            minY: minY !== undefined && isFinite(minY) ? (minY * SCALE_FACTOR) | 0 : INT32_MIN,
-            maxY: maxY !== undefined && isFinite(maxY) ? (maxY * SCALE_FACTOR) | 0 : INT32_MAX,
+            centerX,
+            centerZ,
+            radiusSq: radiusMeters * radiusMeters,
+            minY: minY !== undefined ? minY : -Infinity,
+            maxY: maxY !== undefined ? maxY : Infinity,
             onEnter,
             onExit,
             mask0: 0,
@@ -1976,20 +1898,19 @@ export namespace PlayerLocations {
                 newMinY?: number,
                 newMaxY?: number
             ): void {
-                listener.centerX = (newCenterX * SCALE_FACTOR) | 0;
-                listener.centerZ = (newCenterZ * SCALE_FACTOR) | 0;
+                listener.centerX = newCenterX;
+                listener.centerZ = newCenterZ;
 
                 if (newRadius !== undefined) {
-                    const sr = (newRadius * SCALE_FACTOR) | 0;
-                    listener.radiusSq = sr * sr;
+                    listener.radiusSq = newRadius * newRadius;
                 }
 
                 if (newMinY !== undefined) {
-                    listener.minY = isFinite(newMinY) ? (newMinY * SCALE_FACTOR) | 0 : INT32_MIN;
+                    listener.minY = newMinY;
                 }
 
                 if (newMaxY !== undefined) {
-                    listener.maxY = isFinite(newMaxY) ? (newMaxY * SCALE_FACTOR) | 0 : INT32_MAX;
+                    listener.maxY = newMaxY;
                 }
             },
         };
@@ -2063,12 +1984,12 @@ export namespace PlayerLocations {
         onExit?: PlayerZoneCallback
     ): AABBHandle {
         const listener: AABBListener = {
-            minX: (minX * SCALE_FACTOR) | 0,
-            minY: (minY * SCALE_FACTOR) | 0,
-            minZ: (minZ * SCALE_FACTOR) | 0,
-            maxX: (maxX * SCALE_FACTOR) | 0,
-            maxY: (maxY * SCALE_FACTOR) | 0,
-            maxZ: (maxZ * SCALE_FACTOR) | 0,
+            minX,
+            minY,
+            minZ,
+            maxX,
+            maxY,
+            maxZ,
             onEnter,
             onExit,
             mask0: 0,
@@ -2095,12 +2016,12 @@ export namespace PlayerLocations {
                 newMaxY: number,
                 newMaxZ: number
             ): void {
-                listener.minX = (newMinX * SCALE_FACTOR) | 0;
-                listener.minY = (newMinY * SCALE_FACTOR) | 0;
-                listener.minZ = (newMinZ * SCALE_FACTOR) | 0;
-                listener.maxX = (newMaxX * SCALE_FACTOR) | 0;
-                listener.maxY = (newMaxY * SCALE_FACTOR) | 0;
-                listener.maxZ = (newMaxZ * SCALE_FACTOR) | 0;
+                listener.minX = newMinX;
+                listener.minY = newMinY;
+                listener.minZ = newMinZ;
+                listener.maxX = newMaxX;
+                listener.maxY = newMaxY;
+                listener.maxZ = newMaxZ;
             },
         };
     }
@@ -2117,7 +2038,7 @@ export namespace PlayerLocations {
                 }
             },
             update(newThreshold: number): void {
-                listener.threshold = (newThreshold * SCALE_FACTOR) | 0;
+                listener.threshold = newThreshold;
             },
         };
     }
@@ -2153,7 +2074,7 @@ export namespace PlayerLocations {
     ): PlaneHandle {
         return _createPlaneHandle({
             axis: AxisType.Y,
-            threshold: (y * SCALE_FACTOR) | 0,
+            threshold: y,
             onEnter: onAbove,
             onExit: onBelow,
             mask0: 0,
@@ -2190,7 +2111,7 @@ export namespace PlayerLocations {
     export function onCrossEastWest(x: number, onEast?: PlayerZoneCallback, onWest?: PlayerZoneCallback): PlaneHandle {
         return _createPlaneHandle({
             axis: AxisType.X,
-            threshold: (x * SCALE_FACTOR) | 0,
+            threshold: x,
             onEnter: onEast,
             onExit: onWest,
             mask0: 0,
@@ -2235,7 +2156,7 @@ export namespace PlayerLocations {
     ): PlaneHandle {
         return _createPlaneHandle({
             axis: AxisType.Z,
-            threshold: (z * SCALE_FACTOR) | 0,
+            threshold: z,
             onEnter: onSouth,
             onExit: onNorth,
             mask0: 0,

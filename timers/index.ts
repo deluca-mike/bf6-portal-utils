@@ -35,15 +35,21 @@ export namespace Timers {
      */
     export const INVALID_TIMER_ID: TimerID = -1 as TimerID;
 
+    /**
+     * Maximum timer delay or interval in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
+     */
+    export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
     // --- Configuration ---
     const MAX_TIMERS = 512;
+    const MAX_GENERATIONS = 65_535;
     const SERVER_START_TIME = Date.now();
     const GENERATION_MULTIPLIER = 10_000; // Must be strictly larger than MAX_TIMERS.
     const INVALID_INDEX = -1;
 
     // --- Data-Oriented Storage (Zero Allocation Pool) ---
     const _expirationTimes = new Uint32Array(MAX_TIMERS);
-    const _generations = new Uint32Array(MAX_TIMERS);
+    const _generations = new Uint16Array(MAX_TIMERS);
 
     /**
      * Intrusive link / interval milliseconds array:
@@ -115,11 +121,15 @@ export namespace Timers {
      */
     function _deleteTimer(index: number): void {
         _callbacks[index] = null;
-        ++_generations[index];
         --_activeTimerCount;
 
-        _intervalMs[index] = _firstFree;
-        _firstFree = index;
+        if (_generations[index] < MAX_GENERATIONS) {
+            ++_generations[index];
+            _intervalMs[index] = _firstFree;
+            _firstFree = index;
+        } else if (logging.willLog(LogLevel.Warning)) {
+            logging.log(`Slot ${index} exhausted max generations and was retired`, LogLevel.Warning);
+        }
     }
 
     /**
@@ -185,23 +195,23 @@ export namespace Timers {
     /**
      * Schedules a one-time execution after the specified delay.
      * @param callback - The callback to execute.
-     * @param ms - The delay in milliseconds.
+     * @param ms - The delay in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
      */
     export function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID {
-        const safeMs = ms < 0 ? 0 : ms;
+        const safeMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, ms));
         return _createTimer(callback, safeMs, 0);
     }
 
     /**
      * Schedules a repeated execution after the specified interval.
      * @param callback - The callback to execute.
-     * @param ms - The interval in milliseconds.
+     * @param ms - The interval in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @param immediate - If true, runs the callback immediately.
      * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
      */
     export function setInterval(callback: () => Promise<void> | void, ms: number, immediate: boolean = false): TimerID {
-        const safeMs = ms < 0 ? 0 : ms;
+        const safeMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, ms));
         const expirationDelay = immediate ? 0 : safeMs;
 
         return _createTimer(callback, expirationDelay, safeMs);

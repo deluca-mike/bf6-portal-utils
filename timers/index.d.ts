@@ -26,16 +26,20 @@ export declare namespace Timers {
      */
     const INVALID_TIMER_ID: TimerID;
     /**
+     * Maximum timer delay or interval in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
+     */
+    const MAX_TIMER_DELAY_MS = 2147483647;
+    /**
      * Schedules a one-time execution after the specified delay.
      * @param callback - The callback to execute.
-     * @param ms - The delay in milliseconds.
+     * @param ms - The delay in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
      */
     function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID;
     /**
      * Schedules a repeated execution after the specified interval.
      * @param callback - The callback to execute.
-     * @param ms - The interval in milliseconds.
+     * @param ms - The interval in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @param immediate - If true, runs the callback immediately.
      * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
      */

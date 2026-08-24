@@ -18,11 +18,11 @@ export namespace MultiClickDetector {
          */
         soldierState?: mod.SoldierStateBool;
         /**
-         * The window in milliseconds for a valid multi-click sequence.
+         * The window in milliseconds for a valid multi-click sequence (clamped between 1 and 65,535 ms).
          */
         windowMs?: number;
         /**
-         * The number of clicks required to trigger a multi-click sequence.
+         * The number of clicks required to trigger a multi-click sequence (clamped between 1 and 255).
          */
         requiredClicks?: number;
     }
@@ -53,7 +53,18 @@ export namespace MultiClickDetector {
      */
     export const INVALID_DETECTOR_ID: DetectorID = -1 as DetectorID;
 
+    /**
+     * Maximum multi-click detection window in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
+     */
+    export const MAX_WINDOW_MS = 65_535;
+
+    /**
+     * Maximum required clicks supported for a sequence (unsigned 8-bit integer limit: 255).
+     */
+    export const MAX_REQUIRED_CLICKS = 255;
+
     const MAX_DETECTORS = 300;
+    const MAX_GENERATIONS = 65_535;
     const GENERATION_MULTIPLIER = 10_000;
     const INVALID_INDEX = -1;
     const SERVER_START_TIME = Date.now();
@@ -64,7 +75,7 @@ export namespace MultiClickDetector {
     const FLAG_PLAYER_DEPLOYED = 1 << 2;
     const FLAG_LAST_STATE = 1 << 3;
 
-    const _generations = new Uint32Array(MAX_DETECTORS);
+    const _generations = new Uint16Array(MAX_DETECTORS);
     const _flags = new Uint8Array(MAX_DETECTORS);
     const _playerIds = new Uint8Array(MAX_DETECTORS);
     const _players = new Array<mod.Player | null>(MAX_DETECTORS);
@@ -87,7 +98,7 @@ export namespace MultiClickDetector {
     let _firstFree = 0;
 
     const _soldierStates = new Array<mod.SoldierStateBool | null>(MAX_DETECTORS);
-    const _windows = new Uint32Array(MAX_DETECTORS);
+    const _windows = new Uint16Array(MAX_DETECTORS);
     const _requiredClicks = new Uint8Array(MAX_DETECTORS);
 
     let _activeDetectorCount = 0;
@@ -255,11 +266,15 @@ export namespace MultiClickDetector {
         _players[index] = null;
         _callbacks[index] = null;
         _soldierStates[index] = null;
-        ++_generations[index];
         --_activeDetectorCount;
 
-        _sequenceStartTimes[index] = _firstFree;
-        _firstFree = index;
+        if (_generations[index] < MAX_GENERATIONS) {
+            ++_generations[index];
+            _sequenceStartTimes[index] = _firstFree;
+            _firstFree = index;
+        } else if (logging.willLog(Logging.LogLevel.Warning)) {
+            logging.log(`Slot ${index} exhausted max generations and was retired`, Logging.LogLevel.Warning);
+        }
     }
 
     /**
@@ -284,8 +299,8 @@ export namespace MultiClickDetector {
         _sequenceStartTimes[index] = 0;
 
         _soldierStates[index] = options?.soldierState ?? mod.SoldierStateBool.IsInteracting;
-        _windows[index] = options?.windowMs ?? 1000;
-        _requiredClicks[index] = options?.requiredClicks ?? 3;
+        _windows[index] = Math.min(MAX_WINDOW_MS, Math.max(1, options?.windowMs ?? 1000));
+        _requiredClicks[index] = Math.min(MAX_REQUIRED_CLICKS, Math.max(1, options?.requiredClicks ?? 3));
 
         ++_activeDetectorCount;
 

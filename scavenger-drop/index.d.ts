@@ -9,11 +9,11 @@ export declare namespace ScavengerDrop {
      */
     interface Options {
         /**
-         * The duration of the scavenger drop in milliseconds.
+         * The duration of the scavenger drop in milliseconds (clamped to positive integer range, max 2,147,483,647 ms).
          */
         duration?: number;
         /**
-         * The interval at which to check for scavengers in milliseconds.
+         * The interval at which to check for scavengers in milliseconds (clamped between 1 and 65,535 ms).
          */
         checkInterval?: number;
     }
@@ -38,6 +38,14 @@ export declare namespace ScavengerDrop {
      * Sentinel value representing an invalid or uninitialized Drop ID.
      */
     const INVALID_DROP_ID: DropID;
+    /**
+     * Maximum check interval in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
+     */
+    const MAX_CHECK_INTERVAL_MS = 65535;
+    /**
+     * Maximum drop duration in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
+     */
+    const MAX_DURATION_MS = 2147483647;
     /**
      * Creates a new scavenger drop.
      * Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid.

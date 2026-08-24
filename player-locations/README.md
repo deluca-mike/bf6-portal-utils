@@ -90,22 +90,22 @@ The engine is engineered around cache-friendly memory layouts and algorithmic pr
 
 Instead of an Array of Objects (`Array<{ x, y, z }>` which incurs GC pointer chasing and fragmented memory), `PlayerLocations` stores coordinates in parallel, contiguous Typed Arrays:
 
-- `posX: Int32Array(100)`
-- `posY: Int32Array(100)`
-- `posZ: Int32Array(100)`
+- `posX: Float32Array(100)`
+- `posY: Float32Array(100)`
+- `posZ: Float32Array(100)`
 - `stateFlags: Uint8Array(100)`
 
 **Key Benefits:**
 
 - **$O(1)$ Direct Lookup**: Coordinates for player slot `id` are indexed directly via `posX[id]`, `posY[id]`, `posZ[id]`.
-- **Cache-Dense Sequential Access**: 1-to-all distance sweeps scan contiguous 32-bit integers, keeping memory lines hot in CPU L1/L2 cache.
-- **Millimeter Integer Scaling ($1000\times$)**: World coordinates (meters) are scaled by $1000$ to integers, eliminating floating-point rounding divergence and enabling bitwise integer math.
+- **Cache-Dense Sequential Access**: 1-to-all distance sweeps scan contiguous 32-bit floating-point numbers in world meters, keeping memory lines hot in CPU L1/L2 cache.
+- **Direct Metric Coordinates & Sub-Millimeter Precision**: Direct float storage in meters eliminates integer scaling multiplications (`* 1000`) and divisions (`/ 1000`) on every tick and query while maintaining sub-millimeter precision across a $[-10000, 10000]$ meter world.
 
 ---
 
 ### 2. Zero-GC Linked-List Spatial Voxel Grid
 
-To perform fast volumetric proximity queries without testing all 100 players, the 3D world is partitioned into a uniform $25\text{m}$ ($25,000\text{mm}$) voxel grid backed by a fixed-size flat array linked list:
+To perform fast volumetric proximity queries without testing all 100 players, the 3D world is partitioned into a uniform $25\text{m}$ voxel grid backed by a fixed-size flat array linked list:
 
 - `gridHead: Int8Array(512)` (stores the head player ID for each of the 512 hash buckets, or `-1` if empty)
 - `nextPlayer: Int8Array(100)` (stores the next player ID in the linked list chain)
@@ -183,9 +183,9 @@ Under maximum load (100 connected and active players), `PlayerLocations` maintai
 
 | Buffer | Type & Elements | Purpose | Raw Data Size |
 | :-- | :-- | :-- | :-- |
-| **`posX`** | `Int32Array(100)` | Scaled $X$ coordinates (mm) | **400 Bytes** |
-| **`posY`** | `Int32Array(100)` | Scaled $Y$ coordinates (mm) | **400 Bytes** |
-| **`posZ`** | `Int32Array(100)` | Scaled $Z$ coordinates (mm) | **400 Bytes** |
+| **`posX`** | `Float32Array(100)` | Metric $X$ coordinates (meters) | **400 Bytes** |
+| **`posY`** | `Float32Array(100)` | Metric $Y$ coordinates (meters) | **400 Bytes** |
+| **`posZ`** | `Float32Array(100)` | Metric $Z$ coordinates (meters) | **400 Bytes** |
 | **`stateFlags`** | `Uint8Array(100)` | Connected & Active bit flags | **100 Bytes** |
 | **`gridHead`** | `Int8Array(512)` | Spatial grid hash table head pointers | **512 Bytes** |
 | **`nextPlayer`** | `Int8Array(100)` | Spatial grid linked-list node pointers | **100 Bytes** |
@@ -281,10 +281,9 @@ interface TargetExtremaHandle extends ExtremaHandle {
 
 #### Constants
 
-| Constant | Type | Value | Description |
-| :-- | :-- | :-- | :-- |
+| Constant      | Type     | Value | Description                                                      |
+| :------------ | :------- | :---- | :--------------------------------------------------------------- |
 | `MAX_PLAYERS` | `number` | `100` | Maximum supported player slots in Battlefield 6 Portal (`0-99`). |
-| `SCALE_FACTOR` | `number` | `1000` | Scale factor converting world meters to millimeter integers ($1\text{m} = 1000\text{mm}$). |
 
 ---
 

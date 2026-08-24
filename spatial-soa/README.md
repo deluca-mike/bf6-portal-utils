@@ -14,7 +14,7 @@ This architecture:
 - **Completely eliminates GC tracing and transient garbage churn** for scene graph properties.
 - **Uses Left-Child Right-Sibling (LCRS) hierarchy indexing** in 16-bit integers (`Int16Array`) for $\mathcal{O}(1)$ zero-allocation parent-child relationships.
 - **Unified Triple-Duty Intrusive Linking**: Chained free-slots, active root nodes, and parent-child siblings all share the same `_nextSibling` buffer, eliminating auxiliary array overhead.
-- **Prevents stale ID reuse** via generation-encoded node IDs (analogous to the `Timers` module).
+- **Prevents stale ID reuse** via generation-encoded node IDs (`Uint16Array`) with slot retirement at 65,535 generations to eliminate wrap-around collisions.
 
 </ai>
 
@@ -41,7 +41,7 @@ This architecture:
     - **FREE Slot**: Points to the next free slot on the intrusive free-list (`_firstFree`).
     - **ROOT Node (`_parent === -1`)**: Points to the next root node on the active root chain (`_firstRoot`).
     - **CHILD Node (`_parent !== -1`)**: Points to the next sibling under the same parent (`_firstChild[parent]`).
-- **Generation-Encoded IDs**: Stale references to destroyed nodes are instantly rejected even after their memory slot is recycled.
+- **Generation-Encoded IDs**: Stale references to destroyed nodes are instantly rejected (`Uint16Array` generation storage; retired upon reaching 65,535 generations).
 - **16-Bit Integer Hierarchy (`Int16Array`)**: Stores parent, first-child, and sibling pointers in only 6 bytes per node.
 - **Zero-Allocation Out Parameters**: All getters and projections support optional `out` vectors/quaternions.
 - **Top-Down Dirty Transform Caching**: World transforms and native `mod.SetObjectTransform` bridge calls only execute for objects that have actually moved or rotated.

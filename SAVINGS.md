@@ -9,18 +9,19 @@ Because this version uses Structure-of-Arrays (SoA), memory scales completely li
 The math per clock slot:
 
 - `_flags` (Uint8Array): 1 byte
+- `_generations` (Uint16Array): 2 bytes
 - 3x `Float64Array` (`accumulatedMs`, `lastResumeTime`, `limits`): 24 bytes
-- 2x `Int32Array` (`lastIntegerSecond`, `lastIntegerMinute`): 8 bytes
+- 2x `Int16Array` (`lastIntegerSecond` / intrusive free list, `lastIntegerMinute`): 4 bytes
 - 3x Standard Arrays (for callback pointers): ~24 bytes (assuming 64-bit QuickJS values)
 
-**Total Marginal Cost**: **~57 bytes per clock capacity**.
+**Total Marginal Cost**: **~55 bytes per clock capacity**.
 
 Because it pre-allocates everything, it costs this much _whether 0 clocks are running or the max clocks are running_:
 
-- **64 Clocks**: ~3.6 KB
-- **128 Clocks**: ~7.2 KB
-- **256 Clocks (Default)**: ~14.5 KB
-- **512 Clocks**: ~29.1 KB
+- **64 Clocks**: ~3.5 KB
+- **128 Clocks**: ~7.0 KB
+- **256 Clocks (Default)**: ~14.0 KB
+- **512 Clocks**: ~28.1 KB
 
 _(Plus a tiny, fixed ~1 KB overhead for the Array/TypedArray object wrappers)._
 

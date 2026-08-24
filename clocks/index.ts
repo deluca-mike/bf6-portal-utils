@@ -58,7 +58,8 @@ export namespace Clocks {
      */
     export type CountUpOptions = ClockOptions & {
         /**
-         * Optional limit. If set, clock stops and fires onComplete when reached.
+         * Optional limit in seconds (clamped between 0 and 32,767). If set, clock stops and fires onComplete when reached.
+         * Defaults to MAX_CLOCK_SECONDS (32,767 seconds / ~9.1 hours) if omitted.
          */
         timeLimitSeconds?: number;
     };
@@ -68,7 +69,13 @@ export namespace Clocks {
      */
     export type CountDownOptions = ClockOptions;
 
+    /**
+     * Maximum duration or time limit in seconds supported by clocks (signed 16-bit integer limit).
+     */
+    export const MAX_CLOCK_SECONDS = 32_767;
+
     const MAX_CLOCKS = 256;
+    const MAX_GENERATIONS = 65_535;
     const GENERATION_MULTIPLIER = 10_000;
     const INVALID_INDEX = -1;
     const FLAG_IN_USE = 1 << 0;
@@ -77,7 +84,7 @@ export namespace Clocks {
     const FLAG_COUNTDOWN = 1 << 3;
 
     const _flags = new Uint8Array(MAX_CLOCKS);
-    const _generations = new Uint32Array(MAX_CLOCKS);
+    const _generations = new Uint16Array(MAX_CLOCKS);
 
     function _isInUse(flags: number): boolean {
         return (flags & FLAG_IN_USE) !== 0;
@@ -114,7 +121,7 @@ export namespace Clocks {
      * - Free slot (!FLAG_IN_USE): Points to the next free slot on the intrusive free list (`_firstFree`).
      * - In-use slot (FLAG_IN_USE): Stores the last reported integer second (initialized to INVALID_INDEX).
      */
-    const _lastIntegerSecond = new Int32Array(MAX_CLOCKS);
+    const _lastIntegerSecond = new Int16Array(MAX_CLOCKS);
 
     for (let i = 0; i < MAX_CLOCKS - 1; ++i) {
         _lastIntegerSecond[i] = i + 1;
@@ -300,7 +307,7 @@ export namespace Clocks {
 
     /**
      * Creates a count up clock.
-     * @param options The options for the clock.
+     * @param options The options for the clock. `timeLimitSeconds` is clamped to [0, MAX_CLOCK_SECONDS].
      * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
     export function createCountUp(options?: CountUpOptions): ClockID {
@@ -312,7 +319,7 @@ export namespace Clocks {
         _setFlag(index, FLAG_IN_USE);
         _accumulatedMs[index] = 0;
         _lastResumeTime[index] = 0;
-        _limits[index] = options?.timeLimitSeconds ?? 86400;
+        _limits[index] = Math.min(MAX_CLOCK_SECONDS, Math.max(0, options?.timeLimitSeconds ?? MAX_CLOCK_SECONDS));
 
         _onSecond[index] = options?.onSecond ?? null;
         _onMinute[index] = options?.onMinute ?? null;
@@ -323,7 +330,7 @@ export namespace Clocks {
 
     /**
      * Creates a countdown clock.
-     * @param durationSeconds The duration of the clock in seconds.
+     * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      * @param options The options for the clock.
      * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
      */
@@ -337,7 +344,7 @@ export namespace Clocks {
         _setFlag(index, FLAG_COUNTDOWN);
         _accumulatedMs[index] = 0;
         _lastResumeTime[index] = 0;
-        _limits[index] = durationSeconds;
+        _limits[index] = Math.min(MAX_CLOCK_SECONDS, Math.max(0, durationSeconds));
 
         _onSecond[index] = options?.onSecond ?? null;
         _onMinute[index] = options?.onMinute ?? null;
@@ -361,11 +368,15 @@ export namespace Clocks {
         _onSecond[index] = null;
         _onMinute[index] = null;
         _onComplete[index] = null;
-        ++_generations[index];
         --_activeClockCount;
 
-        _lastIntegerSecond[index] = _firstFree;
-        _firstFree = index;
+        if (_generations[index] < MAX_GENERATIONS) {
+            ++_generations[index];
+            _lastIntegerSecond[index] = _firstFree;
+            _firstFree = index;
+        } else if (logging.willLog(LogLevel.Warning)) {
+            logging.log(`Slot ${index} exhausted max generations and was retired`, LogLevel.Warning);
+        }
     }
 
     /**
@@ -440,14 +451,14 @@ export namespace Clocks {
     /**
      * Sets the total duration of the clock that will result in completion. Will not resume completed clocks.
      * @param id The ID of the clock.
-     * @param durationSeconds The duration of the clock in seconds.
+     * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      */
     export function setDuration(id: ClockID, durationSeconds: number): void {
         const index = _resolveIndex(id);
 
         if (index === INVALID_INDEX) return;
 
-        _limits[index] = durationSeconds;
+        _limits[index] = Math.min(MAX_CLOCK_SECONDS, Math.max(0, durationSeconds));
         _queueTick();
     }
 

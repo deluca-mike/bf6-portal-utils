@@ -13,11 +13,11 @@ export declare namespace MultiClickDetector {
          */
         soldierState?: mod.SoldierStateBool;
         /**
-         * The window in milliseconds for a valid multi-click sequence.
+         * The window in milliseconds for a valid multi-click sequence (clamped between 1 and 65,535 ms).
          */
         windowMs?: number;
         /**
-         * The number of clicks required to trigger a multi-click sequence.
+         * The number of clicks required to trigger a multi-click sequence (clamped between 1 and 255).
          */
         requiredClicks?: number;
     }
@@ -42,6 +42,14 @@ export declare namespace MultiClickDetector {
      * Sentinel value representing an invalid or uninitialized Detector ID.
      */
     const INVALID_DETECTOR_ID: DetectorID;
+    /**
+     * Maximum multi-click detection window in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
+     */
+    const MAX_WINDOW_MS = 65535;
+    /**
+     * Maximum required clicks supported for a sequence (unsigned 8-bit integer limit: 255).
+     */
+    const MAX_REQUIRED_CLICKS = 255;
     /**
      * Creates a new multi-click detector for the specified player.
      * @param player - The player to detect multi-click sequences for.

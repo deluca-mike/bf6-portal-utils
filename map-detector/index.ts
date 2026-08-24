@@ -108,16 +108,26 @@ export namespace MapDetector {
         mod.Maps.Abbasid,
     ];
 
-    const _mapX = new Int32Array([
+    /**
+     * Minimum coordinate value supported by map detector (signed 16-bit integer limit: -32,768).
+     */
+    export const MIN_MAP_COORDINATE = -32_768;
+
+    /**
+     * Maximum coordinate value supported by map detector (signed 16-bit integer limit: 32,767).
+     */
+    export const MAX_MAP_COORDINATE = 32_767;
+
+    const _mapX = new Int16Array([
         427, -202, -164, -27, 715, -143, -274, -1044, -195, -672, -299, -103, 849, 94, -323, -1474, -99, -99, -39, -30,
         -120, 566, 293, -84,
     ]);
 
-    const _mapY = new Int32Array([
+    const _mapY = new Int16Array([
         177, 217, 76, 64, 201, 323, 138, 122, 231, 53, 191, 66, 78, 133, 52, 103, 88, 92, 124, 32, 728, 144, 70, 64,
     ]);
 
-    const _mapZ = new Int32Array([
+    const _mapZ = new Int16Array([
         -743, 20, -322, 4, -343, 7, 309, 220, -41, -115, -664, 13, 116, 77, -440, -690, -253, -124, -116, 0, 726, 356,
         134, -58,
     ]);
@@ -125,7 +135,7 @@ export namespace MapDetector {
     let _cachedMapIndex = -1;
 
     /**
-     * Sets the coordinates of interest for a map.
+     * Sets the coordinates of interest for a map. Coordinates are rounded to nearest integers and clamped to [-32,768, 32,767].
      * @param map - The map to set the coordinates of interest for.
      * @param coordinates - The coordinates of interest to set for the map.
      */
@@ -134,9 +144,9 @@ export namespace MapDetector {
 
         if (index === -1) return;
 
-        _mapX[index] = coordinates.x;
-        _mapY[index] = coordinates.y;
-        _mapZ[index] = coordinates.z;
+        _mapX[index] = Math.min(MAX_MAP_COORDINATE, Math.max(MIN_MAP_COORDINATE, Math.round(coordinates.x)));
+        _mapY[index] = Math.min(MAX_MAP_COORDINATE, Math.max(MIN_MAP_COORDINATE, Math.round(coordinates.y)));
+        _mapZ[index] = Math.min(MAX_MAP_COORDINATE, Math.max(MIN_MAP_COORDINATE, Math.round(coordinates.z)));
     }
 
     /**
