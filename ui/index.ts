@@ -710,6 +710,12 @@ export namespace UI {
         }
 
         protected static _getNativeWidget(id: number): mod.UIWidget | undefined {
+            if (id === 0 && !_nativeWidgets[0]) {
+                const root = mod.GetUIRoot();
+                _nativeWidgets[0] = root;
+                return root;
+            }
+
             return id >= 0 && id < MAX_WIDGETS ? (_nativeWidgets[id] ?? undefined) : undefined;
         }
 
@@ -874,7 +880,7 @@ export namespace UI {
         public set parent(parent: Parent) {
             if (this._isDeletedCheck()) return;
 
-            mod.SetUIWidgetParent(this._uiWidget, _nativeWidgets[parent.id]!);
+            mod.SetUIWidgetParent(this._uiWidget, Element._getNativeWidget(parent.id)!);
 
             const oldParentId = _parents[this._id];
 

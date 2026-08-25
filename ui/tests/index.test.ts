@@ -151,6 +151,31 @@ describe('UI Module & Components Lifecycle Tests', () => {
             containerB.delete();
         });
 
+        it('should correctly resolve native root widget when defaulting parent to UI.ROOT_NODE and reparenting', () => {
+            // Constructing with default parent (UI.ROOT_NODE)
+            const rootElement = new UIContainer({ x: 0, y: 0, width: 100, height: 100 });
+            expect(rootElement.parent).toBe(UI.ROOT_NODE);
+            expect(UI.ROOT_NODE.children).toContain(rootElement);
+
+            const nativeMock = mockWidgets.get(`ui_${rootElement.id}`);
+            expect(nativeMock).toBeDefined();
+            expect(nativeMock?.parent).toBeDefined();
+            expect(nativeMock?.parent?.name).toBe('ui_0');
+
+            // Reparent to a child container, then back to UI.ROOT_NODE
+            const childContainer = new UIContainer({ parent: rootElement, x: 0, y: 0, width: 50, height: 50 });
+            const subChild = new UIText({ parent: childContainer, message: mod.Message('test') });
+            expect(subChild.parent).toBe(childContainer);
+
+            // Reparent back to root
+            subChild.parent = UI.ROOT_NODE;
+            expect(subChild.parent).toBe(UI.ROOT_NODE);
+            expect(mockWidgets.get(`ui_${subChild.id}`)?.parent?.name).toBe('ui_0');
+
+            rootElement.delete();
+            subChild.delete();
+        });
+
         it('should correctly unlink middle, first, and last children in LCRS sibling chains', () => {
             const parent = new UIContainer({ x: 0, y: 0, width: 100, height: 100 });
 

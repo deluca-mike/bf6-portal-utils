@@ -103,6 +103,9 @@ const mockMod: Record<string, unknown> = {
         bgFill: number,
         depth: number
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -145,6 +148,9 @@ const mockMod: Record<string, unknown> = {
         focusedAlpha2: number,
         depth: number
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -190,6 +196,9 @@ const mockMod: Record<string, unknown> = {
         textAnchor: number,
         depth: number
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -229,6 +238,9 @@ const mockMod: Record<string, unknown> = {
         imageAlpha: number,
         depth: number
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -258,6 +270,9 @@ const mockMod: Record<string, unknown> = {
         _gadget: number,
         parent: MockWidget
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -285,6 +300,9 @@ const mockMod: Record<string, unknown> = {
         parent: MockWidget,
         _pkg: unknown
     ): MockWidget => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         const w: MockWidget = {
             _id: parseInt(name.replace('ui_', ''), 10) || 0,
             name,
@@ -308,6 +326,9 @@ const mockMod: Record<string, unknown> = {
         mockWidgets.delete(widget.name);
     },
     SetUIWidgetParent: (widget: MockWidget, parent: MockWidget) => {
+        if (!parent) {
+            throw new Error('Exception: JsUndefinedValue');
+        }
         widget.parent = parent;
     },
     SetUIWidgetVisible: (widget: MockWidget, visible: boolean) => {
