@@ -3,7 +3,7 @@ export declare namespace PlayerLocations {
     /** Callback invoked when a player enters or exits a spatial zone or crosses a boundary. */
     type PlayerZoneCallback = (playerId: number) => Promise<void> | void;
     /** Callback invoked when the identity of an extremum player changes. */
-    type PlayerExtremaCallback = (newPlayerId: number, prevPlayerId: number) => Promise<void> | void;
+    type PlayerExtremaCallback = (newPlayerId: number | null, prevPlayerId: number | null) => Promise<void> | void;
     /** Handle returned by sphere zone subscriptions to allow updating parameters or unsubscribing. */
     interface SphereHandle {
         /** Cancels the subscription and removes the zone listener. Safe to call multiple times. */
@@ -83,9 +83,9 @@ export declare namespace PlayerLocations {
      * Pass an `out` vector for zero-allocation reuse.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
      * @param out - Optional target Vector3 to write coordinates into.
-     * @returns The Vector3 position in meters, or null if the player is not active.
+     * @returns The Vector3 position in meters, null if the player is connected but unspawned/inactive, or undefined if not connected.
      */
-    function getPosition(player: number | mod.Player, out?: Vectors.Vector3): Vectors.Vector3 | null;
+    function getPosition(player: number | mod.Player, out?: Vectors.Vector3): Vectors.Vector3 | null | undefined;
     /**
      * Checks if a player slot is currently connected to the server.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -95,9 +95,9 @@ export declare namespace PlayerLocations {
     /**
      * Checks if a player is active (connected, spawned, and tracked with a valid 3D position).
      * @param player - The player slot ID (0-99) or engine mod.Player object.
-     * @returns True if the player is active and spawned, false otherwise.
+     * @returns True if active/spawned, false if connected but inactive, or undefined if the player is not connected.
      */
-    function isPlayerActive(player: number | mod.Player): boolean;
+    function isPlayerActive(player: number | mod.Player): boolean | undefined;
     /**
      * Returns the total count of currently connected players.
      * @returns The number of connected players.
@@ -125,32 +125,32 @@ export declare namespace PlayerLocations {
      * Avoids square root overhead.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The squared distance in meters squared, or Infinity if either player is not active.
+     * @returns The squared distance in meters squared, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    function getDistanceSq(playerA: number | mod.Player, playerB: number | mod.Player): number;
+    function getDistanceSq(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined;
     /**
      * Returns the 3D Euclidean distance in meters between two active players.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The distance in meters, or Infinity if either player is not active.
+     * @returns The distance in meters, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    function getDistance(playerA: number | mod.Player, playerB: number | mod.Player): number;
+    function getDistance(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined;
     /**
      * Returns the squared 2D horizontal distance in meters squared (m^2) on the XZ plane between two active players.
      * Avoids square root overhead and ignores vertical elevation differences.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The horizontal squared distance in meters squared, or Infinity if either player is not active.
+     * @returns The horizontal squared distance in meters squared, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    function getDistanceSqXZ(playerA: number | mod.Player, playerB: number | mod.Player): number;
+    function getDistanceSqXZ(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined;
     /**
      * Returns the 2D horizontal distance in meters on the XZ plane between two active players.
      * Ignores vertical elevation differences.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The horizontal distance in meters, or Infinity if either player is not active.
+     * @returns The horizontal distance in meters, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    function getDistanceXZ(playerA: number | mod.Player, playerB: number | mod.Player): number;
+    function getDistanceXZ(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined;
     /**
      * Fast 3D Volumetric Sphere Query using 3D Linked Voxel Grid.
      * Executes in O(cells) with ZERO Garbage Collection pressure and eliminates duplicate results.
@@ -304,18 +304,18 @@ export declare namespace PlayerLocations {
      * @param y - Target Y coordinate in world meters.
      * @param z - Target Z coordinate in world meters.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the closest player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the closest player, or null if no active player satisfies the condition.
      */
-    function getClosestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number;
+    function getClosestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number | null;
     /**
      * Finds the single farthest active player from a 3D target point.
      * @param x - Target X coordinate in world meters.
      * @param y - Target Y coordinate in world meters.
      * @param z - Target Z coordinate in world meters.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the farthest player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the farthest player, or null if no active player satisfies the condition.
      */
-    function getFarthestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number;
+    function getFarthestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number | null;
     /**
      * Returns the 'k' closest active players to a target 3D point, sorted closest-first.
      * Executes in O(N log k) time using a bounded Max-Heap with ZERO Garbage Collection pressure.
@@ -357,15 +357,15 @@ export declare namespace PlayerLocations {
     /**
      * Gets the highest altitude (Y axis) active player in near O(1) time using the Y-axis sorted array.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the highest active player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the highest active player, or null if no active player satisfies the condition.
      */
-    function getHighestPlayer(filterFn?: (id: number) => boolean): number;
+    function getHighestPlayer(filterFn?: (id: number) => boolean): number | null;
     /**
      * Gets the lowest altitude (Y axis) active player in near O(1) time using the Y-axis sorted array.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the lowest active player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the lowest active player, or null if no active player satisfies the condition.
      */
-    function getLowestPlayer(filterFn?: (id: number) => boolean): number;
+    function getLowestPlayer(filterFn?: (id: number) => boolean): number | null;
     /**
      * Returns the 'k' highest altitude active players, sorted from highest to lowest.
      * @param k - Number of highest players to return.
@@ -390,7 +390,7 @@ export declare namespace PlayerLocations {
      * @param radiusMeters - Cylinder radius in meters.
      * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
      * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
-     * @returns True if the player is active and inside the cylinder (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     function isPlayerInCylinder(
         player: number | mod.Player,
@@ -399,7 +399,7 @@ export declare namespace PlayerLocations {
         radiusMeters: number,
         minY?: number,
         maxY?: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Checks if an active player lies strictly outside a 2.5D vertical cylinder.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -408,7 +408,7 @@ export declare namespace PlayerLocations {
      * @param radiusMeters - Cylinder radius in meters.
      * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
      * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
-     * @returns True if the player is active and outside the cylinder, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     function isPlayerOutsideCylinder(
         player: number | mod.Player,
@@ -417,7 +417,7 @@ export declare namespace PlayerLocations {
         radiusMeters: number,
         minY?: number,
         maxY?: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Checks if an active player lies within a 3D sphere.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -425,7 +425,7 @@ export declare namespace PlayerLocations {
      * @param centerY - Sphere center Y coordinate in world meters.
      * @param centerZ - Sphere center Z coordinate in world meters.
      * @param radiusMeters - Sphere radius in meters.
-     * @returns True if the player is active and inside the sphere (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     function isPlayerInSphere(
         player: number | mod.Player,
@@ -433,7 +433,7 @@ export declare namespace PlayerLocations {
         centerY: number,
         centerZ: number,
         radiusMeters: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Checks if an active player lies strictly outside a 3D sphere.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -441,7 +441,7 @@ export declare namespace PlayerLocations {
      * @param centerY - Sphere center Y coordinate in world meters.
      * @param centerZ - Sphere center Z coordinate in world meters.
      * @param radiusMeters - Sphere radius in meters.
-     * @returns True if the player is active and strictly outside the sphere, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     function isPlayerOutsideSphere(
         player: number | mod.Player,
@@ -449,7 +449,7 @@ export declare namespace PlayerLocations {
         centerY: number,
         centerZ: number,
         radiusMeters: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Checks if an active player lies within a 3D Axis-Aligned Bounding Box (AABB).
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -459,7 +459,7 @@ export declare namespace PlayerLocations {
      * @param maxX - Maximum X coordinate in world meters.
      * @param maxY - Maximum Y coordinate in world meters.
      * @param maxZ - Maximum Z coordinate in world meters.
-     * @returns True if the player is active and inside the bounding box (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     function isPlayerInAABB(
         player: number | mod.Player,
@@ -469,7 +469,7 @@ export declare namespace PlayerLocations {
         maxX: number,
         maxY: number,
         maxZ: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Checks if an active player lies strictly outside a 3D Axis-Aligned Bounding Box (AABB).
      * @param player - The player slot ID (0-99) or engine mod.Player object.
@@ -479,7 +479,7 @@ export declare namespace PlayerLocations {
      * @param maxX - Maximum X coordinate in world meters.
      * @param maxY - Maximum Y coordinate in world meters.
      * @param maxZ - Maximum Z coordinate in world meters.
-     * @returns True if the player is active and strictly outside the bounding box, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     function isPlayerOutsideAABB(
         player: number | mod.Player,
@@ -489,7 +489,7 @@ export declare namespace PlayerLocations {
         maxX: number,
         maxY: number,
         maxZ: number
-    ): boolean;
+    ): boolean | undefined;
     /**
      * Subscribes to events when any player enters or exits a 3D sphere.
      * At least one callback (onEnter or onExit) must be provided.

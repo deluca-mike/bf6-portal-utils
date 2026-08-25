@@ -102,8 +102,8 @@ export namespace Sounds {
     export type PlayOneShotOptions = PlayOptions;
 
     type SFXState = {
-        stopTimerId?: Timers.TimerID;
-        fadeTimerId?: Timers.TimerID;
+        stopTimerId?: Timers.TimerID | null;
+        fadeTimerId?: Timers.TimerID | null;
     };
 
     const _states = new Map<number, SFXState>();
@@ -159,12 +159,14 @@ export namespace Sounds {
     function _cancelStop(sfxId: number): void {
         const state = _states.get(sfxId);
 
-        if (state?.stopTimerId === undefined) return;
+        if (!state) return;
 
-        Timers.clearTimeout(state.stopTimerId);
+        if (state.stopTimerId != null) {
+            Timers.clearTimeout(state.stopTimerId);
+        }
         state.stopTimerId = undefined;
 
-        if (state.fadeTimerId === undefined) {
+        if (!state.fadeTimerId) {
             _states.delete(sfxId);
         }
     }
@@ -172,12 +174,14 @@ export namespace Sounds {
     function _cancelFade(sfxId: number): void {
         const state = _states.get(sfxId);
 
-        if (state?.fadeTimerId === undefined) return;
+        if (!state) return;
 
-        Timers.clearInterval(state.fadeTimerId);
+        if (state.fadeTimerId != null) {
+            Timers.clearInterval(state.fadeTimerId);
+        }
         state.fadeTimerId = undefined;
 
-        if (state.stopTimerId === undefined) {
+        if (!state.stopTimerId) {
             _states.delete(sfxId);
         }
     }
@@ -187,12 +191,12 @@ export namespace Sounds {
 
         if (!state) return;
 
-        if (state.stopTimerId !== undefined) {
+        if (state.stopTimerId != null) {
             Timers.clearTimeout(state.stopTimerId);
             state.stopTimerId = undefined;
         }
 
-        if (state.fadeTimerId !== undefined) {
+        if (state.fadeTimerId != null) {
             Timers.clearInterval(state.fadeTimerId);
             state.fadeTimerId = undefined;
         }

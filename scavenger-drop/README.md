@@ -94,7 +94,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | Method | Description |
 | --- | --- |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the ScavengerDrop module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. |
-| `create(body: mod.Player, onScavenge: (player: mod.Player) => Promise<void> \| void, options?: ScavengerDrop.Options): DropID` | Creates a new scavenger drop. Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid. Returns a generational `DropID`, or `INVALID_DROP_ID` if the pre-allocated drop pool is full. |
+| `create(body: mod.Player, onScavenge: (player: mod.Player) => Promise<void> \| void, options?: ScavengerDrop.Options): DropID \| null` | Creates a new scavenger drop. Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid. Returns a generational `DropID`, or `null` if the pre-allocated drop pool is full. |
 | `stop(id: DropID): void` | Manually stops an active scavenger drop by its ID, preventing the callback from being triggered. |
 | `stopAll(): void` | Stops and cleans up all currently active scavenger drops. |
 | `isActive(id: DropID): boolean` | Checks whether the given drop ID is currently active. |
@@ -104,7 +104,6 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Constant | Type | Value | Description |
 | --- | --- | --- | --- |
-| `INVALID_DROP_ID` | `DropID` | `-1` | Sentinel value representing an invalid or uninitialized Drop ID. |
 | `MAX_CHECK_INTERVAL_MS` | `number` | `65_535` | Maximum check interval in milliseconds (unsigned 16-bit limit). |
 | `MAX_DURATION_MS` | `number` | `2_147_483_647` | Maximum drop duration in milliseconds (signed 32-bit positive limit). |
 
@@ -179,7 +178,7 @@ The `ScavengerDrop` module implements scavenger detection using Battlefield Port
     - `_expirationTimes` (`Uint32Array`) – Expiration timestamps based on server uptime (with `0` indicating an inactive slot).
     - `_checkIntervalMs` (`Uint16Array`) – Configured check interval.
     - `_nextCheckTimes` (`Int32Array`) – Next scheduled proximity check timestamp, or link in the intrusive free list (`_firstFree`).
-    - `_positions` & `_callbacks` – Fixed-size object references. If the pool is full when `create()` is called, it logs an error and returns `INVALID_DROP_ID` without throwing an exception.
+    - `_positions` & `_callbacks` – Fixed-size object references. If the pool is full when `create()` is called, it logs an error and returns `null` without throwing an exception.
 
 2. **Centralized Engine Loop** – Instead of creating individual interval and timeout timers per drop, all active drops are evaluated in a single global tick handler (`Events.OngoingGlobal`). When no drops are active (`_activeDropCount === 0`), the handler returns immediately in a single comparison.
 
@@ -203,7 +202,7 @@ The `ScavengerDrop` module implements scavenger detection using Battlefield Port
 
 ## Known Limitations & Caveats
 
-- **Pool Capacity** – The drop pool is pre-allocated to 128 concurrent slots (`MAX_DROPS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `INVALID_DROP_ID` without throwing an exception.
+- **Pool Capacity** – The drop pool is pre-allocated to 128 concurrent slots (`MAX_DROPS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `null` without throwing an exception.
 - **Position Capture** – The drop captures the position of the dead player's body at creation time. If the body moves (e.g., due to physics or explosions), the drop will continue checking the original position. Always create the drop immediately in `OnPlayerDied` to ensure the position is accurate.
 - **Single Trigger** – Each drop triggers its callback only once—when the first player gets within 2 meters. If multiple players are close when the check occurs, only the closest player triggers the callback.
 - **Distance Precision** – The 2-meter threshold is fixed and matches typical interaction ranges in Battlefield Portal.

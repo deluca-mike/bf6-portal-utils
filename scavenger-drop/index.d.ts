@@ -35,10 +35,6 @@ export declare namespace ScavengerDrop {
         readonly __brand: 'DropID';
     };
     /**
-     * Sentinel value representing an invalid or uninitialized Drop ID.
-     */
-    const INVALID_DROP_ID: DropID;
-    /**
      * Maximum check interval in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
      */
     const MAX_CHECK_INTERVAL_MS = 65535;
@@ -52,13 +48,13 @@ export declare namespace ScavengerDrop {
      * @param body - The body of the player that the scavenger drop is on.
      * @param onScavenge - The callback to invoke when a scavenger is found.
      * @param options - The options for the scavenger drop.
-     * @returns A generational drop ID, or INVALID_DROP_ID if the pre-allocated drop pool is full.
+     * @returns A generational drop ID, or null if the pre-allocated drop pool is full.
      */
     function create(
         body: mod.Player,
         onScavenge: (player: mod.Player) => Promise<void> | void,
         options?: Options
-    ): DropID;
+    ): DropID | null;
     /**
      * Stops/cancels an active scavenger drop by ID.
      * @param id - The drop ID returned by `create`.

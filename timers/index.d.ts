@@ -22,10 +22,6 @@ export declare namespace Timers {
         readonly __brand: 'TimerID';
     };
     /**
-     * Sentinel value representing an invalid or uninitialized Timer ID.
-     */
-    const INVALID_TIMER_ID: TimerID;
-    /**
      * Maximum timer delay or interval in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
      */
     const MAX_TIMER_DELAY_MS = 2147483647;
@@ -33,17 +29,17 @@ export declare namespace Timers {
      * Schedules a one-time execution after the specified delay.
      * @param callback - The callback to execute.
      * @param ms - The delay in milliseconds (clamped between 0 and 2,147,483,647 ms).
-     * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
+     * @returns The timer ID, or null if the pool is full.
      */
-    function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID;
+    function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID | null;
     /**
      * Schedules a repeated execution after the specified interval.
      * @param callback - The callback to execute.
      * @param ms - The interval in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @param immediate - If true, runs the callback immediately.
-     * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
+     * @returns The timer ID, or null if the pool is full.
      */
-    function setInterval(callback: () => Promise<void> | void, ms: number, immediate?: boolean): TimerID;
+    function setInterval(callback: () => Promise<void> | void, ms: number, immediate?: boolean): TimerID | null;
     /**
      * Cancels a timeout (or interval). Silently ignores invalid IDs.
      * @param id - The timer ID to cancel.

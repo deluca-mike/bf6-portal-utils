@@ -90,9 +90,6 @@ export namespace SpatialSOA {
      */
     export type SpatialNodeID = number & { readonly __brand: 'SpatialNodeID' };
 
-    /** Sentinel constant representing an invalid or non-existent node ID. */
-    export const INVALID_NODE_ID: SpatialNodeID = -1 as SpatialNodeID;
-
     // Module-Level Configuration
     const MAX_NODES = 1024;
     const MAX_GENERATIONS = 65_535;
@@ -752,10 +749,10 @@ export namespace SpatialSOA {
         options?: NodeOptions,
         isRuntimeSpawned: boolean = false,
         object?: TransformableObject
-    ): SpatialNodeID {
+    ): SpatialNodeID | null {
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_NODE_ID;
+        if (index === INVALID_INDEX) return null;
 
         _objects[index] = object;
         _parent[index] = INVALID_INDEX;
@@ -937,8 +934,9 @@ export namespace SpatialSOA {
         const nodeId = _encodeId(index);
 
         if (typeof target === 'number') {
-            if (isValid(target)) {
-                const targetPos = getWorldPosition(target, _lookAtTargetPos);
+            const targetPos = getWorldPosition(target, _lookAtTargetPos);
+
+            if (targetPos) {
                 lookAt(nodeId, targetPos, options.upAxis);
             }
         } else if ('x' in target && 'y' in target && 'z' in target) {
@@ -957,9 +955,7 @@ export namespace SpatialSOA {
         let targetPos: Vector3 | undefined;
 
         if (typeof target === 'number') {
-            if (isValid(target)) {
-                targetPos = getWorldPosition(target, _followTargetWithOffset);
-            }
+            targetPos = getWorldPosition(target, _followTargetWithOffset);
         } else if (mod.IsValid(target)) {
             targetPos = Vectors.toVector3(mod.GetObjectPosition(target), _followPlayerPos);
         }
@@ -1036,16 +1032,16 @@ export namespace SpatialSOA {
     /**
      * Creates an empty SpatialNode (virtual parent anchor or child node).
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if parentId is invalid or pool is full.
+     * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
-    export function createEmpty(options?: NodeOptions): SpatialNodeID {
+    export function createEmpty(options?: NodeOptions): SpatialNodeID | null {
         if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
-            return INVALID_NODE_ID;
+            return null;
         }
 
         const id = _initSlot(options, false);
 
-        if (id === INVALID_NODE_ID) return INVALID_NODE_ID;
+        if (id === null) return null;
 
         const index = id % GENERATION_MULTIPLIER;
 
@@ -1062,16 +1058,16 @@ export namespace SpatialSOA {
      * Spawns a runtime prefab as a new SpatialNode (root or child).
      * @param prefab - The runtime spawn prefab enum.
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if spawning failed, parentId is invalid, or pool is full.
+     * @returns The created node ID, or null if spawning failed, parentId is invalid, or pool is full.
      */
-    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID {
+    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID | null {
         if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
-            return INVALID_NODE_ID;
+            return null;
         }
 
         const id = _initSlot(options, true);
 
-        if (id === INVALID_NODE_ID) return INVALID_NODE_ID;
+        if (id === null) return null;
 
         const index = id % GENERATION_MULTIPLIER;
 
@@ -1095,7 +1091,7 @@ export namespace SpatialSOA {
             if (!mod.IsValid(spawned)) {
                 logging.log('Failed to spawn runtime object prefab', LogLevel.Warning);
                 destroy(id);
-                return INVALID_NODE_ID;
+                return null;
             }
 
             _objects[index] = spawned as TransformableObject;
@@ -1103,7 +1099,7 @@ export namespace SpatialSOA {
         } catch (error: unknown) {
             logging.log('Error spawning runtime object', LogLevel.Error, error);
             destroy(id);
-            return INVALID_NODE_ID;
+            return null;
         }
     }
 
@@ -1111,16 +1107,16 @@ export namespace SpatialSOA {
      * Wraps an existing in-game object as a SpatialNode (root or child).
      * @param object - The existing native transformable object.
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if parentId is invalid or pool is full.
+     * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
-    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID {
+    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID | null {
         if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
-            return INVALID_NODE_ID;
+            return null;
         }
 
         const id = _initSlot(options, false, object);
 
-        if (id === INVALID_NODE_ID) return INVALID_NODE_ID;
+        if (id === null) return null;
 
         const index = id % GENERATION_MULTIPLIER;
 
@@ -1311,27 +1307,27 @@ export namespace SpatialSOA {
     /**
      * Returns the parent node ID of a node.
      * @param id - The node ID.
-     * @returns The parent node ID, or INVALID_NODE_ID if root or invalid.
+     * @returns The parent node ID, null if root node, or undefined if the node does not exist.
      */
-    export function getParent(id: SpatialNodeID): SpatialNodeID {
+    export function getParent(id: SpatialNodeID): SpatialNodeID | null | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return INVALID_NODE_ID;
+        if (idx === INVALID_INDEX) return undefined;
 
         const pIdx = _parent[idx];
 
-        return pIdx !== INVALID_INDEX ? _encodeId(pIdx) : INVALID_NODE_ID;
+        return pIdx !== INVALID_INDEX ? _encodeId(pIdx) : null;
     }
 
     /**
      * Returns the total direct child count for a node.
      * @param id - The node ID.
-     * @returns The number of direct children.
+     * @returns The number of direct children, or undefined if the node does not exist.
      */
-    export function getChildCount(id: SpatialNodeID): number {
+    export function getChildCount(id: SpatialNodeID): number | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return 0;
+        if (idx === INVALID_INDEX) return undefined;
 
         let count = 0;
 
@@ -1345,12 +1341,12 @@ export namespace SpatialSOA {
     /**
      * Returns an array of direct child node IDs.
      * @param id - The node ID.
-     * @returns Array of child node IDs.
+     * @returns Array of child node IDs, or undefined if the node does not exist.
      */
-    export function getChildren(id: SpatialNodeID): SpatialNodeID[] {
+    export function getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return [];
+        if (idx === INVALID_INDEX) return undefined;
 
         const list: SpatialNodeID[] = [];
 
@@ -1365,12 +1361,14 @@ export namespace SpatialSOA {
      * Retrieves a child node ID at a specific zero-based index.
      * @param id - The node ID.
      * @param index - The child index.
-     * @returns The child node ID, or INVALID_NODE_ID if out of bounds.
+     * @returns The child node ID, null if out of bounds, or undefined if the node does not exist.
      */
-    export function getChild(id: SpatialNodeID, index: number): SpatialNodeID {
+    export function getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX || index < 0) return INVALID_NODE_ID;
+        if (idx === INVALID_INDEX) return undefined;
+
+        if (index < 0) return null;
 
         let currentIndex = 0;
 
@@ -1380,7 +1378,7 @@ export namespace SpatialSOA {
             ++currentIndex;
         }
 
-        return INVALID_NODE_ID;
+        return null;
     }
 
     /**
@@ -1416,15 +1414,14 @@ export namespace SpatialSOA {
      * Gets the local position of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local position vector.
+     * @returns The local position vector, or undefined if the node does not exist.
      */
-    export function getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
-        return _cloneVectorFromArray(target, _localPos, idx);
+        return _cloneVectorFromArray(out ?? { x: 0, y: 0, z: 0 }, _localPos, idx);
     }
 
     /**
@@ -1445,15 +1442,14 @@ export namespace SpatialSOA {
      * Gets the local rotation Quaternion of a node.
      * @param id - The node ID.
      * @param out - Optional target Quaternion for zero allocations.
-     * @returns The local rotation quaternion.
+     * @returns The local rotation quaternion, or undefined if the node does not exist.
      */
-    export function getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion {
+    export function getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { w: 1, x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
-        return _cloneQuaternionFromArray(target, _localRot, idx);
+        return _cloneQuaternionFromArray(out ?? { w: 1, x: 0, y: 0, z: 0 }, _localRot, idx);
     }
 
     /**
@@ -1474,15 +1470,17 @@ export namespace SpatialSOA {
      * Gets the local rotation as Euler angles in radians (ZYX order).
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local Euler angles vector in radians.
+     * @returns The local Euler angles vector in radians, or undefined if the node does not exist.
      */
-    export function getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
-        return Quaternions.toEuler(_cloneQuaternionFromArray(_worldSetEulerRot, _localRot, idx), target);
+        return Quaternions.toEuler(
+            _cloneQuaternionFromArray(_worldSetEulerRot, _localRot, idx),
+            out ?? { x: 0, y: 0, z: 0 }
+        );
     }
 
     /**
@@ -1507,15 +1505,14 @@ export namespace SpatialSOA {
      * Gets the local scale of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local scale vector.
+     * @returns The local scale vector, or undefined if the node does not exist.
      */
-    export function getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 1, y: 1, z: 1 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
-        return _cloneVectorFromArray(target, _localScale, idx);
+        return _cloneVectorFromArray(out ?? { x: 1, y: 1, z: 1 }, _localScale, idx);
     }
 
     /**
@@ -1545,17 +1542,16 @@ export namespace SpatialSOA {
      * Gets the evaluated world position of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world position vector.
+     * @returns The world position vector, or undefined if the node does not exist.
      */
-    export function getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
         _ensureWorldTransformUpdated(idx);
 
-        return _cloneVectorFromArray(target, _worldPos, idx);
+        return _cloneVectorFromArray(out ?? { x: 0, y: 0, z: 0 }, _worldPos, idx);
     }
 
     /**
@@ -1583,17 +1579,16 @@ export namespace SpatialSOA {
      * Gets the evaluated world rotation Quaternion of a node.
      * @param id - The node ID.
      * @param out - Optional target Quaternion for zero allocations.
-     * @returns The world rotation quaternion.
+     * @returns The world rotation quaternion, or undefined if the node does not exist.
      */
-    export function getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion {
+    export function getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { w: 1, x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
         _ensureWorldTransformUpdated(idx);
 
-        return _cloneQuaternionFromArray(target, _worldRot, idx);
+        return _cloneQuaternionFromArray(out ?? { w: 1, x: 0, y: 0, z: 0 }, _worldRot, idx);
     }
 
     /**
@@ -1624,17 +1619,19 @@ export namespace SpatialSOA {
      * Gets the evaluated world rotation as Euler angles in radians (ZYX order).
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world Euler angles vector in radians.
+     * @returns The world Euler angles vector in radians, or undefined if the node does not exist.
      */
-    export function getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 0, y: 0, z: 0 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
         _ensureWorldTransformUpdated(idx);
 
-        return Quaternions.toEuler(_cloneQuaternionFromArray(_worldSetEulerRot, _worldRot, idx), target);
+        return Quaternions.toEuler(
+            _cloneQuaternionFromArray(_worldSetEulerRot, _worldRot, idx),
+            out ?? { x: 0, y: 0, z: 0 }
+        );
     }
 
     /**
@@ -1651,29 +1648,30 @@ export namespace SpatialSOA {
      * Gets the evaluated world scale of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world scale vector.
+     * @returns The world scale vector, or undefined if the node does not exist.
      */
-    export function getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3 {
+    export function getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
-        const target = out ?? { x: 1, y: 1, z: 1 };
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
         _ensureWorldTransformUpdated(idx);
 
-        return _cloneVectorFromArray(target, _worldScale, idx);
+        return _cloneVectorFromArray(out ?? { x: 1, y: 1, z: 1 }, _worldScale, idx);
     }
 
     /**
      * Gets the model pivot offset for a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3.
-     * @returns The pivot offset vector or undefined if none.
+     * @returns The pivot offset vector, null if unset, or undefined if the node does not exist.
      */
-    export function getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
+    export function getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | null | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX || !_hasPivot(idx)) return undefined;
+        if (idx === INVALID_INDEX) return undefined;
+
+        if (!_hasPivot(idx)) return null;
 
         return _cloneVectorFromArray(out ?? { x: 0, y: 0, z: 0 }, _pivotOffset, idx);
     }
@@ -1681,9 +1679,9 @@ export namespace SpatialSOA {
     /**
      * Sets the in-game model pivot offset correction on a node.
      * @param id - The node ID.
-     * @param offset - The pivot offset vector or undefined to clear.
+     * @param offset - The pivot offset vector or undefined/null to clear.
      */
-    export function setPivotOffset(id: SpatialNodeID, offset?: Vector3): void {
+    export function setPivotOffset(id: SpatialNodeID, offset?: Vector3 | null): void {
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return;
@@ -1718,16 +1716,16 @@ export namespace SpatialSOA {
      * Computes the visual placement position of the native model accounting for pivot offset.
      * @param id - The node ID.
      * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-     * @returns The render position vector, or zero vector if invalid node ID.
+     * @returns The render position vector, or undefined if the node does not exist.
      */
-    export function computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3 {
-        const target = out ?? { x: 0, y: 0, z: 0 };
+    export function computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return target;
+        if (idx === INVALID_INDEX) return undefined;
 
         _ensureWorldTransformUpdated(idx);
-        return _computeRenderPosition(idx, target);
+
+        return _computeRenderPosition(idx, out ?? { x: 0, y: 0, z: 0 });
     }
 
     /**
@@ -1740,7 +1738,7 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
-        getLocalRotation(id, _translateRot);
+        _cloneQuaternionFromArray(_translateRot, _localRot, idx);
         Quaternions.rotateVector(delta, _translateRot, _translateRotatedDelta);
         _addVectorIntoArray(_localPos, idx, _translateRotatedDelta, _localPos, idx);
         _markDirty(idx);
@@ -1766,11 +1764,14 @@ export namespace SpatialSOA {
      * @param deltaRot - The delta quaternion.
      */
     export function rotateLocal(id: SpatialNodeID, deltaRot: Quaternion): void {
-        if (_resolveIndex(id) === INVALID_INDEX) return;
+        const idx = _resolveIndex(id);
 
-        getLocalRotation(id, _rotateLocalRot);
+        if (idx === INVALID_INDEX) return;
+
+        _cloneQuaternionFromArray(_rotateLocalRot, _localRot, idx);
         Quaternions.multiply(_rotateLocalRot, deltaRot, _rotateLocalRot);
-        setLocalRotation(id, _rotateLocalRot);
+        _copyQuaternionIntoArray(_localRot, idx, _rotateLocalRot);
+        _markDirty(idx);
     }
 
     /**
@@ -1781,21 +1782,24 @@ export namespace SpatialSOA {
      * @param pivotCenter - Optional center point in parent space.
      */
     export function rotateAroundAxis(id: SpatialNodeID, axis: Vector3, angleRad: number, pivotCenter?: Vector3): void {
-        if (_resolveIndex(id) === INVALID_INDEX) return;
+        const idx = _resolveIndex(id);
+
+        if (idx === INVALID_INDEX) return;
 
         Quaternions.setFromAxisAngle(_rotateAroundAxisRot, axis, angleRad);
 
         if (pivotCenter) {
-            const localPos = getLocalPosition(id, _rotateAroundDisplacedPos);
+            const localPos = _cloneVectorFromArray(_rotateAroundDisplacedPos, _localPos, idx);
             Vectors.subtract(localPos, pivotCenter, _rotateAroundDisplacedPos);
             Quaternions.rotateVector(_rotateAroundDisplacedPos, _rotateAroundAxisRot, _rotateAroundRotatedPos);
             Vectors.add(pivotCenter, _rotateAroundRotatedPos, localPos);
-            setLocalPosition(id, localPos);
+            _copyVectorIntoArray(_localPos, idx, localPos);
         }
 
-        getLocalRotation(id, _rotateLocalRot);
+        _cloneQuaternionFromArray(_rotateLocalRot, _localRot, idx);
         Quaternions.multiply(_rotateAroundAxisRot, _rotateLocalRot, _rotateLocalRot);
-        setLocalRotation(id, _rotateLocalRot);
+        _copyQuaternionIntoArray(_localRot, idx, _rotateLocalRot);
+        _markDirty(idx);
     }
 
     /**
@@ -1805,9 +1809,13 @@ export namespace SpatialSOA {
      * @param upAxis - The world up reference vector (default: 0, 1, 0).
      */
     export function lookAt(id: SpatialNodeID, targetWorld: Vector3, upAxis?: Vector3): void {
-        if (_resolveIndex(id) === INVALID_INDEX) return;
+        const idx = _resolveIndex(id);
 
-        const worldPos = getWorldPosition(id, _lookAtDeltaPos);
+        if (idx === INVALID_INDEX) return;
+
+        _ensureWorldTransformUpdated(idx);
+
+        const worldPos = _cloneVectorFromArray(_lookAtDeltaPos, _worldPos, idx);
         Vectors.subtract(targetWorld, worldPos, _lookAtDeltaPos);
         Quaternions.setFromLookRotation(_lookAtRot, _lookAtDeltaPos, upAxis ?? _UP_AXIS);
         setWorldRotation(id, _lookAtRot);
@@ -1818,16 +1826,19 @@ export namespace SpatialSOA {
      * @param id - The node ID.
      * @param localPoint - Point in local coordinate space.
      * @param out - Optional target Vector3.
-     * @returns The transformed world space point.
+     * @returns The transformed world space point, or undefined if the node does not exist.
      */
-    export function localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3 {
+    export function localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3 | undefined {
+        const idx = _resolveIndex(id);
+
+        if (idx === INVALID_INDEX) return undefined;
+
+        _ensureWorldTransformUpdated(idx);
+
         const target = out ?? { x: 0, y: 0, z: 0 };
-
-        if (_resolveIndex(id) === INVALID_INDEX) return target;
-
-        const wScale = getWorldScale(id, _projLocalScaled);
-        const wRot = getWorldRotation(id, _projRot);
-        const wPos = getWorldPosition(id, _projWorldPos);
+        const wScale = _cloneVectorFromArray(_projLocalScaled, _worldScale, idx);
+        const wRot = _cloneQuaternionFromArray(_projRot, _worldRot, idx);
+        const wPos = _cloneVectorFromArray(_projWorldPos, _worldPos, idx);
 
         Vectors.hadamardMultiply(localPoint, wScale, _projLocalScaled);
         Quaternions.rotateVector(_projLocalScaled, wRot, target);
@@ -1840,16 +1851,19 @@ export namespace SpatialSOA {
      * @param id - The node ID.
      * @param worldPoint - Point in world coordinates.
      * @param out - Optional target Vector3.
-     * @returns The transformed local space point.
+     * @returns The transformed local space point, or undefined if the node does not exist.
      */
-    export function worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3 {
+    export function worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3 | undefined {
+        const idx = _resolveIndex(id);
+
+        if (idx === INVALID_INDEX) return undefined;
+
+        _ensureWorldTransformUpdated(idx);
+
         const target = out ?? { x: 0, y: 0, z: 0 };
-
-        if (_resolveIndex(id) === INVALID_INDEX) return target;
-
-        const wPos = getWorldPosition(id, _projWorldDelta);
-        const wRot = getWorldRotation(id, _projInvRot);
-        const ws = getWorldScale(id, _projLocalScaled);
+        const wPos = _cloneVectorFromArray(_projWorldDelta, _worldPos, idx);
+        const wRot = _cloneQuaternionFromArray(_projInvRot, _worldRot, idx);
+        const ws = _cloneVectorFromArray(_projLocalScaled, _worldScale, idx);
 
         Vectors.subtract(worldPoint, wPos, _projWorldDelta);
         Quaternions.conjugate(wRot, _projInvRot);
@@ -1867,14 +1881,18 @@ export namespace SpatialSOA {
      * @param id - The node ID.
      * @param localVec - Local direction vector.
      * @param out - Optional target Vector3.
-     * @returns The transformed world direction vector.
+     * @returns The transformed world direction vector, or undefined if the node does not exist.
      */
-    export function localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3 {
-        if (_resolveIndex(id) === INVALID_INDEX) return out ?? { x: 0, y: 0, z: 0 };
+    export function localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3 | undefined {
+        const idx = _resolveIndex(id);
 
-        const wRot = getWorldRotation(id, _projRot);
+        if (idx === INVALID_INDEX) return undefined;
 
-        return Quaternions.rotateVector(localVec, wRot, out);
+        _ensureWorldTransformUpdated(idx);
+
+        const wRot = _cloneQuaternionFromArray(_projRot, _worldRot, idx);
+
+        return Quaternions.rotateVector(localVec, wRot, out ?? { x: 0, y: 0, z: 0 });
     }
 
     /**
@@ -1882,15 +1900,19 @@ export namespace SpatialSOA {
      * @param id - The node ID.
      * @param worldVec - World direction vector.
      * @param out - Optional target Vector3.
-     * @returns The transformed local direction vector.
+     * @returns The transformed local direction vector, or undefined if the node does not exist.
      */
-    export function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 {
-        if (_resolveIndex(id) === INVALID_INDEX) return out ?? { x: 0, y: 0, z: 0 };
+    export function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined {
+        const idx = _resolveIndex(id);
 
-        const wRot = getWorldRotation(id, _projInvRot);
+        if (idx === INVALID_INDEX) return undefined;
+
+        _ensureWorldTransformUpdated(idx);
+
+        const wRot = _cloneQuaternionFromArray(_projInvRot, _worldRot, idx);
         Quaternions.conjugate(wRot, _projInvRot);
 
-        return Quaternions.rotateVector(worldVec, _projInvRot, out);
+        return Quaternions.rotateVector(worldVec, _projInvRot, out ?? { x: 0, y: 0, z: 0 });
     }
 
     // -------------------------------------------------------------------------
@@ -2166,10 +2188,10 @@ export namespace SpatialSOA {
             existing.selfSpinSpeedRadPerSec = options.selfSpinSpeedRadPerSec;
             existing.currentAngleRad = 0;
 
-            const localPos = getLocalPosition(id, _orbitRotatedOffset);
+            const localPos = _cloneVectorFromArray(_orbitRotatedOffset, _localPos, idx);
             Vectors.subtract(localPos, options.center ?? Vectors.ZERO, existing.initialOffset);
         } else {
-            const localPos = getLocalPosition(id, _orbitRotatedOffset);
+            const localPos = _cloneVectorFromArray(_orbitRotatedOffset, _localPos, idx);
 
             _controllers[idx].orbit = {
                 ...options,

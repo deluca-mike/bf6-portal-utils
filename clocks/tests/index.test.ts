@@ -19,14 +19,21 @@ describe('Clocks Module Tests', () => {
         it('should create and destroy count-up and countdown clocks and track active count', () => {
             expect(Clocks.getActiveClockCount()).toBe(0);
 
-            const c1 = Clocks.createCountUp();
-            const c2 = Clocks.createCountDown(60);
+            const c1 = Clocks.createCountUp()!;
+            const c2 = Clocks.createCountDown(60)!;
 
             expect(Clocks.getActiveClockCount()).toBe(2);
             expect(Clocks.isActive(c1)).toBe(true);
             expect(Clocks.isActive(c2)).toBe(true);
-            expect(Clocks.isActive(Clocks.INVALID_CLOCK_ID)).toBe(false);
+            expect(Clocks.isActive(-1 as Clocks.ClockID)).toBe(false);
             expect(Clocks.isActive(99999 as Clocks.ClockID)).toBe(false);
+
+            // Test undefined returns for non-existent clocks
+            expect(Clocks.getSeconds(-1 as Clocks.ClockID)).toBeUndefined();
+            expect(Clocks.getDuration(-1 as Clocks.ClockID)).toBeUndefined();
+            expect(Clocks.isRunning(-1 as Clocks.ClockID)).toBeUndefined();
+            expect(Clocks.isPaused(-1 as Clocks.ClockID)).toBeUndefined();
+            expect(Clocks.isComplete(-1 as Clocks.ClockID)).toBeUndefined();
 
             Clocks.destroy(c1);
             expect(Clocks.isActive(c1)).toBe(false);
@@ -38,13 +45,13 @@ describe('Clocks Module Tests', () => {
         });
 
         it('should recycle slot indices with incremented generations', () => {
-            const id1 = Clocks.createCountUp();
+            const id1 = Clocks.createCountUp()!;
             const slot1 = (id1 as number) % 10_000;
 
             Clocks.destroy(id1);
 
             // Re-allocate from the free list - should reuse slot1 with next generation
-            const id2 = Clocks.createCountUp();
+            const id2 = Clocks.createCountUp()!;
             const slot2 = (id2 as number) % 10_000;
 
             expect(slot2).toBe(slot1);
@@ -55,16 +62,16 @@ describe('Clocks Module Tests', () => {
             Clocks.destroy(id2);
         });
 
-        it('should return INVALID_CLOCK_ID when clock pool is full and recover when freed', () => {
+        it('should return null when clock pool is full and recover when freed', () => {
             const createdIds: Clocks.ClockID[] = [];
 
             for (let i = 0; i < 256; ++i) {
-                createdIds.push(Clocks.createCountUp());
+                createdIds.push(Clocks.createCountUp()!);
             }
 
             expect(Clocks.getActiveClockCount()).toBe(256);
 
-            expect(Clocks.createCountUp()).toBe(Clocks.INVALID_CLOCK_ID);
+            expect(Clocks.createCountUp()).toBeNull();
 
             // Destroy one clock and verify allocation succeeds again
             const freedId = createdIds.pop()!;
@@ -72,7 +79,7 @@ describe('Clocks Module Tests', () => {
 
             expect(Clocks.getActiveClockCount()).toBe(255);
 
-            const newId = Clocks.createCountDown(10);
+            const newId = Clocks.createCountDown(10)!;
             expect(Clocks.isActive(newId)).toBe(true);
             createdIds.push(newId);
 
@@ -94,7 +101,7 @@ describe('Clocks Module Tests', () => {
                 onSecond,
                 onMinute,
                 onComplete,
-            });
+            })!;
 
             Clocks.start(clockId);
             expect(Clocks.isRunning(clockId)).toBe(true);
@@ -144,7 +151,7 @@ describe('Clocks Module Tests', () => {
                 onSecond,
                 onMinute,
                 onComplete,
-            });
+            })!;
 
             Clocks.start(clockId);
             await Promise.resolve();
@@ -176,7 +183,7 @@ describe('Clocks Module Tests', () => {
 
     describe('Pause, Resume, and Time Adjustments', () => {
         it('should pause and resume without losing elapsed time', async () => {
-            const clockId = Clocks.createCountUp();
+            const clockId = Clocks.createCountUp()!;
             Clocks.start(clockId);
             await Promise.resolve();
 
@@ -210,7 +217,7 @@ describe('Clocks Module Tests', () => {
         });
 
         it('should add and subtract seconds', async () => {
-            const clockId = Clocks.createCountUp();
+            const clockId = Clocks.createCountUp()!;
             Clocks.start(clockId);
             await Promise.resolve();
 

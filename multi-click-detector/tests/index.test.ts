@@ -60,13 +60,13 @@ describe('MultiClickDetector Module Tests', () => {
             const p1 = createPlayer(1);
             const p2 = createPlayer(2);
 
-            const d1 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {});
-            const d2 = MultiClickDetector.create(p2 as unknown as mod.Player, () => {});
+            const d1 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {})!;
+            const d2 = MultiClickDetector.create(p2 as unknown as mod.Player, () => {})!;
 
             expect(MultiClickDetector.getActiveDetectorCount()).toBe(2);
             expect(MultiClickDetector.isActive(d1)).toBe(true);
             expect(MultiClickDetector.isActive(d2)).toBe(true);
-            expect(MultiClickDetector.isActive(MultiClickDetector.INVALID_DETECTOR_ID)).toBe(false);
+            expect(MultiClickDetector.isActive(-1 as MultiClickDetector.DetectorID)).toBe(false);
             expect(MultiClickDetector.isActive(99999 as MultiClickDetector.DetectorID)).toBe(false);
 
             MultiClickDetector.destroy(d1);
@@ -80,13 +80,13 @@ describe('MultiClickDetector Module Tests', () => {
 
         it('should recycle slot indices with incremented generations', () => {
             const p1 = createPlayer(1);
-            const id1 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {});
+            const id1 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {})!;
             const slot1 = (id1 as number) % 10_000;
 
             MultiClickDetector.destroy(id1);
 
             // Re-allocate from free list - should reuse slot1 with next generation
-            const id2 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {});
+            const id2 = MultiClickDetector.create(p1 as unknown as mod.Player, () => {})!;
             const slot2 = (id2 as number) % 10_000;
 
             expect(slot2).toBe(slot1);
@@ -97,18 +97,16 @@ describe('MultiClickDetector Module Tests', () => {
             MultiClickDetector.destroy(id2);
         });
 
-        it('should return INVALID_DETECTOR_ID when pool is full and recover when freed', () => {
+        it('should return null when pool is full and recover when freed', () => {
             const createdIds: MultiClickDetector.DetectorID[] = [];
             const player = createPlayer(1);
 
             for (let i = 0; i < 300; ++i) {
-                createdIds.push(MultiClickDetector.create(player as unknown as mod.Player, () => {}));
+                createdIds.push(MultiClickDetector.create(player as unknown as mod.Player, () => {})!);
             }
 
             expect(MultiClickDetector.getActiveDetectorCount()).toBe(300);
-            expect(MultiClickDetector.create(player as unknown as mod.Player, () => {})).toBe(
-                MultiClickDetector.INVALID_DETECTOR_ID
-            );
+            expect(MultiClickDetector.create(player as unknown as mod.Player, () => {})).toBeNull();
 
             // Destroy one detector and verify allocation succeeds again
             const freedId = createdIds.pop()!;
@@ -116,7 +114,7 @@ describe('MultiClickDetector Module Tests', () => {
 
             expect(MultiClickDetector.getActiveDetectorCount()).toBe(299);
 
-            const newId = MultiClickDetector.create(player as unknown as mod.Player, () => {});
+            const newId = MultiClickDetector.create(player as unknown as mod.Player, () => {})!;
             expect(MultiClickDetector.isActive(newId)).toBe(true);
             createdIds.push(newId);
 
@@ -135,7 +133,7 @@ describe('MultiClickDetector Module Tests', () => {
             const detectorId = MultiClickDetector.create(player as unknown as mod.Player, callback, {
                 requiredClicks: 3,
                 windowMs: 1000,
-            });
+            })!;
 
             // Click 1 (rising edge)
             player.isInteracting = true;
@@ -173,7 +171,7 @@ describe('MultiClickDetector Module Tests', () => {
             const detectorId = MultiClickDetector.create(player as unknown as mod.Player, callback, {
                 requiredClicks: 2,
                 windowMs: 500,
-            });
+            })!;
 
             // Click 1
             player.isInteracting = true;
@@ -199,7 +197,7 @@ describe('MultiClickDetector Module Tests', () => {
 
             const detectorId = MultiClickDetector.create(player as unknown as mod.Player, callback, {
                 requiredClicks: 1,
-            });
+            })!;
 
             MultiClickDetector.disable(detectorId);
 

@@ -46,11 +46,6 @@ export namespace ScavengerDrop {
     export type DropID = number & { readonly __brand: 'DropID' };
 
     /**
-     * Sentinel value representing an invalid or uninitialized Drop ID.
-     */
-    export const INVALID_DROP_ID: DropID = -1 as DropID;
-
-    /**
      * Maximum check interval in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
      */
     export const MAX_CHECK_INTERVAL_MS = 65_535;
@@ -213,19 +208,19 @@ export namespace ScavengerDrop {
      * @param body - The body of the player that the scavenger drop is on.
      * @param onScavenge - The callback to invoke when a scavenger is found.
      * @param options - The options for the scavenger drop.
-     * @returns A generational drop ID, or INVALID_DROP_ID if the pre-allocated drop pool is full.
+     * @returns A generational drop ID, or null if the pre-allocated drop pool is full.
      */
     export function create(
         body: mod.Player,
         onScavenge: (player: mod.Player) => Promise<void> | void,
         options?: Options
-    ): DropID {
+    ): DropID | null {
         // Do this first to maximize the chances of the body still being valid and on the field.
         const position = mod.GetObjectPosition(body);
 
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_DROP_ID;
+        if (index === INVALID_INDEX) return null;
 
         const duration = Math.min(MAX_DURATION_MS, Math.max(0, options?.duration ?? 37_000)); // 37 seconds is how long a dead player's bag stays on the ground.
         const checkInterval = Math.min(MAX_CHECK_INTERVAL_MS, Math.max(1, options?.checkInterval ?? 200)); // 0.2 seconds between checks.

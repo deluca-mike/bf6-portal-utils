@@ -74,8 +74,6 @@ export declare namespace SpatialSOA {
     type SpatialNodeID = number & {
         readonly __brand: 'SpatialNodeID';
     };
-    /** Sentinel constant representing an invalid or non-existent node ID. */
-    const INVALID_NODE_ID: SpatialNodeID;
     /**
      * Common initialization options for creating SpatialNodes.
      */
@@ -153,23 +151,23 @@ export declare namespace SpatialSOA {
     /**
      * Creates an empty SpatialNode (virtual parent anchor or child node).
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if parentId is invalid or pool is full.
+     * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
-    function createEmpty(options?: NodeOptions): SpatialNodeID;
+    function createEmpty(options?: NodeOptions): SpatialNodeID | null;
     /**
      * Spawns a runtime prefab as a new SpatialNode (root or child).
      * @param prefab - The runtime spawn prefab enum.
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if spawning failed, parentId is invalid, or pool is full.
+     * @returns The created node ID, or null if spawning failed, parentId is invalid, or pool is full.
      */
-    function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID;
+    function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID | null;
     /**
      * Wraps an existing in-game object as a SpatialNode (root or child).
      * @param object - The existing native transformable object.
      * @param options - Initialization options (including optional parentId).
-     * @returns The created node ID, or INVALID_NODE_ID if parentId is invalid or pool is full.
+     * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
-    function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID;
+    function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID | null;
     /**
      * Checks whether a node ID is currently valid and active.
      * @param id - The node ID to check.
@@ -209,28 +207,28 @@ export declare namespace SpatialSOA {
     /**
      * Returns the parent node ID of a node.
      * @param id - The node ID.
-     * @returns The parent node ID, or INVALID_NODE_ID if root or invalid.
+     * @returns The parent node ID, null if root node, or undefined if the node does not exist.
      */
-    function getParent(id: SpatialNodeID): SpatialNodeID;
+    function getParent(id: SpatialNodeID): SpatialNodeID | null | undefined;
     /**
      * Returns the total direct child count for a node.
      * @param id - The node ID.
-     * @returns The number of direct children.
+     * @returns The number of direct children, or undefined if the node does not exist.
      */
-    function getChildCount(id: SpatialNodeID): number;
+    function getChildCount(id: SpatialNodeID): number | undefined;
     /**
      * Returns an array of direct child node IDs.
      * @param id - The node ID.
-     * @returns Array of child node IDs.
+     * @returns Array of child node IDs, or undefined if the node does not exist.
      */
-    function getChildren(id: SpatialNodeID): SpatialNodeID[];
+    function getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined;
     /**
      * Retrieves a child node ID at a specific zero-based index.
      * @param id - The node ID.
      * @param index - The child index.
-     * @returns The child node ID, or INVALID_NODE_ID if out of bounds.
+     * @returns The child node ID, null if out of bounds, or undefined if the node does not exist.
      */
-    function getChild(id: SpatialNodeID, index: number): SpatialNodeID;
+    function getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined;
     /**
      * Iterates over all direct children of a node with zero allocations.
      * @param id - The node ID.
@@ -241,9 +239,9 @@ export declare namespace SpatialSOA {
      * Gets the local position of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local position vector.
+     * @returns The local position vector, or undefined if the node does not exist.
      */
-    function getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Sets the local position of a node.
      * @param id - The node ID.
@@ -254,9 +252,9 @@ export declare namespace SpatialSOA {
      * Gets the local rotation Quaternion of a node.
      * @param id - The node ID.
      * @param out - Optional target Quaternion for zero allocations.
-     * @returns The local rotation quaternion.
+     * @returns The local rotation quaternion, or undefined if the node does not exist.
      */
-    function getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion;
+    function getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined;
     /**
      * Sets the local rotation Quaternion of a node.
      * @param id - The node ID.
@@ -267,9 +265,9 @@ export declare namespace SpatialSOA {
      * Gets the local rotation as Euler angles in radians (ZYX order).
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local Euler angles vector in radians.
+     * @returns The local Euler angles vector in radians, or undefined if the node does not exist.
      */
-    function getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Sets the local rotation using Euler angles in radians (ZYX order).
      * @param id - The node ID.
@@ -280,9 +278,9 @@ export declare namespace SpatialSOA {
      * Gets the local scale of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The local scale vector.
+     * @returns The local scale vector, or undefined if the node does not exist.
      */
-    function getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Sets the local scale of a node.
      * @param id - The node ID.
@@ -293,9 +291,9 @@ export declare namespace SpatialSOA {
      * Gets the evaluated world position of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world position vector.
+     * @returns The world position vector, or undefined if the node does not exist.
      */
-    function getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Sets the world position directly (calculates appropriate local coordinates).
      * @param id - The node ID.
@@ -306,9 +304,9 @@ export declare namespace SpatialSOA {
      * Gets the evaluated world rotation Quaternion of a node.
      * @param id - The node ID.
      * @param out - Optional target Quaternion for zero allocations.
-     * @returns The world rotation quaternion.
+     * @returns The world rotation quaternion, or undefined if the node does not exist.
      */
-    function getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion;
+    function getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined;
     /**
      * Sets the world rotation directly (calculates appropriate local quaternion).
      * @param id - The node ID.
@@ -319,9 +317,9 @@ export declare namespace SpatialSOA {
      * Gets the evaluated world rotation as Euler angles in radians (ZYX order).
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world Euler angles vector in radians.
+     * @returns The world Euler angles vector in radians, or undefined if the node does not exist.
      */
-    function getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Sets the world rotation directly using Euler angles in radians (ZYX order).
      * @param id - The node ID.
@@ -332,22 +330,22 @@ export declare namespace SpatialSOA {
      * Gets the evaluated world scale of a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3 for zero allocations.
-     * @returns The world scale vector.
+     * @returns The world scale vector, or undefined if the node does not exist.
      */
-    function getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3;
+    function getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Gets the model pivot offset for a node.
      * @param id - The node ID.
      * @param out - Optional target Vector3.
-     * @returns The pivot offset vector or undefined if none.
+     * @returns The pivot offset vector, null if unset, or undefined if the node does not exist.
      */
-    function getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
+    function getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | null | undefined;
     /**
      * Sets the in-game model pivot offset correction on a node.
      * @param id - The node ID.
-     * @param offset - The pivot offset vector or undefined to clear.
+     * @param offset - The pivot offset vector or undefined/null to clear.
      */
-    function setPivotOffset(id: SpatialNodeID, offset?: Vector3): void;
+    function setPivotOffset(id: SpatialNodeID, offset?: Vector3 | null): void;
     /**
      * Ensures that the world transform at `id` and its ancestors are up to date.
      * @param id - The node ID.
@@ -357,9 +355,9 @@ export declare namespace SpatialSOA {
      * Computes the visual placement position of the native model accounting for pivot offset.
      * @param id - The node ID.
      * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-     * @returns The render position vector, or zero vector if invalid node ID.
+     * @returns The render position vector, or undefined if the node does not exist.
      */
-    function computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3;
+    function computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined;
     /**
      * Translates a node in local coordinate space.
      * @param id - The node ID.
@@ -398,33 +396,33 @@ export declare namespace SpatialSOA {
      * @param id - The node ID.
      * @param localPoint - Point in local coordinate space.
      * @param out - Optional target Vector3.
-     * @returns The transformed world space point.
+     * @returns The transformed world space point, or undefined if the node does not exist.
      */
-    function localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3;
+    function localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3 | undefined;
     /**
      * Converts a world space point to local coordinate space.
      * @param id - The node ID.
      * @param worldPoint - Point in world coordinates.
      * @param out - Optional target Vector3.
-     * @returns The transformed local space point.
+     * @returns The transformed local space point, or undefined if the node does not exist.
      */
-    function worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3;
+    function worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3 | undefined;
     /**
      * Converts a local direction vector to world space (ignores translation).
      * @param id - The node ID.
      * @param localVec - Local direction vector.
      * @param out - Optional target Vector3.
-     * @returns The transformed world direction vector.
+     * @returns The transformed world direction vector, or undefined if the node does not exist.
      */
-    function localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3;
+    function localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3 | undefined;
     /**
      * Converts a world direction vector to local space (ignores translation).
      * @param id - The node ID.
      * @param worldVec - World direction vector.
      * @param out - Optional target Vector3.
-     * @returns The transformed local direction vector.
+     * @returns The transformed local direction vector, or undefined if the node does not exist.
      */
-    function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3;
+    function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined;
     /**
      * Attaches a node to follow a player's real-time position/orientation in world space.
      * If the node has a parent, it is automatically detached and promoted to a root node.

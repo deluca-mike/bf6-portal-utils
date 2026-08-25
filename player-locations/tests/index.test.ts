@@ -33,6 +33,9 @@ describe('PlayerLocations Integration Tests', () => {
 
             for (const id of fixture.disconnectedIds) {
                 expect(PlayerLocations.isPlayerConnected(id)).toBe(false);
+                expect(PlayerLocations.isPlayerActive(id)).toBeUndefined();
+                expect(PlayerLocations.getPosition(id)).toBeUndefined();
+                expect(PlayerLocations.isPlayerInSphere(id, 0, 0, 0, 1000)).toBeUndefined();
             }
         });
 
@@ -79,6 +82,7 @@ describe('PlayerLocations Integration Tests', () => {
 
             const pos = PlayerLocations.getPosition(testId);
             expect(pos).not.toBeNull();
+            expect(pos).not.toBeUndefined();
             expect(pos!.x).toBeCloseTo(500, 2);
             expect(pos!.y).toBeCloseTo(120, 2);
             expect(pos!.z).toBeCloseTo(-300, 2);
@@ -88,8 +92,8 @@ describe('PlayerLocations Integration Tests', () => {
             harness.stepTick();
 
             expect(PlayerLocations.isPlayerConnected(testId)).toBe(false);
-            expect(PlayerLocations.isPlayerActive(testId)).toBe(false);
-            expect(PlayerLocations.getPosition(testId)).toBeNull();
+            expect(PlayerLocations.isPlayerActive(testId)).toBeUndefined();
+            expect(PlayerLocations.getPosition(testId)).toBeUndefined();
             expect(PlayerLocations.getActivePlayerCount()).toBe(80);
         });
     });
@@ -126,15 +130,15 @@ describe('PlayerLocations Integration Tests', () => {
             expect(PlayerLocations.getDistanceXZ(p1, p2)).toBeCloseTo(expectedDistXZ, 2);
         });
 
-        it('should return Infinity when calculating distance to inactive or disconnected players', () => {
+        it('should return Infinity for inactive players and undefined for disconnected players', () => {
             const activeId = fixture.activeIds[0];
             const inactiveId = fixture.inactiveOriginIds[0];
             const disconnectedId = fixture.disconnectedIds[0];
 
             expect(PlayerLocations.getDistanceSq(activeId, inactiveId)).toBe(Infinity);
-            expect(PlayerLocations.getDistance(activeId, disconnectedId)).toBe(Infinity);
-            expect(PlayerLocations.getDistanceSqXZ(inactiveId, disconnectedId)).toBe(Infinity);
-            expect(PlayerLocations.getDistanceXZ(activeId, 999)).toBe(Infinity);
+            expect(PlayerLocations.getDistance(activeId, disconnectedId)).toBeUndefined();
+            expect(PlayerLocations.getDistanceSqXZ(inactiveId, disconnectedId)).toBeUndefined();
+            expect(PlayerLocations.getDistanceXZ(activeId, 999)).toBeUndefined();
         });
     });
 
@@ -263,6 +267,10 @@ describe('PlayerLocations Integration Tests', () => {
 
             const expectedKHighestFiltered = GroundTruth.kHighest(fixture, 5, filterPositiveX);
             expect(PlayerLocations.getKHighestPlayers(5, filterPositiveX)).toEqual(expectedKHighestFiltered);
+
+            // Filter matching nobody should return null
+            expect(PlayerLocations.getHighestPlayer(() => false)).toBeNull();
+            expect(PlayerLocations.getLowestPlayer(() => false)).toBeNull();
         });
     });
 
@@ -275,6 +283,10 @@ describe('PlayerLocations Integration Tests', () => {
 
             expect(PlayerLocations.getClosestPlayer(queryPoint.x, queryPoint.y, queryPoint.z)).toBe(expectedClosest);
             expect(PlayerLocations.getFarthestPlayer(queryPoint.x, queryPoint.y, queryPoint.z)).toBe(expectedFarthest);
+
+            // Filter matching nobody should return null
+            expect(PlayerLocations.getClosestPlayer(queryPoint.x, queryPoint.y, queryPoint.z, () => false)).toBeNull();
+            expect(PlayerLocations.getFarthestPlayer(queryPoint.x, queryPoint.y, queryPoint.z, () => false)).toBeNull();
         });
 
         it('should return k-closest players sorted in exact ascending distance order', () => {

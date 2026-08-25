@@ -174,12 +174,32 @@ export declare namespace SpatialOC {
         private _linearAcceleration?;
         private _angularAcceleration?;
         /**
-         * Internal constructor for SpatialNode. Use `SpatialOC.createEmpty`, `createRuntime`, or `createExisting`.
+         * Creates an empty SpatialNode (virtual root anchor or child node).
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if parent is deleted.
+         */
+        static createEmpty(options?: NodeOptions): SpatialNode | null;
+        /**
+         * Spawns a runtime prefab as a new SpatialNode (root or child).
+         * @param prefab - The runtime spawn prefab enum.
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if spawning failed or parent is deleted.
+         */
+        static createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null;
+        /**
+         * Wraps an existing in-game object as a SpatialNode (root or child).
+         * @param object - The existing native transformable object.
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if parent is deleted.
+         */
+        static createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null;
+        /**
+         * Private constructor for SpatialNode. Use `SpatialNode.createEmpty`, `createRuntime`, or `createExisting`.
          * @param options - Initialization options.
          * @param isRuntimeSpawned - Whether the native object was spawned dynamically at runtime.
          * @param nativeObject - The native engine object handle.
          */
-        constructor(options?: NodeOptions, isRuntimeSpawned?: boolean, nativeObject?: TransformableObject);
+        private constructor();
         /**
          * Checks whether this node and its native object (if any) are valid and alive.
          * @returns True if valid and alive, false otherwise.
@@ -191,108 +211,225 @@ export declare namespace SpatialOC {
          */
         get isDeleted(): boolean;
         /**
-         * The parent node in the hierarchy, or undefined if this is a root node.
-         * @returns The parent node, or undefined.
+         * The parent node in the hierarchy, or null if this is a root node, or undefined if deleted.
+         * @returns The parent node, null, or undefined.
          */
-        get parent(): SpatialNode | undefined;
+        get parent(): SpatialNode | null | undefined;
         /**
-         * The total number of direct child nodes.
-         * @returns The child count.
+         * Retrieves the parent node in the hierarchy.
+         * @returns The parent node, null for root nodes, or undefined if deleted.
          */
-        get childCount(): number;
+        getParent(): SpatialNode | null | undefined;
         /**
-         * Returns a shallow copy of the list of direct child nodes.
-         * @returns Array of direct children.
+         * The total number of direct child nodes, or undefined if deleted.
+         * @returns The child count, or undefined.
          */
-        get children(): readonly SpatialNode[];
+        get childCount(): number | undefined;
+        /**
+         * Retrieves the total number of direct child nodes.
+         * @returns The child count, or undefined if deleted.
+         */
+        getChildCount(): number | undefined;
+        /**
+         * Returns a shallow copy of the list of direct child nodes, or undefined if deleted.
+         * @returns Array of direct children, or undefined.
+         */
+        get children(): readonly SpatialNode[] | undefined;
+        /**
+         * Retrieves a shallow copy of the list of direct child nodes.
+         * @returns Array of direct children, or undefined if deleted.
+         */
+        getChildren(): readonly SpatialNode[] | undefined;
         /**
          * Retrieves a child node at the specified index.
          * @param index - Zero-based index of the child.
-         * @returns The child node, or undefined if out of bounds.
+         * @returns The child node, null if out of bounds, or undefined if deleted.
          */
-        getChild(index: number): SpatialNode | undefined;
+        getChild(index: number): SpatialNode | null | undefined;
         /**
          * Iterates over all direct child nodes without allocating an intermediate array.
          * @param callback - Function invoked for each child.
          */
         forEachChild(callback: (child: SpatialNode, index: number) => void): void;
         /**
-         * Gets the in-game model offset correction, or undefined if zero.
-         * @returns The pivot offset vector, or undefined.
+         * Gets the in-game model offset correction, null if unset, or undefined if deleted.
+         * @returns The pivot offset vector, null, or undefined.
          */
-        get pivotOffset(): Vector3 | undefined;
+        get pivotOffset(): Vector3 | null | undefined;
         /**
          * Sets the in-game model offset correction for prefab centering.
          */
-        set pivotOffset(offset: Vector3 | undefined);
+        set pivotOffset(offset: Vector3 | null | undefined);
         /**
-         * Gets the local position relative to parent.
-         * @returns The local position vector.
+         * Retrieves the in-game model offset correction.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The pivot offset vector, null if unset, or undefined if deleted.
          */
-        get localPosition(): Vector3;
+        getPivotOffset(out?: Vector3): Vector3 | null | undefined;
+        /**
+         * Sets the in-game model offset correction for prefab centering.
+         * @param offset - The offset vector, or null/undefined to clear.
+         * @returns This node for chaining.
+         */
+        setPivotOffset(offset?: Vector3 | null): this;
+        /**
+         * Gets the local position relative to parent, or undefined if deleted.
+         * @returns The local position vector, or undefined.
+         */
+        get localPosition(): Vector3 | undefined;
         /**
          * Sets the local position relative to parent.
          */
         set localPosition(pos: Vector3);
         /**
-         * Gets the local rotation Quaternion relative to parent.
-         * @returns The local rotation quaternion.
+         * Retrieves the local position relative to parent.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local position vector, or undefined if deleted.
          */
-        get localRotation(): Quaternion;
+        getLocalPosition(out?: Vector3): Vector3 | undefined;
+        /**
+         * Sets the local position relative to parent.
+         * @param pos - The new local position.
+         * @returns This node for chaining.
+         */
+        setLocalPosition(pos: Vector3): this;
+        /**
+         * Gets the local rotation Quaternion relative to parent, or undefined if deleted.
+         * @returns The local rotation quaternion, or undefined.
+         */
+        get localRotation(): Quaternion | undefined;
         /**
          * Sets the local rotation Quaternion relative to parent.
          */
         set localRotation(rot: Quaternion);
         /**
-         * Gets the local rotation as Euler angles in radians (ZYX order).
-         * @returns The local Euler angles vector in radians.
+         * Retrieves the local rotation Quaternion relative to parent.
+         * @param out - Optional target Quaternion to write into for zero-allocation reuse.
+         * @returns The local rotation quaternion, or undefined if deleted.
          */
-        get localRotationEuler(): Vector3;
+        getLocalRotation(out?: Quaternion): Quaternion | undefined;
+        /**
+         * Sets the local rotation Quaternion relative to parent.
+         * @param rot - The new local rotation quaternion.
+         * @returns This node for chaining.
+         */
+        setLocalRotation(rot: Quaternion): this;
+        /**
+         * Gets the local rotation as Euler angles in radians (ZYX order), or undefined if deleted.
+         * @returns The local Euler angles vector in radians, or undefined.
+         */
+        get localRotationEuler(): Vector3 | undefined;
         /**
          * Sets the local rotation using Euler angles in radians (ZYX order).
          */
         set localRotationEuler(euler: Vector3);
         /**
-         * Gets the local scale relative to parent.
-         * @returns The local scale vector.
+         * Retrieves the local rotation as Euler angles in radians (ZYX order).
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local Euler angles vector in radians, or undefined if deleted.
          */
-        get localScale(): Vector3;
+        getLocalRotationEuler(out?: Vector3): Vector3 | undefined;
+        /**
+         * Sets the local rotation using Euler angles in radians (ZYX order).
+         * @param euler - The new local Euler angles in radians.
+         * @returns This node for chaining.
+         */
+        setLocalRotationEuler(euler: Vector3): this;
+        /**
+         * Gets the local scale relative to parent, or undefined if deleted.
+         * @returns The local scale vector, or undefined.
+         */
+        get localScale(): Vector3 | undefined;
         /**
          * Sets the local scale relative to parent.
          */
         set localScale(scale: Vector3 | number);
         /**
-         * Gets the evaluated world position.
-         * @returns The evaluated world position vector.
+         * Retrieves the local scale relative to parent.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local scale vector, or undefined if deleted.
          */
-        get worldPosition(): Vector3;
+        getLocalScale(out?: Vector3): Vector3 | undefined;
+        /**
+         * Sets the local scale relative to parent.
+         * @param scale - Uniform scale number or Vector3 scale.
+         * @returns This node for chaining.
+         */
+        setLocalScale(scale: Vector3 | number): this;
+        /**
+         * Gets the evaluated world position, or undefined if deleted.
+         * @returns The evaluated world position vector, or undefined.
+         */
+        get worldPosition(): Vector3 | undefined;
         /**
          * Sets the world position directly (computes appropriate local coordinates so world position matches).
          */
         set worldPosition(worldPos: Vector3);
         /**
-         * Gets the evaluated world rotation Quaternion.
-         * @returns The evaluated world rotation quaternion.
+         * Retrieves the evaluated world position.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world position vector, or undefined if deleted.
          */
-        get worldRotation(): Quaternion;
+        getWorldPosition(out?: Vector3): Vector3 | undefined;
+        /**
+         * Sets the world position directly (computes appropriate local coordinates so world position matches).
+         * @param worldPos - The desired world position vector.
+         * @returns This node for chaining.
+         */
+        setWorldPosition(worldPos: Vector3): this;
+        /**
+         * Gets the evaluated world rotation Quaternion, or undefined if deleted.
+         * @returns The evaluated world rotation quaternion, or undefined.
+         */
+        get worldRotation(): Quaternion | undefined;
         /**
          * Sets the world rotation directly (computes appropriate local quaternion so world rotation matches).
          */
         set worldRotation(worldRot: Quaternion);
         /**
-         * Gets the evaluated world rotation as Euler angles in radians (ZYX order).
-         * @returns The evaluated world Euler angles vector in radians.
+         * Retrieves the evaluated world rotation Quaternion.
+         * @param out - Optional target Quaternion to write into for zero-allocation reuse.
+         * @returns The evaluated world rotation quaternion, or undefined if deleted.
          */
-        get worldRotationEuler(): Vector3;
+        getWorldRotation(out?: Quaternion): Quaternion | undefined;
+        /**
+         * Sets the world rotation directly (computes appropriate local quaternion so world rotation matches).
+         * @param worldRot - The desired world rotation quaternion.
+         * @returns This node for chaining.
+         */
+        setWorldRotation(worldRot: Quaternion): this;
+        /**
+         * Gets the evaluated world rotation as Euler angles in radians (ZYX order), or undefined if deleted.
+         * @returns The evaluated world Euler angles vector in radians, or undefined.
+         */
+        get worldRotationEuler(): Vector3 | undefined;
         /**
          * Sets the world rotation directly using Euler angles in radians (ZYX order).
          */
         set worldRotationEuler(worldEuler: Vector3);
         /**
-         * Gets the evaluated world scale.
-         * @returns The evaluated world scale vector.
+         * Retrieves the evaluated world rotation as Euler angles in radians (ZYX order).
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world Euler angles vector in radians, or undefined if deleted.
          */
-        get worldScale(): Vector3;
+        getWorldRotationEuler(out?: Vector3): Vector3 | undefined;
+        /**
+         * Sets the world rotation directly using Euler angles in radians (ZYX order).
+         * @param worldEuler - The desired world Euler angles in radians.
+         * @returns This node for chaining.
+         */
+        setWorldRotationEuler(worldEuler: Vector3): this;
+        /**
+         * Gets the evaluated world scale, or undefined if deleted.
+         * @returns The evaluated world scale vector, or undefined.
+         */
+        get worldScale(): Vector3 | undefined;
+        /**
+         * Retrieves the evaluated world scale.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world scale vector, or undefined if deleted.
+         */
+        getWorldScale(out?: Vector3): Vector3 | undefined;
         /**
          * Translates the node in local coordinates.
          * @param delta - Vector delta in local space.
@@ -330,30 +467,30 @@ export declare namespace SpatialOC {
          * Converts a local point to world space.
          * @param localPoint - Point in local coordinate space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed world space point.
+         * @returns The transformed world space point, or undefined if deleted.
          */
-        localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3;
+        localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3 | undefined;
         /**
          * Converts a world space point to local coordinate space.
          * @param worldPoint - Point in world coordinates.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed local space point.
+         * @returns The transformed local space point, or undefined if deleted.
          */
-        worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3;
+        worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3 | undefined;
         /**
          * Converts a local direction vector to world space (ignores translation).
          * @param localVec - Direction vector in local space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed world direction vector.
+         * @returns The transformed world direction vector, or undefined if deleted.
          */
-        localToWorldVector(localVec: Vector3, out?: Vector3): Vector3;
+        localToWorldVector(localVec: Vector3, out?: Vector3): Vector3 | undefined;
         /**
          * Converts a world direction vector to local space (ignores translation).
          * @param worldVec - Direction vector in world space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed local direction vector.
+         * @returns The transformed local direction vector, or undefined if deleted.
          */
-        worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3;
+        worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3 | undefined;
         /**
          * Adds an existing SpatialNode as a child of this node.
          * @param child - The node to add as child.
@@ -463,7 +600,7 @@ export declare namespace SpatialOC {
         /**
          * Configures kinematic velocity and acceleration integration on this node.
          * Linear kinematics clear conflicting positional controllers (orbit, follow, tracker).
-         * Angular kinematics clear conflicting rotational controllers (lookAt, orbit spin).
+         * Angular kinematics clear rotational controllers (lookAt, orbit spin).
          * @param options - Kinematics options, or null to disable.
          * @returns This node for chaining.
          */
@@ -479,9 +616,9 @@ export declare namespace SpatialOC {
         /**
          * Computes the visual placement position of the native model accounting for pivot offset.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The render position.
+         * @returns The render position, or undefined if deleted.
          */
-        computeRenderPosition(out?: Vector3): Vector3;
+        computeRenderPosition(out?: Vector3): Vector3 | undefined;
         /**
          * Steps kinematic linear and angular velocities and accelerations.
          * @param dt - Delta time in seconds.
@@ -516,23 +653,23 @@ export declare namespace SpatialOC {
     /**
      * Creates an empty SpatialNode (virtual root anchor or child node).
      * @param options - Initialization options (including optional parent).
-     * @returns The created node.
+     * @returns The created node, or null if parent is deleted.
      */
-    export function createEmpty(options?: NodeOptions): SpatialNode;
+    export function createEmpty(options?: NodeOptions): SpatialNode | null;
     /**
      * Spawns a runtime prefab as a new SpatialNode (root or child).
      * @param prefab - The runtime spawn prefab enum.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or undefined if spawning failed or parent is deleted.
+     * @returns The created node, or null if spawning failed or parent is deleted.
      */
-    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | undefined;
+    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null;
     /**
      * Wraps an existing in-game object as a SpatialNode (root or child).
      * @param object - The existing native transformable object.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or undefined if parent is deleted.
+     * @returns The created node, or null if parent is deleted.
      */
-    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | undefined;
+    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null;
     /**
      * Updates all active controllers, kinematics, and external trackers across the scene graph,
      * then synchronizes dirty transforms to the game engine.

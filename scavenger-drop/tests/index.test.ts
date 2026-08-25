@@ -51,13 +51,13 @@ describe('ScavengerDrop Module Tests', () => {
             const p1 = createPlayer(1, 10, 0, 0);
             const p2 = createPlayer(2, 20, 0, 0);
 
-            const d1 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {});
-            const d2 = ScavengerDrop.create(p2 as unknown as mod.Player, () => {});
+            const d1 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {})!;
+            const d2 = ScavengerDrop.create(p2 as unknown as mod.Player, () => {})!;
 
             expect(ScavengerDrop.getActiveDropCount()).toBe(2);
             expect(ScavengerDrop.isActive(d1)).toBe(true);
             expect(ScavengerDrop.isActive(d2)).toBe(true);
-            expect(ScavengerDrop.isActive(ScavengerDrop.INVALID_DROP_ID)).toBe(false);
+            expect(ScavengerDrop.isActive(-1 as ScavengerDrop.DropID)).toBe(false);
             expect(ScavengerDrop.isActive(99999 as ScavengerDrop.DropID)).toBe(false);
 
             ScavengerDrop.stop(d1);
@@ -71,13 +71,13 @@ describe('ScavengerDrop Module Tests', () => {
 
         it('should recycle slot indices with incremented generations', () => {
             const p1 = createPlayer(1, 10, 0, 0);
-            const id1 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {});
+            const id1 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {})!;
             const slot1 = (id1 as number) % 10_000;
 
             ScavengerDrop.stop(id1);
 
             // Re-allocate from free list - should reuse slot1 with next generation
-            const id2 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {});
+            const id2 = ScavengerDrop.create(p1 as unknown as mod.Player, () => {})!;
             const slot2 = (id2 as number) % 10_000;
 
             expect(slot2).toBe(slot1);
@@ -88,16 +88,16 @@ describe('ScavengerDrop Module Tests', () => {
             ScavengerDrop.stop(id2);
         });
 
-        it('should return INVALID_DROP_ID when pool is full and recover when freed', () => {
+        it('should return null when pool is full and recover when freed', () => {
             const createdIds: ScavengerDrop.DropID[] = [];
             const player = createPlayer(1, 0, 0, 0);
 
             for (let i = 0; i < 128; ++i) {
-                createdIds.push(ScavengerDrop.create(player as unknown as mod.Player, () => {}));
+                createdIds.push(ScavengerDrop.create(player as unknown as mod.Player, () => {})!);
             }
 
             expect(ScavengerDrop.getActiveDropCount()).toBe(128);
-            expect(ScavengerDrop.create(player as unknown as mod.Player, () => {})).toBe(ScavengerDrop.INVALID_DROP_ID);
+            expect(ScavengerDrop.create(player as unknown as mod.Player, () => {})).toBeNull();
 
             // Stop one drop and verify allocation succeeds again
             const freedId = createdIds.pop()!;
@@ -105,7 +105,7 @@ describe('ScavengerDrop Module Tests', () => {
 
             expect(ScavengerDrop.getActiveDropCount()).toBe(127);
 
-            const newId = ScavengerDrop.create(player as unknown as mod.Player, () => {});
+            const newId = ScavengerDrop.create(player as unknown as mod.Player, () => {})!;
             expect(ScavengerDrop.isActive(newId)).toBe(true);
             createdIds.push(newId);
 
@@ -122,7 +122,7 @@ describe('ScavengerDrop Module Tests', () => {
             const dropId = ScavengerDrop.create(player as unknown as mod.Player, onScavenge, {
                 duration: 5000,
                 checkInterval: 200,
-            });
+            })!;
 
             expect(ScavengerDrop.isActive(dropId)).toBe(true);
 
@@ -143,7 +143,7 @@ describe('ScavengerDrop Module Tests', () => {
             const onScavenge = vi.fn();
             const dropId = ScavengerDrop.create(deadPlayer as unknown as mod.Player, onScavenge, {
                 checkInterval: 200,
-            });
+            })!;
 
             vi.advanceTimersByTime(250);
             Events.OngoingGlobal.trigger();

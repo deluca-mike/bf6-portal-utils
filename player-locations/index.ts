@@ -13,7 +13,10 @@ export namespace PlayerLocations {
     export type PlayerZoneCallback = (playerId: number) => Promise<void> | void;
 
     /** Callback invoked when the identity of an extremum player changes. */
-    export type PlayerExtremaCallback = (newPlayerId: number, prevPlayerId: number) => Promise<void> | void;
+    export type PlayerExtremaCallback = (
+        newPlayerId: number | null,
+        prevPlayerId: number | null
+    ) => Promise<void> | void;
 
     /** Handle returned by sphere zone subscriptions to allow updating parameters or unsubscribing. */
     export interface SphereHandle {
@@ -150,7 +153,7 @@ export namespace PlayerLocations {
         x: number;
         y: number;
         z: number;
-        lastPlayerId: number;
+        lastPlayerId: number | null;
     }
 
     // =========================================================================
@@ -538,7 +541,7 @@ export namespace PlayerLocations {
 
         for (let i = 0; i < extremaCount; ++i) {
             const l = extremaListeners[i];
-            let currId = -1;
+            let currId: number | null = null;
 
             if (l.type === ExtremaType.Highest) {
                 currId = getHighestPlayer();
@@ -796,8 +799,8 @@ export namespace PlayerLocations {
         z: number,
         findClosest: boolean,
         filterFn?: (id: number) => boolean
-    ): number {
-        let bestId = -1;
+    ): number | null {
+        let bestId: number | null = null;
         let bestDistSq = findClosest ? Infinity : -1;
 
         for (let id = 0; id < MAX_PLAYERS; ++id) {
@@ -912,10 +915,15 @@ export namespace PlayerLocations {
      * Pass an `out` vector for zero-allocation reuse.
      * @param player - The player slot ID (0-99) or engine mod.Player object.
      * @param out - Optional target Vector3 to write coordinates into.
-     * @returns The Vector3 position in meters, or null if the player is not active.
+     * @returns The Vector3 position in meters, null if the player is connected but unspawned/inactive, or undefined if not connected.
      */
-    export function getPosition(player: number | mod.Player, out?: Vectors.Vector3): Vectors.Vector3 | null {
+    export function getPosition(
+        player: number | mod.Player,
+        out?: Vectors.Vector3
+    ): Vectors.Vector3 | null | undefined {
         const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
 
         if (!_isActive(id)) return null;
 
@@ -939,10 +947,14 @@ export namespace PlayerLocations {
     /**
      * Checks if a player is active (connected, spawned, and tracked with a valid 3D position).
      * @param player - The player slot ID (0-99) or engine mod.Player object.
-     * @returns True if the player is active and spawned, false otherwise.
+     * @returns True if active/spawned, false if connected but inactive, or undefined if the player is not connected.
      */
-    export function isPlayerActive(player: number | mod.Player): boolean {
-        return _isActive(_getPlayerId(player));
+    export function isPlayerActive(player: number | mod.Player): boolean | undefined {
+        const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
+
+        return _isActive(id);
     }
 
     /**
@@ -988,11 +1000,13 @@ export namespace PlayerLocations {
      * Avoids square root overhead.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The squared distance in meters squared, or Infinity if either player is not active.
+     * @returns The squared distance in meters squared, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    export function getDistanceSq(playerA: number | mod.Player, playerB: number | mod.Player): number {
+    export function getDistanceSq(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined {
         const idA = _getPlayerId(playerA);
         const idB = _getPlayerId(playerB);
+
+        if (!_isConnected(idA) || !_isConnected(idB)) return undefined;
 
         if (!_isActive(idA) || !_isActive(idB)) return Infinity;
 
@@ -1007,10 +1021,13 @@ export namespace PlayerLocations {
      * Returns the 3D Euclidean distance in meters between two active players.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The distance in meters, or Infinity if either player is not active.
+     * @returns The distance in meters, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    export function getDistance(playerA: number | mod.Player, playerB: number | mod.Player): number {
+    export function getDistance(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined {
         const distSq = getDistanceSq(playerA, playerB);
+
+        if (distSq === undefined) return undefined;
+
         return distSq === Infinity ? Infinity : Math.sqrt(distSq);
     }
 
@@ -1019,11 +1036,13 @@ export namespace PlayerLocations {
      * Avoids square root overhead and ignores vertical elevation differences.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The horizontal squared distance in meters squared, or Infinity if either player is not active.
+     * @returns The horizontal squared distance in meters squared, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    export function getDistanceSqXZ(playerA: number | mod.Player, playerB: number | mod.Player): number {
+    export function getDistanceSqXZ(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined {
         const idA = _getPlayerId(playerA);
         const idB = _getPlayerId(playerB);
+
+        if (!_isConnected(idA) || !_isConnected(idB)) return undefined;
 
         if (!_isActive(idA) || !_isActive(idB)) return Infinity;
 
@@ -1038,10 +1057,13 @@ export namespace PlayerLocations {
      * Ignores vertical elevation differences.
      * @param playerA - The first player slot ID (0-99) or engine mod.Player object.
      * @param playerB - The second player slot ID (0-99) or engine mod.Player object.
-     * @returns The horizontal distance in meters, or Infinity if either player is not active.
+     * @returns The horizontal distance in meters, Infinity if either player is inactive, or undefined if either player is not connected.
      */
-    export function getDistanceXZ(playerA: number | mod.Player, playerB: number | mod.Player): number {
+    export function getDistanceXZ(playerA: number | mod.Player, playerB: number | mod.Player): number | undefined {
         const distSq = getDistanceSqXZ(playerA, playerB);
+
+        if (distSq === undefined) return undefined;
+
         return distSq === Infinity ? Infinity : Math.sqrt(distSq);
     }
 
@@ -1427,9 +1449,14 @@ export namespace PlayerLocations {
      * @param y - Target Y coordinate in world meters.
      * @param z - Target Z coordinate in world meters.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the closest player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the closest player, or null if no active player satisfies the condition.
      */
-    export function getClosestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number {
+    export function getClosestPlayer(
+        x: number,
+        y: number,
+        z: number,
+        filterFn?: (id: number) => boolean
+    ): number | null {
         return _getExtremumPlayer(x, y, z, true, filterFn);
     }
 
@@ -1439,9 +1466,14 @@ export namespace PlayerLocations {
      * @param y - Target Y coordinate in world meters.
      * @param z - Target Z coordinate in world meters.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the farthest player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the farthest player, or null if no active player satisfies the condition.
      */
-    export function getFarthestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean): number {
+    export function getFarthestPlayer(
+        x: number,
+        y: number,
+        z: number,
+        filterFn?: (id: number) => boolean
+    ): number | null {
         return _getExtremumPlayer(x, y, z, false, filterFn);
     }
 
@@ -1492,31 +1524,31 @@ export namespace PlayerLocations {
     /**
      * Gets the highest altitude (Y axis) active player in near O(1) time using the Y-axis sorted array.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the highest active player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the highest active player, or null if no active player satisfies the condition.
      */
-    export function getHighestPlayer(filterFn?: (id: number) => boolean): number {
+    export function getHighestPlayer(filterFn?: (id: number) => boolean): number | null {
         for (let i = MAX_PLAYERS - 1; i >= 0; --i) {
             const id = sortedY[i];
 
             if (_isActive(id) && (!filterFn || filterFn(id))) return id;
         }
 
-        return -1;
+        return null;
     }
 
     /**
      * Gets the lowest altitude (Y axis) active player in near O(1) time using the Y-axis sorted array.
      * @param filterFn - Optional filter predicate returning true for candidates to consider.
-     * @returns The ID of the lowest active player, or -1 if no active player satisfies the condition.
+     * @returns The ID of the lowest active player, or null if no active player satisfies the condition.
      */
-    export function getLowestPlayer(filterFn?: (id: number) => boolean): number {
+    export function getLowestPlayer(filterFn?: (id: number) => boolean): number | null {
         for (let i = 0; i < MAX_PLAYERS; ++i) {
             const id = sortedY[i];
 
             if (_isActive(id) && (!filterFn || filterFn(id))) return id;
         }
 
-        return -1;
+        return null;
     }
 
     /**
@@ -1561,7 +1593,7 @@ export namespace PlayerLocations {
      * @param radiusMeters - Cylinder radius in meters.
      * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
      * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
-     * @returns True if the player is active and inside the cylinder (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     export function isPlayerInCylinder(
         player: number | mod.Player,
@@ -1570,8 +1602,10 @@ export namespace PlayerLocations {
         radiusMeters: number,
         minY: number = -Infinity,
         maxY: number = Infinity
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
 
         if (!_isActive(id)) return false;
 
@@ -1593,7 +1627,7 @@ export namespace PlayerLocations {
      * @param radiusMeters - Cylinder radius in meters.
      * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
      * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
-     * @returns True if the player is active and outside the cylinder, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     export function isPlayerOutsideCylinder(
         player: number | mod.Player,
@@ -1602,10 +1636,14 @@ export namespace PlayerLocations {
         radiusMeters: number,
         minY: number = -Infinity,
         maxY: number = Infinity
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
 
-        return _isActive(id) && !isPlayerInCylinder(id, centerX, centerZ, radiusMeters, minY, maxY);
+        if (!_isConnected(id)) return undefined;
+
+        if (!_isActive(id)) return false;
+
+        return !isPlayerInCylinder(id, centerX, centerZ, radiusMeters, minY, maxY);
     }
 
     /**
@@ -1615,7 +1653,7 @@ export namespace PlayerLocations {
      * @param centerY - Sphere center Y coordinate in world meters.
      * @param centerZ - Sphere center Z coordinate in world meters.
      * @param radiusMeters - Sphere radius in meters.
-     * @returns True if the player is active and inside the sphere (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     export function isPlayerInSphere(
         player: number | mod.Player,
@@ -1623,8 +1661,10 @@ export namespace PlayerLocations {
         centerY: number,
         centerZ: number,
         radiusMeters: number
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
 
         if (!_isActive(id)) return false;
 
@@ -1642,7 +1682,7 @@ export namespace PlayerLocations {
      * @param centerY - Sphere center Y coordinate in world meters.
      * @param centerZ - Sphere center Z coordinate in world meters.
      * @param radiusMeters - Sphere radius in meters.
-     * @returns True if the player is active and strictly outside the sphere, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     export function isPlayerOutsideSphere(
         player: number | mod.Player,
@@ -1650,10 +1690,14 @@ export namespace PlayerLocations {
         centerY: number,
         centerZ: number,
         radiusMeters: number
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
 
-        return _isActive(id) && !isPlayerInSphere(id, centerX, centerY, centerZ, radiusMeters);
+        if (!_isConnected(id)) return undefined;
+
+        if (!_isActive(id)) return false;
+
+        return !isPlayerInSphere(id, centerX, centerY, centerZ, radiusMeters);
     }
 
     /**
@@ -1665,7 +1709,7 @@ export namespace PlayerLocations {
      * @param maxX - Maximum X coordinate in world meters.
      * @param maxY - Maximum Y coordinate in world meters.
      * @param maxZ - Maximum Z coordinate in world meters.
-     * @returns True if the player is active and inside the bounding box (inclusive), false otherwise.
+     * @returns True if active and inside, false if active and outside or inactive, or undefined if not connected.
      */
     export function isPlayerInAABB(
         player: number | mod.Player,
@@ -1675,8 +1719,10 @@ export namespace PlayerLocations {
         maxX: number,
         maxY: number,
         maxZ: number
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
 
         if (!_isActive(id)) return false;
 
@@ -1696,7 +1742,7 @@ export namespace PlayerLocations {
      * @param maxX - Maximum X coordinate in world meters.
      * @param maxY - Maximum Y coordinate in world meters.
      * @param maxZ - Maximum Z coordinate in world meters.
-     * @returns True if the player is active and strictly outside the bounding box, false otherwise.
+     * @returns True if active and outside, false if active and inside or inactive, or undefined if not connected.
      */
     export function isPlayerOutsideAABB(
         player: number | mod.Player,
@@ -1706,10 +1752,14 @@ export namespace PlayerLocations {
         maxX: number,
         maxY: number,
         maxZ: number
-    ): boolean {
+    ): boolean | undefined {
         const id = _getPlayerId(player);
 
-        return _isActive(id) && !isPlayerInAABB(id, minX, minY, minZ, maxX, maxY, maxZ);
+        if (!_isConnected(id)) return undefined;
+
+        if (!_isActive(id)) return false;
+
+        return !isPlayerInAABB(id, minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     // =========================================================================

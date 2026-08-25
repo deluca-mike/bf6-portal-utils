@@ -8,9 +8,9 @@ export namespace ModExtensions {
     /**
      * Returns the player damage type of an event damage type.
      * @param eventDamageType - The event damage type.
-     * @returns The player damage type of the event damage type, or undefined if no match is found.
+     * @returns The player damage type of the event damage type, or null if no match is found.
      */
-    export function getPlayerDamageType(eventDamageType: mod.DamageType): mod.PlayerDamageTypes | undefined {
+    export function getPlayerDamageType(eventDamageType: mod.DamageType): mod.PlayerDamageTypes | null {
         const count = _damageTypes.length;
 
         for (let i = 0; i < count; ++i) {
@@ -19,15 +19,15 @@ export namespace ModExtensions {
             if (mod.EventDamageTypeCompare(eventDamageType, damageType)) return damageType;
         }
 
-        return undefined;
+        return null;
     }
 
     /**
      * Returns the player death type of an event death type.
      * @param eventDeathType - The event death type.
-     * @returns The player death type of the event death type, or undefined if no match is found.
+     * @returns The player death type of the event death type, or null if no match is found.
      */
-    export function getPlayerDeathType(eventDeathType: mod.DeathType): mod.PlayerDeathTypes | undefined {
+    export function getPlayerDeathType(eventDeathType: mod.DeathType): mod.PlayerDeathTypes | null {
         const count = _deathTypes.length;
 
         for (let i = 0; i < count; ++i) {
@@ -36,15 +36,15 @@ export namespace ModExtensions {
             if (mod.EventDeathTypeCompare(eventDeathType, deathType)) return deathType;
         }
 
-        return undefined;
+        return null;
     }
 
     /**
      * Returns the gadget of an event weapon unlock.
      * @param weaponUnlock - The event weapon unlock.
-     * @returns The gadget of the event weapon unlock, or undefined if no match is found.
+     * @returns The gadget of the event weapon unlock, or null if no match is found.
      */
-    export function getGadget(weaponUnlock: mod.WeaponUnlock): mod.Gadgets | undefined {
+    export function getGadget(weaponUnlock: mod.WeaponUnlock): mod.Gadgets | null {
         const count = _gadgets.length;
 
         for (let i = 0; i < count; ++i) {
@@ -53,15 +53,15 @@ export namespace ModExtensions {
             if (mod.EventWeaponCompare(weaponUnlock, gadget)) return gadget;
         }
 
-        return undefined;
+        return null;
     }
 
     /**
      * Returns the weapon of an event weapon unlock.
      * @param weaponUnlock - The event weapon unlock.
-     * @returns The weapon of the event weapon unlock, or undefined if no match is found.
+     * @returns The weapon of the event weapon unlock, or null if no match is found.
      */
-    export function getWeapon(weaponUnlock: mod.WeaponUnlock): mod.Weapons | undefined {
+    export function getWeapon(weaponUnlock: mod.WeaponUnlock): mod.Weapons | null {
         const count = _weapons.length;
 
         for (let i = 0; i < count; ++i) {
@@ -70,6 +70,6 @@ export namespace ModExtensions {
             if (mod.EventWeaponCompare(weaponUnlock, weapon)) return weapon;
         }
 
-        return undefined;
+        return null;
     }
 }

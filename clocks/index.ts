@@ -31,11 +31,6 @@ export namespace Clocks {
     export type ClockID = number & { readonly __brand: 'ClockID' };
 
     /**
-     * Sentinel value representing an invalid or uninitialized Clock ID.
-     */
-    export const INVALID_CLOCK_ID: ClockID = -1 as ClockID;
-
-    /**
      * Options for the clock.
      */
     export type ClockOptions = {
@@ -140,7 +135,7 @@ export namespace Clocks {
     const _onComplete = new Array<(() => Promise<void> | void) | null>(MAX_CLOCKS);
 
     let _activeClockCount = 0;
-    let _tickTimerId: Timers.TimerID = Timers.INVALID_TIMER_ID;
+    let _tickTimerId: Timers.TimerID | null = null;
     let _queueTickPending = false;
 
     // Reusable static promise for zero-allocation microtask dispatch.
@@ -210,9 +205,10 @@ export namespace Clocks {
     }
 
     function _scheduleTick(): void {
-        Timers.clear(_tickTimerId);
-
-        _tickTimerId = Timers.INVALID_TIMER_ID;
+        if (_tickTimerId !== null) {
+            Timers.clear(_tickTimerId);
+            _tickTimerId = null;
+        }
 
         // Fast exit if no timers are active.
         if (_activeClockCount === 0) return;
@@ -308,12 +304,12 @@ export namespace Clocks {
     /**
      * Creates a count up clock.
      * @param options The options for the clock. `timeLimitSeconds` is clamped to [0, MAX_CLOCK_SECONDS].
-     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     * @returns The ID of the clock, or null if the clock pool is full.
      */
-    export function createCountUp(options?: CountUpOptions): ClockID {
+    export function createCountUp(options?: CountUpOptions): ClockID | null {
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_CLOCK_ID;
+        if (index === INVALID_INDEX) return null;
 
         ++_activeClockCount;
         _setFlag(index, FLAG_IN_USE);
@@ -332,12 +328,12 @@ export namespace Clocks {
      * Creates a countdown clock.
      * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      * @param options The options for the clock.
-     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     * @returns The ID of the clock, or null if the clock pool is full.
      */
-    export function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID {
+    export function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID | null {
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_CLOCK_ID;
+        if (index === INVALID_INDEX) return null;
 
         ++_activeClockCount;
         _setFlag(index, FLAG_IN_USE);
@@ -382,23 +378,25 @@ export namespace Clocks {
     /**
      * Returns if a clock is running.
      * @param id The ID of the clock.
-     * @returns True if the clock is running, false otherwise.
+     * @returns True if running, false if not running, or undefined if the clock does not exist.
      */
-    export function isRunning(id: ClockID): boolean {
+    export function isRunning(id: ClockID): boolean | undefined {
         const index = _resolveIndex(id);
 
-        return index !== INVALID_INDEX && _isRunning(_flags[index]);
+        if (index === INVALID_INDEX) return undefined;
+
+        return _isRunning(_flags[index]);
     }
 
     /**
      * Returns if a clock is paused.
      * @param id The ID of the clock.
-     * @returns True if the clock is paused, false otherwise.
+     * @returns True if paused, false if not paused, or undefined if the clock does not exist.
      */
-    export function isPaused(id: ClockID): boolean {
+    export function isPaused(id: ClockID): boolean | undefined {
         const index = _resolveIndex(id);
 
-        if (index === INVALID_INDEX) return false;
+        if (index === INVALID_INDEX) return undefined;
 
         const flags = _flags[index];
 
@@ -408,23 +406,25 @@ export namespace Clocks {
     /**
      * Returns if a clock has completed.
      * @param id The ID of the clock.
-     * @returns True if the clock is complete, false otherwise.
+     * @returns True if complete, false if not complete, or undefined if the clock does not exist.
      */
-    export function isComplete(id: ClockID): boolean {
+    export function isComplete(id: ClockID): boolean | undefined {
         const index = _resolveIndex(id);
 
-        return index !== INVALID_INDEX && _isComplete(_flags[index]);
+        if (index === INVALID_INDEX) return undefined;
+
+        return _isComplete(_flags[index]);
     }
 
     /**
      * Gets the seconds of a clock. For a countdown clock, this is the seconds remaining. For a count up clock, this is the total time elapsed.
      * @param id The ID of the clock.
-     * @returns The seconds of the clock.
+     * @returns The seconds of the clock, or undefined if the clock does not exist.
      */
-    export function getSeconds(id: ClockID): number {
+    export function getSeconds(id: ClockID): number | undefined {
         const index = _resolveIndex(id);
 
-        if (index === INVALID_INDEX) return 0;
+        if (index === INVALID_INDEX) return undefined;
 
         const flags = _flags[index];
         const isCountDown = _isCountDown(flags);
@@ -440,12 +440,12 @@ export namespace Clocks {
     /**
      * Gets the total duration of the clock that will result in completion.
      * @param id The ID of the clock.
-     * @returns The duration of the clock in seconds.
+     * @returns The duration of the clock in seconds, or undefined if the clock does not exist.
      */
-    export function getDuration(id: ClockID): number {
+    export function getDuration(id: ClockID): number | undefined {
         const index = _resolveIndex(id);
 
-        return index !== INVALID_INDEX ? _limits[index] : 0;
+        return index !== INVALID_INDEX ? _limits[index] : undefined;
     }
 
     /**

@@ -420,7 +420,7 @@ export namespace FFASpawnPoints {
 
             this._delayCountdownClockId = Clocks.createCountDown(initialPromptDelay, {
                 onSecond: (seconds: number) => {
-                    if (Clocks.isComplete(this._delayCountdownClockId)) {
+                    if (this._delayCountdownClockId !== null && Clocks.isComplete(this._delayCountdownClockId)) {
                         if (this._countdownUI) {
                             this._countdownUI.visible = false;
                         }
@@ -430,7 +430,7 @@ export namespace FFASpawnPoints {
                         }
                     }
 
-                    if (Clocks.isRunning(this._delayCountdownClockId)) {
+                    if (this._delayCountdownClockId !== null && Clocks.isRunning(this._delayCountdownClockId)) {
                         if (this._promptUI?.visible) {
                             this._promptUI.visible = false;
                         }
@@ -483,13 +483,13 @@ export namespace FFASpawnPoints {
 
         private _isAISoldier: boolean;
 
-        private _delayCountdownClockId: Clocks.ClockID = Clocks.INVALID_CLOCK_ID;
+        private _delayCountdownClockId: Clocks.ClockID | null = null;
 
         private _promptUI?: UIContainer;
 
         private _countdownUI?: UIText;
 
-        private _updatePositionIntervalId: Timers.TimerID = Timers.INVALID_TIMER_ID;
+        private _updatePositionIntervalId: Timers.TimerID | null = null;
 
         private _debugPositionUI?: UIText;
 
@@ -522,6 +522,8 @@ export namespace FFASpawnPoints {
 
             if (delay <= 0) return this._addToQueue();
 
+            if (this._delayCountdownClockId === null) return;
+
             Clocks.setDuration(this._delayCountdownClockId, delay);
             Clocks.start(this._delayCountdownClockId);
         }
@@ -535,8 +537,13 @@ export namespace FFASpawnPoints {
 
             logging.log(`P_${this._playerId} is no longer valid.`, LogLevel.Warning);
 
-            Clocks.stop(this._delayCountdownClockId);
-            Timers.clearInterval(this._updatePositionIntervalId);
+            if (this._delayCountdownClockId !== null) {
+                Clocks.stop(this._delayCountdownClockId);
+            }
+
+            if (this._updatePositionIntervalId !== null) {
+                Timers.clearInterval(this._updatePositionIntervalId);
+            }
 
             this._promptUI?.delete();
             this._countdownUI?.delete();
@@ -548,7 +555,7 @@ export namespace FFASpawnPoints {
         }
 
         private _addToQueue(): void {
-            if (!this._isAISoldier) {
+            if (!this._isAISoldier && this._delayCountdownClockId !== null) {
                 Clocks.reset(this._delayCountdownClockId);
             }
 

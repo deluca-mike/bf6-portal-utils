@@ -151,17 +151,17 @@ The `SpatialOC` namespace manages the global scene graph, factory functions, bat
 
 #### Static Methods
 
-##### `SpatialOC.createEmpty(options?: NodeOptions): SpatialNode`
+##### `SpatialOC.createEmpty(options?: NodeOptions): SpatialNode | null`
 
-Creates an empty virtual root node or child node (via `options.parent`).
+Creates an empty virtual root node or child node (via `options.parent`). Returns `null` if the specified parent is deleted.
 
-##### `SpatialOC.createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | undefined`
+##### `SpatialOC.createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null`
 
-Spawns a runtime prefab as a new root node or child node (via `options.parent`).
+Spawns a runtime prefab as a new root node or child node (via `options.parent`). Returns `null` if spawning failed or parent is deleted.
 
-##### `SpatialOC.createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | undefined`
+##### `SpatialOC.createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null`
 
-Wraps an existing in-game object as a root node or child node (via `options.parent`).
+Wraps an existing in-game object as a root node or child node (via `options.parent`). Returns `null` if parent is deleted.
 
 ##### `SpatialOC.update(deltaTimeSeconds?: number): void`
 
@@ -191,26 +191,55 @@ Attaches a logging callback and minimum log level.
 
 ### `class SpatialNode`
 
+#### Static Factory Methods
+
+- `SpatialNode.createEmpty(options?: NodeOptions): SpatialNode | null`
+- `SpatialNode.createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null`
+- `SpatialNode.createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null`
+
 #### Properties & Lifecycle
 
 - `node.isValid`: `boolean` - Whether the node and native object are valid and alive.
 - `node.isDeleted`: `boolean` - Whether the node has been destroyed.
-- `node.parent`: `SpatialNode | undefined` - The parent node in the hierarchy.
-- `node.childCount`: `number` - Total number of direct children ($O(1)$ query).
-- `node.children`: `readonly SpatialNode[]` - Returns a safe shallow copy of direct children.
-- `node.pivotOffset`: `Vector3 | undefined` - The in-game model offset correction (get/set).
-- `node.localPosition`: `Vector3` - Local position relative to parent (get/set).
-- `node.localRotation`: `Quaternion` - Local rotation quaternion relative to parent (get/set).
-- `node.localRotationEuler`: `Vector3` - Local rotation as Euler angles in radians (ZYX order, get/set).
-- `node.localScale`: `Vector3` - Local scale relative to parent (get/set with `number` or `Vector3`).
-- `node.worldPosition`: `Vector3` - Evaluated world position (get/set; setting solves for local coordinates).
-- `node.worldRotation`: `Quaternion` - Evaluated world rotation quaternion (get/set; setting solves for local rotation).
-- `node.worldRotationEuler`: `Vector3` - Evaluated world Euler angles in radians (get/set; setting solves for local rotation).
-- `node.worldScale`: `Vector3` - Evaluated world scale (get).
+- `node.parent`: `SpatialNode | null | undefined` - The parent node in the hierarchy (`null` for root nodes, `undefined` if deleted).
+- `node.childCount`: `number | undefined` - Total number of direct children ($O(1)$ query, `undefined` if deleted).
+- `node.children`: `readonly SpatialNode[] | undefined` - Returns a safe shallow copy of direct children (`undefined` if deleted).
+- `node.pivotOffset`: `Vector3 | null | undefined` - The in-game model offset correction (`null` if unset, `undefined` if deleted, get/set).
+- `node.localPosition`: `Vector3 | undefined` - Local position relative to parent (get/set, `undefined` if deleted).
+- `node.localRotation`: `Quaternion | undefined` - Local rotation quaternion relative to parent (get/set, `undefined` if deleted).
+- `node.localRotationEuler`: `Vector3 | undefined` - Local rotation as Euler angles in radians (ZYX order, get/set, `undefined` if deleted).
+- `node.localScale`: `Vector3 | undefined` - Local scale relative to parent (get/set with `number` or `Vector3`, `undefined` if deleted).
+- `node.worldPosition`: `Vector3 | undefined` - Evaluated world position (get/set; setting solves for local coordinates, `undefined` if deleted).
+- `node.worldRotation`: `Quaternion | undefined` - Evaluated world rotation quaternion (get/set; setting solves for local rotation, `undefined` if deleted).
+- `node.worldRotationEuler`: `Vector3 | undefined` - Evaluated world Euler angles in radians (get/set; setting solves for local rotation, `undefined` if deleted).
+- `node.worldScale`: `Vector3 | undefined` - Evaluated world scale (get, `undefined` if deleted).
+
+#### Zero-Allocation & Complementary Methods
+
+- `node.getParent(): SpatialNode | null | undefined`
+- `node.getChildCount(): number | undefined`
+- `node.getChildren(): readonly SpatialNode[] | undefined`
+- `node.getChild(index: number): SpatialNode | null | undefined`
+- `node.getPivotOffset(out?: Vector3): Vector3 | null | undefined`
+- `node.setPivotOffset(offset?: Vector3 | null): this`
+- `node.getLocalPosition(out?: Vector3): Vector3 | undefined`
+- `node.setLocalPosition(pos: Vector3): this`
+- `node.getLocalRotation(out?: Quaternion): Quaternion | undefined`
+- `node.setLocalRotation(rot: Quaternion): this`
+- `node.getLocalRotationEuler(out?: Vector3): Vector3 | undefined`
+- `node.setLocalRotationEuler(euler: Vector3): this`
+- `node.getLocalScale(out?: Vector3): Vector3 | undefined`
+- `node.setLocalScale(scale: Vector3 | number): this`
+- `node.getWorldPosition(out?: Vector3): Vector3 | undefined`
+- `node.setWorldPosition(worldPos: Vector3): this`
+- `node.getWorldRotation(out?: Quaternion): Quaternion | undefined`
+- `node.setWorldRotation(worldRot: Quaternion): this`
+- `node.getWorldRotationEuler(out?: Vector3): Vector3 | undefined`
+- `node.setWorldRotationEuler(worldEuler: Vector3): this`
+- `node.getWorldScale(out?: Vector3): Vector3 | undefined`
 
 #### Hierarchy & Traversal Methods
 
-- `node.getChild(index: number): SpatialNode | undefined`
 - `node.forEachChild(callback: (child: SpatialNode, index: number) => void): void` (safely invoked with error isolation via `CallbackHandler`)
 - `node.addChild(child: SpatialNode): boolean` (attaches child to parent; clears any active attachment tracker or follow controller on the child)
 - `node.removeChild(child: SpatialNode): boolean`
@@ -225,14 +254,14 @@ Attaches a logging callback and minimum log level.
 - `node.rotateAroundAxis(axis: Vector3, angleRad: number, pivotCenter?: Vector3): this`
 - `node.lookAt(targetWorld: Vector3, upAxis?: Vector3): this`
 - `node.ensureWorldTransformUpdated(): void`
-- `node.computeRenderPosition(out?: Vector3): Vector3`
+- `node.computeRenderPosition(out?: Vector3): Vector3 | undefined`
 
 #### Space Conversion
 
-- `node.localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3`
-- `node.worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3`
-- `node.localToWorldVector(localVec: Vector3, out?: Vector3): Vector3`
-- `node.worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3`
+- `node.localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3 | undefined`
+- `node.worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3 | undefined`
+- `node.localToWorldVector(localVec: Vector3, out?: Vector3): Vector3 | undefined`
+- `node.worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3 | undefined`
 
 ##### Controllers & Trackers
 

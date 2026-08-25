@@ -135,6 +135,7 @@ export namespace SpatialOC {
     const _orbitRotatedOffset: Vector3 = { x: 0, y: 0, z: 0 };
     const _orbitTangentCross: Vector3 = { x: 0, y: 0, z: 0 };
     const _orbitSpinRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
+    const _lookAtTargetPos: Vector3 = { x: 0, y: 0, z: 0 };
     const _lookAtPlayerPos: Vector3 = { x: 0, y: 0, z: 0 };
     const _followPlayerPos: Vector3 = { x: 0, y: 0, z: 0 };
     const _followTargetWithOffset: Vector3 = { x: 0, y: 0, z: 0 };
@@ -291,12 +292,103 @@ export namespace SpatialOC {
         private _angularAcceleration?: Vector3;
 
         /**
-         * Internal constructor for SpatialNode. Use `SpatialOC.createEmpty`, `createRuntime`, or `createExisting`.
+         * Creates an empty SpatialNode (virtual root anchor or child node).
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if parent is deleted.
+         */
+        public static createEmpty(options?: NodeOptions): SpatialNode | null {
+            if (options?.parent && options.parent.isDeleted) return null;
+
+            const node = new SpatialNode(options, false);
+
+            if (options?.parent) {
+                options.parent.addChild(node);
+            } else {
+                _addRoot(node);
+            }
+
+            return node;
+        }
+
+        /**
+         * Spawns a runtime prefab as a new SpatialNode (root or child).
+         * @param prefab - The runtime spawn prefab enum.
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if spawning failed or parent is deleted.
+         */
+        public static createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null {
+            if (options?.parent && options.parent.isDeleted) return null;
+
+            const node = new SpatialNode(options, true);
+
+            if (options?.parent) {
+                options.parent.addChild(node);
+            } else {
+                _addRoot(node);
+            }
+
+            node.ensureWorldTransformUpdated();
+
+            const renderPos = node.computeRenderPosition(_renderPos);
+
+            if (!renderPos) {
+                node.destroy();
+                return null;
+            }
+
+            const rotEuler = Quaternions.toEuler(node._worldRot, _renderEuler);
+            const scaleVec = Vectors.toVector(node._worldScale);
+
+            try {
+                const spawned = mod.SpawnObject(
+                    prefab,
+                    Vectors.toVector(renderPos),
+                    Vectors.toVector(rotEuler),
+                    scaleVec
+                );
+
+                if (!mod.IsValid(spawned)) {
+                    logging.log('Failed to spawn runtime object prefab', LogLevel.Warning);
+                    node.destroy();
+                    return null;
+                }
+
+                node._object = spawned as TransformableObject;
+                return node;
+            } catch (error: unknown) {
+                logging.log('Error spawning runtime object', LogLevel.Error, error);
+                node.destroy();
+                return null;
+            }
+        }
+
+        /**
+         * Wraps an existing in-game object as a SpatialNode (root or child).
+         * @param object - The existing native transformable object.
+         * @param options - Initialization options (including optional parent).
+         * @returns The created node, or null if parent is deleted.
+         */
+        public static createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null {
+            if (options?.parent && options.parent.isDeleted) return null;
+
+            const node = new SpatialNode(options, false, object);
+
+            if (options?.parent) {
+                options.parent.addChild(node);
+            } else {
+                _addRoot(node);
+            }
+
+            return node;
+        }
+
+        /**
+         * Private constructor for SpatialNode. Use `SpatialNode.createEmpty`, `createRuntime`, or `createExisting`.
          * @param options - Initialization options.
          * @param isRuntimeSpawned - Whether the native object was spawned dynamically at runtime.
          * @param nativeObject - The native engine object handle.
          */
-        public constructor(
+        private constructor(
             options?: NodeOptions,
             isRuntimeSpawned: boolean = false,
             nativeObject?: TransformableObject
@@ -367,36 +459,68 @@ export namespace SpatialOC {
         }
 
         /**
-         * The parent node in the hierarchy, or undefined if this is a root node.
-         * @returns The parent node, or undefined.
+         * The parent node in the hierarchy, or null if this is a root node, or undefined if deleted.
+         * @returns The parent node, null, or undefined.
          */
-        public get parent(): SpatialNode | undefined {
-            return this._parent;
+        public get parent(): SpatialNode | null | undefined {
+            return this.getParent();
         }
 
         /**
-         * The total number of direct child nodes.
-         * @returns The child count.
+         * Retrieves the parent node in the hierarchy.
+         * @returns The parent node, null for root nodes, or undefined if deleted.
          */
-        public get childCount(): number {
+        public getParent(): SpatialNode | null | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return this._parent ?? null;
+        }
+
+        /**
+         * The total number of direct child nodes, or undefined if deleted.
+         * @returns The child count, or undefined.
+         */
+        public get childCount(): number | undefined {
+            return this.getChildCount();
+        }
+
+        /**
+         * Retrieves the total number of direct child nodes.
+         * @returns The child count, or undefined if deleted.
+         */
+        public getChildCount(): number | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             return this._children.length;
         }
 
         /**
-         * Returns a shallow copy of the list of direct child nodes.
-         * @returns Array of direct children.
+         * Returns a shallow copy of the list of direct child nodes, or undefined if deleted.
+         * @returns Array of direct children, or undefined.
          */
-        public get children(): readonly SpatialNode[] {
+        public get children(): readonly SpatialNode[] | undefined {
+            return this.getChildren();
+        }
+
+        /**
+         * Retrieves a shallow copy of the list of direct child nodes.
+         * @returns Array of direct children, or undefined if deleted.
+         */
+        public getChildren(): readonly SpatialNode[] | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             return this._children.slice();
         }
 
         /**
          * Retrieves a child node at the specified index.
          * @param index - Zero-based index of the child.
-         * @returns The child node, or undefined if out of bounds.
+         * @returns The child node, null if out of bounds, or undefined if deleted.
          */
-        public getChild(index: number): SpatialNode | undefined {
-            return this._children[index];
+        public getChild(index: number): SpatialNode | null | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return this._children[index] ?? null;
         }
 
         /**
@@ -404,6 +528,8 @@ export namespace SpatialOC {
          * @param callback - Function invoked for each child.
          */
         public forEachChild(callback: (child: SpatialNode, index: number) => void): void {
+            if (this._hasFlag(FLAG_DELETED)) return;
+
             const count = this._children.length;
 
             for (let i = 0; i < count; ++i) {
@@ -412,17 +538,41 @@ export namespace SpatialOC {
         }
 
         /**
-         * Gets the in-game model offset correction, or undefined if zero.
-         * @returns The pivot offset vector, or undefined.
+         * Gets the in-game model offset correction, null if unset, or undefined if deleted.
+         * @returns The pivot offset vector, null, or undefined.
          */
-        public get pivotOffset(): Vector3 | undefined {
-            return this._pivotOffset ? Vectors.clone(this._pivotOffset) : undefined;
+        public get pivotOffset(): Vector3 | null | undefined {
+            return this.getPivotOffset();
         }
 
         /**
          * Sets the in-game model offset correction for prefab centering.
          */
-        public set pivotOffset(offset: Vector3 | undefined) {
+        public set pivotOffset(offset: Vector3 | null | undefined) {
+            this.setPivotOffset(offset);
+        }
+
+        /**
+         * Retrieves the in-game model offset correction.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The pivot offset vector, null if unset, or undefined if deleted.
+         */
+        public getPivotOffset(out?: Vector3): Vector3 | null | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            if (!this._pivotOffset) return null;
+
+            return Vectors.copy(out ?? { x: 0, y: 0, z: 0 }, this._pivotOffset);
+        }
+
+        /**
+         * Sets the in-game model offset correction for prefab centering.
+         * @param offset - The offset vector, or null/undefined to clear.
+         * @returns This node for chaining.
+         */
+        public setPivotOffset(offset?: Vector3 | null): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (offset) {
                 if (!this._pivotOffset) {
                     this._pivotOffset = { x: 0, y: 0, z: 0 };
@@ -434,68 +584,163 @@ export namespace SpatialOC {
             }
 
             this._setFlag(FLAG_ENGINE_TRANSFORM_DIRTY);
+            return this;
         }
 
         /**
-         * Gets the local position relative to parent.
-         * @returns The local position vector.
+         * Gets the local position relative to parent, or undefined if deleted.
+         * @returns The local position vector, or undefined.
          */
-        public get localPosition(): Vector3 {
-            return Vectors.clone(this._localPos);
+        public get localPosition(): Vector3 | undefined {
+            return this.getLocalPosition();
         }
 
         /**
          * Sets the local position relative to parent.
          */
         public set localPosition(pos: Vector3) {
-            Vectors.copy(this._localPos, pos);
-            this._markDirty();
+            this.setLocalPosition(pos);
         }
 
         /**
-         * Gets the local rotation Quaternion relative to parent.
-         * @returns The local rotation quaternion.
+         * Retrieves the local position relative to parent.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local position vector, or undefined if deleted.
          */
-        public get localRotation(): Quaternion {
-            return Quaternions.clone(this._localRot);
+        public getLocalPosition(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return Vectors.copy(out ?? { x: 0, y: 0, z: 0 }, this._localPos);
+        }
+
+        /**
+         * Sets the local position relative to parent.
+         * @param pos - The new local position.
+         * @returns This node for chaining.
+         */
+        public setLocalPosition(pos: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
+            Vectors.copy(this._localPos, pos);
+            this._markDirty();
+
+            return this;
+        }
+
+        /**
+         * Gets the local rotation Quaternion relative to parent, or undefined if deleted.
+         * @returns The local rotation quaternion, or undefined.
+         */
+        public get localRotation(): Quaternion | undefined {
+            return this.getLocalRotation();
         }
 
         /**
          * Sets the local rotation Quaternion relative to parent.
          */
         public set localRotation(rot: Quaternion) {
-            Quaternions.copy(this._localRot, rot);
-            this._markDirty();
+            this.setLocalRotation(rot);
         }
 
         /**
-         * Gets the local rotation as Euler angles in radians (ZYX order).
-         * @returns The local Euler angles vector in radians.
+         * Retrieves the local rotation Quaternion relative to parent.
+         * @param out - Optional target Quaternion to write into for zero-allocation reuse.
+         * @returns The local rotation quaternion, or undefined if deleted.
          */
-        public get localRotationEuler(): Vector3 {
-            return Quaternions.toEuler(this._localRot);
+        public getLocalRotation(out?: Quaternion): Quaternion | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return Quaternions.copy(out ?? { w: 1, x: 0, y: 0, z: 0 }, this._localRot);
+        }
+
+        /**
+         * Sets the local rotation Quaternion relative to parent.
+         * @param rot - The new local rotation quaternion.
+         * @returns This node for chaining.
+         */
+        public setLocalRotation(rot: Quaternion): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
+            Quaternions.copy(this._localRot, rot);
+            this._markDirty();
+
+            return this;
+        }
+
+        /**
+         * Gets the local rotation as Euler angles in radians (ZYX order), or undefined if deleted.
+         * @returns The local Euler angles vector in radians, or undefined.
+         */
+        public get localRotationEuler(): Vector3 | undefined {
+            return this.getLocalRotationEuler();
         }
 
         /**
          * Sets the local rotation using Euler angles in radians (ZYX order).
          */
         public set localRotationEuler(euler: Vector3) {
-            Quaternions.setFromEuler(this._localRot, euler.x, euler.y, euler.z);
-            this._markDirty();
+            this.setLocalRotationEuler(euler);
         }
 
         /**
-         * Gets the local scale relative to parent.
-         * @returns The local scale vector.
+         * Retrieves the local rotation as Euler angles in radians (ZYX order).
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local Euler angles vector in radians, or undefined if deleted.
          */
-        public get localScale(): Vector3 {
-            return Vectors.clone(this._localScale);
+        public getLocalRotationEuler(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return Quaternions.toEuler(this._localRot, out);
+        }
+
+        /**
+         * Sets the local rotation using Euler angles in radians (ZYX order).
+         * @param euler - The new local Euler angles in radians.
+         * @returns This node for chaining.
+         */
+        public setLocalRotationEuler(euler: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
+            Quaternions.setFromEuler(this._localRot, euler.x, euler.y, euler.z);
+            this._markDirty();
+
+            return this;
+        }
+
+        /**
+         * Gets the local scale relative to parent, or undefined if deleted.
+         * @returns The local scale vector, or undefined.
+         */
+        public get localScale(): Vector3 | undefined {
+            return this.getLocalScale();
         }
 
         /**
          * Sets the local scale relative to parent.
          */
         public set localScale(scale: Vector3 | number) {
+            this.setLocalScale(scale);
+        }
+
+        /**
+         * Retrieves the local scale relative to parent.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The local scale vector, or undefined if deleted.
+         */
+        public getLocalScale(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            return Vectors.copy(out ?? { x: 0, y: 0, z: 0 }, this._localScale);
+        }
+
+        /**
+         * Sets the local scale relative to parent.
+         * @param scale - Uniform scale number or Vector3 scale.
+         * @returns This node for chaining.
+         */
+        public setLocalScale(scale: Vector3 | number): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (typeof scale === 'number') {
                 Vectors.set(this._localScale, scale, scale, scale);
             } else {
@@ -503,79 +748,168 @@ export namespace SpatialOC {
             }
 
             this._markDirty();
+
+            return this;
         }
 
         /**
-         * Gets the evaluated world position.
-         * @returns The evaluated world position vector.
+         * Gets the evaluated world position, or undefined if deleted.
+         * @returns The evaluated world position vector, or undefined.
          */
-        public get worldPosition(): Vector3 {
-            this.ensureWorldTransformUpdated();
-            return Vectors.clone(this._worldPos);
+        public get worldPosition(): Vector3 | undefined {
+            return this.getWorldPosition();
         }
 
         /**
          * Sets the world position directly (computes appropriate local coordinates so world position matches).
          */
         public set worldPosition(worldPos: Vector3) {
+            this.setWorldPosition(worldPos);
+        }
+
+        /**
+         * Retrieves the evaluated world position.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world position vector, or undefined if deleted.
+         */
+        public getWorldPosition(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            this.ensureWorldTransformUpdated();
+
+            return Vectors.copy(out ?? { x: 0, y: 0, z: 0 }, this._worldPos);
+        }
+
+        /**
+         * Sets the world position directly (computes appropriate local coordinates so world position matches).
+         * @param worldPos - The desired world position vector.
+         * @returns This node for chaining.
+         */
+        public setWorldPosition(worldPos: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (!this._parent) {
-                this.localPosition = worldPos;
-                return;
+                this.setLocalPosition(worldPos);
+                return this;
             }
 
             this._parent.ensureWorldTransformUpdated();
             this._parent.worldToLocalPoint(worldPos, _worldSetLocalPos);
-            this.localPosition = _worldSetLocalPos;
+            this.setLocalPosition(_worldSetLocalPos);
+
+            return this;
         }
 
         /**
-         * Gets the evaluated world rotation Quaternion.
-         * @returns The evaluated world rotation quaternion.
+         * Gets the evaluated world rotation Quaternion, or undefined if deleted.
+         * @returns The evaluated world rotation quaternion, or undefined.
          */
-        public get worldRotation(): Quaternion {
-            this.ensureWorldTransformUpdated();
-            return Quaternions.clone(this._worldRot);
+        public get worldRotation(): Quaternion | undefined {
+            return this.getWorldRotation();
         }
 
         /**
          * Sets the world rotation directly (computes appropriate local quaternion so world rotation matches).
          */
         public set worldRotation(worldRot: Quaternion) {
+            this.setWorldRotation(worldRot);
+        }
+
+        /**
+         * Retrieves the evaluated world rotation Quaternion.
+         * @param out - Optional target Quaternion to write into for zero-allocation reuse.
+         * @returns The evaluated world rotation quaternion, or undefined if deleted.
+         */
+        public getWorldRotation(out?: Quaternion): Quaternion | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            this.ensureWorldTransformUpdated();
+
+            return Quaternions.copy(out ?? { w: 1, x: 0, y: 0, z: 0 }, this._worldRot);
+        }
+
+        /**
+         * Sets the world rotation directly (computes appropriate local quaternion so world rotation matches).
+         * @param worldRot - The desired world rotation quaternion.
+         * @returns This node for chaining.
+         */
+        public setWorldRotation(worldRot: Quaternion): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (!this._parent) {
-                this.localRotation = worldRot;
-                return;
+                this.setLocalRotation(worldRot);
+                return this;
             }
 
             this._parent.ensureWorldTransformUpdated();
             Quaternions.conjugate(this._parent._worldRot, _worldSetInvRot);
             Quaternions.multiply(_worldSetInvRot, worldRot, _worldSetInvRot);
-            this.localRotation = _worldSetInvRot;
+            this.setLocalRotation(_worldSetInvRot);
+
+            return this;
         }
 
         /**
-         * Gets the evaluated world rotation as Euler angles in radians (ZYX order).
-         * @returns The evaluated world Euler angles vector in radians.
+         * Gets the evaluated world rotation as Euler angles in radians (ZYX order), or undefined if deleted.
+         * @returns The evaluated world Euler angles vector in radians, or undefined.
          */
-        public get worldRotationEuler(): Vector3 {
-            this.ensureWorldTransformUpdated();
-            return Quaternions.toEuler(this._worldRot);
+        public get worldRotationEuler(): Vector3 | undefined {
+            return this.getWorldRotationEuler();
         }
 
         /**
          * Sets the world rotation directly using Euler angles in radians (ZYX order).
          */
         public set worldRotationEuler(worldEuler: Vector3) {
-            Quaternions.setFromEuler(_worldSetEulerRot, worldEuler.x, worldEuler.y, worldEuler.z);
-            this.worldRotation = _worldSetEulerRot;
+            this.setWorldRotationEuler(worldEuler);
         }
 
         /**
-         * Gets the evaluated world scale.
-         * @returns The evaluated world scale vector.
+         * Retrieves the evaluated world rotation as Euler angles in radians (ZYX order).
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world Euler angles vector in radians, or undefined if deleted.
          */
-        public get worldScale(): Vector3 {
+        public getWorldRotationEuler(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             this.ensureWorldTransformUpdated();
-            return Vectors.clone(this._worldScale);
+
+            return Quaternions.toEuler(this._worldRot, out);
+        }
+
+        /**
+         * Sets the world rotation directly using Euler angles in radians (ZYX order).
+         * @param worldEuler - The desired world Euler angles in radians.
+         * @returns This node for chaining.
+         */
+        public setWorldRotationEuler(worldEuler: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
+            Quaternions.setFromEuler(_worldSetEulerRot, worldEuler.x, worldEuler.y, worldEuler.z);
+            this.setWorldRotation(_worldSetEulerRot);
+
+            return this;
+        }
+
+        /**
+         * Gets the evaluated world scale, or undefined if deleted.
+         * @returns The evaluated world scale vector, or undefined.
+         */
+        public get worldScale(): Vector3 | undefined {
+            return this.getWorldScale();
+        }
+
+        /**
+         * Retrieves the evaluated world scale.
+         * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+         * @returns The evaluated world scale vector, or undefined if deleted.
+         */
+        public getWorldScale(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            this.ensureWorldTransformUpdated();
+
+            return Vectors.copy(out ?? { x: 0, y: 0, z: 0 }, this._worldScale);
         }
 
         // ---------------------------------------------------------------------
@@ -588,9 +922,12 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public translateLocal(delta: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             Quaternions.rotateVector(delta, this._localRot, _translateRotatedDelta);
             Vectors.add(this._localPos, _translateRotatedDelta, this._localPos);
             this._markDirty();
+
             return this;
         }
 
@@ -600,8 +937,11 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public translate(delta: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             Vectors.add(this._localPos, delta, this._localPos);
             this._markDirty();
+
             return this;
         }
 
@@ -611,8 +951,11 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public rotateLocal(deltaRot: Quaternion): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             Quaternions.multiply(this._localRot, deltaRot, this._localRot);
             this._markDirty();
+
             return this;
         }
 
@@ -624,6 +967,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public rotateAroundAxis(axis: Vector3, angleRad: number, pivotCenter?: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             Quaternions.setFromAxisAngle(_rotateAroundAxisRot, axis, angleRad);
 
             if (pivotCenter) {
@@ -635,6 +980,7 @@ export namespace SpatialOC {
 
             Quaternions.multiply(_rotateAroundAxisRot, this._localRot, this._localRot);
             this._markDirty();
+
             return this;
         }
 
@@ -645,10 +991,13 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public lookAt(targetWorld: Vector3, upAxis?: Vector3): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this.ensureWorldTransformUpdated();
             Vectors.subtract(targetWorld, this._worldPos, _lookAtDeltaPos);
             Quaternions.setFromLookRotation(_lookAtRot, _lookAtDeltaPos, upAxis ?? _UP_AXIS);
-            this.worldRotation = _lookAtRot;
+            this.setWorldRotation(_lookAtRot);
+
             return this;
         }
 
@@ -660,13 +1009,16 @@ export namespace SpatialOC {
          * Converts a local point to world space.
          * @param localPoint - Point in local coordinate space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed world space point.
+         * @returns The transformed world space point, or undefined if deleted.
          */
-        public localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3 {
+        public localToWorldPoint(localPoint: Vector3, out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             this.ensureWorldTransformUpdated();
             const target = out ?? { x: 0, y: 0, z: 0 };
             Vectors.hadamardMultiply(localPoint, this._worldScale, _projLocalScaled);
             Quaternions.rotateVector(_projLocalScaled, this._worldRot, target);
+
             return Vectors.add(target, this._worldPos, target);
         }
 
@@ -674,9 +1026,11 @@ export namespace SpatialOC {
          * Converts a world space point to local coordinate space.
          * @param worldPoint - Point in world coordinates.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed local space point.
+         * @returns The transformed local space point, or undefined if deleted.
          */
-        public worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3 {
+        public worldToLocalPoint(worldPoint: Vector3, out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             this.ensureWorldTransformUpdated();
             const target = out ?? { x: 0, y: 0, z: 0 };
 
@@ -697,10 +1051,13 @@ export namespace SpatialOC {
          * Converts a local direction vector to world space (ignores translation).
          * @param localVec - Direction vector in local space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed world direction vector.
+         * @returns The transformed world direction vector, or undefined if deleted.
          */
-        public localToWorldVector(localVec: Vector3, out?: Vector3): Vector3 {
+        public localToWorldVector(localVec: Vector3, out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             this.ensureWorldTransformUpdated();
+
             return Quaternions.rotateVector(localVec, this._worldRot, out);
         }
 
@@ -708,11 +1065,14 @@ export namespace SpatialOC {
          * Converts a world direction vector to local space (ignores translation).
          * @param worldVec - Direction vector in world space.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The transformed local direction vector.
+         * @returns The transformed local direction vector, or undefined if deleted.
          */
-        public worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3 {
+        public worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
             this.ensureWorldTransformUpdated();
             Quaternions.conjugate(this._worldRot, _projInvRot);
+
             return Quaternions.rotateVector(worldVec, _projInvRot, out);
         }
 
@@ -894,6 +1254,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public attachToPlayer(player: mod.Player, options?: AttachOptions): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this.detachFromParent();
             this._followConfig = undefined;
             this._orbitConfig = undefined;
@@ -935,6 +1297,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public attachToVehicle(vehicle: mod.Vehicle, options?: AttachOptions): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this.detachFromParent();
             this._followConfig = undefined;
             this._orbitConfig = undefined;
@@ -979,6 +1343,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public attachToObject(object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this.detachFromParent();
             this._followConfig = undefined;
             this._orbitConfig = undefined;
@@ -1022,6 +1388,8 @@ export namespace SpatialOC {
         public attachToTracker(
             tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined
         ): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this.detachFromParent();
             this._followConfig = undefined;
             this._orbitConfig = undefined;
@@ -1033,16 +1401,16 @@ export namespace SpatialOC {
 
                 if (!result) return;
 
-                this.worldPosition = result.position;
+                this.setWorldPosition(result.position);
 
                 if (!result.rotation) return;
 
                 if ('w' in result.rotation) {
-                    this.worldRotation = result.rotation as Quaternion;
+                    this.setWorldRotation(result.rotation as Quaternion);
                 } else {
                     const euler = result.rotation as Vector3;
                     Quaternions.setFromEuler(_trackerEulerRot, euler.x, euler.y, euler.z);
-                    this.worldRotation = _trackerEulerRot;
+                    this.setWorldRotation(_trackerEulerRot);
                 }
             };
 
@@ -1056,6 +1424,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public detachTracker(): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             this._tracker = undefined;
             return this;
         }
@@ -1067,6 +1437,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public setOrbit(options?: OrbitOptions | null): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (!options) {
                 this._orbitConfig = undefined;
                 return this;
@@ -1110,6 +1482,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public setLookAt(options?: LookAtOptions | null): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (options?.target !== undefined) {
                 this._angularVelocity = undefined;
                 this._angularAcceleration = undefined;
@@ -1132,6 +1506,8 @@ export namespace SpatialOC {
          * @returns This node for chaining.
          */
         public setFollow(options?: FollowOptions | null): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (options?.target !== undefined) {
                 this.detachFromParent();
                 this._tracker = undefined;
@@ -1147,11 +1523,13 @@ export namespace SpatialOC {
         /**
          * Configures kinematic velocity and acceleration integration on this node.
          * Linear kinematics clear conflicting positional controllers (orbit, follow, tracker).
-         * Angular kinematics clear conflicting rotational controllers (lookAt, orbit spin).
+         * Angular kinematics clear rotational controllers (lookAt, orbit spin).
          * @param options - Kinematics options, or null to disable.
          * @returns This node for chaining.
          */
         public setKinematics(options?: KinematicsOptions | null): this {
+            if (this._hasFlag(FLAG_DELETED)) return this;
+
             if (!options) {
                 this._linearVelocity = undefined;
                 this._angularVelocity = undefined;
@@ -1210,6 +1588,8 @@ export namespace SpatialOC {
          * Ensures that the world transform of this node (and its ancestors) is fresh and up to date.
          */
         public ensureWorldTransformUpdated(): void {
+            if (this._hasFlag(FLAG_DELETED)) return;
+
             if (!this._hasFlag(FLAG_DIRTY)) return;
 
             if (this._parent) {
@@ -1241,9 +1621,12 @@ export namespace SpatialOC {
         /**
          * Computes the visual placement position of the native model accounting for pivot offset.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The render position.
+         * @returns The render position, or undefined if deleted.
          */
-        public computeRenderPosition(out?: Vector3): Vector3 {
+        public computeRenderPosition(out?: Vector3): Vector3 | undefined {
+            if (this._hasFlag(FLAG_DELETED)) return undefined;
+
+            this.ensureWorldTransformUpdated();
             const target = out ?? { x: 0, y: 0, z: 0 };
 
             if (!this._pivotOffset) return Vectors.copy(target, this._worldPos);
@@ -1349,9 +1732,10 @@ export namespace SpatialOC {
             const upAxis = this._lookAtConfig.upAxis;
 
             if (target instanceof SpatialNode) {
-                if (!target.isDeleted) {
-                    target.ensureWorldTransformUpdated();
-                    this.lookAt(target._worldPos, upAxis);
+                const targetPos = target.getWorldPosition(_lookAtTargetPos);
+
+                if (targetPos) {
+                    this.lookAt(targetPos, upAxis);
                 }
             } else if ('x' in target && 'y' in target && 'z' in target) {
                 this.lookAt(target, upAxis);
@@ -1372,10 +1756,7 @@ export namespace SpatialOC {
             let targetPos: Vector3 | undefined;
 
             if (target instanceof SpatialNode) {
-                if (!target.isDeleted) {
-                    target.ensureWorldTransformUpdated();
-                    targetPos = target._worldPos;
-                }
+                targetPos = target.getWorldPosition(_followPlayerPos);
             } else if (mod.IsValid(target)) {
                 targetPos = Vectors.toVector3(mod.GetObjectPosition(target), _followPlayerPos);
             }
@@ -1389,7 +1770,7 @@ export namespace SpatialOC {
             this.ensureWorldTransformUpdated();
             Vectors.add(targetPos, off, _followTargetWithOffset);
             Vectors.lerp(this._worldPos, _followTargetWithOffset, factor, _followLerpedPos);
-            this.worldPosition = _followLerpedPos;
+            this.setWorldPosition(_followLerpedPos);
         }
 
         /**
@@ -1428,15 +1809,18 @@ export namespace SpatialOC {
 
             if (this._hasFlag(FLAG_ENGINE_TRANSFORM_DIRTY) && this._object && mod.IsValid(this._object)) {
                 const renderPos = this.computeRenderPosition(_renderPos);
-                const rotEuler = Quaternions.toEuler(this._worldRot, _renderEuler);
 
-                try {
-                    mod.SetObjectTransform(
-                        this._object as mod.SpatialObject,
-                        mod.CreateTransform(Vectors.toVector(renderPos), Vectors.toVector(rotEuler))
-                    );
-                } catch (error: unknown) {
-                    logging.log('Error applying transform to native object', LogLevel.Warning, error);
+                if (renderPos) {
+                    const rotEuler = Quaternions.toEuler(this._worldRot, _renderEuler);
+
+                    try {
+                        mod.SetObjectTransform(
+                            this._object as mod.SpatialObject,
+                            mod.CreateTransform(Vectors.toVector(renderPos), Vectors.toVector(rotEuler))
+                        );
+                    } catch (error: unknown) {
+                        logging.log('Error applying transform to native object', LogLevel.Warning, error);
+                    }
                 }
 
                 this._clearFlag(FLAG_ENGINE_TRANSFORM_DIRTY);
@@ -1496,79 +1880,30 @@ export namespace SpatialOC {
     /**
      * Creates an empty SpatialNode (virtual root anchor or child node).
      * @param options - Initialization options (including optional parent).
-     * @returns The created node.
+     * @returns The created node, or null if parent is deleted.
      */
-    export function createEmpty(options?: NodeOptions): SpatialNode {
-        const node = new SpatialNode(options, false);
-
-        if (options?.parent) {
-            options.parent.addChild(node);
-        } else {
-            _addRoot(node);
-        }
-
-        return node;
+    export function createEmpty(options?: NodeOptions): SpatialNode | null {
+        return SpatialNode.createEmpty(options);
     }
 
     /**
      * Spawns a runtime prefab as a new SpatialNode (root or child).
      * @param prefab - The runtime spawn prefab enum.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or undefined if spawning failed or parent is deleted.
+     * @returns The created node, or null if spawning failed or parent is deleted.
      */
-    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | undefined {
-        if (options?.parent && options.parent.isDeleted) return undefined;
-
-        const node = new SpatialNode(options, true);
-
-        if (options?.parent) {
-            options.parent.addChild(node);
-        } else {
-            _addRoot(node);
-        }
-
-        node.ensureWorldTransformUpdated();
-
-        const renderPos = node.computeRenderPosition(_renderPos);
-        const rotEuler = Quaternions.toEuler(node.worldRotation, _renderEuler);
-        const scaleVec = Vectors.toVector(node.worldScale);
-
-        try {
-            const spawned = mod.SpawnObject(prefab, Vectors.toVector(renderPos), Vectors.toVector(rotEuler), scaleVec);
-
-            if (!mod.IsValid(spawned)) {
-                logging.log('Failed to spawn runtime object prefab', LogLevel.Warning);
-                node.destroy();
-                return undefined;
-            }
-
-            (node as unknown as { _object?: TransformableObject })._object = spawned as TransformableObject;
-            return node;
-        } catch (error: unknown) {
-            logging.log('Error spawning runtime object', LogLevel.Error, error);
-            node.destroy();
-            return undefined;
-        }
+    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null {
+        return SpatialNode.createRuntime(prefab, options);
     }
 
     /**
      * Wraps an existing in-game object as a SpatialNode (root or child).
      * @param object - The existing native transformable object.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or undefined if parent is deleted.
+     * @returns The created node, or null if parent is deleted.
      */
-    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | undefined {
-        if (options?.parent && options.parent.isDeleted) return undefined;
-
-        const node = new SpatialNode(options, false, object);
-
-        if (options?.parent) {
-            options.parent.addChild(node);
-        } else {
-            _addRoot(node);
-        }
-
-        return node;
+    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null {
+        return SpatialNode.createExisting(object, options);
     }
 
     /**

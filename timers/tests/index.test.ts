@@ -23,28 +23,28 @@ describe('Timers Module Tests', () => {
             const t2 = Timers.setInterval(() => {}, 500);
 
             expect(Timers.getActiveTimerCount()).toBe(2);
-            expect(Timers.isActive(t1)).toBe(true);
-            expect(Timers.isActive(t2)).toBe(true);
-            expect(Timers.isActive(Timers.INVALID_TIMER_ID)).toBe(false);
+            expect(Timers.isActive(t1!)).toBe(true);
+            expect(Timers.isActive(t2!)).toBe(true);
+            expect(Timers.isActive(-1 as Timers.TimerID)).toBe(false);
             expect(Timers.isActive(99999 as Timers.TimerID)).toBe(false);
 
-            Timers.clearTimeout(t1);
-            expect(Timers.isActive(t1)).toBe(false);
+            Timers.clearTimeout(t1!);
+            expect(Timers.isActive(t1!)).toBe(false);
             expect(Timers.getActiveTimerCount()).toBe(1);
 
-            Timers.clearInterval(t2);
-            expect(Timers.isActive(t2)).toBe(false);
+            Timers.clearInterval(t2!);
+            expect(Timers.isActive(t2!)).toBe(false);
             expect(Timers.getActiveTimerCount()).toBe(0);
         });
 
         it('should recycle slot indices with incremented generations', () => {
-            const id1 = Timers.setTimeout(() => {}, 1000);
+            const id1 = Timers.setTimeout(() => {}, 1000)!;
             const slot1 = (id1 as number) % 10_000;
 
             Timers.clear(id1);
 
             // Re-allocate from the free list - should reuse slot1 with next generation
-            const id2 = Timers.setTimeout(() => {}, 2000);
+            const id2 = Timers.setTimeout(() => {}, 2000)!;
             const slot2 = (id2 as number) % 10_000;
 
             expect(slot2).toBe(slot1);
@@ -55,16 +55,16 @@ describe('Timers Module Tests', () => {
             Timers.clear(id2);
         });
 
-        it('should return INVALID_TIMER_ID when timer pool is full and recover when freed', () => {
+        it('should return null when timer pool is full and recover when freed', () => {
             const createdIds: Timers.TimerID[] = [];
 
             for (let i = 0; i < 512; ++i) {
-                createdIds.push(Timers.setTimeout(() => {}, 10_000));
+                createdIds.push(Timers.setTimeout(() => {}, 10_000)!);
             }
 
             expect(Timers.getActiveTimerCount()).toBe(512);
-            expect(Timers.setTimeout(() => {}, 1000)).toBe(Timers.INVALID_TIMER_ID);
-            expect(Timers.setInterval(() => {}, 1000)).toBe(Timers.INVALID_TIMER_ID);
+            expect(Timers.setTimeout(() => {}, 1000)).toBeNull();
+            expect(Timers.setInterval(() => {}, 1000)).toBeNull();
 
             // Clear one timer and verify allocation succeeds again
             const freedId = createdIds.pop()!;

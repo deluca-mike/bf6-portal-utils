@@ -85,7 +85,7 @@ export function OnPlayerJoinGame(player: mod.Player) {
             pivotOffset: floorOffset,
         });
 
-        if (orbiter !== SpatialSOA.INVALID_NODE_ID) {
+        if (orbiter !== null) {
             // Configure smooth orbital revolution and continuous self-spin
             SpatialSOA.setOrbit(orbiter, {
                 axis: { x: 0, y: 1, z: 0 },
@@ -120,9 +120,9 @@ export function OnPlayerLeaveGame(playerId: number) {
 
 #### Node Creation & Lifecycle
 
-- `createEmpty(options?: NodeOptions): SpatialNodeID` (returns `INVALID_NODE_ID` if pool is full or `parentId` is invalid)
-- `createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID` (returns `INVALID_NODE_ID` if spawning failed, pool is full, or `parentId` is invalid)
-- `createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID` (returns `INVALID_NODE_ID` if pool is full or `parentId` is invalid)
+- `createEmpty(options?: NodeOptions): SpatialNodeID | null` (returns `null` if pool is full or `parentId` is invalid)
+- `createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID | null` (returns `null` if spawning failed, pool is full, or `parentId` is invalid)
+- `createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID | null` (returns `null` if pool is full or `parentId` is invalid)
 - `destroy(id: SpatialNodeID): void`
 - `destroyAll(): void`
 - `isValid(id: SpatialNodeID): boolean`
@@ -133,10 +133,10 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `addChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean` (attaches child to parent; clears any active attachment tracker or follow controller on the child)
 - `removeChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean`
 - `detachFromParent(id: SpatialNodeID): void`
-- `getParent(id: SpatialNodeID): SpatialNodeID`
-- `getChildCount(id: SpatialNodeID): number`
-- `getChildren(id: SpatialNodeID): SpatialNodeID[]`
-- `getChild(id: SpatialNodeID, index: number): SpatialNodeID`
+- `getParent(id: SpatialNodeID): SpatialNodeID | null | undefined` (returns `null` for root nodes, `undefined` if unlocated)
+- `getChildCount(id: SpatialNodeID): number | undefined` (returns `undefined` if unlocated)
+- `getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined` (returns `undefined` if unlocated)
+- `getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined` (returns `null` if index out of bounds, `undefined` if unlocated)
 - `forEachChild(id: SpatialNodeID, callback: (childId: SpatialNodeID, index: number) => void): void` (safely invoked with error isolation via `CallbackHandler`)
 - `getRootCount(): number`
 - `getRootNodes(): SpatialNodeID[]`
@@ -144,15 +144,15 @@ export function OnPlayerLeaveGame(playerId: number) {
 
 #### Local & World Transforms
 
-- `getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3` / `setLocalPosition(id: SpatialNodeID, pos: Vector3): void`
-- `getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion` / `setLocalRotation(id: SpatialNodeID, rot: Quaternion): void`
-- `getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3` / `setLocalRotationEuler(id: SpatialNodeID, euler: Vector3): void`
-- `getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3` / `setLocalScale(id: SpatialNodeID, scale: Vector3 | number): void`
-- `getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3` / `setWorldPosition(id: SpatialNodeID, worldPos: Vector3): void`
-- `getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion` / `setWorldRotation(id: SpatialNodeID, worldRot: Quaternion): void`
-- `getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3` / `setWorldRotationEuler(id: SpatialNodeID, worldEuler: Vector3): void`
-- `getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3`
-- `getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setPivotOffset(id: SpatialNodeID, offset?: Vector3): void`
+- `getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setLocalPosition(id: SpatialNodeID, pos: Vector3): void`
+- `getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined` / `setLocalRotation(id: SpatialNodeID, rot: Quaternion): void`
+- `getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setLocalRotationEuler(id: SpatialNodeID, euler: Vector3): void`
+- `getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setLocalScale(id: SpatialNodeID, scale: Vector3 | number): void`
+- `getWorldPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setWorldPosition(id: SpatialNodeID, worldPos: Vector3): void`
+- `getWorldRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined` / `setWorldRotation(id: SpatialNodeID, worldRot: Quaternion): void`
+- `getWorldRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined` / `setWorldRotationEuler(id: SpatialNodeID, worldEuler: Vector3): void`
+- `getWorldScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined`
+- `getPivotOffset(id: SpatialNodeID, out?: Vector3): Vector3 | null | undefined` / `setPivotOffset(id: SpatialNodeID, offset?: Vector3 | null): void`
 
 #### Manipulations & Space Projections
 
@@ -162,11 +162,11 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `rotateAroundAxis(id: SpatialNodeID, axis: Vector3, angleRad: number, pivotCenter?: Vector3): void`
 - `lookAt(id: SpatialNodeID, targetWorld: Vector3, upAxis?: Vector3): void`
 - `ensureWorldTransformUpdated(id: SpatialNodeID): void`
-- `computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3`
-- `localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3`
-- `worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3`
-- `localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3`
-- `worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3`
+- `computeRenderPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined`
+- `localToWorldPoint(id: SpatialNodeID, localPoint: Vector3, out?: Vector3): Vector3 | undefined`
+- `worldToLocalPoint(id: SpatialNodeID, worldPoint: Vector3, out?: Vector3): Vector3 | undefined`
+- `localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3 | undefined`
+- `worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined`
 
 #### Attachments & Controllers
 

@@ -22,10 +22,6 @@ export declare namespace Clocks {
         readonly __brand: 'ClockID';
     };
     /**
-     * Sentinel value representing an invalid or uninitialized Clock ID.
-     */
-    const INVALID_CLOCK_ID: ClockID;
-    /**
      * Options for the clock.
      */
     type ClockOptions = {
@@ -63,16 +59,16 @@ export declare namespace Clocks {
     /**
      * Creates a count up clock.
      * @param options The options for the clock. `timeLimitSeconds` is clamped to [0, MAX_CLOCK_SECONDS].
-     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     * @returns The ID of the clock, or null if the clock pool is full.
      */
-    function createCountUp(options?: CountUpOptions): ClockID;
+    function createCountUp(options?: CountUpOptions): ClockID | null;
     /**
      * Creates a countdown clock.
      * @param durationSeconds The duration of the clock in seconds (clamped to [0, MAX_CLOCK_SECONDS]).
      * @param options The options for the clock.
-     * @returns The ID of the clock, or INVALID_CLOCK_ID if the clock pool is full.
+     * @returns The ID of the clock, or null if the clock pool is full.
      */
-    function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID;
+    function createCountDown(durationSeconds: number, options?: CountDownOptions): ClockID | null;
     /**
      * Destroys a clock.
      * @param id The ID of the clock.
@@ -81,33 +77,33 @@ export declare namespace Clocks {
     /**
      * Returns if a clock is running.
      * @param id The ID of the clock.
-     * @returns True if the clock is running, false otherwise.
+     * @returns True if running, false if not running, or undefined if the clock does not exist.
      */
-    function isRunning(id: ClockID): boolean;
+    function isRunning(id: ClockID): boolean | undefined;
     /**
      * Returns if a clock is paused.
      * @param id The ID of the clock.
-     * @returns True if the clock is paused, false otherwise.
+     * @returns True if paused, false if not paused, or undefined if the clock does not exist.
      */
-    function isPaused(id: ClockID): boolean;
+    function isPaused(id: ClockID): boolean | undefined;
     /**
      * Returns if a clock has completed.
      * @param id The ID of the clock.
-     * @returns True if the clock is complete, false otherwise.
+     * @returns True if complete, false if not complete, or undefined if the clock does not exist.
      */
-    function isComplete(id: ClockID): boolean;
+    function isComplete(id: ClockID): boolean | undefined;
     /**
      * Gets the seconds of a clock. For a countdown clock, this is the seconds remaining. For a count up clock, this is the total time elapsed.
      * @param id The ID of the clock.
-     * @returns The seconds of the clock.
+     * @returns The seconds of the clock, or undefined if the clock does not exist.
      */
-    function getSeconds(id: ClockID): number;
+    function getSeconds(id: ClockID): number | undefined;
     /**
      * Gets the total duration of the clock that will result in completion.
      * @param id The ID of the clock.
-     * @returns The duration of the clock in seconds.
+     * @returns The duration of the clock in seconds, or undefined if the clock does not exist.
      */
-    function getDuration(id: ClockID): number;
+    function getDuration(id: ClockID): number | undefined;
     /**
      * Sets the total duration of the clock that will result in completion. Will not resume completed clocks.
      * @param id The ID of the clock.

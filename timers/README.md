@@ -171,7 +171,6 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Constant | Type | Value | Description |
 | --- | --- | --- | --- |
-| `INVALID_TIMER_ID` | `TimerID` | `-1` | Sentinel value representing an invalid or uninitialized Timer ID. |
 | `MAX_TIMER_DELAY_MS` | `number` | `2_147_483_647` | Maximum timer delay in milliseconds (signed 32-bit positive limit). |
 
 #### Static Methods
@@ -179,8 +178,8 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | Method | Description |
 | --- | --- |
 | `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the Timers module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. This allows you to monitor and debug timer callback failures without breaking your mod. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. The runtime error can be very large and may cause issues with UI loggers. For more information, see the [`Logging` module documentation](../logging/README.md). |
-| `setTimeout(callback: () => Promise<void> \| void, ms: number): TimerID` | Schedules a one-time execution of `callback` after `ms` milliseconds delay (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
-| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): TimerID` | Schedules repeated execution of `callback` every `ms` milliseconds (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `INVALID_TIMER_ID` if the pre-allocated timer pool is full. If `immediate` is `true`, the callback runs immediately. Defaults to `false`. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
+| `setTimeout(callback: () => Promise<void> \| void, ms: number): TimerID \| null` | Schedules a one-time execution of `callback` after `ms` milliseconds delay (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `null` if the pre-allocated timer pool is full. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
+| `setInterval(callback: () => Promise<void> \| void, ms: number, immediate?: boolean): TimerID \| null` | Schedules repeated execution of `callback` every `ms` milliseconds (clamped to `[0, MAX_TIMER_DELAY_MS]`). Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Returns a `TimerID`, or `null` if the pre-allocated timer pool is full. If `immediate` is `true`, the callback runs immediately. Defaults to `false`. The returned ID can be used with `clearTimeout()`, `clearInterval()`, or `clear()`. |
 | `clearTimeout(id: TimerID): void` | Cancels a timeout or interval identified by `id`. Silently ignores invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearInterval()`. |
 | `clearInterval(id: TimerID): void` | Cancels an interval or timeout identified by `id`. Silently ignores invalid IDs. This is equivalent to `clear()` and can be used interchangeably with `clearTimeout()`. |
 | `clear(id: TimerID): void` | Generic function to cancel a timeout or interval identified by `id`. Silently ignores invalid IDs. Since timer and interval IDs are indistinguishable under the hood, this function can be used for simplicity instead of `clearTimeout()` or `clearInterval()`. |
@@ -301,7 +300,7 @@ export async function OnGameModeStarted(): Promise<void> {
     - If an active callback's scheduled expiration time is met or exceeded, the callback is executed.
     - For one-time timeouts, the slot is cleared/deleted (reset to `null` and generation incremented) and the active count is decremented. For intervals, the expiration time is rescheduled.
 
-3. **Timer ID Allocation & Intrusive Free List** – When a timer is scheduled, the system pops the next available index from an intrusive free list (`_firstFree` linked through `_intervalMs`) in $O(1)$ time. The returned `TimerID` is computed using a **generational index** formula: `index + 10,000 * _generations[index]`. When a timer is completed or cancelled, its slot generation count is incremented and the slot index is recycled back onto the free list. This ensures that old, stale IDs cannot interact with a new timer that reuses the same slot index. If the pool is full, it logs an error via `Logging` and returns `INVALID_TIMER_ID` without throwing an exception.
+3. **Timer ID Allocation & Intrusive Free List** – When a timer is scheduled, the system pops the next available index from an intrusive free list (`_firstFree` linked through `_intervalMs`) in $O(1)$ time. The returned `TimerID` is computed using a **generational index** formula: `index + 10,000 * _generations[index]`. When a timer is completed or cancelled, its slot generation count is incremented and the slot index is recycled back onto the free list. This ensures that old, stale IDs cannot interact with a new timer that reuses the same slot index. If the pool is full, it logs an error via `Logging` and returns `null` without throwing an exception.
 
 4. **Timer Cancellation** – Clearing a timer via `clearTimeout()`, `clearInterval()`, or `clear()` decodes the ID by taking `id % 10,000` to find the slot index and checking if the encoded generation (`Math.floor(id / 10,000)`) matches the current slot's generation. If they match and the slot has a callback, the system sets the callback reference to `null`, increments the generation count for that slot (invalidating any copy of the ID), decrements the active timer count, and returns the slot index to the free list.
 
@@ -311,7 +310,7 @@ export async function OnGameModeStarted(): Promise<void> {
 
 ## Known Limitations & Caveats
 
-- **Pool Capacity** – The timer pool is pre-allocated to 512 concurrent slots (`MAX_TIMERS`). Attempting to schedule additional timers when the pool is full will log an error via `Logging` and return `INVALID_TIMER_ID` without throwing an exception.
+- **Pool Capacity** – The timer pool is pre-allocated to 512 concurrent slots (`MAX_TIMERS`). Attempting to schedule additional timers when the pool is full will log an error via `Logging` and return `null` without throwing an exception.
 
 - **Tick Rate Precision** – Timer checks are performed on every game tick (typically 30hz or ~33ms intervals). Precision is bounded by the server tick rate and frame timing.
 

@@ -49,11 +49,6 @@ export namespace MultiClickDetector {
     export type DetectorID = number & { readonly __brand: 'DetectorID' };
 
     /**
-     * Sentinel value representing an invalid or uninitialized Detector ID.
-     */
-    export const INVALID_DETECTOR_ID: DetectorID = -1 as DetectorID;
-
-    /**
      * Maximum multi-click detection window in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
      */
     export const MAX_WINDOW_MS = 65_535;
@@ -282,12 +277,16 @@ export namespace MultiClickDetector {
      * @param player - The player to detect multi-click sequences for.
      * @param callback - The callback to call when a multi-click sequence is detected.
      * @param options - The options for the multi-click detector.
-     * @returns The ID of the created multi-click detector, or INVALID_DETECTOR_ID if the pool is full.
+     * @returns The ID of the created multi-click detector, or null if the pool is full.
      */
-    export function create(player: mod.Player, callback: () => Promise<void> | void, options?: Options): DetectorID {
+    export function create(
+        player: mod.Player,
+        callback: () => Promise<void> | void,
+        options?: Options
+    ): DetectorID | null {
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_DETECTOR_ID;
+        if (index === INVALID_INDEX) return null;
 
         const isDeployed = _isPlayerDeployed(player);
 

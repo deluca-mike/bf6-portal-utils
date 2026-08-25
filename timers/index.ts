@@ -31,11 +31,6 @@ export namespace Timers {
     export type TimerID = number & { readonly __brand: 'TimerID' };
 
     /**
-     * Sentinel value representing an invalid or uninitialized Timer ID.
-     */
-    export const INVALID_TIMER_ID: TimerID = -1 as TimerID;
-
-    /**
      * Maximum timer delay or interval in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
      */
     export const MAX_TIMER_DELAY_MS = 2_147_483_647;
@@ -175,14 +170,18 @@ export namespace Timers {
      * @param callback - The callback to execute.
      * @param expirationDelay - The delay before the first execution.
      * @param interval - The interval between executions.
-     * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
+     * @returns The timer ID, or null if the pool is full.
      */
-    function _createTimer(callback: () => Promise<void> | void, expirationDelay: number, interval: number): TimerID {
+    function _createTimer(
+        callback: () => Promise<void> | void,
+        expirationDelay: number,
+        interval: number
+    ): TimerID | null {
         _ensureSubscribed();
 
         const index = _allocateSlot();
 
-        if (index === INVALID_INDEX) return INVALID_TIMER_ID;
+        if (index === INVALID_INDEX) return null;
 
         ++_activeTimerCount;
         _callbacks[index] = callback;
@@ -196,9 +195,9 @@ export namespace Timers {
      * Schedules a one-time execution after the specified delay.
      * @param callback - The callback to execute.
      * @param ms - The delay in milliseconds (clamped between 0 and 2,147,483,647 ms).
-     * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
+     * @returns The timer ID, or null if the pool is full.
      */
-    export function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID {
+    export function setTimeout(callback: () => Promise<void> | void, ms: number): TimerID | null {
         const safeMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, ms));
         return _createTimer(callback, safeMs, 0);
     }
@@ -208,9 +207,13 @@ export namespace Timers {
      * @param callback - The callback to execute.
      * @param ms - The interval in milliseconds (clamped between 0 and 2,147,483,647 ms).
      * @param immediate - If true, runs the callback immediately.
-     * @returns The timer ID, or INVALID_TIMER_ID if the pool is full.
+     * @returns The timer ID, or null if the pool is full.
      */
-    export function setInterval(callback: () => Promise<void> | void, ms: number, immediate: boolean = false): TimerID {
+    export function setInterval(
+        callback: () => Promise<void> | void,
+        ms: number,
+        immediate: boolean = false
+    ): TimerID | null {
         const safeMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(0, ms));
         const expirationDelay = immediate ? 0 : safeMs;
 

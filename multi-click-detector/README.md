@@ -106,7 +106,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Method | Description |
 | --- | --- |
-| `create(player: mod.Player, callback: () => Promise<void> \| void, options?: MultiClickDetector.Options): DetectorID` | Creates a new multi-click detector for the specified player and returns its `DetectorID`. The detector is registered for event handling automatically (no manual event wiring). It starts **enabled** (call `disable()` to turn it off). The module only runs detector logic when the player is deployed (deploy/undeploy do not overwrite each detector's enabled state). The callback is invoked via `CallbackHandler` when a multi-click sequence is detected. Callbacks can be sync or async; **async is preferred** because sync callbacks block the entire `OngoingGlobal` event stack. See the `Options` interface below. Default soldier state is `mod.SoldierStateBool.IsInteracting`. Returns `INVALID_DETECTOR_ID` if the detector pool is full (max 300). |
+| `create(player: mod.Player, callback: () => Promise<void> \| void, options?: MultiClickDetector.Options): DetectorID \| null` | Creates a new multi-click detector for the specified player and returns its `DetectorID`. The detector is registered for event handling automatically (no manual event wiring). It starts **enabled** (call `disable()` to turn it off). The module only runs detector logic when the player is deployed (deploy/undeploy do not overwrite each detector's enabled state). The callback is invoked via `CallbackHandler` when a multi-click sequence is detected. Callbacks can be sync or async; **async is preferred** because sync callbacks block the entire `OngoingGlobal` event stack. See the `Options` interface below. Default soldier state is `mod.SoldierStateBool.IsInteracting`. Returns `null` if the detector pool is full (max 300). |
 
 #### Instance Methods
 
@@ -121,7 +121,6 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Constant | Type | Value | Description |
 | --- | --- | --- | --- |
-| `INVALID_DETECTOR_ID` | `DetectorID` | `-1` | Sentinel value representing an invalid or uninitialized Detector ID. |
 | `MAX_WINDOW_MS` | `number` | `65_535` | Maximum multi-click time window in milliseconds (unsigned 16-bit limit). |
 | `MAX_REQUIRED_CLICKS` | `number` | `255` | Maximum required click count to trigger sequence (unsigned 8-bit limit). |
 
@@ -165,7 +164,7 @@ You must **not** implement or export any Battlefield Portal event handler functi
 
 The `MultiClickDetector` uses a Structure of Arrays (SoA) data-oriented model with edge detection and time-windowed counting:
 
-1. **Instance Creation** – When a detector is created via `MultiClickDetector.create()`, a slot is allocated in $O(1)$ time from the intrusive free list (`_sequenceStartTimes`). The maximum number of concurrent detectors is capped at 300 to eliminate runtime memory allocations. If the pool is full, it logs an error and returns `INVALID_DETECTOR_ID`.
+1. **Instance Creation** – When a detector is created via `MultiClickDetector.create()`, a slot is allocated in $O(1)$ time from the intrusive free list (`_sequenceStartTimes`). The maximum number of concurrent detectors is capped at 300 to eliminate runtime memory allocations. If the pool is full, it logs an error and returns `null`.
 
 2. **Generational Safety & Exhaustion** – Detector IDs encode generation (`index + 10_000 * generation`) using a `Uint16Array`. When a slot reaches the maximum generation count of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
 
@@ -279,7 +278,7 @@ The remaining soldier states in `mod.SoldierStateBool` are **not recommended** f
 
 ## Known Limitations & Caveats
 
-- **Pool Capacity** – The detector pool is pre-allocated to 300 concurrent slots (`MAX_DETECTORS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `INVALID_DETECTOR_ID` without throwing an exception.
+- **Pool Capacity** – The detector pool is pre-allocated to 300 concurrent slots (`MAX_DETECTORS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `null` without throwing an exception.
 
 - **Soldier State Dependency** – The detector relies on soldier state booleans to detect state changes. If the behavior of soldier states changes in future Battlefield Portal updates, detection may be affected. The default `mod.SoldierStateBool.IsInteracting` is the most reliable option, but any state you choose may be subject to game engine changes.
 

@@ -63,10 +63,10 @@ Events.OnPlayerDamaged.subscribe((event: mod.OnPlayerDamagedEvent) => {
 
 | Method | Description |
 | --- | --- |
-| `getPlayerDamageType(eventDamageType: mod.DamageType): mod.PlayerDamageTypes \| undefined` | Resolves an opaque event `DamageType` to its corresponding `mod.PlayerDamageTypes` enum value, or `undefined` if not matched. |
-| `getPlayerDeathType(eventDeathType: mod.DeathType): mod.PlayerDeathTypes \| undefined` | Resolves an opaque event `DeathType` to its corresponding `mod.PlayerDeathTypes` enum value, or `undefined` if not matched. |
-| `getGadget(weaponUnlock: mod.WeaponUnlock): mod.Gadgets \| undefined` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Gadgets` enum value, or `undefined` if not matched. |
-| `getWeapon(weaponUnlock: mod.WeaponUnlock): mod.Weapons \| undefined` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Weapons` enum value, or `undefined` if not matched. |
+| `getPlayerDamageType(eventDamageType: mod.DamageType): mod.PlayerDamageTypes \| null` | Resolves an opaque event `DamageType` to its corresponding `mod.PlayerDamageTypes` enum value, or `null` if not matched. |
+| `getPlayerDeathType(eventDeathType: mod.DeathType): mod.PlayerDeathTypes \| null` | Resolves an opaque event `DeathType` to its corresponding `mod.PlayerDeathTypes` enum value, or `null` if not matched. |
+| `getGadget(weaponUnlock: mod.WeaponUnlock): mod.Gadgets \| null` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Gadgets` enum value, or `null` if not matched. |
+| `getWeapon(weaponUnlock: mod.WeaponUnlock): mod.Weapons \| null` | Resolves an opaque event `WeaponUnlock` to its corresponding `mod.Weapons` enum value, or `null` if not matched. |
 
 ---
 

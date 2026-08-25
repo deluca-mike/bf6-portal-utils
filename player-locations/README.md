@@ -291,9 +291,9 @@ interface TargetExtremaHandle extends ExtremaHandle {
 
 | Function | Return Type | Description |
 | :-- | :-- | :-- |
-| `getPosition(player: number \| mod.Player, out?: Vectors.Vector3)` | `Vectors.Vector3 \| null` | Returns world coordinates in meters for an active player. Pass `out` for zero-allocation reuse. Returns `null` if the player is unspawned/inactive. |
+| `getPosition(player: number \| mod.Player, out?: Vectors.Vector3)` | `Vectors.Vector3 \| null \| undefined` | Returns world coordinates in meters for an active player. Pass `out` for zero-allocation reuse. Returns `null` if the player is connected but unspawned/inactive, or `undefined` if not connected. |
 | `isPlayerConnected(player: number \| mod.Player)` | `boolean` | Checks if a player slot is currently connected to the server. |
-| `isPlayerActive(player: number \| mod.Player)` | `boolean` | Checks if a player is active (connected, spawned, and tracked with valid 3D coordinates). |
+| `isPlayerActive(player: number \| mod.Player)` | `boolean \| undefined` | Checks if a player is active (connected, spawned, and tracked with valid 3D coordinates). Returns `undefined` if the player is not connected. |
 | `getConnectedPlayerCount()` | `number` | Returns the total count of currently connected players. |
 | `getActivePlayerCount()` | `number` | Returns the total count of currently active (spawned) players. |
 | `getConnectedPlayers(outArray?: number[])` | `number[]` | Populates an array with all connected player IDs (Zero-GC). |
@@ -303,14 +303,14 @@ interface TargetExtremaHandle extends ExtremaHandle {
 
 #### Distance Functions
 
-> **Note on Return Values:** Distance functions return `Infinity` if either player is invalid, dead, or disconnected. This prevents JavaScript coercion bugs (e.g. `null <= 25` evaluating to `true`) and allows safe direct usage in `Math.min()`.
+> **Note on Return Values:** Distance functions return `undefined` if either player is not connected, or `Infinity` if either player is dead/inactive. This prevents JavaScript coercion bugs (e.g. `null <= 25` evaluating to `true`) and allows safe direct usage in `Math.min()`.
 
 | Function | Return Type | Description |
 | :-- | :-- | :-- |
-| `getDistanceSq(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number` | Returns squared 3D Euclidean distance in meters squared ($m^2$) between two active players. Avoids square root overhead. |
-| `getDistance(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number` | Returns 3D Euclidean distance in meters between two active players. |
-| `getDistanceSqXZ(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number` | Returns squared 2D horizontal distance in $m^2$ on the XZ plane between two active players (ignores vertical elevation). |
-| `getDistanceXZ(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number` | Returns 2D horizontal distance in meters on the XZ plane between two active players. |
+| `getDistanceSq(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number \| undefined` | Returns squared 3D Euclidean distance in meters squared ($m^2$) between two active players. Avoids square root overhead. Returns `undefined` if either player is disconnected, or `Infinity` if inactive. |
+| `getDistance(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number \| undefined` | Returns 3D Euclidean distance in meters between two active players. Returns `undefined` if either player is disconnected, or `Infinity` if inactive. |
+| `getDistanceSqXZ(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number \| undefined` | Returns squared 2D horizontal distance in $m^2$ on the XZ plane between two active players (ignores vertical elevation). Returns `undefined` if either player is disconnected, or `Infinity` if inactive. |
+| `getDistanceXZ(playerA: number \| mod.Player, playerB: number \| mod.Player)` | `number \| undefined` | Returns 2D horizontal distance in meters on the XZ plane between two active players. Returns `undefined` if either player is disconnected, or `Infinity` if inactive. |
 
 ---
 
@@ -337,10 +337,10 @@ interface TargetExtremaHandle extends ExtremaHandle {
 | `getPlayersWestOf(x: number, outArray?: number[])` | `number[]` | Returns all active players located west ($-X$) of $X$ ($X_{\text{player}} \le x$). |
 | `getPlayersNorthOf(z: number, outArray?: number[])` | `number[]` | Returns all active players located north ($-Z$) of $Z$ ($Z_{\text{player}} \le z$). |
 | `getPlayersSouthOf(z: number, outArray?: number[])` | `number[]` | Returns all active players located south ($+Z$) of $Z$ ($Z_{\text{player}} \ge z$). |
-| `getClosestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean)` | `number` | Finds the single closest active player to target point. Returns ID, or `-1` if none found. |
-| `getFarthestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean)` | `number` | Finds the single farthest active player from target point. Returns ID, or `-1` if none found. |
-| `getHighestPlayer(filterFn?: (id: number) => boolean)` | `number` | Returns ID of the highest altitude active player ($O(1)$), or `-1` if none found. |
-| `getLowestPlayer(filterFn?: (id: number) => boolean)` | `number` | Returns ID of the lowest altitude active player ($O(1)$), or `-1` if none found. |
+| `getClosestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean)` | `number \| null` | Finds the single closest active player to target point. Returns ID, or `null` if none found. |
+| `getFarthestPlayer(x: number, y: number, z: number, filterFn?: (id: number) => boolean)` | `number \| null` | Finds the single farthest active player from target point. Returns ID, or `null` if none found. |
+| `getHighestPlayer(filterFn?: (id: number) => boolean)` | `number \| null` | Returns ID of the highest altitude active player ($O(1)$), or `null` if none found. |
+| `getLowestPlayer(filterFn?: (id: number) => boolean)` | `number \| null` | Returns ID of the lowest altitude active player ($O(1)$), or `null` if none found. |
 | `getKHighestPlayers(k: number, filterFn?: (id: number) => boolean, outArray?: number[])` | `number[]` | Returns the top-$k$ highest altitude active players, sorted highest to lowest ($O(k)$). |
 | `getKLowestPlayers(k: number, filterFn?: (id: number) => boolean, outArray?: number[])` | `number[]` | Returns the bottom-$k$ lowest altitude active players, sorted lowest to highest ($O(k)$). |
 | `getKClosestPlayers(x: number, y: number, z: number, k: number, filterFn?: (id: number) => boolean, outArray?: number[])` | `number[]` | Returns the $k$ closest active players sorted closest-first ($O(N \log k)$ Max-Heap). |
@@ -352,12 +352,12 @@ interface TargetExtremaHandle extends ExtremaHandle {
 
 | Function | Return Type | Description |
 | :-- | :-- | :-- |
-| `isPlayerInCylinder(player: number \| mod.Player, centerX: number, centerZ: number, radiusMeters: number, minY?: number, maxY?: number)` | `boolean` | Tests if player is active and inside a 2.5D cylinder (inclusive). |
-| `isPlayerOutsideCylinder(player: number \| mod.Player, centerX: number, centerZ: number, radiusMeters: number, minY?: number, maxY?: number)` | `boolean` | Tests if player is active and strictly outside a 2.5D cylinder. |
-| `isPlayerInSphere(player: number \| mod.Player, centerX: number, centerY: number, centerZ: number, radiusMeters: number)` | `boolean` | Tests if player is active and inside a 3D sphere (inclusive). |
-| `isPlayerOutsideSphere(player: number \| mod.Player, centerX: number, centerY: number, centerZ: number, radiusMeters: number)` | `boolean` | Tests if player is active and strictly outside a 3D sphere. |
-| `isPlayerInAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean` | Tests if player is active and inside a 3D AABB bounding box (inclusive). |
-| `isPlayerOutsideAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean` | Tests if player is active and strictly outside a 3D AABB bounding box. |
+| `isPlayerInCylinder(player: number \| mod.Player, centerX: number, centerZ: number, radiusMeters: number, minY?: number, maxY?: number)` | `boolean \| undefined` | Tests if player is active and inside a 2.5D cylinder (inclusive). Returns `undefined` if disconnected. |
+| `isPlayerOutsideCylinder(player: number \| mod.Player, centerX: number, centerZ: number, radiusMeters: number, minY?: number, maxY?: number)` | `boolean \| undefined` | Tests if player is active and strictly outside a 2.5D cylinder. Returns `undefined` if disconnected. |
+| `isPlayerInSphere(player: number \| mod.Player, centerX: number, centerY: number, centerZ: number, radiusMeters: number)` | `boolean \| undefined` | Tests if player is active and inside a 3D sphere (inclusive). Returns `undefined` if disconnected. |
+| `isPlayerOutsideSphere(player: number \| mod.Player, centerX: number, centerY: number, centerZ: number, radiusMeters: number)` | `boolean \| undefined` | Tests if player is active and strictly outside a 3D sphere. Returns `undefined` if disconnected. |
+| `isPlayerInAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean \| undefined` | Tests if player is active and inside a 3D AABB bounding box (inclusive). Returns `undefined` if disconnected. |
+| `isPlayerOutsideAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean \| undefined` | Tests if player is active and strictly outside a 3D AABB bounding box. Returns `undefined` if disconnected. |
 
 ---
 
