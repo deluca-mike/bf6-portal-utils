@@ -200,27 +200,43 @@ export declare namespace SpatialOC {
          * Internal helper to add a child element.
          * @param child - The child element to add.
          * @returns True if added, false otherwise.
-         * @internal
          */
-        _addChild(child: SpatialElement): boolean;
+        protected _addChild(child: SpatialElement): boolean;
         /**
          * Internal helper to remove a child element.
          * @param child - The child element to remove.
          * @returns True if removed, false otherwise.
-         * @internal
          */
-        _removeChild(child: SpatialElement): boolean;
+        protected _removeChild(child: SpatialElement): boolean;
         /**
-         * Internal update lifecycle step.
+         * Links a child element to a parent node.
+         * @param parent - The parent node.
+         * @param child - The child element to link.
+         */
+        protected static _link(parent: SpatialNode, child: SpatialElement): void;
+        /**
+         * Unlinks a child element from its parent node.
+         * @param child - The child element to unlink.
+         */
+        protected static _unlink(child: SpatialElement): void;
+        /**
+         * Internal self update lifecycle step.
+         * @param _dt - Delta time in seconds.
+         */
+        protected _updateSelf(_dt: number): void;
+        /**
+         * Internal self sync lifecycle step.
+         */
+        protected _syncSelf(): void;
+        /**
+         * Internal update lifecycle step that updates self and all child elements.
          * @param dt - Delta time in seconds.
-         * @internal
          */
-        abstract _updateInternal(dt: number): void;
+        protected _updateInternal(dt: number): void;
         /**
-         * Internal sync lifecycle step.
-         * @internal
+         * Internal sync lifecycle step that syncs self and all child elements.
          */
-        abstract _syncInternal(): void;
+        protected _syncInternal(): void;
         /**
          * Updates all active controllers, kinematics, and external trackers across the scene graph,
          * then synchronizes dirty transforms to the game engine.
@@ -679,16 +695,14 @@ export declare namespace SpatialOC {
          */
         private _markDirty;
         /**
-         * Internal update lifecycle step.
+         * Internal update step for this element's active controllers and kinematics.
          * @param dt - Delta time in seconds.
-         * @internal
          */
-        _updateInternal(dt: number): void;
+        protected _updateSelf(dt: number): void;
         /**
-         * Internal method to synchronize dirty transforms to native engine objects.
-         * @internal
+         * Internal method to synchronize dirty transforms of this element to native engine objects.
          */
-        _syncInternal(): void;
+        protected _syncSelf(): void;
     }
     /**
      * Creates an empty SpatialElement (virtual parent anchor or child element).

@@ -327,9 +327,8 @@ export namespace SpatialOC {
          * Internal helper to add a child element.
          * @param child - The child element to add.
          * @returns True if added, false otherwise.
-         * @internal
          */
-        _addChild(child: SpatialElement): boolean {
+        protected _addChild(child: SpatialElement): boolean {
             if (this._children.indexOf(child) !== -1) return true;
 
             this._children.push(child);
@@ -341,9 +340,8 @@ export namespace SpatialOC {
          * Internal helper to remove a child element.
          * @param child - The child element to remove.
          * @returns True if removed, false otherwise.
-         * @internal
          */
-        _removeChild(child: SpatialElement): boolean {
+        protected _removeChild(child: SpatialElement): boolean {
             const index = this._children.indexOf(child);
 
             if (index === -1) return false;
@@ -358,17 +356,71 @@ export namespace SpatialOC {
         }
 
         /**
-         * Internal update lifecycle step.
-         * @param dt - Delta time in seconds.
-         * @internal
+         * Links a child element to a parent node.
+         * @param parent - The parent node.
+         * @param child - The child element to link.
          */
-        abstract _updateInternal(dt: number): void;
+        protected static _link(parent: SpatialNode, child: SpatialElement): void {
+            if (child._parent && child._parent !== parent) {
+                child._parent._removeChild(child);
+            }
+
+            parent._addChild(child);
+            child._parent = parent;
+        }
 
         /**
-         * Internal sync lifecycle step.
-         * @internal
+         * Unlinks a child element from its parent node.
+         * @param child - The child element to unlink.
          */
-        abstract _syncInternal(): void;
+        protected static _unlink(child: SpatialElement): void {
+            if (child._parent) {
+                child._parent._removeChild(child);
+                child._parent = null;
+            }
+        }
+
+        /**
+         * Internal self update lifecycle step.
+         * @param _dt - Delta time in seconds.
+         */
+        protected _updateSelf(_dt: number): void {
+            // No-op for base SpatialNode / RootNode
+        }
+
+        /**
+         * Internal self sync lifecycle step.
+         */
+        protected _syncSelf(): void {
+            // No-op for base SpatialNode / RootNode
+        }
+
+        /**
+         * Internal update lifecycle step that updates self and all child elements.
+         * @param dt - Delta time in seconds.
+         */
+        protected _updateInternal(dt: number): void {
+            this._updateSelf(dt);
+
+            const childCount = this._children.length;
+
+            for (let i = 0; i < childCount; ++i) {
+                this._children[i]._updateInternal(dt);
+            }
+        }
+
+        /**
+         * Internal sync lifecycle step that syncs self and all child elements.
+         */
+        protected _syncInternal(): void {
+            this._syncSelf();
+
+            const childCount = this._children.length;
+
+            for (let i = 0; i < childCount; ++i) {
+                this._children[i]._syncInternal();
+            }
+        }
 
         /**
          * Updates all active controllers, kinematics, and external trackers across the scene graph,
@@ -421,22 +473,6 @@ export namespace SpatialOC {
 
         public override getParent(): null {
             return null;
-        }
-
-        override _updateInternal(dt: number): void {
-            const childCount = this._children.length;
-
-            for (let i = 0; i < childCount; ++i) {
-                this._children[i]._updateInternal(dt);
-            }
-        }
-
-        override _syncInternal(): void {
-            const childCount = this._children.length;
-
-            for (let i = 0; i < childCount; ++i) {
-                this._children[i]._syncInternal();
-            }
         }
     }
 
@@ -509,8 +545,7 @@ export namespace SpatialOC {
             }
 
             const element = new SpatialElement(options, false);
-            parent._addChild(element);
-            element._parent = parent;
+            SpatialNode._link(parent, element);
 
             return element;
         }
@@ -530,8 +565,7 @@ export namespace SpatialOC {
             }
 
             const element = new SpatialElement(options, true);
-            parent._addChild(element);
-            element._parent = parent;
+            SpatialNode._link(parent, element);
 
             element.ensureWorldTransformUpdated();
 
@@ -578,8 +612,7 @@ export namespace SpatialOC {
             }
 
             const element = new SpatialElement(options, false, object);
-            parent._addChild(element);
-            element._parent = parent;
+            SpatialNode._link(parent, element);
 
             return element;
         }
@@ -715,12 +748,7 @@ export namespace SpatialOC {
 
             if (this._parent === newParent) return this;
 
-            if (this._parent) {
-                this._parent._removeChild(this);
-            }
-
-            this._parent = newParent;
-            newParent._addChild(this);
+            SpatialNode._link(newParent, this);
 
             if (newParent !== ROOT_NODE) {
                 this._tracker = undefined;
@@ -1281,10 +1309,7 @@ export namespace SpatialOC {
             --_activeNodeCount;
 
             // Remove from parent
-            if (this._parent) {
-                this._parent._removeChild(this);
-                this._parent = null;
-            }
+            SpatialNode._unlink(this);
 
             // Recursively destroy children
             const children = this._children;
@@ -1868,11 +1893,10 @@ export namespace SpatialOC {
         }
 
         /**
-         * Internal update lifecycle step.
+         * Internal update step for this element's active controllers and kinematics.
          * @param dt - Delta time in seconds.
-         * @internal
          */
-        override _updateInternal(dt: number): void {
+        protected override _updateSelf(dt: number): void {
             if (this._isDeleted()) return;
 
             if (this._tracker) {
@@ -1883,19 +1907,12 @@ export namespace SpatialOC {
             this._stepOrbit(dt);
             this._stepLookAt();
             this._stepFollow(dt);
-
-            const childCount = this._children.length;
-
-            for (let i = 0; i < childCount; ++i) {
-                this._children[i]._updateInternal(dt);
-            }
         }
 
         /**
-         * Internal method to synchronize dirty transforms to native engine objects.
-         * @internal
+         * Internal method to synchronize dirty transforms of this element to native engine objects.
          */
-        override _syncInternal(): void {
+        protected override _syncSelf(): void {
             if (this._isDeleted()) return;
 
             this.ensureWorldTransformUpdated();
@@ -1917,12 +1934,6 @@ export namespace SpatialOC {
                 }
 
                 this._clearFlag(FLAG_ENGINE_TRANSFORM_DIRTY);
-            }
-
-            const childCount = this._children.length;
-
-            for (let i = 0; i < childCount; ++i) {
-                this._children[i]._syncInternal();
             }
         }
     }
