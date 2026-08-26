@@ -6,7 +6,7 @@ The `SpatialSOA` namespace provides an ultra-high-performance, data-oriented 3D 
 
 Instead of allocating individual object instances and Vector/Quaternion properties on the QuickJS heap, `SpatialSOA` stores transforms, hierarchies, and states in **flat, pre-allocated TypedArrays** (`Float32Array`, `Int16Array`, `Uint8Array`).
 
-Every node is referenced purely by a type-safe `SpatialNodeID` (generation-encoded `number`), with zero heap objects created during gameplay queries and transformations.
+Every node is referenced purely by a type-safe `SpatialNodeID` (1-based generation-encoded `number`), with zero heap objects created during gameplay queries and transformations. Node ID 0 is reserved for the exported constant `ROOT_NODE_ID`.
 
 This architecture:
 
@@ -15,6 +15,7 @@ This architecture:
 - **Uses Left-Child Right-Sibling (LCRS) hierarchy indexing** in 16-bit integers (`Int16Array`) for $\mathcal{O}(1)$ zero-allocation parent-child relationships.
 - **Unified Triple-Duty Intrusive Linking**: Chained free-slots, active root nodes, and parent-child siblings all share the same `_nextSibling` buffer, eliminating auxiliary array overhead.
 - **Prevents stale ID reuse** via generation-encoded node IDs (`Uint16Array`) with slot retirement at 65,535 generations to eliminate wrap-around collisions.
+- **Explicit Root Node ID (`ROOT_NODE_ID = 0`)**: Top-level nodes are children of `ROOT_NODE_ID`.
 
 </ai>
 
@@ -61,12 +62,14 @@ let playerOrbitRoot: SpatialSOA.SpatialNodeID | undefined;
 
 export function OnPlayerJoinGame(player: mod.Player) {
     // 1. Create a virtual parent anchor attached to the player's position
-    playerOrbitRoot = SpatialSOA.createEmpty();
-    SpatialSOA.attachToPlayer(playerOrbitRoot, player, {
-        offset: { x: 0, y: 1.5, z: 0 },
-        trackRotation: true,
-        yawOnly: true,
-    });
+    playerOrbitRoot = SpatialSOA.createEmpty() ?? undefined;
+    if (playerOrbitRoot !== undefined) {
+        SpatialSOA.attachToPlayer(playerOrbitRoot, player, {
+            offset: { x: 0, y: 1.5, z: 0 },
+            trackRotation: true,
+            yawOnly: true,
+        });
+    }
 
     const radius = 3.5;
     const count = 3;
@@ -118,6 +121,10 @@ export function OnPlayerLeaveGame(playerId: number) {
 
 ### `namespace SpatialSOA`
 
+#### Constants
+
+- `ROOT_NODE_ID: SpatialNodeID` (value `0`) – The root node identifier.
+
 #### Node Creation & Lifecycle
 
 - `createEmpty(options?: NodeOptions): SpatialNodeID | null` (returns `null` if pool is full or `parentId` is invalid)
@@ -127,20 +134,16 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `destroyAll(): void`
 - `isValid(id: SpatialNodeID): boolean`
 - `isDeleted(id: SpatialNodeID): boolean`
+- `getActiveNodeCount(): number`
 
 #### Hierarchy Operations
 
-- `addChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean` (attaches child to parent; clears any active attachment tracker or follow controller on the child)
-- `removeChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean`
-- `detachFromParent(id: SpatialNodeID): void`
-- `getParent(id: SpatialNodeID): SpatialNodeID | null | undefined` (returns `null` for root nodes, `undefined` if unlocated)
-- `getChildCount(id: SpatialNodeID): number | undefined` (returns `undefined` if unlocated)
-- `getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined` (returns `undefined` if unlocated)
-- `getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined` (returns `null` if index out of bounds, `undefined` if unlocated)
+- `setParent(id: SpatialNodeID, parentId: SpatialNodeID): boolean` (re-parents a node; returns `false` if invalid or cycle detected)
+- `getParent(id: SpatialNodeID): SpatialNodeID | null | undefined` (returns `null` for `ROOT_NODE_ID`, `ROOT_NODE_ID` for top-level nodes, `undefined` if deleted)
+- `getChildCount(id: SpatialNodeID): number | undefined` (returns `undefined` if deleted)
+- `getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined` (returns `undefined` if deleted)
+- `getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined` (returns `null` if index out of bounds, `undefined` if deleted)
 - `forEachChild(id: SpatialNodeID, callback: (childId: SpatialNodeID, index: number) => void): void` (safely invoked with error isolation via `CallbackHandler`)
-- `getRootCount(): number`
-- `getRootNodes(): SpatialNodeID[]`
-- `getActiveNodeCount(): number`
 
 #### Local & World Transforms
 
@@ -170,14 +173,14 @@ export function OnPlayerLeaveGame(playerId: number) {
 
 #### Attachments & Controllers
 
-- `attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void` (attaches in world space; auto-detaches from parent and clears follow, orbit, and linear kinematics)
-- `attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void` (attaches in world space; auto-detaches from parent and clears follow, orbit, and linear kinematics)
-- `attachToObject(id: SpatialNodeID, object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): void` (attaches in world space; auto-detaches from parent and clears follow, orbit, and linear kinematics)
-- `attachToTracker(id: SpatialNodeID, tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined): void` (attaches in world space; auto-detaches from parent and clears follow, orbit, and linear kinematics)
+- `attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
+- `attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
+- `attachToObject(id: SpatialNodeID, object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
+- `attachToTracker(id: SpatialNodeID, tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
 - `detachTracker(id: SpatialNodeID): void`
 - `setOrbit(id: SpatialNodeID, options?: OrbitOptions | null): void` (orbits in parent space; clears attach trackers, follow options, and linear kinematics)
 - `setLookAt(id: SpatialNodeID, options?: LookAtOptions | null): void` (aims orientation at target; clears angular kinematics and disables orbit spin/tangent alignment)
-- `setFollow(id: SpatialNodeID, options?: FollowOptions | null): void` (follows target in world space; auto-detaches from parent and clears attach trackers, orbit options, and linear kinematics)
+- `setFollow(id: SpatialNodeID, options?: FollowOptions | null): void` (follows target in world space; sets parent to `ROOT_NODE_ID` and clears attach trackers, orbit options, and linear kinematics)
 - `setKinematics(id: SpatialNodeID, options?: KinematicsOptions | null): void` (linear kinematics clear positional controllers; angular kinematics clear rotational controllers)
 
 #### Engine Synchronization
@@ -191,7 +194,7 @@ export function OnPlayerLeaveGame(playerId: number) {
 
 #### `NodeOptions`
 
-- `parentId?: SpatialNodeID` – Optional parent node ID to attach to upon creation. If omitted, creates a root node.
+- `parentId?: SpatialNodeID` – Optional parent node ID to attach to upon creation. If omitted, attaches to `ROOT_NODE_ID`.
 - `position?: Vector3` – Initial local position.
 - `rotation?: Vector3 | Quaternion` – Initial local rotation (Quaternion or Euler angles in radians).
 - `scale?: Vector3 | number` – Initial local scale (uniform or per-axis). Default: 1.
@@ -208,7 +211,7 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `offset?: Vector3` – Positional offset relative to the target's orientation coordinate frame.
 - `trackRotation?: boolean` – Whether to track and match the target's rotation. Default: true.
 - `yawOnly?: boolean` – When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object.
-- _Note: Attaching a node automatically detaches it from its parent (making it a root node) and clears any active follow, orbit, or linear kinematics._
+- _Note: Attaching a node automatically sets its parent to `ROOT_NODE_ID` and clears any active follow, orbit, or linear kinematics._
 
 #### `OrbitOptions`
 
@@ -224,7 +227,7 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `target?: SpatialNodeID | mod.Player` – The target to follow (SpatialNodeID or Player).
 - `offset?: Vector3` – Desired offset from the target in world space.
 - `smoothSpeed?: number` – Damping speed factor (0 for instant snap, > 0 for smooth lerp). Default: 10.
-- _Note: Configuring follow behavior automatically detaches the node from its parent (making it a root node) and clears any active attachment trackers, orbit controllers, or linear kinematics._
+- _Note: Configuring follow behavior automatically sets the node's parent to `ROOT_NODE_ID` and clears any active attachment trackers, orbit controllers, or linear kinematics._
 
 #### `KinematicsOptions`
 

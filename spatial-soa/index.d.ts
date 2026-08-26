@@ -75,10 +75,14 @@ export declare namespace SpatialSOA {
         readonly __brand: 'SpatialNodeID';
     };
     /**
+     * Constant representing the root anchor node ID in the scene graph.
+     */
+    const ROOT_NODE_ID: SpatialNodeID;
+    /**
      * Common initialization options for creating SpatialNodes.
      */
     interface NodeOptions {
-        /** Optional parent node ID to attach this node to upon creation. If undefined, creates a root node. */
+        /** Optional parent node ID to attach this node to upon creation. If undefined, attaches to ROOT_NODE_ID. */
         parentId?: SpatialNodeID;
         /** Initial local or world position. */
         position?: Vector3;
@@ -186,32 +190,20 @@ export declare namespace SpatialSOA {
      */
     function destroy(id: SpatialNodeID): void;
     /**
-     * Adds a child node under a parent node.
-     * @param parentId - The parent node ID.
-     * @param childId - The child node ID.
-     * @returns True if added successfully, false if circular or invalid.
+     * Sets the parent node of a node.
+     * @param id - The child node ID.
+     * @param parentId - The new parent node ID (can be ROOT_NODE_ID or another node).
+     * @returns True if parent was set successfully, false if circular or invalid.
      */
-    function addChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean;
-    /**
-     * Removes a child node from its parent.
-     * @param parentId - The parent node ID.
-     * @param childId - The child node ID.
-     * @returns True if removed, false otherwise.
-     */
-    function removeChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean;
-    /**
-     * Detaches a node from its parent, making it a root node.
-     * @param id - The node ID to detach.
-     */
-    function detachFromParent(id: SpatialNodeID): void;
+    function setParent(id: SpatialNodeID, parentId: SpatialNodeID): boolean;
     /**
      * Returns the parent node ID of a node.
      * @param id - The node ID.
-     * @returns The parent node ID, null if root node, or undefined if the node does not exist.
+     * @returns The parent node ID, null for ROOT_NODE_ID, or undefined if the node does not exist.
      */
     function getParent(id: SpatialNodeID): SpatialNodeID | null | undefined;
     /**
-     * Returns the total direct child count for a node.
+     * Returns the total direct child count for a node or the root scene.
      * @param id - The node ID.
      * @returns The number of direct children, or undefined if the node does not exist.
      */
@@ -425,7 +417,7 @@ export declare namespace SpatialSOA {
     function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined;
     /**
      * Attaches a node to follow a player's real-time position/orientation in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param player - The target player.
@@ -434,7 +426,7 @@ export declare namespace SpatialSOA {
     function attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void;
     /**
      * Attaches a node to follow a vehicle's real-time position/orientation in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param vehicle - The target vehicle.
@@ -443,7 +435,7 @@ export declare namespace SpatialSOA {
     function attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void;
     /**
      * Attaches a node to follow an in-game object (props, spawners, etc.) in real time in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param object - The native in-game object to track (excluding Player and Vehicle).
@@ -456,7 +448,7 @@ export declare namespace SpatialSOA {
     ): void;
     /**
      * Attaches a custom dynamic tracker callback in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param tracker - Tracker callback function.
@@ -491,7 +483,7 @@ export declare namespace SpatialSOA {
     function setLookAt(id: SpatialNodeID, options?: LookAtOptions | null): void;
     /**
      * Configures continuous smooth follow behavior on a node in world space.
-     * If configuring follow on a child node, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active attachment tracker, orbit controller, or linear kinematics.
      * @param id - The node ID.
      * @param options - Follow configuration or null to disable.
@@ -519,20 +511,10 @@ export declare namespace SpatialSOA {
      */
     function sync(): void;
     /**
-     * Returns the total count of active root nodes.
-     * @returns The number of root nodes.
-     */
-    function getRootCount(): number;
-    /**
      * Returns the total count of active nodes in the scene graph (roots + children).
      * @returns The number of active nodes.
      */
     function getActiveNodeCount(): number;
-    /**
-     * Returns an array of active root node IDs.
-     * @returns Array of root node IDs.
-     */
-    function getRootNodes(): SpatialNodeID[];
     /**
      * Recursively destroys all managed nodes in the scene graph and unspawns runtime entities.
      */

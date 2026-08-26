@@ -7,9 +7,10 @@ import { SpatialOC } from '../index.ts';
 
 describe('SpatialOC Module Integration Tests', () => {
     beforeEach(() => {
-        SpatialOC.destroyAll();
+        SpatialOC.ROOT_NODE.forEachChild((child) => child.destroy());
         harness.objects.clear();
     });
+
     describe('1. Scene Graph Hierarchy & Coordinate Transformations', () => {
         it('should compute world positions for multi-level hierarchies', () => {
             const root = SpatialOC.createEmpty({ position: { x: 0, y: 100, z: 0 } })!;
@@ -30,15 +31,16 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(root.getChild(0)).toBe(c1);
             expect(root.getChild(1)).toBe(c2);
             expect(root.getChild(2)).toBeNull();
-            expect(root.parent).toBeNull();
+            expect(root.parent).toBe(SpatialOC.ROOT_NODE);
+            expect(SpatialOC.ROOT_NODE.parent).toBeNull();
             expect(root.pivotOffset).toBeNull();
 
-            const visited: SpatialOC.SpatialNode[] = [];
+            const visited: SpatialOC.SpatialElement[] = [];
             root.forEachChild((child) => visited.push(child));
             expect(visited).toEqual([c1, c2]);
 
             // Mutating children copy should not affect internal structure
-            const arr = root.children as SpatialOC.SpatialNode[];
+            const arr = root.children as SpatialOC.SpatialElement[];
             arr.pop();
             expect(root.childCount).toBe(2);
         });
@@ -130,9 +132,8 @@ describe('SpatialOC Module Integration Tests', () => {
             const c = SpatialOC.createEmpty({ parent: b })!;
 
             // Attempting to add ancestor 'a' as child of 'c'
-            const result = c.addChild(a);
-            expect(result).toBe(false);
-            expect(a.parent).toBeNull();
+            a.setParent(c);
+            expect(a.parent).toBe(SpatialOC.ROOT_NODE);
         });
 
         it('should safely destroy nodes, remove from hierarchy, and unspawn native runtime objects', () => {
@@ -145,12 +146,12 @@ describe('SpatialOC Module Integration Tests', () => {
 
             expect(root.isDeleted).toBe(true);
             expect(childRuntime.isDeleted).toBe(true);
-            expect(SpatialOC.getRootCount()).toBe(0);
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(0);
         });
 
-        it('should accurately track getActiveNodeCount and getRootCount across hierarchies and destructions', () => {
+        it('should accurately track getActiveNodeCount and childCount on ROOT_NODE across hierarchies and destructions', () => {
             expect(SpatialOC.getActiveNodeCount()).toBe(0);
-            expect(SpatialOC.getRootCount()).toBe(0);
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(0);
 
             const root1 = SpatialOC.createEmpty()!;
             const root2 = SpatialOC.createEmpty()!;
@@ -162,22 +163,22 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(child2.isValid).toBe(true);
             expect(grandChild.isValid).toBe(true);
 
-            expect(SpatialOC.getRootCount()).toBe(2);
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(2);
             expect(SpatialOC.getActiveNodeCount()).toBe(5);
 
             // Destroy child1 and its subtree (child1 + grandChild)
             child1.destroy();
-            expect(SpatialOC.getRootCount()).toBe(2);
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(2);
             expect(SpatialOC.getActiveNodeCount()).toBe(3);
 
             // Destroy root1 and its remaining child (root1 + child2)
             root1.destroy();
-            expect(SpatialOC.getRootCount()).toBe(1);
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(1);
             expect(SpatialOC.getActiveNodeCount()).toBe(1);
 
             // Destroy all
-            SpatialOC.destroyAll();
-            expect(SpatialOC.getRootCount()).toBe(0);
+            SpatialOC.ROOT_NODE.forEachChild((c) => c.destroy());
+            expect(SpatialOC.ROOT_NODE.childCount).toBe(0);
             expect(SpatialOC.getActiveNodeCount()).toBe(0);
         });
 
@@ -201,8 +202,8 @@ describe('SpatialOC Module Integration Tests', () => {
 
     describe('2. High-Level Controllers (Orbit, Follow, LookAt, Kinematics)', () => {
         it('should smoothly orbit a child around its parent using OrbitController', () => {
-            const kartRoot = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
-            const shell = SpatialOC.createEmpty({ parent: kartRoot, position: { x: 5, y: 0, z: 0 } });
+            const kartRoot = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const shell = SpatialOC.createEmpty({ parent: kartRoot, position: { x: 5, y: 0, z: 0 } })!;
 
             // Orbit at 90 deg (PI/2 rad) per second
             shell.setOrbit({
@@ -224,7 +225,7 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should rotate node to face target using lookAt', () => {
-            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
+            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             node.lookAt({ x: 0, y: 0, z: 100 }); // Look forward (+Z)
 
             const euler = node.worldRotationEuler;
@@ -236,8 +237,8 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should smoothly follow a moving target using FollowController', () => {
-            const target = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
-            const follower = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
+            const target = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const follower = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
 
             follower.setFollow({
                 target: target,
@@ -258,7 +259,7 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should integrate kinematic velocities accurately over time', () => {
-            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
+            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             node.setKinematics({
                 linearVelocity: { x: 10, y: 0, z: -5 },
                 angularVelocity: { x: 0, y: Math.PI, z: 0 },
@@ -276,7 +277,7 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should integrate linear and angular accelerations accurately over time', () => {
-            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
+            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             node.setKinematics({
                 linearVelocity: { x: 0, y: 0, z: 0 },
                 linearAcceleration: { x: 4, y: 0, z: 0 }, // v = a * dt = 4 * 1 = 4 m/s; dx = 4 * 1 = 4 m
@@ -299,14 +300,14 @@ describe('SpatialOC Module Integration Tests', () => {
             playerMock.position = { x: 200, y: 50, z: 300 };
             playerMock.rotation = { x: 0, y: 0, z: 1 }; // Facing +Z
 
-            const root = SpatialOC.createEmpty();
+            const root = SpatialOC.createEmpty()!;
             root.attachToPlayer(playerMock as unknown as mod.Player, {
                 offset: { x: 0, y: 2, z: 0 },
                 trackRotation: true,
                 yawOnly: true,
             });
 
-            const orbiter = SpatialOC.createEmpty({ parent: root, position: { x: 3, y: 0, z: 0 } });
+            const orbiter = SpatialOC.createEmpty({ parent: root, position: { x: 3, y: 0, z: 0 } })!;
 
             // Step update
             SpatialOC.update(0.016);
@@ -332,7 +333,7 @@ describe('SpatialOC Module Integration Tests', () => {
             propMock.position = { x: 10, y: 0, z: 20 };
             propMock.rotation = { x: 0, y: Math.PI / 2, z: 0 }; // 90 deg yaw
 
-            const root = SpatialOC.createEmpty();
+            const root = SpatialOC.createEmpty()!;
             root.attachToObject(propMock as unknown as Exclude<mod.Object, mod.Player | mod.Vehicle>, {
                 offset: { x: 0, y: 0, z: 5 }, // 5m forward in object's local frame
                 trackRotation: true,
@@ -352,7 +353,7 @@ describe('SpatialOC Module Integration Tests', () => {
                 rotation: { x: 0, y: 0, z: 0 },
                 scale: { x: 1, y: 2, z: 3 },
                 pivotOffset: { x: 5, y: 5, z: 5 },
-            });
+            })!;
 
             // Mutate localPosition return
             const localPos = node.localPosition;
@@ -393,18 +394,18 @@ describe('SpatialOC Module Integration Tests', () => {
         it('should support Quaternion or Euler Vector3 in NodeOptions.rotation', () => {
             const nodeQuat = SpatialOC.createEmpty({
                 rotation: { w: 0.7071068, x: 0, y: 0.7071068, z: 0 },
-            });
+            })!;
             expect(nodeQuat.localRotationEuler.y).toBeCloseTo(Math.PI / 2);
 
             const nodeEuler = SpatialOC.createEmpty({
                 rotation: { x: 0, y: Math.PI / 2, z: 0 },
-            });
+            })!;
             expect(nodeEuler.localRotationEuler.y).toBeCloseTo(Math.PI / 2);
         });
 
         it('should track targets using LookAt controller with target node, vector, or player', () => {
-            const watcher = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
-            const targetNode = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 50 } });
+            const watcher = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const targetNode = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 50 } })!;
 
             watcher.setLookAt({ target: targetNode });
             SpatialOC.update(0.016);
@@ -422,7 +423,7 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should safely execute forEachChild callbacks via CallbackHandler', () => {
-            const root = SpatialOC.createEmpty();
+            const root = SpatialOC.createEmpty()!;
             SpatialOC.createEmpty({ parent: root });
             SpatialOC.createEmpty({ parent: root });
 
@@ -437,12 +438,12 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should manually update transforms via ensureWorldTransformUpdated and computeRenderPosition', () => {
-            const root = SpatialOC.createEmpty({ position: { x: 10, y: 20, z: 30 } });
+            const root = SpatialOC.createEmpty({ position: { x: 10, y: 20, z: 30 } })!;
             const child = SpatialOC.createEmpty({
                 parent: root,
                 position: { x: 0, y: 5, z: 0 },
                 pivotOffset: { x: 0, y: 1, z: 0 },
-            });
+            })!;
 
             child.ensureWorldTransformUpdated();
             const renderPos = child.computeRenderPosition();
@@ -452,7 +453,7 @@ describe('SpatialOC Module Integration Tests', () => {
         });
 
         it('should automatically compute delta time from server uptime when update() is called without arguments', async () => {
-            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } });
+            const node = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             node.setKinematics({
                 linearVelocity: { x: 100, y: 0, z: 0 },
             });
@@ -480,18 +481,18 @@ describe('SpatialOC Module Integration Tests', () => {
 
             // setFollow first
             child1.setFollow({ target });
-            expect(child1.parent).toBeNull();
+            expect(child1.parent).toBe(SpatialOC.ROOT_NODE);
 
-            // attachToPlayer should auto-detach and clear follow
+            // attachToPlayer should auto-detach to ROOT_NODE and clear follow
             const playerMock = harness.createMockObject(1);
             child1.attachToPlayer(playerMock as unknown as mod.Player);
-            expect(child1.parent).toBeNull();
+            expect(child1.parent).toBe(SpatialOC.ROOT_NODE);
             expect(parent.childCount).toBe(1);
 
-            // setFollow with target should auto-detach and clear tracker
+            // setFollow with target should auto-detach to ROOT_NODE and clear tracker
             child2.attachToPlayer(playerMock as unknown as mod.Player);
             child2.setFollow({ target });
-            expect(child2.parent).toBeNull();
+            expect(child2.parent).toBe(SpatialOC.ROOT_NODE);
             expect(parent.childCount).toBe(0);
 
             // setOrbit should clear tracker and follow
@@ -518,28 +519,30 @@ describe('SpatialOC Module Integration Tests', () => {
             // Kinematics should clear lookAt
             node.setKinematics({ angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. addChild should clear tracker and follow on the child
+            // 3. setParent should clear tracker and follow on the child when attaching to ROOT_NODE
             const parent = SpatialOC.createEmpty()!;
             const child = SpatialOC.createEmpty()!;
             child.setFollow({ target });
-            expect(child.parent).toBeNull();
-            parent.addChild(child);
+            expect(child.parent).toBe(SpatialOC.ROOT_NODE);
+            child.setParent(parent);
             expect(child.parent).toBe(parent);
         });
     });
 
     describe('4. Static Factories, Complementary Getters & Deleted Node Safety', () => {
-        it('should support static factory methods on SpatialNode class', () => {
-            const root = SpatialOC.SpatialNode.createEmpty({ position: { x: 10, y: 20, z: 30 } });
+        it('should support static factory methods on SpatialElement class', () => {
+            const root = SpatialOC.SpatialElement.createEmpty({ position: { x: 10, y: 20, z: 30 } });
             expect(root).not.toBeNull();
             expect(root!.localPosition).toEqual({ x: 10, y: 20, z: 30 });
 
             const mockObj = harness.createMockObject(55);
-            const existing = SpatialOC.SpatialNode.createExisting(mockObj as unknown as SpatialOC.TransformableObject);
+            const existing = SpatialOC.SpatialElement.createExisting(
+                mockObj as unknown as SpatialOC.TransformableObject
+            );
             expect(existing).not.toBeNull();
             expect(existing!.isValid).toBe(true);
 
-            const runtime = SpatialOC.SpatialNode.createRuntime(101);
+            const runtime = SpatialOC.SpatialElement.createRuntime(101);
             expect(runtime).not.toBeNull();
             expect(runtime!.isValid).toBe(true);
         });
@@ -596,7 +599,7 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(resWorldScale).toBe(outWorldScale);
             expect(outWorldScale).toEqual({ x: 2, y: 3, z: 4 });
 
-            expect(node.getParent()).toBeNull();
+            expect(node.getParent()).toBe(SpatialOC.ROOT_NODE);
             expect(node.getChildCount()).toBe(0);
             expect(node.getChildren()).toEqual([]);
         });

@@ -127,9 +127,10 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             const c = SpatialSOA.createEmpty({ parentId: b })!;
 
             // Attempting to add ancestor 'a' as child of 'c'
-            const result = SpatialSOA.addChild(c, a);
+            const result = SpatialSOA.setParent(a, c);
             expect(result).toBe(false);
-            expect(SpatialSOA.getParent(a)).toBeNull();
+            expect(SpatialSOA.getParent(a)).toBe(SpatialSOA.ROOT_NODE_ID);
+            expect(SpatialSOA.getParent(SpatialSOA.ROOT_NODE_ID)).toBeNull();
             expect(SpatialSOA.getParent(999999 as SpatialSOA.SpatialNodeID)).toBeUndefined();
         });
 
@@ -143,13 +144,33 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
 
             expect(SpatialSOA.isDeleted(root)).toBe(true);
             expect(SpatialSOA.isDeleted(childRuntime)).toBe(true);
-            expect(SpatialSOA.getRootCount()).toBe(0);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(0);
             expect(SpatialSOA.getActiveNodeCount()).toBe(0);
         });
 
-        it('should accurately track getActiveNodeCount and getRootCount across hierarchies and destructions', () => {
+        it('should protect ROOT_NODE_ID from destruction and re-parenting', () => {
+            const logs: string[] = [];
+            SpatialSOA.setLogging((text) => void logs.push(text), SpatialSOA.LogLevel.Warning);
+
+            expect(SpatialSOA.isValid(SpatialSOA.ROOT_NODE_ID)).toBe(true);
+            expect(SpatialSOA.isDeleted(SpatialSOA.ROOT_NODE_ID)).toBe(false);
+            expect(SpatialSOA.getParent(SpatialSOA.ROOT_NODE_ID)).toBeNull();
+
+            // Attempt to destroy root node
+            SpatialSOA.destroy(SpatialSOA.ROOT_NODE_ID);
+            expect(logs.some((l) => l.includes('Cannot destroy the root node'))).toBe(true);
+            expect(SpatialSOA.isValid(SpatialSOA.ROOT_NODE_ID)).toBe(true);
+
+            // Attempt to re-parent root node
+            const node = SpatialSOA.createEmpty()!;
+            const reparentResult = SpatialSOA.setParent(SpatialSOA.ROOT_NODE_ID, node);
+            expect(reparentResult).toBe(false);
+            expect(logs.some((l) => l.includes('Cannot re-parent the root node'))).toBe(true);
+        });
+
+        it('should accurately track getActiveNodeCount and ROOT_NODE_ID childCount across hierarchies and destructions', () => {
             expect(SpatialSOA.getActiveNodeCount()).toBe(0);
-            expect(SpatialSOA.getRootCount()).toBe(0);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(0);
 
             const root1 = SpatialSOA.createEmpty()!;
             const root2 = SpatialSOA.createEmpty()!;
@@ -161,22 +182,22 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(SpatialSOA.isValid(child2)).toBe(true);
             expect(SpatialSOA.isValid(grandChild)).toBe(true);
 
-            expect(SpatialSOA.getRootCount()).toBe(2);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(2);
             expect(SpatialSOA.getActiveNodeCount()).toBe(5);
 
             // Destroy child1 and its subtree (child1 + grandChild)
             SpatialSOA.destroy(child1);
-            expect(SpatialSOA.getRootCount()).toBe(2);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(2);
             expect(SpatialSOA.getActiveNodeCount()).toBe(3);
 
             // Destroy root1 and its remaining child (root1 + child2)
             SpatialSOA.destroy(root1);
-            expect(SpatialSOA.getRootCount()).toBe(1);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(1);
             expect(SpatialSOA.getActiveNodeCount()).toBe(1);
 
             // Destroy all
             SpatialSOA.destroyAll();
-            expect(SpatialSOA.getRootCount()).toBe(0);
+            expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(0);
             expect(SpatialSOA.getActiveNodeCount()).toBe(0);
         });
 
@@ -322,18 +343,18 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
 
             // setFollow first
             SpatialSOA.setFollow(child1, { target });
-            expect(SpatialSOA.getParent(child1)).toBeNull();
+            expect(SpatialSOA.getParent(child1)).toBe(SpatialSOA.ROOT_NODE_ID);
 
-            // attachToPlayer should auto-detach and clear follow
+            // attachToPlayer should auto-detach to ROOT_NODE_ID and clear follow
             const playerMock = harness.createMockObject(1);
             SpatialSOA.attachToPlayer(child1, playerMock as unknown as mod.Player);
-            expect(SpatialSOA.getParent(child1)).toBeNull();
+            expect(SpatialSOA.getParent(child1)).toBe(SpatialSOA.ROOT_NODE_ID);
             expect(SpatialSOA.getChildCount(parent)).toBe(1);
 
-            // setFollow with target should auto-detach and clear tracker
+            // setFollow with target should auto-detach to ROOT_NODE_ID and clear tracker
             SpatialSOA.attachToPlayer(child2, playerMock as unknown as mod.Player);
             SpatialSOA.setFollow(child2, { target });
-            expect(SpatialSOA.getParent(child2)).toBeNull();
+            expect(SpatialSOA.getParent(child2)).toBe(SpatialSOA.ROOT_NODE_ID);
             expect(SpatialSOA.getChildCount(parent)).toBe(0);
 
             // setOrbit should clear tracker and follow
@@ -360,12 +381,12 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             // Kinematics should clear lookAt
             SpatialSOA.setKinematics(node, { angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. addChild should clear tracker and follow on the child
+            // 3. setParent should clear tracker and follow on the child when attaching to ROOT_NODE_ID
             const parent = SpatialSOA.createEmpty()!;
             const child = SpatialSOA.createEmpty()!;
             SpatialSOA.setFollow(child, { target });
-            expect(SpatialSOA.getParent(child)).toBeNull();
-            SpatialSOA.addChild(parent, child);
+            expect(SpatialSOA.getParent(child)).toBe(SpatialSOA.ROOT_NODE_ID);
+            SpatialSOA.setParent(child, parent);
             expect(SpatialSOA.getParent(child)).toBe(parent);
         });
 

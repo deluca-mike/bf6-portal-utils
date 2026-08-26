@@ -90,6 +90,11 @@ export namespace SpatialSOA {
      */
     export type SpatialNodeID = number & { readonly __brand: 'SpatialNodeID' };
 
+    /**
+     * Constant representing the root anchor node ID in the scene graph.
+     */
+    export const ROOT_NODE_ID = 0 as SpatialNodeID;
+
     // Module-Level Configuration
     const MAX_NODES = 1024;
     const MAX_GENERATIONS = 65_535;
@@ -111,7 +116,7 @@ export namespace SpatialSOA {
      * Common initialization options for creating SpatialNodes.
      */
     export interface NodeOptions {
-        /** Optional parent node ID to attach this node to upon creation. If undefined, creates a root node. */
+        /** Optional parent node ID to attach this node to upon creation. If undefined, attaches to ROOT_NODE_ID. */
         parentId?: SpatialNodeID;
         /** Initial local or world position. */
         position?: Vector3;
@@ -422,11 +427,11 @@ export namespace SpatialSOA {
      * @returns The internal array index, or INVALID_INDEX if invalid, generation-mismatched, or inactive.
      */
     function _resolveIndex(id: SpatialNodeID): number {
-        if (id < 0) return INVALID_INDEX;
+        if (id <= 0) return INVALID_INDEX;
 
-        const index = id % GENERATION_MULTIPLIER;
+        const index = (id % GENERATION_MULTIPLIER) - 1;
 
-        if (index >= MAX_NODES) return INVALID_INDEX;
+        if (index < 0 || index >= MAX_NODES) return INVALID_INDEX;
 
         const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
 
@@ -437,11 +442,12 @@ export namespace SpatialSOA {
 
     /**
      * Encodes an internal array index and its current generation into a public node ID.
+     * 1-based offset ensures slot 0 with generation 0 starts at ID 1, preserving ROOT_NODE_ID = 0.
      * @param index - The internal array index.
      * @returns The encoded public node ID.
      */
     function _encodeId(index: number): SpatialNodeID {
-        return (index + GENERATION_MULTIPLIER * _generations[index]) as SpatialNodeID;
+        return (index + 1 + GENERATION_MULTIPLIER * _generations[index]) as SpatialNodeID;
     }
 
     /**
@@ -731,6 +737,7 @@ export namespace SpatialSOA {
             _firstRoot = _nextSibling[index];
             _nextSibling[index] = INVALID_INDEX;
             --_rootCount;
+
             return;
         }
 
@@ -743,6 +750,25 @@ export namespace SpatialSOA {
 
             return;
         }
+    }
+
+    /**
+     * Unlinks a child node from its parent's child list.
+     * @param parentIndex - The parent's internal array index.
+     * @param childIndex - The child's internal array index.
+     */
+    function _unlinkChild(parentIndex: number, childIndex: number): void {
+        if (_firstChild[parentIndex] === childIndex) {
+            _firstChild[parentIndex] = _nextSibling[childIndex];
+        } else {
+            for (let prev = _firstChild[parentIndex]; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
+                if (_nextSibling[prev] === childIndex) {
+                    _nextSibling[prev] = _nextSibling[childIndex];
+                    break;
+                }
+            }
+        }
+        _nextSibling[childIndex] = INVALID_INDEX;
     }
 
     function _initSlot(
@@ -815,6 +841,7 @@ export namespace SpatialSOA {
     function _computeFacingQuaternion(facing: Vector3, yawOnly: boolean, out: Quaternion): Quaternion {
         const yawRad = Math.atan2(facing.x, facing.z);
         const pitchRad = yawOnly ? 0 : -Math.asin(Math.max(-1, Math.min(1, facing.y)));
+
         return Quaternions.setFromEuler(out, pitchRad, yawRad, 0);
     }
 
@@ -1010,7 +1037,7 @@ export namespace SpatialSOA {
                     mod.CreateTransform(Vectors.toVector(renderPos), Vectors.toVector(rotEuler))
                 );
             } catch (error: unknown) {
-                logging.log('Error applying transform to native object', LogLevel.Warning, error);
+                logging.log('Error applying transform to native object', LogLevel.Error, error);
             }
 
             _clearFlag(index, FLAG_ENGINE_TRANSFORM_DIRTY);
@@ -1035,7 +1062,10 @@ export namespace SpatialSOA {
      * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
     export function createEmpty(options?: NodeOptions): SpatialNodeID | null {
-        if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
+        const parentId = options?.parentId ?? ROOT_NODE_ID;
+
+        if (parentId !== ROOT_NODE_ID && _resolveIndex(parentId) === INVALID_INDEX) {
+            logging.log('Create empty failed, parent is invalid', LogLevel.Error);
             return null;
         }
 
@@ -1043,12 +1073,12 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = id % GENERATION_MULTIPLIER;
+        const index = _resolveIndex(id);
 
-        if (options?.parentId !== undefined) {
-            addChild(options.parentId, id);
-        } else {
+        if (parentId === ROOT_NODE_ID) {
             _addRoot(index);
+        } else {
+            setParent(id, parentId);
         }
 
         return id;
@@ -1061,7 +1091,10 @@ export namespace SpatialSOA {
      * @returns The created node ID, or null if spawning failed, parentId is invalid, or pool is full.
      */
     export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID | null {
-        if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
+        const parentId = options?.parentId ?? ROOT_NODE_ID;
+
+        if (parentId !== ROOT_NODE_ID && _resolveIndex(parentId) === INVALID_INDEX) {
+            logging.log('Create runtime failed, parent is invalid', LogLevel.Error);
             return null;
         }
 
@@ -1069,12 +1102,12 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = id % GENERATION_MULTIPLIER;
+        const index = _resolveIndex(id);
 
-        if (options?.parentId !== undefined) {
-            addChild(options.parentId, id);
-        } else {
+        if (parentId === ROOT_NODE_ID) {
             _addRoot(index);
+        } else {
+            setParent(id, parentId);
         }
 
         _ensureWorldTransformUpdated(index);
@@ -1089,16 +1122,16 @@ export namespace SpatialSOA {
             const spawned = mod.SpawnObject(prefab, Vectors.toVector(renderPos), Vectors.toVector(rotEuler), scaleVec);
 
             if (!mod.IsValid(spawned)) {
-                logging.log('Failed to spawn runtime object prefab', LogLevel.Warning);
                 destroy(id);
+                logging.log('Create runtime failed, failed to spawn object prefab', LogLevel.Error);
                 return null;
             }
 
             _objects[index] = spawned as TransformableObject;
             return id;
         } catch (error: unknown) {
-            logging.log('Error spawning runtime object', LogLevel.Error, error);
             destroy(id);
+            logging.log('Create runtime failed, spawn object threw exception', LogLevel.Error, error);
             return null;
         }
     }
@@ -1110,7 +1143,10 @@ export namespace SpatialSOA {
      * @returns The created node ID, or null if parentId is invalid or pool is full.
      */
     export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID | null {
-        if (options?.parentId !== undefined && _resolveIndex(options.parentId) === INVALID_INDEX) {
+        const parentId = options?.parentId ?? ROOT_NODE_ID;
+
+        if (parentId !== ROOT_NODE_ID && _resolveIndex(parentId) === INVALID_INDEX) {
+            logging.log('Create existing failed, parent is invalid', LogLevel.Error);
             return null;
         }
 
@@ -1118,12 +1154,12 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = id % GENERATION_MULTIPLIER;
+        const index = _resolveIndex(id);
 
-        if (options?.parentId !== undefined) {
-            addChild(options.parentId, id);
-        } else {
+        if (parentId === ROOT_NODE_ID) {
             _addRoot(index);
+        } else {
+            setParent(id, parentId);
         }
 
         return id;
@@ -1135,6 +1171,8 @@ export namespace SpatialSOA {
      * @returns True if valid and alive, false otherwise.
      */
     export function isValid(id: SpatialNodeID): boolean {
+        if (id === ROOT_NODE_ID) return true;
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return false;
@@ -1150,11 +1188,11 @@ export namespace SpatialSOA {
      * @returns True if the node was created and subsequently destroyed, false otherwise.
      */
     export function isDeleted(id: SpatialNodeID): boolean {
-        if (id < 0) return false;
+        if (id <= 0) return false;
 
-        const index = id % GENERATION_MULTIPLIER;
+        const index = (id % GENERATION_MULTIPLIER) - 1;
 
-        if (index >= MAX_NODES) return false;
+        if (index < 0 || index >= MAX_NODES) return false;
 
         const expectedGeneration = Math.floor(id / GENERATION_MULTIPLIER);
 
@@ -1166,6 +1204,11 @@ export namespace SpatialSOA {
      * @param id - The node ID to destroy.
      */
     export function destroy(id: SpatialNodeID): void {
+        if (id === ROOT_NODE_ID) {
+            logging.log('Cannot destroy the root node', LogLevel.Warning);
+            return;
+        }
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return;
@@ -1182,7 +1225,7 @@ export namespace SpatialSOA {
         const pIdx = _parent[idx];
 
         if (pIdx !== INVALID_INDEX) {
-            removeChild(_encodeId(pIdx), id);
+            _unlinkChild(pIdx, idx);
         } else {
             _removeRoot(idx);
         }
@@ -1193,7 +1236,7 @@ export namespace SpatialSOA {
             try {
                 mod.UnspawnObject(obj);
             } catch (error: unknown) {
-                logging.log('Error unspawning object on destroy', LogLevel.Warning, error);
+                logging.log('Error unspawning object on destroy', LogLevel.Error, error);
             }
         }
 
@@ -1205,16 +1248,45 @@ export namespace SpatialSOA {
     // -------------------------------------------------------------------------
 
     /**
-     * Adds a child node under a parent node.
-     * @param parentId - The parent node ID.
-     * @param childId - The child node ID.
-     * @returns True if added successfully, false if circular or invalid.
+     * Sets the parent node of a node.
+     * @param id - The child node ID.
+     * @param parentId - The new parent node ID (can be ROOT_NODE_ID or another node).
+     * @returns True if parent was set successfully, false if circular or invalid.
      */
-    export function addChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean {
-        const pIdx = _resolveIndex(parentId);
-        const cIdx = _resolveIndex(childId);
+    export function setParent(id: SpatialNodeID, parentId: SpatialNodeID): boolean {
+        if (id === ROOT_NODE_ID) {
+            logging.log('Cannot re-parent the root node', LogLevel.Warning);
+            return false;
+        }
 
-        if (pIdx === INVALID_INDEX || cIdx === INVALID_INDEX || pIdx === cIdx) return false;
+        if (id === parentId) return false;
+
+        const cIdx = _resolveIndex(id);
+
+        if (cIdx === INVALID_INDEX) return false;
+
+        if (parentId === ROOT_NODE_ID) {
+            // Unlink from current parent if not already root
+            const oldParent = _parent[cIdx];
+
+            if (oldParent === INVALID_INDEX) return true; // Already top-level root child
+
+            _unlinkChild(oldParent, cIdx);
+            _addRoot(cIdx);
+
+            if (_controllers[cIdx]) {
+                _controllers[cIdx].tracker = undefined;
+                _controllers[cIdx].follow = undefined;
+            }
+
+            _markDirty(cIdx);
+
+            return true;
+        }
+
+        const pIdx = _resolveIndex(parentId);
+
+        if (pIdx === INVALID_INDEX) return false;
 
         // Check circular dependency
         for (let currentIndex = pIdx; currentIndex !== INVALID_INDEX; currentIndex = _parent[currentIndex]) {
@@ -1224,22 +1296,18 @@ export namespace SpatialSOA {
             }
         }
 
-        // If child already has parent, unlink
         const oldParentIndex = _parent[cIdx];
 
+        if (oldParentIndex === pIdx) return true;
+
         if (oldParentIndex !== INVALID_INDEX) {
-            removeChild(_encodeId(oldParentIndex), childId);
+            _unlinkChild(oldParentIndex, cIdx);
         } else {
             _removeRoot(cIdx);
         }
 
         _parent[cIdx] = pIdx;
         _nextSibling[cIdx] = INVALID_INDEX;
-
-        if (_controllers[cIdx]) {
-            _controllers[cIdx].tracker = undefined;
-            _controllers[cIdx].follow = undefined;
-        }
 
         if (_firstChild[pIdx] === INVALID_INDEX) {
             _firstChild[pIdx] = cIdx;
@@ -1254,77 +1322,35 @@ export namespace SpatialSOA {
         }
 
         _markDirty(cIdx);
-        return true;
-    }
-
-    /**
-     * Removes a child node from its parent.
-     * @param parentId - The parent node ID.
-     * @param childId - The child node ID.
-     * @returns True if removed, false otherwise.
-     */
-    export function removeChild(parentId: SpatialNodeID, childId: SpatialNodeID): boolean {
-        const pIdx = _resolveIndex(parentId);
-        const cIdx = _resolveIndex(childId);
-
-        if (pIdx === INVALID_INDEX || cIdx === INVALID_INDEX || _parent[cIdx] !== pIdx) return false;
-
-        // Unlink from sibling list
-        if (_firstChild[pIdx] === cIdx) {
-            _firstChild[pIdx] = _nextSibling[cIdx];
-        } else {
-            for (let prev = _firstChild[pIdx]; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
-                if (_nextSibling[prev] === cIdx) {
-                    _nextSibling[prev] = _nextSibling[cIdx];
-                    break;
-                }
-            }
-        }
-
-        _parent[cIdx] = INVALID_INDEX;
-        _nextSibling[cIdx] = INVALID_INDEX;
-        _markDirty(cIdx);
-
-        if (_isActive(cIdx)) {
-            _addRoot(cIdx);
-        }
 
         return true;
-    }
-
-    /**
-     * Detaches a node from its parent, making it a root node.
-     * @param id - The node ID to detach.
-     */
-    export function detachFromParent(id: SpatialNodeID): void {
-        const idx = _resolveIndex(id);
-
-        if (idx === INVALID_INDEX || _parent[idx] === INVALID_INDEX) return;
-
-        removeChild(_encodeId(_parent[idx]), id);
     }
 
     /**
      * Returns the parent node ID of a node.
      * @param id - The node ID.
-     * @returns The parent node ID, null if root node, or undefined if the node does not exist.
+     * @returns The parent node ID, null for ROOT_NODE_ID, or undefined if the node does not exist.
      */
     export function getParent(id: SpatialNodeID): SpatialNodeID | null | undefined {
+        if (id === ROOT_NODE_ID) return null;
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
 
         const pIdx = _parent[idx];
 
-        return pIdx !== INVALID_INDEX ? _encodeId(pIdx) : null;
+        return pIdx !== INVALID_INDEX ? _encodeId(pIdx) : ROOT_NODE_ID;
     }
 
     /**
-     * Returns the total direct child count for a node.
+     * Returns the total direct child count for a node or the root scene.
      * @param id - The node ID.
      * @returns The number of direct children, or undefined if the node does not exist.
      */
     export function getChildCount(id: SpatialNodeID): number | undefined {
+        if (id === ROOT_NODE_ID) return _rootCount;
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
@@ -1344,6 +1370,16 @@ export namespace SpatialSOA {
      * @returns Array of child node IDs, or undefined if the node does not exist.
      */
     export function getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined {
+        if (id === ROOT_NODE_ID) {
+            const list: SpatialNodeID[] = [];
+
+            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
+                list.push(_encodeId(r));
+            }
+
+            return list;
+        }
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
@@ -1364,11 +1400,23 @@ export namespace SpatialSOA {
      * @returns The child node ID, null if out of bounds, or undefined if the node does not exist.
      */
     export function getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined {
+        if (index < 0) return null;
+
+        if (id === ROOT_NODE_ID) {
+            let currentIndex = 0;
+
+            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
+                if (currentIndex === index) return _encodeId(r);
+
+                ++currentIndex;
+            }
+
+            return null;
+        }
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
-
-        if (index < 0) return null;
 
         let currentIndex = 0;
 
@@ -1387,6 +1435,24 @@ export namespace SpatialSOA {
      * @param callback - Callback invoked for each child ID.
      */
     export function forEachChild(id: SpatialNodeID, callback: (childId: SpatialNodeID, index: number) => void): void {
+        if (id === ROOT_NODE_ID) {
+            let currentIndex = 0;
+
+            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
+                CallbackHandler.invoke(
+                    callback,
+                    _encodeId(r),
+                    currentIndex++,
+                    undefined,
+                    undefined,
+                    logging,
+                    'forEachChild'
+                );
+            }
+
+            return;
+        }
+
         const idx = _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return;
@@ -1419,9 +1485,7 @@ export namespace SpatialSOA {
     export function getLocalPosition(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return undefined;
-
-        return _cloneVectorFromArray(out ?? { x: 0, y: 0, z: 0 }, _localPos, idx);
+        return idx === INVALID_INDEX ? undefined : _cloneVectorFromArray(out ?? { x: 0, y: 0, z: 0 }, _localPos, idx);
     }
 
     /**
@@ -1447,9 +1511,9 @@ export namespace SpatialSOA {
     export function getLocalRotation(id: SpatialNodeID, out?: Quaternion): Quaternion | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return undefined;
-
-        return _cloneQuaternionFromArray(out ?? { w: 1, x: 0, y: 0, z: 0 }, _localRot, idx);
+        return idx === INVALID_INDEX
+            ? undefined
+            : _cloneQuaternionFromArray(out ?? { w: 1, x: 0, y: 0, z: 0 }, _localRot, idx);
     }
 
     /**
@@ -1475,12 +1539,12 @@ export namespace SpatialSOA {
     export function getLocalRotationEuler(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return undefined;
-
-        return Quaternions.toEuler(
-            _cloneQuaternionFromArray(_worldSetEulerRot, _localRot, idx),
-            out ?? { x: 0, y: 0, z: 0 }
-        );
+        return idx === INVALID_INDEX
+            ? undefined
+            : Quaternions.toEuler(
+                  _cloneQuaternionFromArray(_worldSetEulerRot, _localRot, idx),
+                  out ?? { x: 0, y: 0, z: 0 }
+              );
     }
 
     /**
@@ -1498,6 +1562,7 @@ export namespace SpatialSOA {
             idx,
             Quaternions.setFromEuler(_worldSetEulerRot, euler.x, euler.y, euler.z)
         );
+
         _markDirty(idx);
     }
 
@@ -1510,9 +1575,7 @@ export namespace SpatialSOA {
     export function getLocalScale(id: SpatialNodeID, out?: Vector3): Vector3 | undefined {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return undefined;
-
-        return _cloneVectorFromArray(out ?? { x: 1, y: 1, z: 1 }, _localScale, idx);
+        return idx === INVALID_INDEX ? undefined : _cloneVectorFromArray(out ?? { x: 1, y: 1, z: 1 }, _localScale, idx);
     }
 
     /**
@@ -1921,7 +1984,7 @@ export namespace SpatialSOA {
 
     /**
      * Attaches a node to follow a player's real-time position/orientation in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param player - The target player.
@@ -1932,7 +1995,7 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
-        detachFromParent(id);
+        setParent(id, ROOT_NODE_ID);
 
         if (_controllers[idx]) {
             _controllers[idx].follow = undefined;
@@ -1952,6 +2015,7 @@ export namespace SpatialSOA {
             if (!mod.IsValid(player)) return;
 
             Vectors.toVector3(mod.GetObjectPosition(player), _attachPlayerPos);
+
             Vectors.toVector3(
                 mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection),
                 _attachPlayerFacing
@@ -1970,7 +2034,7 @@ export namespace SpatialSOA {
 
     /**
      * Attaches a node to follow a vehicle's real-time position/orientation in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param vehicle - The target vehicle.
@@ -1981,7 +2045,7 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
-        detachFromParent(id);
+        setParent(id, ROOT_NODE_ID);
 
         if (_controllers[idx]) {
             _controllers[idx].follow = undefined;
@@ -2001,6 +2065,7 @@ export namespace SpatialSOA {
             if (!mod.IsValid(vehicle)) return;
 
             Vectors.toVector3(mod.GetVehicleState(vehicle, mod.VehicleStateVector.VehiclePosition), _attachVehiclePos);
+
             Vectors.toVector3(
                 mod.GetVehicleState(vehicle, mod.VehicleStateVector.FacingDirection),
                 _attachVehicleFacing
@@ -2022,7 +2087,7 @@ export namespace SpatialSOA {
 
     /**
      * Attaches a node to follow an in-game object (props, spawners, etc.) in real time in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param object - The native in-game object to track (excluding Player and Vehicle).
@@ -2037,7 +2102,7 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
-        detachFromParent(id);
+        setParent(id, ROOT_NODE_ID);
 
         if (_controllers[idx]) {
             _controllers[idx].follow = undefined;
@@ -2080,7 +2145,7 @@ export namespace SpatialSOA {
 
     /**
      * Attaches a custom dynamic tracker callback in world space.
-     * If the node has a parent, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active follow, orbit, or linear kinematics.
      * @param id - The node ID.
      * @param tracker - Tracker callback function.
@@ -2093,7 +2158,7 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
-        detachFromParent(id);
+        setParent(id, ROOT_NODE_ID);
 
         if (_controllers[idx]) {
             _controllers[idx].follow = undefined;
@@ -2233,7 +2298,7 @@ export namespace SpatialSOA {
 
     /**
      * Configures continuous smooth follow behavior on a node in world space.
-     * If configuring follow on a child node, it is automatically detached and promoted to a root node.
+     * Automatically sets parent to ROOT_NODE_ID.
      * Clears any active attachment tracker, orbit controller, or linear kinematics.
      * @param id - The node ID.
      * @param options - Follow configuration or null to disable.
@@ -2244,7 +2309,7 @@ export namespace SpatialSOA {
         if (idx === INVALID_INDEX) return;
 
         if (options?.target !== undefined) {
-            detachFromParent(id);
+            setParent(id, ROOT_NODE_ID);
 
             if (_controllers[idx]) {
                 _controllers[idx].tracker = undefined;
@@ -2361,33 +2426,11 @@ export namespace SpatialSOA {
     }
 
     /**
-     * Returns the total count of active root nodes.
-     * @returns The number of root nodes.
-     */
-    export function getRootCount(): number {
-        return _rootCount;
-    }
-
-    /**
      * Returns the total count of active nodes in the scene graph (roots + children).
      * @returns The number of active nodes.
      */
     export function getActiveNodeCount(): number {
         return _activeNodeCount;
-    }
-
-    /**
-     * Returns an array of active root node IDs.
-     * @returns Array of root node IDs.
-     */
-    export function getRootNodes(): SpatialNodeID[] {
-        const list: SpatialNodeID[] = [];
-
-        for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
-            list.push(_encodeId(r));
-        }
-
-        return list;
     }
 
     /**

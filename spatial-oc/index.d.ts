@@ -5,19 +5,19 @@ export declare namespace SpatialOC {
     /**
      * Re-export of the `Logging.LogLevel` enum.
      */
-    export const LogLevel: typeof Logging.LogLevel;
+    const LogLevel: typeof Logging.LogLevel;
     /**
      * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
      * @param log - The logger function to use. Pass undefined to disable logging.
      * @param logLevel - The minimum log level to use.
      * @param includeRawError - Whether to include the runtime error in the log.
      */
-    export function setLogging(
+    function setLogging(
         log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
-    export type TransformableObject =
+    type TransformableObject =
         | mod.Bomb
         | mod.EmplacementSpawner
         | mod.FixedCamera
@@ -34,7 +34,7 @@ export declare namespace SpatialOC {
     /**
      * Supported runtime spawn prefab enum types in Battlefield 6 Portal.
      */
-    export type RuntimeSpawnPrefab =
+    type RuntimeSpawnPrefab =
         | mod.RuntimeSpawn_Abbasid
         | mod.RuntimeSpawn_Aftermath
         | mod.RuntimeSpawn_Badlands
@@ -63,18 +63,16 @@ export declare namespace SpatialOC {
     /**
      * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
      */
-    export type Vector3 = Vectors.Vector3;
+    type Vector3 = Vectors.Vector3;
     /**
      * A transparent 4D Quaternion representing 3D spatial rotation.
      */
-    export type Quaternion = Quaternions.Quaternion;
-    const _UPDATE_INTERNAL: unique symbol;
-    const _SYNC_INTERNAL: unique symbol;
+    type Quaternion = Quaternions.Quaternion;
     /**
-     * Common initialization options for creating SpatialNodes.
+     * Common initialization options for creating SpatialElements.
      */
-    export interface NodeOptions {
-        /** Optional parent node to attach this node to upon creation. If undefined, creates a root node. */
+    interface NodeOptions {
+        /** Optional parent node to attach this element to upon creation. If undefined, attaches to ROOT_NODE. */
         parent?: SpatialNode;
         /** Initial local or world position. */
         position?: Vector3;
@@ -88,7 +86,7 @@ export declare namespace SpatialOC {
     /**
      * Options for attaching a root node to follow an entity (player, vehicle, object) in real time.
      */
-    export interface AttachOptions {
+    interface AttachOptions {
         /** Positional offset relative to the target's orientation coordinate frame. */
         offset?: Vector3;
         /** Whether to track and match the target's rotation. Default: true. */
@@ -99,7 +97,7 @@ export declare namespace SpatialOC {
     /**
      * Options for configuring an Orbit controller on a node.
      */
-    export interface OrbitOptions {
+    interface OrbitOptions {
         /** The rotation axis of the orbit in parent or world space. Default: (0, 1, 0). */
         axis?: Vector3;
         /** The orbital speed in radians per second. Positive is counter-clockwise. */
@@ -116,18 +114,18 @@ export declare namespace SpatialOC {
     /**
      * Options for configuring a LookAt controller on a node.
      */
-    export interface LookAtOptions {
-        /** The target to continuously look at (world position, Player, or SpatialNode). */
-        target?: Vector3 | mod.Player | SpatialNode;
+    interface LookAtOptions {
+        /** The target to continuously look at (world position, Player, or SpatialElement). */
+        target?: Vector3 | mod.Player | SpatialElement;
         /** The up axis reference vector. Default: (0, 1, 0). */
         upAxis?: Vector3;
     }
     /**
      * Options for configuring a Smooth Follow controller on a node.
      */
-    export interface FollowOptions {
-        /** The target to follow (SpatialNode or Player). */
-        target?: SpatialNode | mod.Player;
+    interface FollowOptions {
+        /** The target to follow (SpatialElement or Player). */
+        target?: SpatialElement | mod.Player;
         /** Desired offset from the target in world space. */
         offset?: Vector3;
         /** Smooth damping / lerp speed factor (0 for instant snap, > 0 for smooth). Default: 10. */
@@ -136,7 +134,7 @@ export declare namespace SpatialOC {
     /**
      * Options for kinematic linear and angular velocity and acceleration integration.
      */
-    export interface KinematicsOptions {
+    interface KinematicsOptions {
         /** Linear velocity vector in parent space (meters per second). */
         linearVelocity?: Vector3;
         /** Angular velocity vector (axis * radians per second) in local space. */
@@ -147,13 +145,106 @@ export declare namespace SpatialOC {
         angularAcceleration?: Vector3;
     }
     /**
-     * Represents a 3D spatial node within the virtual hierarchy.
+     * Base class representing a node within the virtual spatial hierarchy.
+     */
+    abstract class SpatialNode {
+        protected _parent: SpatialNode | null;
+        protected _children: SpatialElement[];
+        /**
+         * Whether this node is deleted.
+         * @returns True if deleted, false otherwise.
+         */
+        protected _isDeleted(): boolean;
+        /**
+         * The parent node in the hierarchy, or null for the root node, or undefined if deleted.
+         * @returns The parent node, null, or undefined.
+         */
+        get parent(): SpatialNode | null | undefined;
+        /**
+         * Retrieves the parent node in the hierarchy.
+         * @returns The parent node, null for the root node, or undefined if deleted.
+         */
+        getParent(): SpatialNode | null | undefined;
+        /**
+         * The total number of direct child elements, or undefined if deleted.
+         * @returns The child count, or undefined.
+         */
+        get childCount(): number | undefined;
+        /**
+         * Retrieves the total number of direct child elements.
+         * @returns The child count, or undefined if deleted.
+         */
+        getChildCount(): number | undefined;
+        /**
+         * Returns a shallow copy of the list of direct child elements, or undefined if deleted.
+         * @returns Array of direct children, or undefined.
+         */
+        get children(): readonly SpatialElement[] | undefined;
+        /**
+         * Retrieves a shallow copy of the list of direct child elements.
+         * @returns Array of direct children, or undefined if deleted.
+         */
+        getChildren(): readonly SpatialElement[] | undefined;
+        /**
+         * Retrieves a child element at the specified index.
+         * @param index - Zero-based index of the child.
+         * @returns The child element, null if out of bounds, or undefined if deleted.
+         */
+        getChild(index: number): SpatialElement | null | undefined;
+        /**
+         * Iterates over all direct child elements without allocating an intermediate array.
+         * @param callback - Function invoked for each child element.
+         */
+        forEachChild(callback: (child: SpatialElement, index: number) => void): void;
+        /**
+         * Internal helper to add a child element.
+         * @param child - The child element to add.
+         * @returns True if added, false otherwise.
+         * @internal
+         */
+        _addChild(child: SpatialElement): boolean;
+        /**
+         * Internal helper to remove a child element.
+         * @param child - The child element to remove.
+         * @returns True if removed, false otherwise.
+         * @internal
+         */
+        _removeChild(child: SpatialElement): boolean;
+        /**
+         * Internal update lifecycle step.
+         * @param dt - Delta time in seconds.
+         * @internal
+         */
+        abstract _updateInternal(dt: number): void;
+        /**
+         * Internal sync lifecycle step.
+         * @internal
+         */
+        abstract _syncInternal(): void;
+        /**
+         * Updates all active controllers, kinematics, and external trackers across the scene graph,
+         * then synchronizes dirty transforms to the game engine.
+         * If `deltaTimeSeconds` is omitted, delta time is automatically computed based on server uptime,
+         * throttled to a minimum interval of 0.01s (10ms) and clamped to a maximum of 0.1s.
+         * @param deltaTimeSeconds - Optional elapsed delta time in seconds.
+         */
+        static update(deltaTimeSeconds?: number): void;
+        /**
+         * Evaluates dirty node hierarchies top-down and applies transformed positions and rotations
+         * to all modified native objects via `mod.SetObjectTransform`.
+         */
+        static sync(): void;
+    }
+    /**
+     * The global root anchor of the scene graph.
+     */
+    const ROOT_NODE: SpatialNode;
+    /**
+     * Represents a 3D spatial transformable element within the virtual hierarchy.
      * Manages canonical local transforms, cached world matrices, model offsets, and engine synchronization.
      */
-    export class SpatialNode {
+    class SpatialElement extends SpatialNode {
         private _object?;
-        private _parent?;
-        private _children;
         private _pivotOffset?;
         private _localPos;
         private _localRot;
@@ -174,83 +265,64 @@ export declare namespace SpatialOC {
         private _linearAcceleration?;
         private _angularAcceleration?;
         /**
-         * Creates an empty SpatialNode (virtual root anchor or child node).
+         * Creates an empty SpatialElement (virtual parent anchor or child element).
          * @param options - Initialization options (including optional parent).
-         * @returns The created node, or null if parent is deleted.
+         * @returns The created element, or null if parent is deleted.
          */
-        static createEmpty(options?: NodeOptions): SpatialNode | null;
+        static createEmpty(options?: NodeOptions): SpatialElement | null;
         /**
-         * Spawns a runtime prefab as a new SpatialNode (root or child).
+         * Spawns a runtime prefab as a new SpatialElement (root or child).
          * @param prefab - The runtime spawn prefab enum.
          * @param options - Initialization options (including optional parent).
-         * @returns The created node, or null if spawning failed or parent is deleted.
+         * @returns The created element, or null if spawning failed or parent is deleted.
          */
-        static createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null;
+        static createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialElement | null;
         /**
-         * Wraps an existing in-game object as a SpatialNode (root or child).
+         * Wraps an existing in-game object as a SpatialElement (root or child).
          * @param object - The existing native transformable object.
          * @param options - Initialization options (including optional parent).
-         * @returns The created node, or null if parent is deleted.
+         * @returns The created element, or null if parent is deleted.
          */
-        static createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null;
+        static createExisting(object: TransformableObject, options?: NodeOptions): SpatialElement | null;
         /**
-         * Private constructor for SpatialNode. Use `SpatialNode.createEmpty`, `createRuntime`, or `createExisting`.
+         * Private constructor for SpatialElement. Use `SpatialElement.createEmpty`, `createRuntime`, or `createExisting`.
          * @param options - Initialization options.
          * @param isRuntimeSpawned - Whether the native object was spawned dynamically at runtime.
          * @param nativeObject - The native engine object handle.
          */
         private constructor();
         /**
-         * Checks whether this node and its native object (if any) are valid and alive.
+         * Checks whether this element and its native object (if any) are valid and alive.
          * @returns True if valid and alive, false otherwise.
          */
         get isValid(): boolean;
         /**
-         * Whether this node has been deleted/destroyed.
+         * Whether this element has been deleted/destroyed.
          * @returns True if deleted/destroyed, false otherwise.
          */
         get isDeleted(): boolean;
+        protected _isDeleted(): boolean;
         /**
-         * The parent node in the hierarchy, or null if this is a root node, or undefined if deleted.
-         * @returns The parent node, null, or undefined.
+         * The parent node in the hierarchy, or undefined if deleted.
+         * @returns The parent node, or undefined if deleted.
          */
-        get parent(): SpatialNode | null | undefined;
+        get parent(): SpatialNode | undefined;
+        /**
+         * Sets the parent node in the hierarchy.
+         * Automatically unlinks from current parent and links to the new parent.
+         */
+        set parent(newParent: SpatialNode);
         /**
          * Retrieves the parent node in the hierarchy.
-         * @returns The parent node, null for root nodes, or undefined if deleted.
+         * @returns The parent node, or undefined if deleted.
          */
-        getParent(): SpatialNode | null | undefined;
+        getParent(): SpatialNode | undefined;
         /**
-         * The total number of direct child nodes, or undefined if deleted.
-         * @returns The child count, or undefined.
+         * Sets the parent node in the hierarchy.
+         * @param newParent - The new parent SpatialNode (e.g. ROOT_NODE or another SpatialElement).
+         * @returns This element for chaining.
          */
-        get childCount(): number | undefined;
-        /**
-         * Retrieves the total number of direct child nodes.
-         * @returns The child count, or undefined if deleted.
-         */
-        getChildCount(): number | undefined;
-        /**
-         * Returns a shallow copy of the list of direct child nodes, or undefined if deleted.
-         * @returns Array of direct children, or undefined.
-         */
-        get children(): readonly SpatialNode[] | undefined;
-        /**
-         * Retrieves a shallow copy of the list of direct child nodes.
-         * @returns Array of direct children, or undefined if deleted.
-         */
-        getChildren(): readonly SpatialNode[] | undefined;
-        /**
-         * Retrieves a child node at the specified index.
-         * @param index - Zero-based index of the child.
-         * @returns The child node, null if out of bounds, or undefined if deleted.
-         */
-        getChild(index: number): SpatialNode | null | undefined;
-        /**
-         * Iterates over all direct child nodes without allocating an intermediate array.
-         * @param callback - Function invoked for each child.
-         */
-        forEachChild(callback: (child: SpatialNode, index: number) => void): void;
+        setParent(newParent: SpatialNode): this;
         /**
          * Gets the in-game model offset correction, null if unset, or undefined if deleted.
          * @returns The pivot offset vector, null, or undefined.
@@ -269,7 +341,7 @@ export declare namespace SpatialOC {
         /**
          * Sets the in-game model offset correction for prefab centering.
          * @param offset - The offset vector, or null/undefined to clear.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setPivotOffset(offset?: Vector3 | null): this;
         /**
@@ -290,7 +362,7 @@ export declare namespace SpatialOC {
         /**
          * Sets the local position relative to parent.
          * @param pos - The new local position.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setLocalPosition(pos: Vector3): this;
         /**
@@ -311,7 +383,7 @@ export declare namespace SpatialOC {
         /**
          * Sets the local rotation Quaternion relative to parent.
          * @param rot - The new local rotation quaternion.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setLocalRotation(rot: Quaternion): this;
         /**
@@ -332,28 +404,28 @@ export declare namespace SpatialOC {
         /**
          * Sets the local rotation using Euler angles in radians (ZYX order).
          * @param euler - The new local Euler angles in radians.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setLocalRotationEuler(euler: Vector3): this;
         /**
-         * Gets the local scale relative to parent, or undefined if deleted.
+         * Gets the local scale, or undefined if deleted.
          * @returns The local scale vector, or undefined.
          */
         get localScale(): Vector3 | undefined;
         /**
-         * Sets the local scale relative to parent.
+         * Sets the local scale (uniform or per-axis).
          */
         set localScale(scale: Vector3 | number);
         /**
-         * Retrieves the local scale relative to parent.
+         * Retrieves the local scale.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
          * @returns The local scale vector, or undefined if deleted.
          */
         getLocalScale(out?: Vector3): Vector3 | undefined;
         /**
-         * Sets the local scale relative to parent.
-         * @param scale - Uniform scale number or Vector3 scale.
-         * @returns This node for chaining.
+         * Sets the local scale (uniform or per-axis).
+         * @param scale - The new uniform number or Vector3 scale.
+         * @returns This element for chaining.
          */
         setLocalScale(scale: Vector3 | number): this;
         /**
@@ -373,8 +445,8 @@ export declare namespace SpatialOC {
         getWorldPosition(out?: Vector3): Vector3 | undefined;
         /**
          * Sets the world position directly (computes appropriate local coordinates so world position matches).
-         * @param worldPos - The desired world position vector.
-         * @returns This node for chaining.
+         * @param worldPos - The desired world position.
+         * @returns This element for chaining.
          */
         setWorldPosition(worldPos: Vector3): this;
         /**
@@ -395,7 +467,7 @@ export declare namespace SpatialOC {
         /**
          * Sets the world rotation directly (computes appropriate local quaternion so world rotation matches).
          * @param worldRot - The desired world rotation quaternion.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setWorldRotation(worldRot: Quaternion): this;
         /**
@@ -416,7 +488,7 @@ export declare namespace SpatialOC {
         /**
          * Sets the world rotation directly using Euler angles in radians (ZYX order).
          * @param worldEuler - The desired world Euler angles in radians.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         setWorldRotationEuler(worldEuler: Vector3): this;
         /**
@@ -431,36 +503,36 @@ export declare namespace SpatialOC {
          */
         getWorldScale(out?: Vector3): Vector3 | undefined;
         /**
-         * Translates the node in local coordinates.
+         * Translates the element in local coordinates.
          * @param delta - Vector delta in local space.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         translateLocal(delta: Vector3): this;
         /**
-         * Translates the node in parent / world coordinates.
+         * Translates the element in parent / world coordinates.
          * @param delta - Vector delta in parent coordinate space.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         translate(delta: Vector3): this;
         /**
-         * Rotates the node locally by multiplying with a delta Quaternion.
+         * Rotates the element locally by multiplying with a delta Quaternion.
          * @param deltaRot - Quaternion delta to multiply.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         rotateLocal(deltaRot: Quaternion): this;
         /**
-         * Rotates the node around an arbitrary axis and optional pivot center in parent/world space.
+         * Rotates the element around an arbitrary axis and optional pivot center in parent/world space.
          * @param axis - The unit axis to rotate around.
          * @param angleRad - The angle in radians.
-         * @param pivotCenter - Optional center point in parent space (default: node's local position).
-         * @returns This node for chaining.
+         * @param pivotCenter - Optional center point in parent space (default: element's local position).
+         * @returns This element for chaining.
          */
         rotateAroundAxis(axis: Vector3, angleRad: number, pivotCenter?: Vector3): this;
         /**
-         * Rotates this node to face a target point in world coordinates.
+         * Rotates this element to face a target point in world coordinates.
          * @param targetWorld - The world coordinate to face.
          * @param upAxis - The world up reference axis (default: 0, 1, 0).
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         lookAt(targetWorld: Vector3, upAxis?: Vector3): this;
         /**
@@ -492,24 +564,7 @@ export declare namespace SpatialOC {
          */
         worldToLocalVector(worldVec: Vector3, out?: Vector3): Vector3 | undefined;
         /**
-         * Adds an existing SpatialNode as a child of this node.
-         * @param child - The node to add as child.
-         * @returns True if added successfully, false if rejected (e.g. circular hierarchy or deleted).
-         */
-        addChild(child: SpatialNode): boolean;
-        /**
-         * Removes a child from this node.
-         * @param child - The child node to remove.
-         * @returns True if removed, false otherwise.
-         */
-        removeChild(child: SpatialNode): boolean;
-        /**
-         * Detaches this node from its parent, making it a root node.
-         * @returns This node for chaining.
-         */
-        detachFromParent(): this;
-        /**
-         * Recursively destroys this node and all of its descendants, unspawning native objects.
+         * Recursively destroys this element and all of its descendants, unspawning native objects.
          */
         destroy(): void;
         /**
@@ -521,7 +576,7 @@ export declare namespace SpatialOC {
          */
         private _computeFacingQuaternion;
         /**
-         * Applies computed attachment transform and offset to this node.
+         * Applies computed attachment transform and offset to this element.
          * @param pos - Evaluated position vector.
          * @param rot - Evaluated rotation quaternion (if trackRotation is true).
          * @param offset - Optional relative offset vector.
@@ -529,38 +584,38 @@ export declare namespace SpatialOC {
          */
         private _applyAttachmentTransform;
         /**
-         * Attaches this node to follow a player's real-time position/orientation in world space.
-         * If this node has a parent, it is automatically detached and promoted to a root node.
+         * Attaches this element to follow a player's real-time position/orientation in world space.
+         * Automatically sets parent to ROOT_NODE.
          * Clears any active follow, orbit, or linear kinematics.
          * @param player - The player to track.
          * @param options - Attachment options.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         attachToPlayer(player: mod.Player, options?: AttachOptions): this;
         /**
-         * Attaches this node to follow a vehicle's real-time position/orientation in world space.
-         * If this node has a parent, it is automatically detached and promoted to a root node.
+         * Attaches this element to follow a vehicle's real-time position/orientation in world space.
+         * Automatically sets parent to ROOT_NODE.
          * Clears any active follow, orbit, or linear kinematics.
          * @param vehicle - The vehicle to track.
          * @param options - Attachment options.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         attachToVehicle(vehicle: mod.Vehicle, options?: AttachOptions): this;
         /**
-         * Attaches this node to follow an in-game object (props, spawners, etc.) in real time in world space.
-         * If this node has a parent, it is automatically detached and promoted to a root node.
+         * Attaches this element to follow an in-game object (props, spawners, etc.) in real time in world space.
+         * Automatically sets parent to ROOT_NODE.
          * Clears any active follow, orbit, or linear kinematics.
          * @param object - The native in-game object to track (excluding Player and Vehicle).
          * @param options - Attachment options.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         attachToObject(object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): this;
         /**
          * Attaches a custom dynamic tracker callback in world space.
-         * If this node has a parent, it is automatically detached and promoted to a root node.
+         * Automatically sets parent to ROOT_NODE.
          * Clears any active follow, orbit, or linear kinematics.
          * @param tracker - Custom tracking function.
-         * @returns This node for chaining.
+         * @returns This element for chaining.
          */
         attachToTracker(
             tracker: () =>
@@ -571,105 +626,90 @@ export declare namespace SpatialOC {
                 | undefined
         ): this;
         /**
-         * Clears any active attachment tracker on this node.
-         * @returns This node for chaining.
+         * Clears any active attachment tracker on this element.
+         * @returns This element for chaining.
          */
         detachTracker(): this;
         /**
-         * Configures orbital motion on this node around its parent or a specified center point.
+         * Configures orbital rotation motion on this element around an axis and pivot center.
          * Clears any active attachment tracker, follow controller, or linear kinematics.
-         * @param options - Orbit configuration options, or null to disable orbit.
-         * @returns This node for chaining.
+         * @param options - Orbit configuration, or null/undefined to clear.
+         * @returns This element for chaining.
          */
         setOrbit(options?: OrbitOptions | null): this;
         /**
-         * Configures continuous look-at behavior on this node.
-         * Clears any active angular kinematics or orbit faceTangent/spin conflicting with look-at.
-         * @param options - LookAt configuration options, or null to disable.
-         * @returns This node for chaining.
+         * Configures LookAt target tracking on this element.
+         * Clears conflicting angular kinematics and orbit tangent/spin options.
+         * @param options - LookAt configuration, or null/undefined to clear.
+         * @returns This element for chaining.
          */
         setLookAt(options?: LookAtOptions | null): this;
         /**
-         * Configures continuous smooth follow behavior on this node in world space.
-         * If configuring follow on a child node, it is automatically detached and promoted to a root node.
-         * Clears any active attachment tracker, orbit controller, or linear kinematics.
-         * @param options - Follow configuration options, or null to disable.
-         * @returns This node for chaining.
+         * Configures continuous smooth follow behavior on this element in world space.
+         * Automatically sets parent to ROOT_NODE.
+         * Clears conflicting attachment trackers, orbit controllers, and linear kinematics.
+         * @param options - Follow configuration, or null/undefined to clear.
+         * @returns This element for chaining.
          */
         setFollow(options?: FollowOptions | null): this;
         /**
-         * Configures kinematic velocity and acceleration integration on this node.
-         * Linear kinematics clear conflicting positional controllers (orbit, follow, tracker).
-         * Angular kinematics clear rotational controllers (lookAt, orbit spin).
-         * @param options - Kinematics options, or null to disable.
-         * @returns This node for chaining.
+         * Configures kinematic velocity and acceleration integration on this element.
+         * Setting linear kinematics clears conflicting positional controllers (orbit, follow, tracker).
+         * Setting angular kinematics clears conflicting rotational controllers (lookAt, orbit spin).
+         * @param options - Kinematics configuration, or null/undefined to clear.
+         * @returns This element for chaining.
          */
         setKinematics(options?: KinematicsOptions | null): this;
+        private _stepKinematics;
+        private _stepOrbit;
+        private _stepLookAt;
+        private _stepFollow;
         /**
-         * Marks this node and all descendants as dirty.
-         */
-        private _markDirty;
-        /**
-         * Ensures that the world transform of this node (and its ancestors) is fresh and up to date.
+         * Re-evaluates world transform hierarchy matrices top-down if dirty.
          */
         ensureWorldTransformUpdated(): void;
         /**
          * Computes the visual placement position of the native model accounting for pivot offset.
          * @param out - Optional target Vector3 to write into for zero-allocation reuse.
-         * @returns The render position, or undefined if deleted.
+         * @returns The evaluated visual placement vector, or undefined if deleted.
          */
         computeRenderPosition(out?: Vector3): Vector3 | undefined;
         /**
-         * Steps kinematic linear and angular velocities and accelerations.
-         * @param dt - Delta time in seconds.
+         * Marks this element and all of its descendants as dirty.
          */
-        private _stepKinematics;
+        private _markDirty;
         /**
-         * Steps orbital kinematics around parent or center point.
-         * @param dt - Delta time in seconds.
-         */
-        private _stepOrbit;
-        /**
-         * Steps continuous LookAt targeting.
-         */
-        private _stepLookAt;
-        /**
-         * Steps continuous smooth follow behavior.
-         * @param dt - Delta time in seconds.
-         */
-        private _stepFollow;
-        /**
-         * Internal method to step active controllers, velocities, and trackers.
+         * Internal update lifecycle step.
          * @param dt - Delta time in seconds.
          * @internal
          */
-        [_UPDATE_INTERNAL](dt: number): void;
+        _updateInternal(dt: number): void;
         /**
          * Internal method to synchronize dirty transforms to native engine objects.
          * @internal
          */
-        [_SYNC_INTERNAL](): void;
+        _syncInternal(): void;
     }
     /**
-     * Creates an empty SpatialNode (virtual root anchor or child node).
+     * Creates an empty SpatialElement (virtual parent anchor or child element).
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or null if parent is deleted.
+     * @returns The created element, or null if parent is deleted.
      */
-    export function createEmpty(options?: NodeOptions): SpatialNode | null;
+    function createEmpty(options?: NodeOptions): SpatialElement | null;
     /**
-     * Spawns a runtime prefab as a new SpatialNode (root or child).
+     * Spawns a runtime prefab as a new SpatialElement (root or child).
      * @param prefab - The runtime spawn prefab enum.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or null if spawning failed or parent is deleted.
+     * @returns The created element, or null if spawning failed or parent is deleted.
      */
-    export function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNode | null;
+    function createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialElement | null;
     /**
-     * Wraps an existing in-game object as a SpatialNode (root or child).
+     * Wraps an existing in-game object as a SpatialElement (root or child).
      * @param object - The existing native transformable object.
      * @param options - Initialization options (including optional parent).
-     * @returns The created node, or null if parent is deleted.
+     * @returns The created element, or null if parent is deleted.
      */
-    export function createExisting(object: TransformableObject, options?: NodeOptions): SpatialNode | null;
+    function createExisting(object: TransformableObject, options?: NodeOptions): SpatialElement | null;
     /**
      * Updates all active controllers, kinematics, and external trackers across the scene graph,
      * then synchronizes dirty transforms to the game engine.
@@ -677,25 +717,15 @@ export declare namespace SpatialOC {
      * throttled to a minimum interval of 0.01s (10ms) and clamped to a maximum of 0.1s.
      * @param deltaTimeSeconds - Optional elapsed delta time in seconds.
      */
-    export function update(deltaTimeSeconds?: number): void;
+    function update(deltaTimeSeconds?: number): void;
     /**
      * Evaluates dirty node hierarchies top-down and applies transformed positions and rotations
      * to all modified native objects via `mod.SetObjectTransform`.
      */
-    export function sync(): void;
+    function sync(): void;
     /**
-     * Returns the total count of active root nodes.
-     * @returns The number of root nodes.
+     * Returns the total count of active elements in the scene graph.
+     * @returns The number of active elements.
      */
-    export function getRootCount(): number;
-    /**
-     * Returns the total count of active nodes in the scene graph (roots + children).
-     * @returns The number of active nodes.
-     */
-    export function getActiveNodeCount(): number;
-    /**
-     * Recursively destroys all managed nodes in the scene graph and unspawns runtime entities.
-     */
-    export function destroyAll(): void;
-    export {};
+    function getActiveNodeCount(): number;
 }
