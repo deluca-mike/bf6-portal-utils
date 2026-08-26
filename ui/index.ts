@@ -607,7 +607,7 @@ export namespace UI {
                 const inst = _instances[curr];
 
                 if (inst) {
-                    CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, logging);
+                    CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, logging, 'forEachChild');
                 }
 
                 curr = next;
@@ -854,7 +854,7 @@ export namespace UI {
 
         protected _isDeletedCheck(): boolean {
             if (this._id === INVALID_INDEX) {
-                logging.log(`Element ${this._name} already deleted`, LogLevel.Warning);
+                logging.log(`Element is deleted`, LogLevel.Warning);
                 return true;
             }
 
@@ -1337,7 +1337,7 @@ export namespace UI {
             return;
         }
 
-        CallbackHandler.invoke(handler, player, undefined, undefined, undefined, logging);
+        CallbackHandler.invoke(handler, player, undefined, undefined, undefined, logging, 'buttonEvent');
     }
 
     Events.OnPlayerUIButtonEvent.subscribe(handleButtonEvent);

@@ -112,7 +112,7 @@ export namespace PortalGadget {
         };
 
         for (let i = 0; i < count; ++i) {
-            CallbackHandler.invoke(handlers[i]!, player, isZooming, getTarget, undefined, logging);
+            CallbackHandler.invoke(handlers[i]!, player, isZooming, getTarget, undefined, logging, 'dispatchHandlers');
         }
     }
 

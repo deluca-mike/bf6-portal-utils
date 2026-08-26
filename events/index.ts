@@ -230,7 +230,8 @@ class EventChannel<K extends EventsTypes.SignatureKey> {
                 b,
                 c,
                 d,
-                EventsPrivate.logging
+                EventsPrivate.logging,
+                'trigger'
             );
         }
 

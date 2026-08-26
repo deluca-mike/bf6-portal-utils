@@ -150,7 +150,7 @@ export namespace Timers {
                 _deleteTimer(index);
             }
 
-            CallbackHandler.invokeNoArgs(cb, logging);
+            CallbackHandler.invokeNoArgs(cb, logging, 'trigger');
         }
     }
 

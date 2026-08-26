@@ -265,7 +265,7 @@ export namespace Clocks {
                 _clearFlag(id, FLAG_RUNNING);
                 _setFlag(id, FLAG_COMPLETE);
 
-                CallbackHandler.invokeNoArgs(_onComplete[id], logging);
+                CallbackHandler.invokeNoArgs(_onComplete[id], logging, 'onComplete');
 
                 if (logging.willLog(LogLevel.Info)) {
                     logging.log(`Clock ${id} completed`, LogLevel.Info);
@@ -280,7 +280,15 @@ export namespace Clocks {
 
             _lastIntegerSecond[id] = currentSecondsInt;
 
-            CallbackHandler.invoke(_onSecond[id], currentSecondsInt, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(
+                _onSecond[id],
+                currentSecondsInt,
+                undefined,
+                undefined,
+                undefined,
+                logging,
+                'onSecond'
+            );
 
             const prevMinute =
                 prevSecond === INVALID_INDEX
@@ -295,7 +303,15 @@ export namespace Clocks {
 
             if (currentMinutesInt === prevMinute) continue;
 
-            CallbackHandler.invoke(_onMinute[id], currentMinutesInt, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(
+                _onMinute[id],
+                currentMinutesInt,
+                undefined,
+                undefined,
+                undefined,
+                logging,
+                'onMinute'
+            );
         }
 
         _scheduleTick();

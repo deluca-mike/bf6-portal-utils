@@ -194,7 +194,7 @@ export namespace ScavengerDrop {
 
             _destroy(i);
 
-            CallbackHandler.invoke(callback, closestPlayer, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(callback, closestPlayer, undefined, undefined, undefined, logging, 'closestPlayer');
 
             if (logging.willLog(LogLevel.Info)) {
                 logging.log(`P-${mod.GetObjId(closestPlayer)} found drop ${dropId}`, LogLevel.Info);

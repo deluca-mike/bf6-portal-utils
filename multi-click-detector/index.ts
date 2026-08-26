@@ -169,7 +169,7 @@ export namespace MultiClickDetector {
 
             _clickCounts[i] = 0;
 
-            CallbackHandler.invokeNoArgs(_callbacks[i], logging);
+            CallbackHandler.invokeNoArgs(_callbacks[i], logging, 'onMultiClick');
 
             if (logging.willLog(Logging.LogLevel.Info)) {
                 logging.log(`P-${_playerIds[i]} performed sequence`, Logging.LogLevel.Info);

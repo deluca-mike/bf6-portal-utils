@@ -173,7 +173,7 @@ export namespace Raycast {
             _freeSlot(i);
 
             if (onMiss) {
-                CallbackHandler.invokeNoArgs(onMiss, logging);
+                CallbackHandler.invokeNoArgs(onMiss, logging, 'timeout');
             }
         }
     }
@@ -279,7 +279,8 @@ export namespace Raycast {
                 eventNormal,
                 undefined,
                 undefined,
-                logging
+                logging,
+                'onHit'
             );
         } else {
             CallbackHandler.invoke(
@@ -288,7 +289,8 @@ export namespace Raycast {
                 Vectors.toVector3(eventNormal),
                 undefined,
                 undefined,
-                logging
+                logging,
+                'onHit'
             );
         }
     }
@@ -303,7 +305,7 @@ export namespace Raycast {
         _freeSlot(slotIndex);
 
         if (onMiss) {
-            CallbackHandler.invokeNoArgs(onMiss, logging);
+            CallbackHandler.invokeNoArgs(onMiss, logging, 'onMiss');
         }
     }
 

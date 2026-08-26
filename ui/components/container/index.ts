@@ -135,7 +135,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
             const inst = UI.Element._getInstance(curr);
 
             if (inst) {
-                CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, this._logging);
+                CallbackHandler.invoke(callback, inst, idx++, undefined, undefined, this._logging, 'forEachChild');
             }
 
             curr = next;

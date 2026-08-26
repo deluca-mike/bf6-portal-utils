@@ -328,7 +328,15 @@ export namespace PlayerLocations {
         const wasInside = _clearPresence(listener, id);
 
         if (wasInside && listener.onExit) {
-            CallbackHandler.invoke(listener.onExit, id, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(
+                listener.onExit,
+                id,
+                undefined,
+                undefined,
+                undefined,
+                logging,
+                'clearPlayerPresence'
+            );
         }
     }
 
@@ -421,11 +429,11 @@ export namespace PlayerLocations {
         if (!wasInside && isInsideNow) {
             if (!listener.onEnter) return;
 
-            CallbackHandler.invoke(listener.onEnter, id, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(listener.onEnter, id, undefined, undefined, undefined, logging, 'onEnter');
         } else if (wasInside && !isInsideNow) {
             if (!listener.onExit) return;
 
-            CallbackHandler.invoke(listener.onExit, id, undefined, undefined, undefined, logging);
+            CallbackHandler.invoke(listener.onExit, id, undefined, undefined, undefined, logging, 'onExit');
         }
     }
 
@@ -558,7 +566,7 @@ export namespace PlayerLocations {
             const prevId = l.lastPlayerId;
             l.lastPlayerId = currId;
 
-            CallbackHandler.invoke(l.callback, currId, prevId, undefined, undefined, logging);
+            CallbackHandler.invoke(l.callback, currId, prevId, undefined, undefined, logging, 'onExtremaChange');
         }
     }
 
