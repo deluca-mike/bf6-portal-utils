@@ -150,6 +150,7 @@ export declare namespace SpatialOC {
     abstract class SpatialNode {
         protected _parent: SpatialNode | null;
         protected _children: SpatialElement[];
+        protected _isDeletedAndLogWarning(): boolean;
         /**
          * Whether this node is deleted.
          * @returns True if deleted, false otherwise.

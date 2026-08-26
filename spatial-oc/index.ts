@@ -246,6 +246,15 @@ export namespace SpatialOC {
         protected _parent: SpatialNode | null = null;
         protected _children: SpatialElement[] = [];
 
+        protected _isDeletedAndLogWarning(): boolean {
+            if (this._isDeleted()) {
+                logging.log('Node is deleted', LogLevel.Warning);
+                return true;
+            }
+
+            return false;
+        }
+
         /**
          * Whether this node is deleted.
          * @returns True if deleted, false otherwise.
@@ -316,7 +325,7 @@ export namespace SpatialOC {
          * @param callback - Function invoked for each child element.
          */
         public forEachChild(callback: (child: SpatialElement, index: number) => void): void {
-            if (this._isDeleted()) return;
+            if (this._isDeletedAndLogWarning()) return;
 
             for (let i = 0; i < this._children.length; ++i) {
                 CallbackHandler.invoke(callback, this._children[i], i, undefined, undefined, logging, 'forEachChild');
@@ -728,9 +737,9 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setParent(newParent: SpatialNode): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
-            if (newParent instanceof SpatialElement && newParent._isDeleted()) return this;
+            if (newParent instanceof SpatialElement && newParent._isDeletedAndLogWarning()) return this;
 
             if (newParent === this) return this;
 
@@ -794,7 +803,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setPivotOffset(offset?: Vector3 | null): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (offset) {
                 if (!this._pivotOffset) {
@@ -842,7 +851,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setLocalPosition(pos: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Vectors.copy(this._localPos, pos);
             this._markDirty();
@@ -880,7 +889,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setLocalRotation(rot: Quaternion): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.copy(this._localRot, rot);
             this._markDirty();
@@ -918,7 +927,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setLocalRotationEuler(euler: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.setFromEuler(this._localRot, euler.x, euler.y, euler.z);
             this._markDirty();
@@ -956,7 +965,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setLocalScale(scale: Vector3 | number): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (typeof scale === 'number') {
                 this._localScale.x = scale;
@@ -1005,7 +1014,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setWorldPosition(worldPos: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (this._parent === ROOT_NODE) {
                 this.setLocalPosition(worldPos);
@@ -1052,7 +1061,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setWorldRotation(worldRot: Quaternion): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (this._parent === ROOT_NODE) {
                 this.setLocalRotation(worldRot);
@@ -1102,7 +1111,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setWorldRotationEuler(worldEuler: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.setFromEuler(_worldSetEulerRot, worldEuler.x, worldEuler.y, worldEuler.z);
             this.setWorldRotation(_worldSetEulerRot);
@@ -1141,7 +1150,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public translateLocal(delta: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.rotateVector(delta, this._localRot, _translateRotatedDelta);
             Vectors.add(this._localPos, _translateRotatedDelta, this._localPos);
@@ -1156,7 +1165,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public translate(delta: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Vectors.add(this._localPos, delta, this._localPos);
             this._markDirty();
@@ -1170,7 +1179,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public rotateLocal(deltaRot: Quaternion): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.multiply(this._localRot, deltaRot, this._localRot);
             this._markDirty();
@@ -1186,7 +1195,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public rotateAroundAxis(axis: Vector3, angleRad: number, pivotCenter?: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             Quaternions.setFromAxisAngle(_rotateAroundAxisRot, axis, angleRad);
 
@@ -1210,7 +1219,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public lookAt(targetWorld: Vector3, upAxis?: Vector3): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             this.ensureWorldTransformUpdated();
             Vectors.subtract(targetWorld, this._worldPos, _lookAtDeltaPos);
@@ -1303,7 +1312,7 @@ export namespace SpatialOC {
          * Recursively destroys this element and all of its descendants, unspawning native objects.
          */
         public destroy(): void {
-            if (this._isDeleted()) return;
+            if (this._isDeletedAndLogWarning()) return;
 
             this._setFlag(FLAG_DELETED);
             --_activeNodeCount;
@@ -1397,7 +1406,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public attachToPlayer(player: mod.Player, options?: AttachOptions): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             this.setParent(ROOT_NODE);
             this._followConfig = undefined;
@@ -1440,7 +1449,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public attachToVehicle(vehicle: mod.Vehicle, options?: AttachOptions): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             this.setParent(ROOT_NODE);
             this._followConfig = undefined;
@@ -1486,7 +1495,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public attachToObject(object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             this.setParent(ROOT_NODE);
             this._followConfig = undefined;
@@ -1531,7 +1540,7 @@ export namespace SpatialOC {
         public attachToTracker(
             tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined
         ): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             this.setParent(ROOT_NODE);
             this._followConfig = undefined;
@@ -1578,7 +1587,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setOrbit(options?: OrbitOptions | null): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (!options) {
                 this._orbitConfig = undefined;
@@ -1614,7 +1623,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setLookAt(options?: LookAtOptions | null): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (options?.target !== undefined) {
                 this._angularVelocity = undefined;
@@ -1639,7 +1648,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setFollow(options?: FollowOptions | null): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (options?.target !== undefined) {
                 this.setParent(ROOT_NODE);
@@ -1662,7 +1671,7 @@ export namespace SpatialOC {
          * @returns This element for chaining.
          */
         public setKinematics(options?: KinematicsOptions | null): this {
-            if (this._isDeleted()) return this;
+            if (this._isDeletedAndLogWarning()) return this;
 
             if (!options) {
                 this._linearVelocity = undefined;

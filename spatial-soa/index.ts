@@ -345,75 +345,75 @@ export namespace SpatialSOA {
 
     /**
      * Checks if a specific flag bit is set for a slot.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @param flag - The flag bitmask to check.
      * @returns True if the flag bit is set.
      */
-    function _hasFlag(index: number, flag: number): boolean {
-        return (_flags[index] & flag) !== 0;
+    function _hasFlag(idx: number, flag: number): boolean {
+        return (_flags[idx] & flag) !== 0;
     }
 
     /**
      * Sets one or more flag bits for a slot.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @param flag - The flag bitmask to set.
      */
-    function _setFlag(index: number, flag: number): void {
-        _flags[index] = _flags[index] | flag;
+    function _setFlag(idx: number, flag: number): void {
+        _flags[idx] = _flags[idx] | flag;
     }
 
     /**
      * Clears one or more flag bits for a slot.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @param flag - The flag bitmask to clear.
      */
-    function _clearFlag(index: number, flag: number): void {
-        _flags[index] = _flags[index] & ~flag;
+    function _clearFlag(idx: number, flag: number): void {
+        _flags[idx] = _flags[idx] & ~flag;
     }
 
     /**
      * Checks if a slot is currently allocated and active.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns True if allocated and active.
      */
-    function _isActive(index: number): boolean {
-        return _hasFlag(index, FLAG_ACTIVE);
+    function _isActive(idx: number): boolean {
+        return _hasFlag(idx, FLAG_ACTIVE);
     }
 
     /**
      * Checks if a slot's world transform is dirty and needs re-evaluation.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns True if transform is dirty.
      */
-    function _isDirty(index: number): boolean {
-        return _hasFlag(index, FLAG_DIRTY);
+    function _isDirty(idx: number): boolean {
+        return _hasFlag(idx, FLAG_DIRTY);
     }
 
     /**
      * Checks if a slot's transform needs synchronization to the native mod.Object.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns True if engine transform is dirty.
      */
-    function _isEngineTransformDirty(index: number): boolean {
-        return _hasFlag(index, FLAG_ENGINE_TRANSFORM_DIRTY);
+    function _isEngineTransformDirty(idx: number): boolean {
+        return _hasFlag(idx, FLAG_ENGINE_TRANSFORM_DIRTY);
     }
 
     /**
      * Checks if a slot was spawned as a runtime entity that must be unspawned on destruction.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns True if runtime spawned.
      */
-    function _isRuntimeSpawned(index: number): boolean {
-        return _hasFlag(index, FLAG_RUNTIME_SPAWNED);
+    function _isRuntimeSpawned(idx: number): boolean {
+        return _hasFlag(idx, FLAG_RUNTIME_SPAWNED);
     }
 
     /**
      * Checks if a slot has a non-zero model pivot offset.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns True if pivot offset is active.
      */
-    function _hasPivot(index: number): boolean {
-        return _hasFlag(index, FLAG_HAS_PIVOT);
+    function _hasPivot(idx: number): boolean {
+        return _hasFlag(idx, FLAG_HAS_PIVOT);
     }
 
     // =========================================================================
@@ -428,25 +428,25 @@ export namespace SpatialSOA {
     function _resolveIndex(id: SpatialNodeID): number {
         if (id <= 0) return INVALID_INDEX;
 
-        const index = (id % GENERATION_MULTIPLIER) - 1;
+        const idx = (id % GENERATION_MULTIPLIER) - 1;
 
-        if (index < 0 || index >= MAX_NODES) return INVALID_INDEX;
+        if (idx < 0 || idx >= MAX_NODES) return INVALID_INDEX;
 
         const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
 
-        if (_generations[index] !== expectedGen || !_isActive(index)) return INVALID_INDEX;
+        if (_generations[idx] !== expectedGen || !_isActive(idx)) return INVALID_INDEX;
 
-        return index;
+        return idx;
     }
 
     /**
      * Encodes an internal array index and its current generation into a public node ID.
      * 1-based offset ensures slot 0 with generation 0 starts at ID 1, preserving ROOT_NODE_ID = 0.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @returns The encoded public node ID.
      */
-    function _encodeId(index: number): SpatialNodeID {
-        return (index + 1 + GENERATION_MULTIPLIER * _generations[index]) as SpatialNodeID;
+    function _encodeId(idx: number): SpatialNodeID {
+        return (idx + 1 + GENERATION_MULTIPLIER * _generations[idx]) as SpatialNodeID;
     }
 
     /**
@@ -459,48 +459,48 @@ export namespace SpatialSOA {
             return INVALID_INDEX;
         }
 
-        const index = _firstFree;
-        _firstFree = _nextSibling[index];
-        _nextSibling[index] = INVALID_INDEX;
+        const idx = _firstFree;
+        _firstFree = _nextSibling[idx];
+        _nextSibling[idx] = INVALID_INDEX;
         ++_activeNodeCount;
 
-        return index;
+        return idx;
     }
 
     /**
      * Recycles a slot back into the intrusive free-list pool, incrementing its generation.
-     * @param index - The internal array index to recycle.
+     * @param idx - The internal array index to recycle.
      */
-    function _freeSlot(index: number): void {
-        _removeRoot(index);
-        _flags[index] = 0;
-        _parent[index] = INVALID_INDEX;
-        _firstChild[index] = INVALID_INDEX;
-        _objects[index] = undefined;
-        _controllers[index] = undefined;
+    function _freeSlot(idx: number): void {
+        _removeRoot(idx);
+        _flags[idx] = 0;
+        _parent[idx] = INVALID_INDEX;
+        _firstChild[idx] = INVALID_INDEX;
+        _objects[idx] = undefined;
+        _controllers[idx] = undefined;
         --_activeNodeCount;
 
-        if (_generations[index] < MAX_GENERATIONS) {
+        if (_generations[idx] < MAX_GENERATIONS) {
             // Invalidate any outstanding handle IDs
-            ++_generations[index];
+            ++_generations[idx];
 
             // Intrusive push to free list
-            _nextSibling[index] = _firstFree;
-            _firstFree = index;
+            _nextSibling[idx] = _firstFree;
+            _firstFree = idx;
         } else if (logging.willLog(LogLevel.Warning)) {
-            logging.log(`Slot ${index} exhausted max generations and was retired`, LogLevel.Warning);
+            logging.log(`Slot ${idx} exhausted max generations and was retired`, LogLevel.Warning);
         }
     }
 
     /**
      * Marks an index and all of its descendants as dirty.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      */
-    function _markDirty(index: number): void {
-        _setFlag(index, FLAG_DIRTY | FLAG_ENGINE_TRANSFORM_DIRTY);
+    function _markDirty(idx: number): void {
+        _setFlag(idx, FLAG_DIRTY | FLAG_ENGINE_TRANSFORM_DIRTY);
 
-        for (let child = _firstChild[index]; child !== INVALID_INDEX; child = _nextSibling[child]) {
-            _markDirty(child);
+        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+            _markDirty(cIdx);
         }
     }
 
@@ -508,30 +508,30 @@ export namespace SpatialSOA {
     // Vector and Quaternion Array Helpers
     // =========================================================================
 
-    function _cloneVectorFromArray(target: Vector3, sourceArray: Float32Array, sourceIndex: number): Vector3 {
-        const sIdx3 = sourceIndex * 3;
+    function _cloneVectorFromArray(target: Vector3, sourceArray: Float32Array, sIdx: number): Vector3 {
+        const sIdx3 = sIdx * 3;
         target.x = sourceArray[sIdx3];
         target.y = sourceArray[sIdx3 + 1];
         target.z = sourceArray[sIdx3 + 2];
         return target;
     }
 
-    function _copyVectorIntoArray(targetArray: Float32Array, targetIndex: number, source: Vector3): void {
-        const tIdx3 = targetIndex * 3;
+    function _copyVectorIntoArray(targetArray: Float32Array, tIdx: number, source: Vector3): void {
+        const tIdx3 = tIdx * 3;
         targetArray[tIdx3] = source.x;
         targetArray[tIdx3 + 1] = source.y;
         targetArray[tIdx3 + 2] = source.z;
     }
 
-    function _copyVectorFromArrayIntoArray(targetArray: Float32Array, sourceArray: Float32Array, index: number): void {
-        const idx3 = index * 3;
+    function _copyVectorFromArrayIntoArray(targetArray: Float32Array, sourceArray: Float32Array, idx: number): void {
+        const idx3 = idx * 3;
         targetArray[idx3] = sourceArray[idx3];
         targetArray[idx3 + 1] = sourceArray[idx3 + 1];
         targetArray[idx3 + 2] = sourceArray[idx3 + 2];
     }
 
-    function _setVectorInArray(targetArray: Float32Array, targetIndex: number, source: number): void {
-        const tIdx3 = targetIndex * 3;
+    function _setVectorInArray(targetArray: Float32Array, tIdx: number, source: number): void {
+        const tIdx3 = tIdx * 3;
         targetArray[tIdx3] = source;
         targetArray[tIdx3 + 1] = source;
         targetArray[tIdx3 + 2] = source;
@@ -539,25 +539,20 @@ export namespace SpatialSOA {
 
     function _addVectorIntoArray(
         aArray: Float32Array,
-        aIndex: number,
+        aIdx: number,
         b: Vector3,
         outArray: Float32Array,
-        outIndex: number
+        outIdx: number
     ): void {
-        const aIdx3 = aIndex * 3;
-        const outIdx3 = outIndex * 3;
+        const aIdx3 = aIdx * 3;
+        const outIdx3 = outIdx * 3;
         outArray[outIdx3] = aArray[aIdx3] + b.x;
         outArray[outIdx3 + 1] = aArray[aIdx3 + 1] + b.y;
         outArray[outIdx3 + 2] = aArray[aIdx3 + 2] + b.z;
     }
 
-    function _addArrayAndVectorIntoVector(
-        aArray: Float32Array,
-        aIndex: number,
-        b: Vector3,
-        outVector: Vector3
-    ): Vector3 {
-        const aIdx3 = aIndex * 3;
+    function _addArrayAndVectorIntoVector(aArray: Float32Array, aIdx: number, b: Vector3, outVector: Vector3): Vector3 {
+        const aIdx3 = aIdx * 3;
         outVector.x = aArray[aIdx3] + b.x;
         outVector.y = aArray[aIdx3 + 1] + b.y;
         outVector.z = aArray[aIdx3 + 2] + b.z;
@@ -566,15 +561,15 @@ export namespace SpatialSOA {
 
     function _hadamardMultiplyArraysIntoArray(
         aArray: Float32Array,
-        aIndex: number,
+        aIdx: number,
         bArray: Float32Array,
-        bIndex: number,
+        bIdx: number,
         targetArray: Float32Array,
-        targetIndex: number
+        tIdx: number
     ): void {
-        const aIdx3 = aIndex * 3;
-        const bIdx3 = bIndex * 3;
-        const tIdx3 = targetIndex * 3;
+        const aIdx3 = aIdx * 3;
+        const bIdx3 = bIdx * 3;
+        const tIdx3 = tIdx * 3;
         targetArray[tIdx3] = aArray[aIdx3] * bArray[bIdx3];
         targetArray[tIdx3 + 1] = aArray[aIdx3 + 1] * bArray[bIdx3 + 1];
         targetArray[tIdx3 + 2] = aArray[aIdx3 + 2] * bArray[bIdx3 + 2];
@@ -582,13 +577,13 @@ export namespace SpatialSOA {
 
     function _hadamardMultiplyArraysIntoVector(
         aArray: Float32Array,
-        aIndex: number,
+        aIdx: number,
         bArray: Float32Array,
-        bIndex: number,
+        bIdx: number,
         targetVector: Vector3
     ): Vector3 {
-        const aIdx3 = aIndex * 3;
-        const bIdx3 = bIndex * 3;
+        const aIdx3 = aIdx * 3;
+        const bIdx3 = bIdx * 3;
         targetVector.x = aArray[aIdx3] * bArray[bIdx3];
         targetVector.y = aArray[aIdx3 + 1] * bArray[bIdx3 + 1];
         targetVector.z = aArray[aIdx3 + 2] * bArray[bIdx3 + 2];
@@ -598,9 +593,9 @@ export namespace SpatialSOA {
     function _cloneQuaternionFromArray(
         target: Quaternions.Quaternion,
         sourceArray: Float32Array,
-        sourceIndex: number
+        sIdx: number
     ): Quaternions.Quaternion {
-        const sIdx4 = sourceIndex * 4;
+        const sIdx4 = sIdx * 4;
         target.w = sourceArray[sIdx4];
         target.x = sourceArray[sIdx4 + 1];
         target.y = sourceArray[sIdx4 + 2];
@@ -608,12 +603,8 @@ export namespace SpatialSOA {
         return target;
     }
 
-    function _copyQuaternionIntoArray(
-        targetArray: Float32Array,
-        targetIndex: number,
-        source: Quaternions.Quaternion
-    ): void {
-        const tIdx4 = targetIndex * 4;
+    function _copyQuaternionIntoArray(targetArray: Float32Array, tIdx: number, source: Quaternions.Quaternion): void {
+        const tIdx4 = tIdx * 4;
         targetArray[tIdx4] = source.w;
         targetArray[tIdx4 + 1] = source.x;
         targetArray[tIdx4 + 2] = source.y;
@@ -623,9 +614,9 @@ export namespace SpatialSOA {
     function _copyQuaternionFromArrayIntoArray(
         targetArray: Float32Array,
         sourceArray: Float32Array,
-        index: number
+        idx: number
     ): void {
-        const idx4 = index * 4;
+        const idx4 = idx * 4;
         targetArray[idx4] = sourceArray[idx4];
         targetArray[idx4 + 1] = sourceArray[idx4 + 1];
         targetArray[idx4 + 2] = sourceArray[idx4 + 2];
@@ -634,25 +625,25 @@ export namespace SpatialSOA {
 
     function _multiplyQuaternionsFromArraysIntoArray(
         aArray: Float32Array,
-        aIndex: number,
+        aIdx: number,
         bArray: Float32Array,
-        bIndex: number,
+        bIdx: number,
         outArray: Float32Array,
-        outIndex: number
+        outIdx: number
     ): void {
-        const a4 = aIndex * 4;
+        const a4 = aIdx * 4;
         const aw = aArray[a4];
         const ax = aArray[a4 + 1];
         const ay = aArray[a4 + 2];
         const az = aArray[a4 + 3];
 
-        const b4 = bIndex * 4;
+        const b4 = bIdx * 4;
         const bw = bArray[b4];
         const bx = bArray[b4 + 1];
         const by = bArray[b4 + 2];
         const bz = bArray[b4 + 3];
 
-        const out4 = outIndex * 4;
+        const out4 = outIdx * 4;
         outArray[out4] = aw * bw - ax * bx - ay * by - az * bz;
         outArray[out4 + 1] = aw * bx + ax * bw + ay * bz - az * by;
         outArray[out4 + 2] = aw * by - ax * bz + ay * bw + az * bx;
@@ -660,89 +651,89 @@ export namespace SpatialSOA {
     }
 
     /**
-     * Ensures that the world transform at `index` and its ancestors are up to date.
-     * @param index - The internal array index.
+     * Ensures that the world transform at `idx` and its ancestors are up to date.
+     * @param idx - The internal array index.
      */
-    function _ensureWorldTransformUpdated(index: number): void {
-        if (!_isDirty(index)) return;
+    function _ensureWorldTransformUpdated(idx: number): void {
+        if (!_isDirty(idx)) return;
 
-        const p = _parent[index];
+        const p = _parent[idx];
 
         if (p !== INVALID_INDEX) {
             _ensureWorldTransformUpdated(p);
 
             // World Scale = Parent World Scale * Local Scale
-            _hadamardMultiplyArraysIntoArray(_worldScale, p, _localScale, index, _worldScale, index);
+            _hadamardMultiplyArraysIntoArray(_worldScale, p, _localScale, idx, _worldScale, idx);
 
             // World Rotation = Parent World Rotation * Local Rotation
-            _multiplyQuaternionsFromArraysIntoArray(_worldRot, p, _localRot, index, _worldRot, index);
+            _multiplyQuaternionsFromArraysIntoArray(_worldRot, p, _localRot, idx, _worldRot, idx);
 
             // Scaled Local Position = Local Pos * Parent World Scale
-            _hadamardMultiplyArraysIntoVector(_localPos, index, _worldScale, p, _worldEvalScaledPos);
+            _hadamardMultiplyArraysIntoVector(_localPos, idx, _worldScale, p, _worldEvalScaledPos);
 
             // Rotate scaled local pos by parent world rotation
             _cloneQuaternionFromArray(_worldEvalRot, _worldRot, p);
             Quaternions.rotateVector(_worldEvalScaledPos, _worldEvalRot, _worldEvalRotatedPos);
 
             // World Position = Parent World Position + Rotated Scaled Local Position
-            _addVectorIntoArray(_worldPos, p, _worldEvalRotatedPos, _worldPos, index);
+            _addVectorIntoArray(_worldPos, p, _worldEvalRotatedPos, _worldPos, idx);
         } else {
             // Root Node
-            _copyVectorFromArrayIntoArray(_worldPos, _localPos, index);
-            _copyQuaternionFromArrayIntoArray(_worldRot, _localRot, index);
-            _copyVectorFromArrayIntoArray(_worldScale, _localScale, index);
+            _copyVectorFromArrayIntoArray(_worldPos, _localPos, idx);
+            _copyQuaternionFromArrayIntoArray(_worldRot, _localRot, idx);
+            _copyVectorFromArrayIntoArray(_worldScale, _localScale, idx);
         }
 
-        _clearFlag(index, FLAG_DIRTY);
+        _clearFlag(idx, FLAG_DIRTY);
     }
 
     /**
      * Computes the visual placement position of the native model accounting for pivot offset.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      * @param out - Target Vector3.
      * @returns The evaluated visual placement vector.
      */
-    function _computeRenderPosition(index: number, out: Vector3): Vector3 {
-        if (!_hasPivot(index)) return _cloneVectorFromArray(out, _worldPos, index);
+    function _computeRenderPosition(idx: number, out: Vector3): Vector3 {
+        if (!_hasPivot(idx)) return _cloneVectorFromArray(out, _worldPos, idx);
 
-        _hadamardMultiplyArraysIntoVector(_pivotOffset, index, _worldScale, index, _renderPivotScaled);
-        _cloneQuaternionFromArray(_renderRot, _worldRot, index);
+        _hadamardMultiplyArraysIntoVector(_pivotOffset, idx, _worldScale, idx, _renderPivotScaled);
+        _cloneQuaternionFromArray(_renderRot, _worldRot, idx);
         Quaternions.rotateVector(_renderPivotScaled, _renderRot, _renderPivotRotated);
 
-        return _addArrayAndVectorIntoVector(_worldPos, index, _renderPivotRotated, out);
+        return _addArrayAndVectorIntoVector(_worldPos, idx, _renderPivotRotated, out);
     }
 
     // Root registration helpers
 
     /**
      * Registers an index as an active root node.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      */
-    function _addRoot(index: number): void {
-        _parent[index] = INVALID_INDEX;
-        _nextSibling[index] = _firstRoot;
-        _firstRoot = index;
+    function _addRoot(idx: number): void {
+        _parent[idx] = INVALID_INDEX;
+        _nextSibling[idx] = _firstRoot;
+        _firstRoot = idx;
     }
 
     /**
      * Unregisters a root node from the root chain.
-     * @param index - The internal array index.
+     * @param idx - The internal array index.
      */
-    function _removeRoot(index: number): void {
+    function _removeRoot(idx: number): void {
         if (_firstRoot === INVALID_INDEX) return;
 
-        if (_firstRoot === index) {
-            _firstRoot = _nextSibling[index];
-            _nextSibling[index] = INVALID_INDEX;
+        if (_firstRoot === idx) {
+            _firstRoot = _nextSibling[idx];
+            _nextSibling[idx] = INVALID_INDEX;
 
             return;
         }
 
         for (let prev = _firstRoot; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
-            if (_nextSibling[prev] !== index) continue;
+            if (_nextSibling[prev] !== idx) continue;
 
-            _nextSibling[prev] = _nextSibling[index];
-            _nextSibling[index] = INVALID_INDEX;
+            _nextSibling[prev] = _nextSibling[idx];
+            _nextSibling[idx] = INVALID_INDEX;
 
             return;
         }
@@ -750,21 +741,21 @@ export namespace SpatialSOA {
 
     /**
      * Unlinks a child node from its parent's child list.
-     * @param parentIndex - The parent's internal array index.
-     * @param childIndex - The child's internal array index.
+     * @param parentIdx - The parent's internal array index.
+     * @param childIdx - The child's internal array index.
      */
-    function _unlinkChild(parentIndex: number, childIndex: number): void {
-        if (_firstChild[parentIndex] === childIndex) {
-            _firstChild[parentIndex] = _nextSibling[childIndex];
+    function _unlinkChild(parentIdx: number, childIdx: number): void {
+        if (_firstChild[parentIdx] === childIdx) {
+            _firstChild[parentIdx] = _nextSibling[childIdx];
         } else {
-            for (let prev = _firstChild[parentIndex]; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
-                if (_nextSibling[prev] === childIndex) {
-                    _nextSibling[prev] = _nextSibling[childIndex];
+            for (let prev = _firstChild[parentIdx]; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
+                if (_nextSibling[prev] === childIdx) {
+                    _nextSibling[prev] = _nextSibling[childIdx];
                     break;
                 }
             }
         }
-        _nextSibling[childIndex] = INVALID_INDEX;
+        _nextSibling[childIdx] = INVALID_INDEX;
     }
 
     function _initSlot(
@@ -772,14 +763,14 @@ export namespace SpatialSOA {
         isRuntimeSpawned: boolean = false,
         object?: TransformableObject
     ): SpatialNodeID | null {
-        const index = _allocateSlot();
+        const idx = _allocateSlot();
 
-        if (index === INVALID_INDEX) return null;
+        if (idx === INVALID_INDEX) return null;
 
-        _objects[index] = object;
-        _parent[index] = INVALID_INDEX;
-        _firstChild[index] = INVALID_INDEX;
-        _nextSibling[index] = INVALID_INDEX;
+        _objects[idx] = object;
+        _parent[idx] = INVALID_INDEX;
+        _firstChild[idx] = INVALID_INDEX;
+        _nextSibling[idx] = INVALID_INDEX;
 
         let flags = FLAG_ACTIVE | FLAG_DIRTY | FLAG_ENGINE_TRANSFORM_DIRTY;
 
@@ -788,20 +779,20 @@ export namespace SpatialSOA {
         }
 
         const pos = options?.position;
-        const idx3 = index * 3;
+        const idx3 = idx * 3;
         _localPos[idx3] = pos ? pos.x : 0;
         _localPos[idx3 + 1] = pos ? pos.y : 0;
         _localPos[idx3 + 2] = pos ? pos.z : 0;
 
         if (options?.rotation) {
             if ('w' in options.rotation) {
-                _copyQuaternionIntoArray(_localRot, index, options.rotation);
+                _copyQuaternionIntoArray(_localRot, idx, options.rotation);
             } else {
                 Quaternions.setFromEuler(_worldSetEulerRot, options.rotation.x, options.rotation.y, options.rotation.z);
-                _copyQuaternionIntoArray(_localRot, index, _worldSetEulerRot);
+                _copyQuaternionIntoArray(_localRot, idx, _worldSetEulerRot);
             }
         } else {
-            const idx4 = index * 4;
+            const idx4 = idx * 4;
             _localRot[idx4] = 1;
             _localRot[idx4 + 1] = 0;
             _localRot[idx4 + 2] = 0;
@@ -811,27 +802,27 @@ export namespace SpatialSOA {
         const scale = options?.scale;
 
         if (typeof scale === 'number') {
-            _setVectorInArray(_localScale, index, scale);
+            _setVectorInArray(_localScale, idx, scale);
         } else if (scale) {
-            _copyVectorIntoArray(_localScale, index, scale);
+            _copyVectorIntoArray(_localScale, idx, scale);
         } else {
-            _setVectorInArray(_localScale, index, 1);
+            _setVectorInArray(_localScale, idx, 1);
         }
 
         if (options?.pivotOffset) {
-            _copyVectorIntoArray(_pivotOffset, index, options.pivotOffset);
+            _copyVectorIntoArray(_pivotOffset, idx, options.pivotOffset);
             flags |= FLAG_HAS_PIVOT;
         } else {
-            _setVectorInArray(_pivotOffset, index, 0);
+            _setVectorInArray(_pivotOffset, idx, 0);
         }
 
-        _copyVectorFromArrayIntoArray(_worldPos, _localPos, index);
-        _copyQuaternionFromArrayIntoArray(_worldRot, _localRot, index);
-        _copyVectorFromArrayIntoArray(_worldScale, _localScale, index);
+        _copyVectorFromArrayIntoArray(_worldPos, _localPos, idx);
+        _copyQuaternionFromArrayIntoArray(_worldRot, _localRot, idx);
+        _copyVectorFromArrayIntoArray(_worldScale, _localScale, idx);
 
-        _flags[index] = flags;
+        _flags[idx] = flags;
 
-        return _encodeId(index);
+        return _encodeId(idx);
     }
 
     function _computeFacingQuaternion(facing: Vector3, yawOnly: boolean, out: Quaternion): Quaternion {
@@ -869,7 +860,7 @@ export namespace SpatialSOA {
     // Scene Graph Updates & Controllers Evaluation
     // =========================================================================
 
-    function _stepKinematics(index: number, dt: number, ks?: KinematicsState): void {
+    function _stepKinematics(idx: number, dt: number, ks?: KinematicsState): void {
         if (!ks) return;
 
         // 1. Linear Acceleration -> Linear Velocity
@@ -885,8 +876,8 @@ export namespace SpatialSOA {
         // 2. Linear Velocity -> Local Position
         if (ks.linearVelocity) {
             Vectors.multiply(ks.linearVelocity, dt, _kinematicsStepDelta);
-            _addVectorIntoArray(_localPos, index, _kinematicsStepDelta, _localPos, index);
-            _markDirty(index);
+            _addVectorIntoArray(_localPos, idx, _kinematicsStepDelta, _localPos, idx);
+            _markDirty(idx);
         }
 
         // 3. Angular Acceleration -> Angular Velocity
@@ -905,16 +896,16 @@ export namespace SpatialSOA {
 
             if (angle > 0) {
                 Quaternions.setFromAxisAngle(_kinematicsAngularRot, ks.angularVelocity, angle);
-                _cloneQuaternionFromArray(_kinematicsRot, _localRot, index);
+                _cloneQuaternionFromArray(_kinematicsRot, _localRot, idx);
                 Quaternions.multiply(_kinematicsRot, _kinematicsAngularRot, _kinematicsRot);
-                _copyQuaternionIntoArray(_localRot, index, _kinematicsRot);
+                _copyQuaternionIntoArray(_localRot, idx, _kinematicsRot);
 
-                _markDirty(index);
+                _markDirty(idx);
             }
         }
     }
 
-    function _stepOrbit(index: number, dt: number, os?: OrbitState): void {
+    function _stepOrbit(idx: number, dt: number, os?: OrbitState): void {
         if (!os) return;
 
         os.currentAngleRad += os.speedRadPerSec * dt;
@@ -926,7 +917,7 @@ export namespace SpatialSOA {
         Quaternions.rotateVector(os.initialOffset, _orbitRot, _orbitRotatedOffset);
 
         // (add 2 vectors into array)
-        const idx3 = index * 3;
+        const idx3 = idx * 3;
         _localPos[idx3] = center.x + _orbitRotatedOffset.x;
         _localPos[idx3 + 1] = center.y + _orbitRotatedOffset.y;
         _localPos[idx3 + 2] = center.z + _orbitRotatedOffset.z;
@@ -936,25 +927,25 @@ export namespace SpatialSOA {
 
             if (Vectors.lengthSquared(_orbitTangentCross) > 0) {
                 const yaw = Math.atan2(_orbitTangentCross.x, _orbitTangentCross.z);
-                _copyQuaternionIntoArray(_localRot, index, Quaternions.setFromEuler(_orbitRot, 0, yaw, 0));
+                _copyQuaternionIntoArray(_localRot, idx, Quaternions.setFromEuler(_orbitRot, 0, yaw, 0));
             }
         }
 
         if (os.selfSpinSpeedRadPerSec) {
             Quaternions.setFromAxisAngle(_orbitSpinRot, _UP_AXIS, os.selfSpinSpeedRadPerSec * dt);
-            _cloneQuaternionFromArray(_orbitRot, _localRot, index);
+            _cloneQuaternionFromArray(_orbitRot, _localRot, idx);
             Quaternions.multiply(_orbitRot, _orbitSpinRot, _orbitRot);
-            _copyQuaternionIntoArray(_localRot, index, _orbitRot);
+            _copyQuaternionIntoArray(_localRot, idx, _orbitRot);
         }
 
-        _markDirty(index);
+        _markDirty(idx);
     }
 
-    function _stepLookAt(index: number, options?: LookAtOptions): void {
+    function _stepLookAt(idx: number, options?: LookAtOptions): void {
         if (!options?.target) return;
 
         const target = options.target;
-        const nodeId = _encodeId(index);
+        const nodeId = _encodeId(idx);
 
         if (typeof target === 'number') {
             const targetPos = getWorldPosition(target, _lookAtTargetPos);
@@ -970,11 +961,11 @@ export namespace SpatialSOA {
         }
     }
 
-    function _stepFollow(index: number, dt: number, options?: FollowOptions): void {
+    function _stepFollow(idx: number, dt: number, options?: FollowOptions): void {
         if (!options?.target) return;
 
         const target = options.target;
-        const nodeId = _encodeId(index);
+        const nodeId = _encodeId(idx);
         let targetPos: Vector3 | undefined;
 
         if (typeof target === 'number') {
@@ -995,37 +986,37 @@ export namespace SpatialSOA {
         setWorldPosition(nodeId, _followLerpedPos);
     }
 
-    function _updateNode(index: number, dt: number): void {
-        if (!_isActive(index)) return;
+    function _updateNode(idx: number, dt: number): void {
+        if (!_isActive(idx)) return;
 
-        const controller = _controllers[index];
+        const controller = _controllers[idx];
 
         if (controller) {
             if (controller.tracker) {
                 controller.tracker();
             }
 
-            _stepKinematics(index, dt, controller.kinematics);
-            _stepOrbit(index, dt, controller.orbit);
-            _stepLookAt(index, controller.lookAt);
-            _stepFollow(index, dt, controller.follow);
+            _stepKinematics(idx, dt, controller.kinematics);
+            _stepOrbit(idx, dt, controller.orbit);
+            _stepLookAt(idx, controller.lookAt);
+            _stepFollow(idx, dt, controller.follow);
         }
 
-        for (let child = _firstChild[index]; child !== INVALID_INDEX; child = _nextSibling[child]) {
-            _updateNode(child, dt);
+        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+            _updateNode(cIdx, dt);
         }
     }
 
-    function _syncNode(index: number): void {
-        if (!_isActive(index)) return;
+    function _syncNode(idx: number): void {
+        if (!_isActive(idx)) return;
 
-        _ensureWorldTransformUpdated(index);
+        _ensureWorldTransformUpdated(idx);
 
-        const obj = _objects[index];
+        const obj = _objects[idx];
 
-        if (_isEngineTransformDirty(index) && obj && mod.IsValid(obj)) {
-            const renderPos = _computeRenderPosition(index, _renderPos);
-            const rotEuler = Quaternions.toEuler(_cloneQuaternionFromArray(_renderRot, _worldRot, index), _renderEuler);
+        if (_isEngineTransformDirty(idx) && obj && mod.IsValid(obj)) {
+            const renderPos = _computeRenderPosition(idx, _renderPos);
+            const rotEuler = Quaternions.toEuler(_cloneQuaternionFromArray(_renderRot, _worldRot, idx), _renderEuler);
 
             try {
                 mod.SetObjectTransform(
@@ -1036,12 +1027,21 @@ export namespace SpatialSOA {
                 logging.log('Error applying transform to native object', LogLevel.Error, error);
             }
 
-            _clearFlag(index, FLAG_ENGINE_TRANSFORM_DIRTY);
+            _clearFlag(idx, FLAG_ENGINE_TRANSFORM_DIRTY);
         }
 
-        for (let child = _firstChild[index]; child !== INVALID_INDEX; child = _nextSibling[child]) {
-            _syncNode(child);
+        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+            _syncNode(cIdx);
         }
+    }
+
+    function _isInvalidIndexAndLogWarning(idx: number): boolean {
+        if (idx === INVALID_INDEX) {
+            logging.log('Node is invalid', LogLevel.Warning);
+            return true;
+        }
+
+        return false;
     }
 
     // =========================================================================
@@ -1069,10 +1069,10 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = _resolveIndex(id);
+        const idx = _resolveIndex(id);
 
         if (parentId === ROOT_NODE_ID) {
-            _addRoot(index);
+            _addRoot(idx);
         } else {
             setParent(id, parentId);
         }
@@ -1098,20 +1098,20 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = _resolveIndex(id);
+        const idx = _resolveIndex(id);
 
         if (parentId === ROOT_NODE_ID) {
-            _addRoot(index);
+            _addRoot(idx);
         } else {
             setParent(id, parentId);
         }
 
-        _ensureWorldTransformUpdated(index);
+        _ensureWorldTransformUpdated(idx);
 
-        const renderPos = _computeRenderPosition(index, _renderPos);
-        const rotEuler = Quaternions.toEuler(_cloneQuaternionFromArray(_renderRot, _worldRot, index), _renderEuler);
+        const renderPos = _computeRenderPosition(idx, _renderPos);
+        const rotEuler = Quaternions.toEuler(_cloneQuaternionFromArray(_renderRot, _worldRot, idx), _renderEuler);
 
-        const c3 = index * 3;
+        const c3 = idx * 3;
         const scaleVec = mod.CreateVector(_worldScale[c3], _worldScale[c3 + 1], _worldScale[c3 + 2]);
 
         try {
@@ -1123,7 +1123,7 @@ export namespace SpatialSOA {
                 return null;
             }
 
-            _objects[index] = spawned as TransformableObject;
+            _objects[idx] = spawned as TransformableObject;
             return id;
         } catch (error: unknown) {
             destroy(id);
@@ -1150,10 +1150,10 @@ export namespace SpatialSOA {
 
         if (id === null) return null;
 
-        const index = _resolveIndex(id);
+        const idx = _resolveIndex(id);
 
         if (parentId === ROOT_NODE_ID) {
-            _addRoot(index);
+            _addRoot(idx);
         } else {
             setParent(id, parentId);
         }
@@ -1186,13 +1186,13 @@ export namespace SpatialSOA {
     export function isDeleted(id: SpatialNodeID): boolean {
         if (id <= 0) return false;
 
-        const index = (id % GENERATION_MULTIPLIER) - 1;
+        const idx = (id % GENERATION_MULTIPLIER) - 1;
 
-        if (index < 0 || index >= MAX_NODES) return false;
+        if (idx < 0 || idx >= MAX_NODES) return false;
 
         const expectedGeneration = Math.floor(id / GENERATION_MULTIPLIER);
 
-        return expectedGeneration < _generations[index];
+        return expectedGeneration < _generations[idx];
     }
 
     /**
@@ -1207,15 +1207,15 @@ export namespace SpatialSOA {
 
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         // Recursively destroy children first
-        let child = _firstChild[idx];
+        let cIdx = _firstChild[idx];
 
-        while (child !== INVALID_INDEX) {
-            const next = _nextSibling[child];
-            destroy(_encodeId(child));
-            child = next;
+        while (cIdx !== INVALID_INDEX) {
+            const next = _nextSibling[cIdx];
+            destroy(_encodeId(cIdx));
+            cIdx = next;
         }
 
         const pIdx = _parent[idx];
@@ -1259,15 +1259,15 @@ export namespace SpatialSOA {
 
         const cIdx = _resolveIndex(id);
 
-        if (cIdx === INVALID_INDEX) return false;
+        if (_isInvalidIndexAndLogWarning(cIdx)) return false;
 
         if (parentId === ROOT_NODE_ID) {
             // Unlink from current parent if not already root
-            const oldParent = _parent[cIdx];
+            const oldParentIdx = _parent[cIdx];
 
-            if (oldParent === INVALID_INDEX) return true; // Already top-level root child
+            if (oldParentIdx === INVALID_INDEX) return true; // Already top-level root child
 
-            _unlinkChild(oldParent, cIdx);
+            _unlinkChild(oldParentIdx, cIdx);
             _addRoot(cIdx);
 
             _markDirty(cIdx);
@@ -1277,22 +1277,22 @@ export namespace SpatialSOA {
 
         const pIdx = _resolveIndex(parentId);
 
-        if (pIdx === INVALID_INDEX) return false;
+        if (_isInvalidIndexAndLogWarning(pIdx)) return false;
 
         // Check circular dependency
-        for (let currentIndex = pIdx; currentIndex !== INVALID_INDEX; currentIndex = _parent[currentIndex]) {
-            if (currentIndex === cIdx) {
+        for (let index = pIdx; index !== INVALID_INDEX; index = _parent[index]) {
+            if (index === cIdx) {
                 logging.log('Cannot create circular parent-child hierarchy', LogLevel.Warning);
                 return false;
             }
         }
 
-        const oldParentIndex = _parent[cIdx];
+        const oldParentIdx = _parent[cIdx];
 
-        if (oldParentIndex === pIdx) return true;
+        if (oldParentIdx === pIdx) return true;
 
-        if (oldParentIndex !== INVALID_INDEX) {
-            _unlinkChild(oldParentIndex, cIdx);
+        if (oldParentIdx !== INVALID_INDEX) {
+            _unlinkChild(oldParentIdx, cIdx);
         } else {
             _removeRoot(cIdx);
         }
@@ -1421,7 +1421,7 @@ export namespace SpatialSOA {
     export function forEachChild(id: SpatialNodeID, callback: (childId: SpatialNodeID, index: number) => void): void {
         const idx = id === ROOT_NODE_ID ? -2 : _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         let currentIndex = 0;
 
@@ -1466,7 +1466,7 @@ export namespace SpatialSOA {
     export function setLocalPosition(id: SpatialNodeID, pos: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _copyVectorIntoArray(_localPos, idx, pos);
         _markDirty(idx);
@@ -1494,7 +1494,7 @@ export namespace SpatialSOA {
     export function setLocalRotation(id: SpatialNodeID, rot: Quaternion): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _copyQuaternionIntoArray(_localRot, idx, rot);
         _markDirty(idx);
@@ -1525,7 +1525,7 @@ export namespace SpatialSOA {
     export function setLocalRotationEuler(id: SpatialNodeID, euler: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _copyQuaternionIntoArray(
             _localRot,
@@ -1556,7 +1556,7 @@ export namespace SpatialSOA {
     export function setLocalScale(id: SpatialNodeID, scale: Vector3 | number): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         if (typeof scale === 'number') {
             _setVectorInArray(_localScale, idx, scale);
@@ -1595,7 +1595,7 @@ export namespace SpatialSOA {
     export function setWorldPosition(id: SpatialNodeID, worldPos: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         const pIdx = _parent[idx];
 
@@ -1632,7 +1632,7 @@ export namespace SpatialSOA {
     export function setWorldRotation(id: SpatialNodeID, worldRot: Quaternion): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         const pIdx = _parent[idx];
 
@@ -1717,7 +1717,7 @@ export namespace SpatialSOA {
     export function setPivotOffset(id: SpatialNodeID, offset?: Vector3 | null): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         // Pivot offset only affects visual model placement during engine sync (computeRenderPosition),
         // not the mathematical scene graph transform hierarchy, so only FLAG_ENGINE_TRANSFORM_DIRTY is set.
@@ -1742,7 +1742,7 @@ export namespace SpatialSOA {
     export function ensureWorldTransformUpdated(id: SpatialNodeID): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _ensureWorldTransformUpdated(idx);
     }
@@ -1771,7 +1771,7 @@ export namespace SpatialSOA {
     export function translateLocal(id: SpatialNodeID, delta: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _cloneQuaternionFromArray(_translateRot, _localRot, idx);
         Quaternions.rotateVector(delta, _translateRot, _translateRotatedDelta);
@@ -1787,7 +1787,7 @@ export namespace SpatialSOA {
     export function translate(id: SpatialNodeID, delta: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _addVectorIntoArray(_localPos, idx, delta, _localPos, idx);
         _markDirty(idx);
@@ -1801,7 +1801,7 @@ export namespace SpatialSOA {
     export function rotateLocal(id: SpatialNodeID, deltaRot: Quaternion): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _cloneQuaternionFromArray(_rotateLocalRot, _localRot, idx);
         Quaternions.multiply(_rotateLocalRot, deltaRot, _rotateLocalRot);
@@ -1819,7 +1819,7 @@ export namespace SpatialSOA {
     export function rotateAroundAxis(id: SpatialNodeID, axis: Vector3, angleRad: number, pivotCenter?: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         Quaternions.setFromAxisAngle(_rotateAroundAxisRot, axis, angleRad);
 
@@ -1846,7 +1846,7 @@ export namespace SpatialSOA {
     export function lookAt(id: SpatialNodeID, targetWorld: Vector3, upAxis?: Vector3): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         _ensureWorldTransformUpdated(idx);
 
@@ -1965,7 +1965,7 @@ export namespace SpatialSOA {
     export function attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         setParent(id, ROOT_NODE_ID);
 
@@ -2015,7 +2015,7 @@ export namespace SpatialSOA {
     export function attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         setParent(id, ROOT_NODE_ID);
 
@@ -2072,7 +2072,7 @@ export namespace SpatialSOA {
     ): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         setParent(id, ROOT_NODE_ID);
 
@@ -2128,7 +2128,7 @@ export namespace SpatialSOA {
     ): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         setParent(id, ROOT_NODE_ID);
 
@@ -2174,7 +2174,7 @@ export namespace SpatialSOA {
     export function detachTracker(id: SpatialNodeID): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX || !_controllers[idx]) return;
+        if (_isInvalidIndexAndLogWarning(idx) || !_controllers[idx]) return;
 
         _controllers[idx].tracker = undefined;
     }
@@ -2188,7 +2188,7 @@ export namespace SpatialSOA {
     export function setOrbit(id: SpatialNodeID, options?: OrbitOptions | null): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         if (!options) {
             if (_controllers[idx]) {
@@ -2247,7 +2247,7 @@ export namespace SpatialSOA {
     export function setLookAt(id: SpatialNodeID, options?: LookAtOptions | null): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         if (!_controllers[idx]) {
             _controllers[idx] = {};
@@ -2278,7 +2278,7 @@ export namespace SpatialSOA {
     export function setFollow(id: SpatialNodeID, options?: FollowOptions | null): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         if (options?.target !== undefined) {
             setParent(id, ROOT_NODE_ID);
@@ -2311,7 +2311,7 @@ export namespace SpatialSOA {
     export function setKinematics(id: SpatialNodeID, options?: KinematicsOptions | null): void {
         const idx = _resolveIndex(id);
 
-        if (idx === INVALID_INDEX) return;
+        if (_isInvalidIndexAndLogWarning(idx)) return;
 
         if (!options) {
             if (_controllers[idx]) {
