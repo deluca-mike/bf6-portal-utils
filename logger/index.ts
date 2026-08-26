@@ -141,7 +141,7 @@ export class Logger {
      * @returns True if visible, false otherwise.
      */
     public get visible(): boolean {
-        return this._window.visible;
+        return this._window.visible ?? false;
     }
 
     /**
@@ -281,7 +281,7 @@ export class Logger {
         if (this._dynamicRows.length < this._maxRows) {
             // Window is not yet full. Shift existing rows up and add a new row at the bottom.
             for (let i = 0; i < this._dynamicRows.length; ++i) {
-                this._dynamicRows[i].y -= Logger._ROW_HEIGHT;
+                this._dynamicRows[i].y = (this._dynamicRows[i].y ?? 0) - Logger._ROW_HEIGHT;
             }
 
             const newRow = new UIContainer({
@@ -303,7 +303,7 @@ export class Logger {
         recycledRow.y = bottomY;
 
         for (let i = 0; i < this._dynamicRows.length; ++i) {
-            this._dynamicRows[i].y -= Logger._ROW_HEIGHT;
+            this._dynamicRows[i].y = (this._dynamicRows[i].y ?? 0) - Logger._ROW_HEIGHT;
         }
 
         this._dynamicRows.push(recycledRow);
@@ -315,6 +315,8 @@ export class Logger {
         let lastPartIndex = -1;
         let widgetIndex = 0;
         const children = row.children;
+
+        if (!children) return null;
 
         for (let i = 0; i < parts.length; ++i) {
             const isLastPart = i === parts.length - 1;
@@ -431,7 +433,7 @@ export namespace Logger {
         /**
          * The parent container for the logger.
          */
-        parent?: UI.Root | UIContainer;
+        parent?: UI.Parent;
         /**
          * The anchor for the logger.
          */

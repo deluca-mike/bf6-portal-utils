@@ -2,7 +2,7 @@ import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIImage } from '../image/index.ts';
 
-// version: 3.0.0
+// version: 4.0.0
 export class UIImageButton extends UIContentButton<UIImage> {
     protected _imageDisabledColor: mod.Vector;
 
@@ -38,13 +38,13 @@ export class UIImageButton extends UIContentButton<UIImage> {
     }
 
     private _setContentEnabled(enabled: boolean): void {
-        const contentWidget = UI.Element._getNativeWidget(this._content.id);
+        const contentWidget = UI.Element._getNativeWidget(this._content);
 
         if (!contentWidget) return;
 
         if (enabled) {
-            mod.SetUIImageColor(contentWidget, this._content.imageColor);
-            mod.SetUIImageAlpha(contentWidget, this._content.imageAlpha);
+            mod.SetUIImageColor(contentWidget, this._content.imageColor ?? UI.COLORS.WHITE);
+            mod.SetUIImageAlpha(contentWidget, this._content.imageAlpha ?? 1);
         } else {
             mod.SetUIImageColor(contentWidget, this._imageDisabledColor);
             mod.SetUIImageAlpha(contentWidget, this._imageDisabledAlpha);
@@ -54,7 +54,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
     /**
      * @inheritdoc
      */
-    public override get enabled(): boolean {
+    public override get enabled(): boolean | undefined {
         return super.enabled;
     }
 
@@ -62,18 +62,26 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @inheritdoc
      */
     public override set enabled(enabled: boolean) {
-        if (this._isDeletedCheck()) return;
-
-        super.enabled = enabled;
-        this._setContentEnabled(enabled);
+        this.setEnabled(enabled);
     }
 
     /**
-     * The type of the image.
-     * @returns The image type.
+     * @inheritdoc
      */
-    public get imageType(): mod.UIImageType {
-        return this._content.imageType;
+    public override setEnabled(enabled: boolean): this {
+        if (this._isDeletedCheck()) return this;
+
+        super.setEnabled(enabled);
+        this._setContentEnabled(enabled);
+        return this;
+    }
+
+    /**
+     * The type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
+     */
+    public get imageType(): mod.UIImageType | undefined {
+        return this.getImageType();
     }
 
     /**
@@ -81,17 +89,35 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param imageType - The new type of the image.
      */
     public set imageType(imageType: mod.UIImageType) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.imageType = imageType;
+        this.setImageType(imageType);
     }
 
     /**
-     * The color of the image.
-     * @returns The image color vector.
+     * Retrieves the type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    public get imageColor(): mod.Vector {
-        return this._content.imageColor;
+    public getImageType(): mod.UIImageType | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.imageType;
+    }
+
+    /**
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     * @returns This image button for chaining.
+     */
+    public setImageType(imageType: mod.UIImageType): this {
+        if (this._isDeletedCheck()) return this;
+
+        this._content.imageType = imageType;
+        return this;
+    }
+
+    /**
+     * The color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
+     */
+    public get imageColor(): mod.Vector | undefined {
+        return this.getImageColor();
     }
 
     /**
@@ -99,25 +125,43 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param color - The new color of the image.
      */
     public set imageColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
+        this.setImageColor(color);
+    }
+
+    /**
+     * Retrieves the color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
+     */
+    public getImageColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.imageColor;
+    }
+
+    /**
+     * Sets the color of the image.
+     * @param color - The new color of the image.
+     * @returns This image button for chaining.
+     */
+    public setImageColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
 
         this._content.imageColor = color;
 
         if (this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUIImageColor(contentWidget, color);
             }
         }
+        return this;
     }
 
     /**
-     * The alpha of the image.
-     * @returns The image alpha opacity.
+     * The alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
      */
-    public get imageAlpha(): number {
-        return this._content.imageAlpha;
+    public get imageAlpha(): number | undefined {
+        return this.getImageAlpha();
     }
 
     /**
@@ -125,25 +169,43 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param alpha - The new alpha of the image.
      */
     public set imageAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
+        this.setImageAlpha(alpha);
+    }
+
+    /**
+     * Retrieves the alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
+     */
+    public getImageAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.imageAlpha;
+    }
+
+    /**
+     * Sets the alpha of the image.
+     * @param alpha - The new alpha of the image.
+     * @returns This image button for chaining.
+     */
+    public setImageAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
 
         this._content.imageAlpha = alpha;
 
         if (this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUIImageAlpha(contentWidget, alpha);
             }
         }
+        return this;
     }
 
     /**
-     * The disabled color of the image.
-     * @returns The disabled image color vector.
+     * The disabled color of the image, or undefined if deleted.
+     * @returns The disabled image color vector, or undefined if deleted.
      */
-    public get imageDisabledColor(): mod.Vector {
-        return this._imageDisabledColor;
+    public get imageDisabledColor(): mod.Vector | undefined {
+        return this.getImageDisabledColor();
     }
 
     /**
@@ -151,25 +213,43 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param color - The new disabled color of the image.
      */
     public set imageDisabledColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
+        this.setImageDisabledColor(color);
+    }
+
+    /**
+     * Retrieves the disabled color of the image, or undefined if deleted.
+     * @returns The disabled image color vector, or undefined if deleted.
+     */
+    public getImageDisabledColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : this._imageDisabledColor;
+    }
+
+    /**
+     * Sets the disabled color of the image.
+     * @param color - The new disabled color of the image.
+     * @returns This image button for chaining.
+     */
+    public setImageDisabledColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
 
         this._imageDisabledColor = color;
 
         if (!this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUIImageColor(contentWidget, color);
             }
         }
+        return this;
     }
 
     /**
-     * The disabled alpha of the image.
-     * @returns The disabled image alpha opacity.
+     * The disabled alpha of the image, or undefined if deleted.
+     * @returns The disabled image alpha opacity, or undefined if deleted.
      */
-    public get imageDisabledAlpha(): number {
-        return this._imageDisabledAlpha;
+    public get imageDisabledAlpha(): number | undefined {
+        return this.getImageDisabledAlpha();
     }
 
     /**
@@ -177,17 +257,35 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param alpha - The new disabled alpha.
      */
     public set imageDisabledAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
+        this.setImageDisabledAlpha(alpha);
+    }
+
+    /**
+     * Retrieves the disabled alpha of the image, or undefined if deleted.
+     * @returns The disabled image alpha opacity, or undefined if deleted.
+     */
+    public getImageDisabledAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : this._imageDisabledAlpha;
+    }
+
+    /**
+     * Sets the disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
+     * @returns This image button for chaining.
+     */
+    public setImageDisabledAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
 
         this._imageDisabledAlpha = alpha;
 
         if (!this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUIImageAlpha(contentWidget, alpha);
             }
         }
+        return this;
     }
 }
 

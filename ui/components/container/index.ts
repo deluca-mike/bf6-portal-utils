@@ -1,7 +1,7 @@
 import { CallbackHandler } from '../../../callback-handler/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 8.0.0
+// version: 9.0.0
 export class UIContainer extends UI.Element implements UI.Parent {
     /**
      * Creates a new container.
@@ -27,7 +27,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 bgColor,
@@ -41,7 +41,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 bgColor,
@@ -77,16 +77,25 @@ export class UIContainer extends UI.Element implements UI.Parent {
     }
 
     /**
-     * Returns a snapshot array of direct child elements.
-     * @returns Array of direct children.
+     * Returns a snapshot array of direct child elements, or undefined if deleted.
+     * @returns Array of direct children, or undefined if deleted.
      */
-    public get children(): readonly UI.Element[] {
-        if (this._isDeletedCheck()) return [];
+    public get children(): readonly UI.Element[] | undefined {
+        return this.getChildren();
+    }
+
+    /**
+     * Retrieves a snapshot array of direct child elements.
+     * @returns Array of direct children, or undefined if deleted.
+     */
+    public getChildren(): readonly UI.Element[] | undefined {
+        if (this._isDeletedCheck()) return undefined;
 
         const list: UI.Element[] = [];
+        list.length = 0;
         let curr = UI.Element._getFirstChild(this._id);
 
-        while (curr !== UI.INVALID_INDEX) {
+        while (curr !== UI.Element._INVALID_INDEX) {
             const inst = UI.Element._getInstance(curr);
 
             if (inst) {
@@ -102,22 +111,41 @@ export class UIContainer extends UI.Element implements UI.Parent {
     /**
      * Retrieves a child element at the specified index.
      * @param index - Zero-based index of the child.
-     * @returns The child element, or undefined if out of bounds.
+     * @returns The child element, null if out of bounds, or undefined if deleted.
      */
-    public getChild(index: number): UI.Element | undefined {
+    public getChild(index: number): UI.Element | null | undefined {
         if (this._isDeletedCheck()) return undefined;
+        if (index < 0) return null;
 
         let curr = UI.Element._getFirstChild(this._id);
         let idx = 0;
 
-        while (curr !== UI.INVALID_INDEX) {
-            if (idx === index) return UI.Element._getInstance(curr);
+        while (curr !== UI.Element._INVALID_INDEX) {
+            if (idx === index) return UI.Element._getInstance(curr) ?? null;
 
             curr = UI.Element._getNextSibling(curr);
             idx++;
         }
 
-        return undefined;
+        return null;
+    }
+
+    /**
+     * Retrieves the total direct child count of the container.
+     * @returns The number of direct children, or undefined if deleted.
+     */
+    public getChildCount(): number | undefined {
+        if (this._isDeletedCheck()) return undefined;
+
+        let count = 0;
+        let curr = UI.Element._getFirstChild(this._id);
+
+        while (curr !== UI.Element._INVALID_INDEX) {
+            count++;
+            curr = UI.Element._getNextSibling(curr);
+        }
+
+        return count;
     }
 
     /**
@@ -130,7 +158,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
         let curr = UI.Element._getFirstChild(this._id);
         let idx = 0;
 
-        while (curr !== UI.INVALID_INDEX) {
+        while (curr !== UI.Element._INVALID_INDEX) {
             const next = UI.Element._getNextSibling(curr);
             const inst = UI.Element._getInstance(curr);
 
@@ -140,26 +168,6 @@ export class UIContainer extends UI.Element implements UI.Parent {
 
             curr = next;
         }
-    }
-
-    /**
-     * Attaches a child to the container.
-     * @param child - The child to attach.
-     */
-    public attachChild(child: UI.Element): void {
-        if (this._isDeletedCheck() || child.id === UI.INVALID_INDEX) return;
-
-        UI.Element._attachChild(this._id, child.id);
-    }
-
-    /**
-     * Detaches a child from the container.
-     * @param child - The child to detach.
-     */
-    public detachChild(child: UI.Element): void {
-        if (this._isDeletedCheck() || child.id === UI.INVALID_INDEX) return;
-
-        UI.Element._detachChild(this._id, child.id);
     }
 }
 

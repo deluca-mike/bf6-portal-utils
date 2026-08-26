@@ -3,7 +3,7 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIText } from '../text/index.ts';
 
-// version: 8.0.0
+// version: 9.0.0
 export class UITextButton extends UIContentButton<UIText> {
     protected _textDisabledColor: mod.Vector;
 
@@ -41,13 +41,13 @@ export class UITextButton extends UIContentButton<UIText> {
     }
 
     private _setContentEnabled(enabled: boolean): void {
-        const contentWidget = UI.Element._getNativeWidget(this._content.id);
+        const contentWidget = UI.Element._getNativeWidget(this._content);
 
         if (!contentWidget) return;
 
         if (enabled) {
-            mod.SetUITextColor(contentWidget, this._content.textColor);
-            mod.SetUITextAlpha(contentWidget, this._content.textAlpha);
+            mod.SetUITextColor(contentWidget, this._content.textColor ?? UI.COLORS.BLACK);
+            mod.SetUITextAlpha(contentWidget, this._content.textAlpha ?? 1);
         } else {
             mod.SetUITextColor(contentWidget, this._textDisabledColor);
             mod.SetUITextAlpha(contentWidget, this._textDisabledAlpha);
@@ -57,7 +57,7 @@ export class UITextButton extends UIContentButton<UIText> {
     /**
      * @inheritdoc
      */
-    public override get enabled(): boolean {
+    public override get enabled(): boolean | undefined {
         return super.enabled;
     }
 
@@ -65,18 +65,26 @@ export class UITextButton extends UIContentButton<UIText> {
      * @inheritdoc
      */
     public override set enabled(enabled: boolean) {
-        if (this._isDeletedCheck()) return;
-
-        super.enabled = enabled;
-        this._setContentEnabled(enabled);
+        this.setEnabled(enabled);
     }
 
     /**
-     * The message of the text.
-     * @returns The message.
+     * @inheritdoc
      */
-    public get message(): mod.Message {
-        return this._content.message;
+    public override setEnabled(enabled: boolean): this {
+        if (this._isDeletedCheck()) return this;
+
+        super.setEnabled(enabled);
+        this._setContentEnabled(enabled);
+        return this;
+    }
+
+    /**
+     * The message of the text, or undefined if deleted.
+     * @returns The message, or undefined if deleted.
+     */
+    public get message(): mod.Message | undefined {
+        return this.getMessage();
     }
 
     /**
@@ -84,17 +92,35 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param message - The new message.
      */
     public set message(message: mod.Message) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.message = message;
+        this.setMessage(message);
     }
 
     /**
-     * The size of the text.
-     * @returns The text size.
+     * Retrieves the message of the text, or undefined if deleted.
+     * @returns The message, or undefined if deleted.
      */
-    public get textSize(): number {
-        return this._content.textSize;
+    public getMessage(): mod.Message | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.message;
+    }
+
+    /**
+     * Sets the message of the text.
+     * @param message - The new message.
+     * @returns This text button for chaining.
+     */
+    public setMessage(message: mod.Message): this {
+        if (this._isDeletedCheck()) return this;
+
+        this._content.message = message;
+        return this;
+    }
+
+    /**
+     * The size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
+     */
+    public get textSize(): number | undefined {
+        return this.getTextSize();
     }
 
     /**
@@ -102,17 +128,35 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param size - The new size.
      */
     public set textSize(size: number) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.textSize = size;
+        this.setTextSize(size);
     }
 
     /**
-     * The anchor of the text.
-     * @returns The text anchor alignment.
+     * Retrieves the size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
      */
-    public get textAnchor(): mod.UIAnchor {
-        return this._content.textAnchor;
+    public getTextSize(): number | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.textSize;
+    }
+
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     * @returns This text button for chaining.
+     */
+    public setTextSize(size: number): this {
+        if (this._isDeletedCheck()) return this;
+
+        this._content.textSize = size;
+        return this;
+    }
+
+    /**
+     * The anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
+     */
+    public get textAnchor(): mod.UIAnchor | undefined {
+        return this.getTextAnchor();
     }
 
     /**
@@ -120,17 +164,35 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param anchor - The new anchor.
      */
     public set textAnchor(anchor: mod.UIAnchor) {
-        if (this._isDeletedCheck()) return;
-
-        this._content.textAnchor = anchor;
+        this.setTextAnchor(anchor);
     }
 
     /**
-     * The color of the text when the button is enabled.
-     * @returns The text color vector.
+     * Retrieves the anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
      */
-    public get textColor(): mod.Vector {
-        return this._content.textColor;
+    public getTextAnchor(): mod.UIAnchor | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.textAnchor;
+    }
+
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     * @returns This text button for chaining.
+     */
+    public setTextAnchor(anchor: mod.UIAnchor): this {
+        if (this._isDeletedCheck()) return this;
+
+        this._content.textAnchor = anchor;
+        return this;
+    }
+
+    /**
+     * The color of the text when the button is enabled, or undefined if deleted.
+     * @returns The text color vector, or undefined if deleted.
+     */
+    public get textColor(): mod.Vector | undefined {
+        return this.getTextColor();
     }
 
     /**
@@ -138,25 +200,43 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param color - The new color.
      */
     public set textColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
+        this.setTextColor(color);
+    }
+
+    /**
+     * Retrieves the color of the text when the button is enabled, or undefined if deleted.
+     * @returns The text color vector, or undefined if deleted.
+     */
+    public getTextColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.textColor;
+    }
+
+    /**
+     * Sets the color of the text when the button is enabled.
+     * @param color - The new color.
+     * @returns This text button for chaining.
+     */
+    public setTextColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
 
         this._content.textColor = color;
 
         if (this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUITextColor(contentWidget, color);
             }
         }
+        return this;
     }
 
     /**
-     * The alpha of the text when the button is enabled.
-     * @returns The text alpha opacity.
+     * The alpha of the text when the button is enabled, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
      */
-    public get textAlpha(): number {
-        return this._content.textAlpha;
+    public get textAlpha(): number | undefined {
+        return this.getTextAlpha();
     }
 
     /**
@@ -164,25 +244,43 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param alpha - The new alpha.
      */
     public set textAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
+        this.setTextAlpha(alpha);
+    }
+
+    /**
+     * Retrieves the alpha of the text when the button is enabled, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
+     */
+    public getTextAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.textAlpha;
+    }
+
+    /**
+     * Sets the alpha of the text when the button is enabled.
+     * @param alpha - The new alpha.
+     * @returns This text button for chaining.
+     */
+    public setTextAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
 
         this._content.textAlpha = alpha;
 
         if (this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUITextAlpha(contentWidget, alpha);
             }
         }
+        return this;
     }
 
     /**
-     * The color of the text when the button is disabled.
-     * @returns The disabled text color vector.
+     * The color of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text color vector, or undefined if deleted.
      */
-    public get textDisabledColor(): mod.Vector {
-        return this._textDisabledColor;
+    public get textDisabledColor(): mod.Vector | undefined {
+        return this.getTextDisabledColor();
     }
 
     /**
@@ -190,25 +288,43 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param color - The new color.
      */
     public set textDisabledColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
+        this.setTextDisabledColor(color);
+    }
+
+    /**
+     * Retrieves the color of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text color vector, or undefined if deleted.
+     */
+    public getTextDisabledColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : this._textDisabledColor;
+    }
+
+    /**
+     * Sets the color of the text when the button is disabled.
+     * @param color - The new color.
+     * @returns This text button for chaining.
+     */
+    public setTextDisabledColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
 
         this._textDisabledColor = color;
 
         if (!this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUITextColor(contentWidget, color);
             }
         }
+        return this;
     }
 
     /**
-     * The alpha of the text when the button is disabled.
-     * @returns The disabled text alpha opacity.
+     * The alpha of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text alpha opacity, or undefined if deleted.
      */
-    public get textDisabledAlpha(): number {
-        return this._textDisabledAlpha;
+    public get textDisabledAlpha(): number | undefined {
+        return this.getTextDisabledAlpha();
     }
 
     /**
@@ -216,17 +332,35 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param alpha - The new alpha.
      */
     public set textDisabledAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
+        this.setTextDisabledAlpha(alpha);
+    }
+
+    /**
+     * Retrieves the alpha of the text when the button is disabled, or undefined if deleted.
+     * @returns The disabled text alpha opacity, or undefined if deleted.
+     */
+    public getTextDisabledAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : this._textDisabledAlpha;
+    }
+
+    /**
+     * Sets the alpha of the text when the button is disabled.
+     * @param alpha - The new alpha.
+     * @returns This text button for chaining.
+     */
+    public setTextDisabledAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
 
         this._textDisabledAlpha = alpha;
 
         if (!this.enabled) {
-            const contentWidget = UI.Element._getNativeWidget(this._content.id);
+            const contentWidget = UI.Element._getNativeWidget(this._content);
 
             if (contentWidget) {
                 mod.SetUITextAlpha(contentWidget, alpha);
             }
         }
+        return this;
     }
 }
 

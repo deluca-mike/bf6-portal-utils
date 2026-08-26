@@ -3,7 +3,7 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIWeaponImage } from '../weapon-image/index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIWeaponImageButton extends UIContentButton<UIWeaponImage> {
     /**
      * Creates a new weapon image button.
@@ -27,19 +27,35 @@ export class UIWeaponImageButton extends UIContentButton<UIWeaponImage> {
     }
 
     /**
-     * The weapon of the weapon image button.
-     * @returns The weapon.
+     * The weapon of the weapon image button, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    public get weapon(): mod.Weapons {
-        return this._content.weapon;
+    public get weapon(): mod.Weapons | undefined {
+        return this.getWeapon();
     }
 
     /**
-     * The weapon package of the weapon image button.
-     * @returns The weapon package.
+     * Retrieves the weapon of the weapon image button, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    public get weaponPackage(): mod.WeaponPackage {
-        return this._content.weaponPackage;
+    public getWeapon(): mod.Weapons | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.weapon;
+    }
+
+    /**
+     * The weapon package of the weapon image button, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    public get weaponPackage(): mod.WeaponPackage | undefined {
+        return this.getWeaponPackage();
+    }
+
+    /**
+     * Retrieves the weapon package of the weapon image button, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    public getWeaponPackage(): mod.WeaponPackage | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.weaponPackage;
     }
 }
 

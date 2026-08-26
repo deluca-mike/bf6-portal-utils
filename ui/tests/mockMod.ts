@@ -42,8 +42,8 @@ export const mockWidgets = new Map<string, MockWidget>();
 export const mockInputModeCalls: Array<{ enabled: boolean; receiver?: unknown }> = [];
 
 export const mockRootWidget: MockWidget = {
-    _id: 0,
-    name: 'ui_0',
+    _id: -1,
+    name: 'ui_root',
     visible: true,
     position: { x: 0, y: 0, z: 0 },
     size: { x: 1920, y: 1080, z: 0 },
@@ -56,14 +56,14 @@ export const mockRootWidget: MockWidget = {
     eventsEnabled: {},
 };
 
-mockWidgets.set('ui_0', mockRootWidget);
+mockWidgets.set('ui_root', mockRootWidget);
 
 /**
  * Resets the mocked UI state for test isolation.
  */
 export function resetMockState(): void {
     mockWidgets.clear();
-    mockWidgets.set('ui_0', mockRootWidget);
+    mockWidgets.set('ui_root', mockRootWidget);
     mockInputModeCalls.length = 0;
 }
 

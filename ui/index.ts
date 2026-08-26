@@ -29,6 +29,9 @@ export namespace UI {
 
     /****** Constants & Limits ******/
 
+    const ROOT_NODE_ID = 0;
+    const INVALID_INDEX = -1;
+
     /**
      * Maximum number of UI widgets supported simultaneously.
      */
@@ -38,21 +41,6 @@ export namespace UI {
      * Maximum number of interactive UI buttons supported simultaneously.
      */
     export const MAX_BUTTONS = 512;
-
-    /**
-     * Sentinel value representing an invalid or uninitialized widget index.
-     */
-    export const INVALID_INDEX = -1;
-
-    /**
-     * Unique identifier for a UI widget.
-     */
-    export type WidgetID = number & { readonly __brand: 'WidgetID' };
-
-    /**
-     * Sentinel value representing an invalid widget ID.
-     */
-    export const INVALID_WIDGET_ID = -1 as WidgetID;
 
     // Bitflags (lower 5 bits of _flags)
     const FLAG_IN_USE = 1 << 0; // 0x01
@@ -81,8 +69,8 @@ export namespace UI {
     const _receivers = new Array<Receiver<mod.Player | mod.Team | undefined> | null>(MAX_WIDGETS);
     const _instances = new Array<Element | null>(MAX_WIDGETS);
 
-    // Intrusive free-list initialization for widgets (IDs start at 1; 0 is Root.instance)
-    for (let i = 1; i < MAX_WIDGETS - 1; ++i) {
+    // Intrusive free-list initialization for widgets (array slots 0..MAX_WIDGETS-1)
+    for (let i = 0; i < MAX_WIDGETS - 1; ++i) {
         _nextSibling[i] = i + 1;
     }
     _nextSibling[MAX_WIDGETS - 1] = INVALID_INDEX;
@@ -93,7 +81,8 @@ export namespace UI {
     _receivers.fill(null);
     _instances.fill(null);
 
-    let _firstFree = 1;
+    let _firstFree = 0;
+    let _firstRoot = INVALID_INDEX;
 
     // Button Storage (1-indexed, slot 0 = not a button)
     const _buttonWidgetId = new Int16Array(MAX_BUTTONS + 1);
@@ -114,6 +103,16 @@ export namespace UI {
 
     let _firstFreeButton = 1;
 
+    let _rootNativeWidget: mod.UIWidget | null = null;
+
+    function _getRootNativeWidget(): mod.UIWidget {
+        if (!_rootNativeWidget) {
+            _rootNativeWidget = mod.GetUIRoot();
+        }
+
+        return _rootNativeWidget;
+    }
+
     /****** Flag & Bit Helper Functions ******/
 
     function _isInUse(flags: number): boolean {
@@ -132,23 +131,23 @@ export namespace UI {
         return (flags & FLAG_UI_INPUT_MODE_WHEN_VISIBLE) !== 0;
     }
 
-    function _setFlag(index: number, flag: number): void {
-        _flags[index] |= flag;
+    function _setFlag(slot: number, flag: number): void {
+        _flags[slot] |= flag;
     }
 
-    function _clearFlag(index: number, flag: number): void {
-        _flags[index] &= ~flag;
+    function _clearFlag(slot: number, flag: number): void {
+        _flags[slot] &= ~flag;
     }
 
     function _getButtonId(flags: number): number {
         return (flags >> BUTTON_ID_SHIFT) & BUTTON_ID_MASK;
     }
 
-    function _setButtonId(index: number, btnId: number): void {
-        _flags[index] = (_flags[index] & FLAGS_MASK) | ((btnId & BUTTON_ID_MASK) << BUTTON_ID_SHIFT);
+    function _setButtonId(slot: number, btnId: number): void {
+        _flags[slot] = (_flags[slot] & FLAGS_MASK) | ((btnId & BUTTON_ID_MASK) << BUTTON_ID_SHIFT);
     }
 
-    /****** Internal SoA Slot Allocators ******/
+    /****** Internal SoA Slot Allocators & Hierarchy Helpers ******/
 
     function _allocateSlot(): number {
         if (_firstFree === INVALID_INDEX) {
@@ -156,35 +155,42 @@ export namespace UI {
             return INVALID_INDEX;
         }
 
-        const index = _firstFree;
-        _firstFree = _nextSibling[index];
-        _nextSibling[index] = INVALID_INDEX;
-        _firstChild[index] = INVALID_INDEX;
-        _parents[index] = INVALID_INDEX;
-        _flags[index] = FLAG_IN_USE;
+        const slot = _firstFree;
+        _firstFree = _nextSibling[slot];
+        _nextSibling[slot] = INVALID_INDEX;
+        _firstChild[slot] = INVALID_INDEX;
+        _parents[slot] = ROOT_NODE_ID;
+        _flags[slot] = FLAG_IN_USE;
 
-        return index;
+        return slot + 1;
     }
 
-    function _freeSlot(index: number): void {
-        if (index <= 0 || index >= MAX_WIDGETS) return;
+    function _freeSlot(id: number): void {
+        const slot = id - 1;
+        if (slot < 0 || slot >= MAX_WIDGETS) return;
 
-        _flags[index] = 0;
-        _nativeWidgets[index] = null;
-        _receivers[index] = null;
-        _instances[index] = null;
-        _parents[index] = INVALID_INDEX;
-        _firstChild[index] = INVALID_INDEX;
-        _x[index] = 0;
-        _y[index] = 0;
-        _width[index] = 0;
-        _height[index] = 0;
+        const parentId = _parents[slot];
 
-        _nextSibling[index] = _firstFree;
-        _firstFree = index;
+        if (parentId !== INVALID_INDEX) {
+            _detachChild(parentId, id);
+        }
+
+        _flags[slot] = 0;
+        _nativeWidgets[slot] = null;
+        _receivers[slot] = null;
+        _instances[slot] = null;
+        _parents[slot] = INVALID_INDEX;
+        _firstChild[slot] = INVALID_INDEX;
+        _x[slot] = 0;
+        _y[slot] = 0;
+        _width[slot] = 0;
+        _height[slot] = 0;
+
+        _nextSibling[slot] = _firstFree;
+        _firstFree = slot;
     }
 
-    function _allocateButtonSlot(widgetIndex: number): number {
+    function _allocateButtonSlot(widgetId: number): number {
         if (_firstFreeButton === INVALID_INDEX) {
             logging.log('UI button pool full', LogLevel.Error);
             return 0;
@@ -192,19 +198,19 @@ export namespace UI {
 
         const slot = _firstFreeButton;
         _firstFreeButton = _buttonWidgetId[slot];
-        _buttonWidgetId[slot] = widgetIndex;
+        _buttonWidgetId[slot] = widgetId;
         _buttonOnClickUp[slot] = null;
         _buttonOnClickDown[slot] = null;
         _buttonOnFocusIn[slot] = null;
         _buttonOnFocusOut[slot] = null;
 
-        _setButtonId(widgetIndex, slot);
+        _setButtonId(widgetId - 1, slot);
 
         return slot;
     }
 
-    function _freeButtonSlot(widgetIndex: number): void {
-        const slot = _getButtonId(_flags[widgetIndex]);
+    function _freeButtonSlot(widgetId: number): void {
+        const slot = _getButtonId(_flags[widgetId - 1]);
 
         if (slot === 0 || slot >= _buttonWidgetId.length) return;
 
@@ -216,36 +222,72 @@ export namespace UI {
         _buttonWidgetId[slot] = _firstFreeButton;
         _firstFreeButton = slot;
 
-        _setButtonId(widgetIndex, 0);
+        _setButtonId(widgetId - 1, 0);
     }
 
     function _attachChild(parentId: number, childId: number): void {
-        if (parentId < 0 || parentId >= MAX_WIDGETS || childId < 0 || childId >= MAX_WIDGETS) return;
+        const childSlot = childId - 1;
+        if (childSlot < 0 || childSlot >= MAX_WIDGETS) return;
 
-        _parents[childId] = parentId;
-        _nextSibling[childId] = _firstChild[parentId];
-        _firstChild[parentId] = childId;
-    }
+        _parents[childSlot] = parentId;
 
-    function _detachChild(parentId: number, childId: number): void {
-        if (parentId < 0 || parentId >= MAX_WIDGETS || childId < 0 || childId >= MAX_WIDGETS) return;
-
-        if (_firstChild[parentId] === childId) {
-            _firstChild[parentId] = _nextSibling[childId];
-            _nextSibling[childId] = INVALID_INDEX;
-            _parents[childId] = INVALID_INDEX;
+        if (parentId === ROOT_NODE_ID) {
+            _nextSibling[childSlot] = _firstRoot;
+            _firstRoot = childSlot;
             return;
         }
 
-        let curr = _firstChild[parentId];
+        const parentSlot = parentId - 1;
+        if (parentSlot < 0 || parentSlot >= MAX_WIDGETS) return;
+
+        _nextSibling[childSlot] = _firstChild[parentSlot];
+        _firstChild[parentSlot] = childSlot;
+    }
+
+    function _detachChild(parentId: number, childId: number): void {
+        const childSlot = childId - 1;
+        if (childSlot < 0 || childSlot >= MAX_WIDGETS) return;
+
+        if (parentId === ROOT_NODE_ID) {
+            if (_firstRoot === INVALID_INDEX) return;
+
+            if (_firstRoot === childSlot) {
+                _firstRoot = _nextSibling[childSlot];
+                _nextSibling[childSlot] = INVALID_INDEX;
+                _parents[childSlot] = INVALID_INDEX;
+                return;
+            }
+
+            for (let prev = _firstRoot; prev !== INVALID_INDEX; prev = _nextSibling[prev]) {
+                if (_nextSibling[prev] !== childSlot) continue;
+
+                _nextSibling[prev] = _nextSibling[childSlot];
+                _nextSibling[childSlot] = INVALID_INDEX;
+                _parents[childSlot] = INVALID_INDEX;
+                return;
+            }
+            return;
+        }
+
+        const parentSlot = parentId - 1;
+        if (parentSlot < 0 || parentSlot >= MAX_WIDGETS) return;
+
+        if (_firstChild[parentSlot] === childSlot) {
+            _firstChild[parentSlot] = _nextSibling[childSlot];
+            _nextSibling[childSlot] = INVALID_INDEX;
+            _parents[childSlot] = INVALID_INDEX;
+            return;
+        }
+
+        let curr = _firstChild[parentSlot];
 
         while (curr !== INVALID_INDEX) {
             const next = _nextSibling[curr];
 
-            if (next === childId) {
-                _nextSibling[curr] = _nextSibling[childId];
-                _nextSibling[childId] = INVALID_INDEX;
-                _parents[childId] = INVALID_INDEX;
+            if (next === childSlot) {
+                _nextSibling[curr] = _nextSibling[childSlot];
+                _nextSibling[childSlot] = INVALID_INDEX;
+                _parents[childSlot] = INVALID_INDEX;
                 return;
             }
 
@@ -272,24 +314,29 @@ export namespace UI {
      * The minimum interface for a button.
      */
     export type Button = {
-        onClickDown?: ButtonHandler;
-        onClickUp?: ButtonHandler;
-        onFocusIn?: ButtonHandler;
-        onFocusOut?: ButtonHandler;
+        onClickDown?: ButtonHandler | null;
+        onClickUp?: ButtonHandler | null;
+        onFocusIn?: ButtonHandler | null;
+        onFocusOut?: ButtonHandler | null;
+        getOnClickDown?(): ButtonHandler | null | undefined;
+        getOnClickUp?(): ButtonHandler | null | undefined;
+        getOnFocusIn?(): ButtonHandler | null | undefined;
+        getOnFocusOut?(): ButtonHandler | null | undefined;
     };
 
     /**
      * The parent of an element.
      */
-    export type Parent = {
-        readonly id: number;
-        readonly receiver: mod.Player | mod.Team | undefined;
-        readonly children: readonly Element[];
-        getChild(index: number): Element | undefined;
+    export interface Parent extends Node {
+        readonly receiver: mod.Player | mod.Team | null | undefined;
+        readonly children: readonly Element[] | undefined;
+        getReceiver(): mod.Player | mod.Team | null | undefined;
+        getParent(): Parent | null | undefined;
+        getChildren(): readonly Element[] | undefined;
+        getChild(index: number): Element | null | undefined;
+        getChildCount(): number | undefined;
         forEachChild(callback: (child: Element, index: number) => void): void;
-        attachChild(child: Element): void;
-        detachChild(child: Element): void;
-    };
+    }
 
     type BaseParams = {
         anchor?: mod.UIAnchor;
@@ -412,12 +459,12 @@ export namespace UI {
      * The global receiver. This is the receiver for all players and teams.
      */
     class GlobalReceiver extends Receiver<undefined> {
-        public static readonly instance = new GlobalReceiver();
-
-        private constructor() {
+        public constructor() {
             super(undefined);
         }
     }
+
+    const _globalReceiver = new GlobalReceiver();
 
     /**
      * The team receiver. This is the receiver for a single team.
@@ -489,6 +536,8 @@ export namespace UI {
      * The base node class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Node {
+        protected static readonly _ROOT_NODE_ID = ROOT_NODE_ID;
+        protected static readonly _INVALID_INDEX = INVALID_INDEX;
         protected readonly _logging: Logging = logging; // Every node has access to the singleton UI logging instance.
         protected _id: number;
 
@@ -501,11 +550,12 @@ export namespace UI {
         }
 
         /**
-         * The unique widget ID.
-         * @returns The widget ID.
+         * Internal static helper to read a Node's ID with zero casting.
+         * @param node - The node to get the ID for.
+         * @returns The node ID.
          */
-        public get id(): number {
-            return this._id;
+        public static _getId(node: Node): number {
+            return node._id;
         }
 
         /**
@@ -513,15 +563,28 @@ export namespace UI {
          * @returns The native UIWidget handle.
          */
         protected get _uiWidget(): mod.UIWidget {
-            return _nativeWidgets[this._id]!;
+            if (this._id === ROOT_NODE_ID) {
+                return _getRootNativeWidget();
+            }
+            return _nativeWidgets[this._id - 1]!;
         }
 
         /**
-         * The target audience receiver for the node (player or team, or undefined if global).
-         * @returns The native receiver.
+         * The target audience receiver for the node (player or team, null if global, undefined if deleted).
+         * @returns The native receiver, null, or undefined.
          */
-        public get receiver(): mod.Player | mod.Team | undefined {
-            return _receivers[this._id]?.nativeReceiver;
+        public get receiver(): mod.Player | mod.Team | null | undefined {
+            return this.getReceiver();
+        }
+
+        /**
+         * Retrieves the target audience receiver for the node.
+         * @returns The native receiver, null if global, or undefined if deleted.
+         */
+        public getReceiver(): mod.Player | mod.Team | null | undefined {
+            if (this._id === INVALID_INDEX) return undefined;
+            if (this._id === ROOT_NODE_ID) return null;
+            return _receivers[this._id - 1]?.nativeReceiver ?? null;
         }
     }
 
@@ -529,29 +592,45 @@ export namespace UI {
      * The root node. This is the root of the UI tree for the entire server.
      */
     export class Root extends Node implements Parent {
-        /**
-         * The singleton instance of the root node.
-         */
-        public static readonly instance = new Root();
-
-        private constructor() {
-            super(0);
-            _flags[0] = FLAG_IN_USE | FLAG_VISIBLE;
-            _parents[0] = INVALID_INDEX;
-            _firstChild[0] = INVALID_INDEX;
-            _nextSibling[0] = INVALID_INDEX;
-            _receivers[0] = GlobalReceiver.instance;
+        public constructor() {
+            super(ROOT_NODE_ID);
         }
 
         /**
          * @inheritdoc
          */
         protected override get _uiWidget(): mod.UIWidget {
-            if (!_nativeWidgets[0]) {
-                _nativeWidgets[0] = mod.GetUIRoot();
-            }
+            return _getRootNativeWidget();
+        }
 
-            return _nativeWidgets[0]!;
+        /**
+         * @inheritdoc
+         */
+        public override get receiver(): null {
+            return null;
+        }
+
+        /**
+         * @inheritdoc
+         */
+        public override getReceiver(): null {
+            return null;
+        }
+
+        /**
+         * The parent of the root node is null.
+         * @returns null.
+         */
+        public get parent(): null {
+            return null;
+        }
+
+        /**
+         * Retrieves the parent of the root node.
+         * @returns null.
+         */
+        public getParent(): null {
+            return null;
         }
 
         /**
@@ -559,8 +638,17 @@ export namespace UI {
          * @returns Array of direct children.
          */
         public get children(): readonly Element[] {
+            return this.getChildren();
+        }
+
+        /**
+         * Retrieves a snapshot array of direct child elements.
+         * @returns Array of direct children.
+         */
+        public getChildren(): readonly Element[] {
             const list: Element[] = [];
-            let curr = _firstChild[0];
+            list.length = 0;
+            let curr = _firstRoot;
 
             while (curr !== INVALID_INDEX) {
                 const inst = _instances[curr];
@@ -578,20 +666,38 @@ export namespace UI {
         /**
          * Retrieves a child element at the specified index.
          * @param index - Zero-based index of the child.
-         * @returns The child element, or undefined if out of bounds.
+         * @returns The child element, or null if out of bounds.
          */
-        public getChild(index: number): Element | undefined {
-            let curr = _firstChild[0];
+        public getChild(index: number): Element | null {
+            if (index < 0) return null;
+
+            let curr = _firstRoot;
             let idx = 0;
 
             while (curr !== INVALID_INDEX) {
-                if (idx === index) return _instances[curr] ?? undefined;
+                if (idx === index) return _instances[curr] ?? null;
 
                 curr = _nextSibling[curr];
                 idx++;
             }
 
-            return undefined;
+            return null;
+        }
+
+        /**
+         * Retrieves the total direct child count of the root node.
+         * @returns The number of direct children.
+         */
+        public getChildCount(): number {
+            let count = 0;
+            let curr = _firstRoot;
+
+            while (curr !== INVALID_INDEX) {
+                count++;
+                curr = _nextSibling[curr];
+            }
+
+            return count;
         }
 
         /**
@@ -599,7 +705,7 @@ export namespace UI {
          * @param callback - Function invoked for each child.
          */
         public forEachChild(callback: (child: Element, index: number) => void): void {
-            let curr = _firstChild[0];
+            let curr = _firstRoot;
             let idx = 0;
 
             while (curr !== INVALID_INDEX) {
@@ -613,51 +719,46 @@ export namespace UI {
                 curr = next;
             }
         }
-
-        /**
-         * Attaches a child to the root node.
-         * @param child - The child to attach.
-         */
-        public attachChild(child: Element): void {
-            if (child.id === INVALID_INDEX) return;
-
-            _attachChild(0, child.id);
-        }
-
-        /**
-         * Detaches a child from the root node.
-         * @param child - The child to detach.
-         */
-        public detachChild(child: Element): void {
-            if (child.id === INVALID_INDEX) return;
-
-            _detachChild(0, child.id);
-        }
     }
+
+    /**
+     * The root node. This is the root of the UI tree and the default parent for all elements.
+     */
+    export const ROOT_NODE: Root = new Root();
 
     /**
      * The base element class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Element extends Node {
+        protected static readonly _ROOT_NODE_ID = ROOT_NODE_ID;
+        protected static readonly _INVALID_INDEX = INVALID_INDEX;
+        protected static readonly _scratchPos: Position = { x: 0, y: 0 };
+        protected static readonly _scratchSize: Size = { width: 0, height: 0 };
+
         protected _name: string;
+
+        private get _slot(): number {
+            return this._id - 1;
+        }
 
         /**
          * The constructor for an element.
-         * @param id - The allocated slot index.
+         * @param id - The allocated slot ID (1-based).
          * @param params - The parameters for the element.
          */
         public constructor(id: number, params: FinalElementParams) {
             super(id);
             this._name = params.name;
 
-            _nativeWidgets[id] = mod.FindUIWidgetWithName(params.name) as mod.UIWidget;
-            _receivers[id] = params.receiver;
-            _instances[id] = this;
+            const slot = id - 1;
+            _nativeWidgets[slot] = mod.FindUIWidgetWithName(params.name) as mod.UIWidget;
+            _receivers[slot] = params.receiver;
+            _instances[slot] = this;
 
-            _x[id] = params.x;
-            _y[id] = params.y;
-            _width[id] = params.width;
-            _height[id] = params.height;
+            _x[slot] = params.x;
+            _y[slot] = params.y;
+            _width[slot] = params.width;
+            _height[slot] = params.height;
 
             let flags = FLAG_IN_USE;
 
@@ -674,9 +775,9 @@ export namespace UI {
                 params.receiver.addInputModeRequester();
             }
 
-            _flags[id] = flags;
+            _flags[slot] = flags;
 
-            _attachChild(params.parent.id, id);
+            _attachChild(Node._getId(params.parent), id);
         }
 
         /****** Protected Static Helpers for Subclasses ******/
@@ -698,25 +799,27 @@ export namespace UI {
         }
 
         protected static _getFirstChild(id: number): number {
-            return id >= 0 && id < MAX_WIDGETS ? _firstChild[id] : INVALID_INDEX;
+            if (id === ROOT_NODE_ID) return _firstRoot;
+            const slot = id - 1;
+            return slot >= 0 && slot < MAX_WIDGETS ? _firstChild[slot] : INVALID_INDEX;
         }
 
-        protected static _getNextSibling(id: number): number {
-            return id >= 0 && id < MAX_WIDGETS ? _nextSibling[id] : INVALID_INDEX;
+        protected static _getNextSibling(slot: number): number {
+            return slot >= 0 && slot < MAX_WIDGETS ? _nextSibling[slot] : INVALID_INDEX;
         }
 
-        protected static _getInstance(id: number): Element | undefined {
-            return id >= 0 && id < MAX_WIDGETS ? (_instances[id] ?? undefined) : undefined;
+        protected static _getInstance(slot: number): Element | undefined {
+            return slot >= 0 && slot < MAX_WIDGETS ? (_instances[slot] ?? undefined) : undefined;
         }
 
-        protected static _getNativeWidget(id: number): mod.UIWidget | undefined {
-            if (id === 0 && !_nativeWidgets[0]) {
-                const root = mod.GetUIRoot();
-                _nativeWidgets[0] = root;
-                return root;
+        public static _getNativeWidget(target: Parent | Node | number): mod.UIWidget | undefined {
+            const id = typeof target === 'number' ? target : Node._getId(target);
+            if (id === ROOT_NODE_ID) {
+                return _getRootNativeWidget();
             }
 
-            return id >= 0 && id < MAX_WIDGETS ? (_nativeWidgets[id] ?? undefined) : undefined;
+            const slot = id - 1;
+            return slot >= 0 && slot < MAX_WIDGETS ? (_nativeWidgets[slot] ?? undefined) : undefined;
         }
 
         /**
@@ -731,22 +834,27 @@ export namespace UI {
         /**
          * Gets the position from the parameters, given either x/y or position.
          * @param params - The parameters.
+         * @param out - Optional target Position object to populate.
          * @returns The position.
          */
-        protected static _getPosition(params: ElementParams): Position {
-            return { x: params.x ?? params.position?.x ?? 0, y: params.y ?? params.position?.y ?? 0 };
+        protected static _getPosition(params: ElementParams, out?: Position): Position {
+            const target = out ?? Element._scratchPos;
+            target.x = params.x ?? params.position?.x ?? 0;
+            target.y = params.y ?? params.position?.y ?? 0;
+            return target;
         }
 
         /**
          * Gets the size from the parameters, given either width/height or size.
          * @param params - The parameters.
+         * @param out - Optional target Size object to populate.
          * @returns The size.
          */
-        protected static _getSize(params: ElementParams): Size {
-            return {
-                width: params.width ?? params.size?.width ?? 0,
-                height: params.height ?? params.size?.height ?? 0,
-            };
+        protected static _getSize(params: ElementParams, out?: Size): Size {
+            const target = out ?? Element._scratchSize;
+            target.width = params.width ?? params.size?.width ?? 0;
+            target.height = params.height ?? params.size?.height ?? 0;
+            return target;
         }
 
         /**
@@ -759,9 +867,12 @@ export namespace UI {
             parent: Parent,
             receiverParam?: mod.Player | mod.Team
         ): Receiver<mod.Player | mod.Team | undefined> {
-            if (!receiverParam) return _receivers[parent.id] ?? GlobalReceiver.instance;
+            const parentId = Node._getId(parent);
+            if (!receiverParam) {
+                return (parentId !== ROOT_NODE_ID ? _receivers[parentId - 1] : undefined) ?? _globalReceiver;
+            }
 
-            const parentReceiver = _receivers[parent.id];
+            const parentReceiver = parentId !== ROOT_NODE_ID ? _receivers[parentId - 1] : undefined;
 
             if (isTeam(receiverParam)) {
                 const receiver = TeamReceiver.getInstance(receiverParam);
@@ -795,7 +906,7 @@ export namespace UI {
                 return receiver;
             }
 
-            return GlobalReceiver.instance;
+            return _globalReceiver;
         }
 
         /****** Protected Button Slot Accessors for Subclasses ******/
@@ -809,52 +920,52 @@ export namespace UI {
         }
 
         protected _getButtonSlot(): number {
-            return _getButtonId(_flags[this._id]);
+            return _getButtonId(_flags[this._slot]);
         }
 
-        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | undefined): void {
+        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | null | undefined): void {
             if (slot > 0 && slot <= MAX_BUTTONS) {
                 _buttonOnClickUp[slot] = handler ?? null;
             }
         }
 
-        protected _getButtonOnClickUp(slot: number): ButtonHandler | undefined {
-            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickUp[slot] ?? undefined) : undefined;
+        protected _getButtonOnClickUp(slot: number): ButtonHandler | null | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickUp[slot] ?? null) : undefined;
         }
 
-        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | undefined): void {
+        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | null | undefined): void {
             if (slot > 0 && slot <= MAX_BUTTONS) {
                 _buttonOnClickDown[slot] = handler ?? null;
             }
         }
 
-        protected _getButtonOnClickDown(slot: number): ButtonHandler | undefined {
-            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickDown[slot] ?? undefined) : undefined;
+        protected _getButtonOnClickDown(slot: number): ButtonHandler | null | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnClickDown[slot] ?? null) : undefined;
         }
 
-        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | undefined): void {
+        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | null | undefined): void {
             if (slot > 0 && slot <= MAX_BUTTONS) {
                 _buttonOnFocusIn[slot] = handler ?? null;
             }
         }
 
-        protected _getButtonOnFocusIn(slot: number): ButtonHandler | undefined {
-            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusIn[slot] ?? undefined) : undefined;
+        protected _getButtonOnFocusIn(slot: number): ButtonHandler | null | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusIn[slot] ?? null) : undefined;
         }
 
-        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | undefined): void {
+        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | null | undefined): void {
             if (slot > 0 && slot <= MAX_BUTTONS) {
                 _buttonOnFocusOut[slot] = handler ?? null;
             }
         }
 
-        protected _getButtonOnFocusOut(slot: number): ButtonHandler | undefined {
-            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusOut[slot] ?? undefined) : undefined;
+        protected _getButtonOnFocusOut(slot: number): ButtonHandler | null | undefined {
+            return slot > 0 && slot <= MAX_BUTTONS ? (_buttonOnFocusOut[slot] ?? null) : undefined;
         }
 
         protected _isDeletedCheck(): boolean {
             if (this._id === INVALID_INDEX) {
-                logging.log(`Element is deleted`, LogLevel.Warning);
+                logging.log('Element is deleted', LogLevel.Warning);
                 return true;
             }
 
@@ -862,15 +973,27 @@ export namespace UI {
         }
 
         /**
-         * The parent of the element.
-         * @returns The parent of the element.
+         * Whether the element is deleted.
+         * @returns True if deleted, false otherwise.
          */
-        public get parent(): Parent {
-            const parentId = _parents[this._id];
+        public get isDeleted(): boolean {
+            return this._id === INVALID_INDEX;
+        }
 
-            if (parentId === 0) return Root.instance;
+        /**
+         * Retrieves whether the element is deleted.
+         * @returns True if deleted, false otherwise.
+         */
+        public getIsDeleted(): boolean {
+            return this._id === INVALID_INDEX;
+        }
 
-            return (_instances[parentId] as unknown as Parent) ?? Root.instance;
+        /**
+         * The parent of the element, or undefined if deleted.
+         * @returns The parent of the element, or undefined.
+         */
+        public get parent(): Parent | undefined {
+            return this.getParent();
         }
 
         /**
@@ -878,27 +1001,64 @@ export namespace UI {
          * @param parent - The parent to set.
          */
         public set parent(parent: Parent) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetParent(this._uiWidget, Element._getNativeWidget(parent.id)!);
-
-            const oldParentId = _parents[this._id];
-
-            if (oldParentId !== INVALID_INDEX) {
-                _detachChild(oldParentId, this._id);
-            }
-
-            _attachChild(parent.id, this._id);
+            this.setParent(parent);
         }
 
         /**
-         * Whether the element is visible.
-         * @returns True if visible, false otherwise.
+         * Retrieves the parent of the element, or undefined if deleted.
+         * @returns The parent of the element, or undefined.
          */
-        public get visible(): boolean {
-            if (this._isDeletedCheck()) return false;
+        public getParent(): Parent | undefined {
+            if (this._isDeletedCheck()) return undefined;
 
-            return _isVisible(_flags[this._id]);
+            const parentId = _parents[this._slot];
+
+            if (parentId === ROOT_NODE_ID) return ROOT_NODE;
+            if (parentId === INVALID_INDEX) return undefined;
+
+            const parentSlot = parentId - 1;
+            return (_instances[parentSlot] as (Element & Parent) | null) ?? ROOT_NODE;
+        }
+
+        /**
+         * Sets the parent of the element.
+         * @param parent - The new parent.
+         * @returns This element for chaining.
+         */
+        public setParent(parent: Parent): this {
+            if (this._isDeletedCheck()) return this;
+
+            const parentId = Node._getId(parent);
+            if (parentId === this._id) return this;
+
+            // Circular hierarchy check
+            let ancestor: Parent | null | undefined = parent;
+            while (ancestor) {
+                if (Node._getId(ancestor) === this._id) {
+                    logging.log('Cannot create circular parent-child hierarchy', LogLevel.Warning);
+                    return this;
+                }
+                ancestor = ancestor.getParent();
+            }
+
+            const slot = this._slot;
+            const oldParentId = _parents[slot];
+            if (oldParentId === parentId) return this;
+
+            _detachChild(oldParentId, this._id);
+            _attachChild(parentId, this._id);
+
+            mod.SetUIWidgetParent(this._uiWidget, Element._getNativeWidget(parentId)!);
+
+            return this;
+        }
+
+        /**
+         * Whether the element is visible, or undefined if deleted.
+         * @returns True if visible, false if invisible, or undefined if deleted.
+         */
+        public get visible(): boolean | undefined {
+            return this.getVisible();
         }
 
         /**
@@ -906,37 +1066,51 @@ export namespace UI {
          * @param visible - The visibility to set.
          */
         public set visible(visible: boolean) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetVisible(this._uiWidget, visible);
-
-            if (visible) {
-                _setFlag(this._id, FLAG_VISIBLE);
-            } else {
-                _clearFlag(this._id, FLAG_VISIBLE);
-            }
-
-            const flags = _flags[this._id];
-            const uiInputModeWhenVisible = _isUIInputModeWhenVisible(flags);
-            const hasInputMode = _hasInputMode(flags);
-
-            if (!uiInputModeWhenVisible) return;
-
-            if (visible && !hasInputMode) {
-                _setFlag(this._id, FLAG_HAS_INPUT_MODE);
-                _receivers[this._id]?.addInputModeRequester();
-            } else if (!visible && hasInputMode) {
-                _clearFlag(this._id, FLAG_HAS_INPUT_MODE);
-                _receivers[this._id]?.removeInputModeRequester();
-            }
+            this.setVisible(visible);
         }
 
         /**
-         * Whether the element is deleted.
-         * @returns True if deleted, false otherwise.
+         * Retrieves the visibility of the element, or undefined if deleted.
+         * @returns True if visible, false if invisible, or undefined if deleted.
          */
-        public get deleted(): boolean {
-            return this._id === INVALID_INDEX;
+        public getVisible(): boolean | undefined {
+            if (this._isDeletedCheck()) return undefined;
+
+            return _isVisible(_flags[this._slot]);
+        }
+
+        /**
+         * Sets the visibility of the element.
+         * @param visible - The visibility to set.
+         * @returns This element for chaining.
+         */
+        public setVisible(visible: boolean): this {
+            if (this._isDeletedCheck()) return this;
+
+            mod.SetUIWidgetVisible(this._uiWidget, visible);
+
+            const slot = this._slot;
+            if (visible) {
+                _setFlag(slot, FLAG_VISIBLE);
+            } else {
+                _clearFlag(slot, FLAG_VISIBLE);
+            }
+
+            const flags = _flags[slot];
+            const uiInputModeWhenVisible = _isUIInputModeWhenVisible(flags);
+            const hasInputMode = _hasInputMode(flags);
+
+            if (!uiInputModeWhenVisible) return this;
+
+            if (visible && !hasInputMode) {
+                _setFlag(slot, FLAG_HAS_INPUT_MODE);
+                _receivers[slot]?.addInputModeRequester();
+            } else if (!visible && hasInputMode) {
+                _clearFlag(slot, FLAG_HAS_INPUT_MODE);
+                _receivers[slot]?.removeInputModeRequester();
+            }
+
+            return this;
         }
 
         /**
@@ -952,10 +1126,11 @@ export namespace UI {
         }
 
         private _deleteRecursive(id: number): void {
-            if (!_isInUse(_flags[id])) return;
+            const slot = id - 1;
+            if (!_isInUse(_flags[slot])) return;
 
             // 1. Recursively delete all children
-            let child = _firstChild[id];
+            let child = _firstChild[slot];
 
             while (child !== INVALID_INDEX) {
                 const next = _nextSibling[child];
@@ -964,21 +1139,21 @@ export namespace UI {
                 if (childInstance) {
                     childInstance.delete();
                 } else {
-                    this._deleteRecursive(child);
+                    this._deleteRecursive(child + 1);
                 }
 
                 child = next;
             }
 
             // 2. Detach from parent
-            const parentId = _parents[id];
+            const parentId = _parents[slot];
 
             if (parentId !== INVALID_INDEX) {
                 _detachChild(parentId, id);
             }
 
             // 3. Free button slot if allocated
-            const flags = _flags[id];
+            const flags = _flags[slot];
 
             if (_getButtonId(flags) !== 0) {
                 _freeButtonSlot(id);
@@ -986,11 +1161,11 @@ export namespace UI {
 
             // 4. Remove input mode requester if active
             if (_hasInputMode(flags)) {
-                _receivers[id]?.removeInputModeRequester();
+                _receivers[slot]?.removeInputModeRequester();
             }
 
             // 5. Delete native widget
-            const nativeWidget = _nativeWidgets[id];
+            const nativeWidget = _nativeWidgets[slot];
 
             if (nativeWidget) {
                 mod.DeleteUIWidget(nativeWidget);
@@ -1001,11 +1176,11 @@ export namespace UI {
         }
 
         /**
-         * The X position of the element.
-         * @returns The X position of the element.
+         * The X position of the element, or undefined if deleted.
+         * @returns The X position of the element, or undefined.
          */
-        public get x(): number {
-            return this._isDeletedCheck() ? 0 : _x[this._id];
+        public get x(): number | undefined {
+            return this.getX();
         }
 
         /**
@@ -1013,18 +1188,36 @@ export namespace UI {
          * @param x - The X position to set.
          */
         public set x(x: number) {
-            if (this._isDeletedCheck()) return;
-
-            _x[this._id] = x;
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, _y[this._id], 0));
+            this.setX(x);
         }
 
         /**
-         * The Y position of the element.
-         * @returns The Y position of the element.
+         * Retrieves the X position of the element, or undefined if deleted.
+         * @returns The X position of the element, or undefined.
          */
-        public get y(): number {
-            return this._isDeletedCheck() ? 0 : _y[this._id];
+        public getX(): number | undefined {
+            return this._isDeletedCheck() ? undefined : _x[this._slot];
+        }
+
+        /**
+         * Sets the X position of the element.
+         * @param x - The X position to set.
+         * @returns This element for chaining.
+         */
+        public setX(x: number): this {
+            if (this._isDeletedCheck()) return this;
+
+            _x[this._slot] = x;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(x, _y[this._slot], 0));
+            return this;
+        }
+
+        /**
+         * The Y position of the element, or undefined if deleted.
+         * @returns The Y position of the element, or undefined.
+         */
+        public get y(): number | undefined {
+            return this.getY();
         }
 
         /**
@@ -1032,18 +1225,36 @@ export namespace UI {
          * @param y - The Y position to set.
          */
         public set y(y: number) {
-            if (this._isDeletedCheck()) return;
-
-            _y[this._id] = y;
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(_x[this._id], y, 0));
+            this.setY(y);
         }
 
         /**
-         * The position of the element.
-         * @returns The position of the element.
+         * Retrieves the Y position of the element, or undefined if deleted.
+         * @returns The Y position of the element, or undefined.
          */
-        public get position(): Position {
-            return this._isDeletedCheck() ? { x: 0, y: 0 } : { x: _x[this._id], y: _y[this._id] };
+        public getY(): number | undefined {
+            return this._isDeletedCheck() ? undefined : _y[this._slot];
+        }
+
+        /**
+         * Sets the Y position of the element.
+         * @param y - The Y position to set.
+         * @returns This element for chaining.
+         */
+        public setY(y: number): this {
+            if (this._isDeletedCheck()) return this;
+
+            _y[this._slot] = y;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(_x[this._slot], y, 0));
+            return this;
+        }
+
+        /**
+         * The position of the element, or undefined if deleted.
+         * @returns The position of the element, or undefined.
+         */
+        public get position(): Position | undefined {
+            return this.getPosition();
         }
 
         /**
@@ -1051,19 +1262,43 @@ export namespace UI {
          * @param params - The position to set.
          */
         public set position(params: Position) {
-            if (this._isDeletedCheck()) return;
-
-            _x[this._id] = params.x;
-            _y[this._id] = params.y;
-            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
+            this.setPosition(params);
         }
 
         /**
-         * The width of the element.
-         * @returns The width of the element.
+         * Retrieves the position of the element, or undefined if deleted.
+         * @param out - Optional target Position object to populate for zero allocations.
+         * @returns The position of the element, or undefined.
          */
-        public get width(): number {
-            return this._isDeletedCheck() ? 0 : _width[this._id];
+        public getPosition(out?: Position): Position | undefined {
+            if (this._isDeletedCheck()) return undefined;
+
+            const target = out ?? { x: 0, y: 0 };
+            target.x = _x[this._slot];
+            target.y = _y[this._slot];
+            return target;
+        }
+
+        /**
+         * Sets the position of the element.
+         * @param params - The position to set.
+         * @returns This element for chaining.
+         */
+        public setPosition(params: Position): this {
+            if (this._isDeletedCheck()) return this;
+
+            _x[this._slot] = params.x;
+            _y[this._slot] = params.y;
+            mod.SetUIWidgetPosition(this._uiWidget, mod.CreateVector(params.x, params.y, 0));
+            return this;
+        }
+
+        /**
+         * The width of the element, or undefined if deleted.
+         * @returns The width of the element, or undefined.
+         */
+        public get width(): number | undefined {
+            return this.getWidth();
         }
 
         /**
@@ -1071,18 +1306,36 @@ export namespace UI {
          * @param width - The width to set.
          */
         public set width(width: number) {
-            if (this._isDeletedCheck()) return;
-
-            _width[this._id] = width;
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, _height[this._id], 0));
+            this.setWidth(width);
         }
 
         /**
-         * The height of the element.
-         * @returns The height of the element.
+         * Retrieves the width of the element, or undefined if deleted.
+         * @returns The width of the element, or undefined.
          */
-        public get height(): number {
-            return this._isDeletedCheck() ? 0 : _height[this._id];
+        public getWidth(): number | undefined {
+            return this._isDeletedCheck() ? undefined : _width[this._slot];
+        }
+
+        /**
+         * Sets the width of the element.
+         * @param width - The width to set.
+         * @returns This element for chaining.
+         */
+        public setWidth(width: number): this {
+            if (this._isDeletedCheck()) return this;
+
+            _width[this._slot] = width;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(width, _height[this._slot], 0));
+            return this;
+        }
+
+        /**
+         * The height of the element, or undefined if deleted.
+         * @returns The height of the element, or undefined.
+         */
+        public get height(): number | undefined {
+            return this.getHeight();
         }
 
         /**
@@ -1090,20 +1343,36 @@ export namespace UI {
          * @param height - The height to set.
          */
         public set height(height: number) {
-            if (this._isDeletedCheck()) return;
-
-            _height[this._id] = height;
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(_width[this._id], height, 0));
+            this.setHeight(height);
         }
 
         /**
-         * The size of the element.
-         * @returns The size of the element.
+         * Retrieves the height of the element, or undefined if deleted.
+         * @returns The height of the element, or undefined.
          */
-        public get size(): Size {
-            return this._isDeletedCheck()
-                ? { width: 0, height: 0 }
-                : { width: _width[this._id], height: _height[this._id] };
+        public getHeight(): number | undefined {
+            return this._isDeletedCheck() ? undefined : _height[this._slot];
+        }
+
+        /**
+         * Sets the height of the element.
+         * @param height - The height to set.
+         * @returns This element for chaining.
+         */
+        public setHeight(height: number): this {
+            if (this._isDeletedCheck()) return this;
+
+            _height[this._slot] = height;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(_width[this._slot], height, 0));
+            return this;
+        }
+
+        /**
+         * The size of the element, or undefined if deleted.
+         * @returns The size of the element, or undefined.
+         */
+        public get size(): Size | undefined {
+            return this.getSize();
         }
 
         /**
@@ -1111,19 +1380,43 @@ export namespace UI {
          * @param params - The size to set.
          */
         public set size(params: Size) {
-            if (this._isDeletedCheck()) return;
-
-            _width[this._id] = params.width;
-            _height[this._id] = params.height;
-            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
+            this.setSize(params);
         }
 
         /**
-         * The background color of the element.
-         * @returns The background color of the element.
+         * Retrieves the size of the element, or undefined if deleted.
+         * @param out - Optional target Size object to populate for zero allocations.
+         * @returns The size of the element, or undefined.
          */
-        public get bgColor(): mod.Vector {
-            return this._isDeletedCheck() ? COLORS.WHITE : mod.GetUIWidgetBgColor(this._uiWidget);
+        public getSize(out?: Size): Size | undefined {
+            if (this._isDeletedCheck()) return undefined;
+
+            const target = out ?? { width: 0, height: 0 };
+            target.width = _width[this._slot];
+            target.height = _height[this._slot];
+            return target;
+        }
+
+        /**
+         * Sets the size of the element.
+         * @param params - The size to set.
+         * @returns This element for chaining.
+         */
+        public setSize(params: Size): this {
+            if (this._isDeletedCheck()) return this;
+
+            _width[this._slot] = params.width;
+            _height[this._slot] = params.height;
+            mod.SetUIWidgetSize(this._uiWidget, mod.CreateVector(params.width, params.height, 0));
+            return this;
+        }
+
+        /**
+         * The background color of the element, or undefined if deleted.
+         * @returns The background color of the element, or undefined.
+         */
+        public get bgColor(): mod.Vector | undefined {
+            return this.getBgColor();
         }
 
         /**
@@ -1131,17 +1424,35 @@ export namespace UI {
          * @param color - The background color to set.
          */
         public set bgColor(color: mod.Vector) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetBgColor(this._uiWidget, color);
+            this.setBgColor(color);
         }
 
         /**
-         * The background alpha of the element.
-         * @returns The background alpha of the element.
+         * Retrieves the background color of the element, or undefined if deleted.
+         * @returns The background color vector, or undefined.
          */
-        public get bgAlpha(): number {
-            return this._isDeletedCheck() ? 0 : mod.GetUIWidgetBgAlpha(this._uiWidget);
+        public getBgColor(): mod.Vector | undefined {
+            return this._isDeletedCheck() ? undefined : mod.GetUIWidgetBgColor(this._uiWidget);
+        }
+
+        /**
+         * Sets the background color of the element.
+         * @param color - The background color to set.
+         * @returns This element for chaining.
+         */
+        public setBgColor(color: mod.Vector): this {
+            if (this._isDeletedCheck()) return this;
+
+            mod.SetUIWidgetBgColor(this._uiWidget, color);
+            return this;
+        }
+
+        /**
+         * The background alpha of the element, or undefined if deleted.
+         * @returns The background alpha of the element, or undefined.
+         */
+        public get bgAlpha(): number | undefined {
+            return this.getBgAlpha();
         }
 
         /**
@@ -1149,17 +1460,35 @@ export namespace UI {
          * @param alpha - The background alpha to set.
          */
         public set bgAlpha(alpha: number) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
+            this.setBgAlpha(alpha);
         }
 
         /**
-         * The background fill of the element.
-         * @returns The background fill of the element.
+         * Retrieves the background alpha of the element, or undefined if deleted.
+         * @returns The background alpha, or undefined.
          */
-        public get bgFill(): mod.UIBgFill {
-            return this._isDeletedCheck() ? mod.UIBgFill.None : mod.GetUIWidgetBgFill(this._uiWidget);
+        public getBgAlpha(): number | undefined {
+            return this._isDeletedCheck() ? undefined : mod.GetUIWidgetBgAlpha(this._uiWidget);
+        }
+
+        /**
+         * Sets the background alpha of the element.
+         * @param alpha - The background alpha to set.
+         * @returns This element for chaining.
+         */
+        public setBgAlpha(alpha: number): this {
+            if (this._isDeletedCheck()) return this;
+
+            mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
+            return this;
+        }
+
+        /**
+         * The background fill of the element, or undefined if deleted.
+         * @returns The background fill of the element, or undefined.
+         */
+        public get bgFill(): mod.UIBgFill | undefined {
+            return this.getBgFill();
         }
 
         /**
@@ -1167,17 +1496,35 @@ export namespace UI {
          * @param fill - The background fill to set.
          */
         public set bgFill(fill: mod.UIBgFill) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetBgFill(this._uiWidget, fill);
+            this.setBgFill(fill);
         }
 
         /**
-         * The depth of the element.
-         * @returns The depth of the element.
+         * Retrieves the background fill of the element, or undefined if deleted.
+         * @returns The background fill, or undefined.
          */
-        public get depth(): mod.UIDepth {
-            return this._isDeletedCheck() ? mod.UIDepth.AboveGameUI : mod.GetUIWidgetDepth(this._uiWidget);
+        public getBgFill(): mod.UIBgFill | undefined {
+            return this._isDeletedCheck() ? undefined : mod.GetUIWidgetBgFill(this._uiWidget);
+        }
+
+        /**
+         * Sets the background fill of the element.
+         * @param fill - The background fill to set.
+         * @returns This element for chaining.
+         */
+        public setBgFill(fill: mod.UIBgFill): this {
+            if (this._isDeletedCheck()) return this;
+
+            mod.SetUIWidgetBgFill(this._uiWidget, fill);
+            return this;
+        }
+
+        /**
+         * The depth of the element, or undefined if deleted.
+         * @returns The depth of the element, or undefined.
+         */
+        public get depth(): mod.UIDepth | undefined {
+            return this.getDepth();
         }
 
         /**
@@ -1185,17 +1532,35 @@ export namespace UI {
          * @param depth - The depth to set.
          */
         public set depth(depth: mod.UIDepth) {
-            if (this._isDeletedCheck()) return;
-
-            mod.SetUIWidgetDepth(this._uiWidget, depth);
+            this.setDepth(depth);
         }
 
         /**
-         * The anchor of the element.
-         * @returns The anchor of the element.
+         * Retrieves the depth of the element, or undefined if deleted.
+         * @returns The depth of the element, or undefined.
          */
-        public get anchor(): mod.UIAnchor {
-            return this._isDeletedCheck() ? mod.UIAnchor.Center : mod.GetUIWidgetAnchor(this._uiWidget);
+        public getDepth(): mod.UIDepth | undefined {
+            return this._isDeletedCheck() ? undefined : mod.GetUIWidgetDepth(this._uiWidget);
+        }
+
+        /**
+         * Sets the depth of the element.
+         * @param depth - The depth to set.
+         * @returns This element for chaining.
+         */
+        public setDepth(depth: mod.UIDepth): this {
+            if (this._isDeletedCheck()) return this;
+
+            mod.SetUIWidgetDepth(this._uiWidget, depth);
+            return this;
+        }
+
+        /**
+         * The anchor of the element, or undefined if deleted.
+         * @returns The anchor of the element, or undefined.
+         */
+        public get anchor(): mod.UIAnchor | undefined {
+            return this.getAnchor();
         }
 
         /**
@@ -1203,17 +1568,35 @@ export namespace UI {
          * @param anchor - The anchor to set.
          */
         public set anchor(anchor: mod.UIAnchor) {
-            if (this._isDeletedCheck()) return;
+            this.setAnchor(anchor);
+        }
+
+        /**
+         * Retrieves the anchor of the element, or undefined if deleted.
+         * @returns The anchor of the element, or undefined.
+         */
+        public getAnchor(): mod.UIAnchor | undefined {
+            return this._isDeletedCheck() ? undefined : mod.GetUIWidgetAnchor(this._uiWidget);
+        }
+
+        /**
+         * Sets the anchor of the element.
+         * @param anchor - The anchor to set.
+         * @returns This element for chaining.
+         */
+        public setAnchor(anchor: mod.UIAnchor): this {
+            if (this._isDeletedCheck()) return this;
 
             mod.SetUIWidgetAnchor(this._uiWidget, anchor);
+            return this;
         }
 
         /**
          * Whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
-         * @returns True if UI input mode is requested when visible, false otherwise.
+         * @returns True if UI input mode is requested when visible, false if not, or undefined if deleted.
          */
-        public get uiInputModeWhenVisible(): boolean {
-            return this._isDeletedCheck() ? false : _isUIInputModeWhenVisible(_flags[this._id]);
+        public get uiInputModeWhenVisible(): boolean | undefined {
+            return this.getUiInputModeWhenVisible();
         }
 
         /**
@@ -1221,24 +1604,44 @@ export namespace UI {
          * @param newValue - The new value.
          */
         public set uiInputModeWhenVisible(newValue: boolean) {
-            if (this._isDeletedCheck()) return;
+            this.setUiInputModeWhenVisible(newValue);
+        }
 
-            const isVisible = _isVisible(_flags[this._id]);
-            const hasInputMode = _hasInputMode(_flags[this._id]);
+        /**
+         * Retrieves whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @returns True if UI input mode is requested when visible, false if not, or undefined if deleted.
+         */
+        public getUiInputModeWhenVisible(): boolean | undefined {
+            return this._isDeletedCheck() ? undefined : _isUIInputModeWhenVisible(_flags[this._slot]);
+        }
+
+        /**
+         * Sets whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @param newValue - The new value.
+         * @returns This element for chaining.
+         */
+        public setUiInputModeWhenVisible(newValue: boolean): this {
+            if (this._isDeletedCheck()) return this;
+
+            const slot = this._slot;
+            const isVisible = _isVisible(_flags[slot]);
+            const hasInputMode = _hasInputMode(_flags[slot]);
 
             if (newValue) {
-                _setFlag(this._id, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
+                _setFlag(slot, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
             } else {
-                _clearFlag(this._id, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
+                _clearFlag(slot, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
             }
 
             if (newValue && isVisible && !hasInputMode) {
-                _setFlag(this._id, FLAG_HAS_INPUT_MODE);
-                _receivers[this._id]?.addInputModeRequester();
+                _setFlag(slot, FLAG_HAS_INPUT_MODE);
+                _receivers[slot]?.addInputModeRequester();
             } else if ((!newValue || !isVisible) && hasInputMode) {
-                _clearFlag(this._id, FLAG_HAS_INPUT_MODE);
-                _receivers[this._id]?.removeInputModeRequester();
+                _clearFlag(slot, FLAG_HAS_INPUT_MODE);
+                _receivers[slot]?.removeInputModeRequester();
             }
+
+            return this;
         }
     }
 
@@ -1274,11 +1677,6 @@ export namespace UI {
         BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // #716000
     };
 
-    /**
-     * The root node. This is the root of the UI tree and the default parent for all elements.
-     */
-    export const ROOT_NODE = Root.instance;
-
     /****** Button Event Handler ******/
 
     /**
@@ -1289,11 +1687,13 @@ export namespace UI {
      */
     function handleButtonEvent(player: mod.Player, widget: mod.UIWidget, event: mod.UIButtonEvent): void {
         const name = mod.GetUIWidgetName(widget);
-        const widgetIndex = parseInt(name.slice(3), 10);
+        const match = /^ui_(\d+)/.exec(name);
+        const widgetId = match ? parseInt(match[1], 10) : NaN;
 
-        if (isNaN(widgetIndex) || widgetIndex <= 0 || widgetIndex >= MAX_WIDGETS) return;
+        if (isNaN(widgetId) || widgetId <= 0 || widgetId > MAX_WIDGETS) return;
 
-        const btnSlot = _getButtonId(_flags[widgetIndex]);
+        const slot = widgetId - 1;
+        const btnSlot = _getButtonId(_flags[slot]);
 
         if (btnSlot === 0 || btnSlot > MAX_BUTTONS) {
             logging.log(`Button ${name} not found or slot unassigned`, LogLevel.Warning);

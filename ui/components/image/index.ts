@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 4.0.0
+// version: 5.0.0
 export class UIImage extends UI.Element {
     /**
      * Creates a new image.
@@ -28,7 +28,7 @@ export class UIImage extends UI.Element {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 bgColor,
@@ -45,7 +45,7 @@ export class UIImage extends UI.Element {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 bgColor,
@@ -78,11 +78,11 @@ export class UIImage extends UI.Element {
     }
 
     /**
-     * The type of the image.
-     * @returns The image type.
+     * The type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    public get imageType(): mod.UIImageType {
-        return this._isDeletedCheck() ? mod.UIImageType.None : mod.GetUIImageType(this._uiWidget);
+    public get imageType(): mod.UIImageType | undefined {
+        return this.getImageType();
     }
 
     /**
@@ -90,17 +90,35 @@ export class UIImage extends UI.Element {
      * @param imageType - The new type of the image.
      */
     public set imageType(imageType: mod.UIImageType) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIImageType(this._uiWidget, imageType);
+        this.setImageType(imageType);
     }
 
     /**
-     * The alpha of the image.
-     * @returns The image alpha opacity.
+     * Retrieves the type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    public get imageAlpha(): number {
-        return this._isDeletedCheck() ? 1 : mod.GetUIImageAlpha(this._uiWidget);
+    public getImageType(): mod.UIImageType | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUIImageType(this._uiWidget);
+    }
+
+    /**
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     * @returns This image for chaining.
+     */
+    public setImageType(imageType: mod.UIImageType): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUIImageType(this._uiWidget, imageType);
+        return this;
+    }
+
+    /**
+     * The alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
+     */
+    public get imageAlpha(): number | undefined {
+        return this.getImageAlpha();
     }
 
     /**
@@ -108,17 +126,35 @@ export class UIImage extends UI.Element {
      * @param alpha - The new alpha of the image.
      */
     public set imageAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUIImageAlpha(this._uiWidget, alpha);
+        this.setImageAlpha(alpha);
     }
 
     /**
-     * The color of the image.
-     * @returns The image color vector.
+     * Retrieves the alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
      */
-    public get imageColor(): mod.Vector {
-        return this._isDeletedCheck() ? UI.COLORS.WHITE : mod.GetUIImageColor(this._uiWidget);
+    public getImageAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUIImageAlpha(this._uiWidget);
+    }
+
+    /**
+     * Sets the alpha of the image.
+     * @param alpha - The new alpha of the image.
+     * @returns This image for chaining.
+     */
+    public setImageAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUIImageAlpha(this._uiWidget, alpha);
+        return this;
+    }
+
+    /**
+     * The color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
+     */
+    public get imageColor(): mod.Vector | undefined {
+        return this.getImageColor();
     }
 
     /**
@@ -126,9 +162,27 @@ export class UIImage extends UI.Element {
      * @param color - The new color of the image.
      */
     public set imageColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
+        this.setImageColor(color);
+    }
+
+    /**
+     * Retrieves the color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
+     */
+    public getImageColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUIImageColor(this._uiWidget);
+    }
+
+    /**
+     * Sets the color of the image.
+     * @param color - The new color of the image.
+     * @returns This image for chaining.
+     */
+    public setImageColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
 
         mod.SetUIImageColor(this._uiWidget, color);
+        return this;
     }
 }
 

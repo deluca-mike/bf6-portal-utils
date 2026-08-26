@@ -15,7 +15,6 @@ export declare namespace UI {
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
-    /****** Constants & Limits ******/
     /**
      * Maximum number of UI widgets supported simultaneously.
      */
@@ -24,20 +23,6 @@ export declare namespace UI {
      * Maximum number of interactive UI buttons supported simultaneously.
      */
     export const MAX_BUTTONS = 512;
-    /**
-     * Sentinel value representing an invalid or uninitialized widget index.
-     */
-    export const INVALID_INDEX = -1;
-    /**
-     * Unique identifier for a UI widget.
-     */
-    export type WidgetID = number & {
-        readonly __brand: 'WidgetID';
-    };
-    /**
-     * Sentinel value representing an invalid widget ID.
-     */
-    export const INVALID_WIDGET_ID: WidgetID;
     /****** Types ******/
     /**
      * The type of a button handler.
@@ -47,23 +32,28 @@ export declare namespace UI {
      * The minimum interface for a button.
      */
     export type Button = {
-        onClickDown?: ButtonHandler;
-        onClickUp?: ButtonHandler;
-        onFocusIn?: ButtonHandler;
-        onFocusOut?: ButtonHandler;
+        onClickDown?: ButtonHandler | null;
+        onClickUp?: ButtonHandler | null;
+        onFocusIn?: ButtonHandler | null;
+        onFocusOut?: ButtonHandler | null;
+        getOnClickDown?(): ButtonHandler | null | undefined;
+        getOnClickUp?(): ButtonHandler | null | undefined;
+        getOnFocusIn?(): ButtonHandler | null | undefined;
+        getOnFocusOut?(): ButtonHandler | null | undefined;
     };
     /**
      * The parent of an element.
      */
-    export type Parent = {
-        readonly id: number;
-        readonly receiver: mod.Player | mod.Team | undefined;
-        readonly children: readonly Element[];
-        getChild(index: number): Element | undefined;
+    export interface Parent extends Node {
+        readonly receiver: mod.Player | mod.Team | null | undefined;
+        readonly children: readonly Element[] | undefined;
+        getReceiver(): mod.Player | mod.Team | null | undefined;
+        getParent(): Parent | null | undefined;
+        getChildren(): readonly Element[] | undefined;
+        getChild(index: number): Element | null | undefined;
+        getChildCount(): number | undefined;
         forEachChild(callback: (child: Element, index: number) => void): void;
-        attachChild(child: Element): void;
-        detachChild(child: Element): void;
-    };
+    }
     type BaseParams = {
         anchor?: mod.UIAnchor;
         parent?: Parent;
@@ -166,6 +156,8 @@ export declare namespace UI {
      * The base node class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Node {
+        protected static readonly _ROOT_NODE_ID = 0;
+        protected static readonly _INVALID_INDEX = -1;
         protected readonly _logging: Logging;
         protected _id: number;
         /**
@@ -174,69 +166,98 @@ export declare namespace UI {
          */
         constructor(id: number);
         /**
-         * The unique widget ID.
-         * @returns The widget ID.
+         * Internal static helper to read a Node's ID with zero casting.
+         * @param node - The node to get the ID for.
+         * @returns The node ID.
          */
-        get id(): number;
+        static _getId(node: Node): number;
         /**
          * The underlying native Battlefield Portal UIWidget handle for this node.
          * @returns The native UIWidget handle.
          */
         protected get _uiWidget(): mod.UIWidget;
         /**
-         * The target audience receiver for the node (player or team, or undefined if global).
-         * @returns The native receiver.
+         * The target audience receiver for the node (player or team, null if global, undefined if deleted).
+         * @returns The native receiver, null, or undefined.
          */
-        get receiver(): mod.Player | mod.Team | undefined;
+        get receiver(): mod.Player | mod.Team | null | undefined;
+        /**
+         * Retrieves the target audience receiver for the node.
+         * @returns The native receiver, null if global, or undefined if deleted.
+         */
+        getReceiver(): mod.Player | mod.Team | null | undefined;
     }
     /**
      * The root node. This is the root of the UI tree for the entire server.
      */
     export class Root extends Node implements Parent {
-        /**
-         * The singleton instance of the root node.
-         */
-        static readonly instance: Root;
-        private constructor();
+        constructor();
         /**
          * @inheritdoc
          */
         protected get _uiWidget(): mod.UIWidget;
+        /**
+         * @inheritdoc
+         */
+        get receiver(): null;
+        /**
+         * @inheritdoc
+         */
+        getReceiver(): null;
+        /**
+         * The parent of the root node is null.
+         * @returns null.
+         */
+        get parent(): null;
+        /**
+         * Retrieves the parent of the root node.
+         * @returns null.
+         */
+        getParent(): null;
         /**
          * Returns a snapshot array of direct child elements.
          * @returns Array of direct children.
          */
         get children(): readonly Element[];
         /**
+         * Retrieves a snapshot array of direct child elements.
+         * @returns Array of direct children.
+         */
+        getChildren(): readonly Element[];
+        /**
          * Retrieves a child element at the specified index.
          * @param index - Zero-based index of the child.
-         * @returns The child element, or undefined if out of bounds.
+         * @returns The child element, or null if out of bounds.
          */
-        getChild(index: number): Element | undefined;
+        getChild(index: number): Element | null;
+        /**
+         * Retrieves the total direct child count of the root node.
+         * @returns The number of direct children.
+         */
+        getChildCount(): number;
         /**
          * Iterates over all direct child elements without allocating an intermediate array.
          * @param callback - Function invoked for each child.
          */
         forEachChild(callback: (child: Element, index: number) => void): void;
-        /**
-         * Attaches a child to the root node.
-         * @param child - The child to attach.
-         */
-        attachChild(child: Element): void;
-        /**
-         * Detaches a child from the root node.
-         * @param child - The child to detach.
-         */
-        detachChild(child: Element): void;
     }
+    /**
+     * The root node. This is the root of the UI tree and the default parent for all elements.
+     */
+    export const ROOT_NODE: Root;
     /**
      * The base element class. All elements are nodes, and all nodes are UI widgets.
      */
     export abstract class Element extends Node {
+        protected static readonly _ROOT_NODE_ID = 0;
+        protected static readonly _INVALID_INDEX = -1;
+        protected static readonly _scratchPos: Position;
+        protected static readonly _scratchSize: Size;
         protected _name: string;
+        private get _slot();
         /**
          * The constructor for an element.
-         * @param id - The allocated slot index.
+         * @param id - The allocated slot ID (1-based).
          * @param params - The parameters for the element.
          */
         constructor(id: number, params: FinalElementParams);
@@ -246,9 +267,9 @@ export declare namespace UI {
         protected static _attachChild(parentId: number, childId: number): void;
         protected static _detachChild(parentId: number, childId: number): void;
         protected static _getFirstChild(id: number): number;
-        protected static _getNextSibling(id: number): number;
-        protected static _getInstance(id: number): Element | undefined;
-        protected static _getNativeWidget(id: number): mod.UIWidget | undefined;
+        protected static _getNextSibling(slot: number): number;
+        protected static _getInstance(slot: number): Element | undefined;
+        static _getNativeWidget(target: Parent | Node | number): mod.UIWidget | undefined;
         /**
          * Makes a deterministic, sequential name for a widget in the format `ui_${id}`.
          * @param id - The widget slot ID.
@@ -258,15 +279,17 @@ export declare namespace UI {
         /**
          * Gets the position from the parameters, given either x/y or position.
          * @param params - The parameters.
+         * @param out - Optional target Position object to populate.
          * @returns The position.
          */
-        protected static _getPosition(params: ElementParams): Position;
+        protected static _getPosition(params: ElementParams, out?: Position): Position;
         /**
          * Gets the size from the parameters, given either width/height or size.
          * @param params - The parameters.
+         * @param out - Optional target Size object to populate.
          * @returns The size.
          */
-        protected static _getSize(params: ElementParams): Size;
+        protected static _getSize(params: ElementParams, out?: Size): Size;
         /**
          * Gets the receiver from the parameters, given either player, team, or neither.
          * @param parent - The parent of the widget.
@@ -281,165 +304,326 @@ export declare namespace UI {
         protected _allocateButtonSlot(): number;
         protected _freeButtonSlot(): void;
         protected _getButtonSlot(): number;
-        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | undefined): void;
-        protected _getButtonOnClickUp(slot: number): ButtonHandler | undefined;
-        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | undefined): void;
-        protected _getButtonOnClickDown(slot: number): ButtonHandler | undefined;
-        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | undefined): void;
-        protected _getButtonOnFocusIn(slot: number): ButtonHandler | undefined;
-        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | undefined): void;
-        protected _getButtonOnFocusOut(slot: number): ButtonHandler | undefined;
+        protected _setButtonOnClickUp(slot: number, handler: ButtonHandler | null | undefined): void;
+        protected _getButtonOnClickUp(slot: number): ButtonHandler | null | undefined;
+        protected _setButtonOnClickDown(slot: number, handler: ButtonHandler | null | undefined): void;
+        protected _getButtonOnClickDown(slot: number): ButtonHandler | null | undefined;
+        protected _setButtonOnFocusIn(slot: number, handler: ButtonHandler | null | undefined): void;
+        protected _getButtonOnFocusIn(slot: number): ButtonHandler | null | undefined;
+        protected _setButtonOnFocusOut(slot: number, handler: ButtonHandler | null | undefined): void;
+        protected _getButtonOnFocusOut(slot: number): ButtonHandler | null | undefined;
         protected _isDeletedCheck(): boolean;
         /**
-         * The parent of the element.
-         * @returns The parent of the element.
+         * Whether the element is deleted.
+         * @returns True if deleted, false otherwise.
          */
-        get parent(): Parent;
+        get isDeleted(): boolean;
+        /**
+         * Retrieves whether the element is deleted.
+         * @returns True if deleted, false otherwise.
+         */
+        getIsDeleted(): boolean;
+        /**
+         * The parent of the element, or undefined if deleted.
+         * @returns The parent of the element, or undefined.
+         */
+        get parent(): Parent | undefined;
         /**
          * Sets the parent of the element.
          * @param parent - The parent to set.
          */
         set parent(parent: Parent);
         /**
-         * Whether the element is visible.
-         * @returns True if visible, false otherwise.
+         * Retrieves the parent of the element, or undefined if deleted.
+         * @returns The parent of the element, or undefined.
          */
-        get visible(): boolean;
+        getParent(): Parent | undefined;
+        /**
+         * Sets the parent of the element.
+         * @param parent - The new parent.
+         * @returns This element for chaining.
+         */
+        setParent(parent: Parent): this;
+        /**
+         * Whether the element is visible, or undefined if deleted.
+         * @returns True if visible, false if invisible, or undefined if deleted.
+         */
+        get visible(): boolean | undefined;
         /**
          * Sets the visibility of the element.
          * @param visible - The visibility to set.
          */
         set visible(visible: boolean);
         /**
-         * Whether the element is deleted.
-         * @returns True if deleted, false otherwise.
+         * Retrieves the visibility of the element, or undefined if deleted.
+         * @returns True if visible, false if invisible, or undefined if deleted.
          */
-        get deleted(): boolean;
+        getVisible(): boolean | undefined;
+        /**
+         * Sets the visibility of the element.
+         * @param visible - The visibility to set.
+         * @returns This element for chaining.
+         */
+        setVisible(visible: boolean): this;
         /**
          * Deletes the element.
          */
         delete(): void;
         private _deleteRecursive;
         /**
-         * The X position of the element.
-         * @returns The X position of the element.
+         * The X position of the element, or undefined if deleted.
+         * @returns The X position of the element, or undefined.
          */
-        get x(): number;
+        get x(): number | undefined;
         /**
          * Sets the X position of the element.
          * @param x - The X position to set.
          */
         set x(x: number);
         /**
-         * The Y position of the element.
-         * @returns The Y position of the element.
+         * Retrieves the X position of the element, or undefined if deleted.
+         * @returns The X position of the element, or undefined.
          */
-        get y(): number;
+        getX(): number | undefined;
+        /**
+         * Sets the X position of the element.
+         * @param x - The X position to set.
+         * @returns This element for chaining.
+         */
+        setX(x: number): this;
+        /**
+         * The Y position of the element, or undefined if deleted.
+         * @returns The Y position of the element, or undefined.
+         */
+        get y(): number | undefined;
         /**
          * Sets the Y position of the element.
          * @param y - The Y position to set.
          */
         set y(y: number);
         /**
-         * The position of the element.
-         * @returns The position of the element.
+         * Retrieves the Y position of the element, or undefined if deleted.
+         * @returns The Y position of the element, or undefined.
          */
-        get position(): Position;
+        getY(): number | undefined;
+        /**
+         * Sets the Y position of the element.
+         * @param y - The Y position to set.
+         * @returns This element for chaining.
+         */
+        setY(y: number): this;
+        /**
+         * The position of the element, or undefined if deleted.
+         * @returns The position of the element, or undefined.
+         */
+        get position(): Position | undefined;
         /**
          * Sets the position of the element.
          * @param params - The position to set.
          */
         set position(params: Position);
         /**
-         * The width of the element.
-         * @returns The width of the element.
+         * Retrieves the position of the element, or undefined if deleted.
+         * @param out - Optional target Position object to populate for zero allocations.
+         * @returns The position of the element, or undefined.
          */
-        get width(): number;
+        getPosition(out?: Position): Position | undefined;
+        /**
+         * Sets the position of the element.
+         * @param params - The position to set.
+         * @returns This element for chaining.
+         */
+        setPosition(params: Position): this;
+        /**
+         * The width of the element, or undefined if deleted.
+         * @returns The width of the element, or undefined.
+         */
+        get width(): number | undefined;
         /**
          * Sets the width of the element.
          * @param width - The width to set.
          */
         set width(width: number);
         /**
-         * The height of the element.
-         * @returns The height of the element.
+         * Retrieves the width of the element, or undefined if deleted.
+         * @returns The width of the element, or undefined.
          */
-        get height(): number;
+        getWidth(): number | undefined;
+        /**
+         * Sets the width of the element.
+         * @param width - The width to set.
+         * @returns This element for chaining.
+         */
+        setWidth(width: number): this;
+        /**
+         * The height of the element, or undefined if deleted.
+         * @returns The height of the element, or undefined.
+         */
+        get height(): number | undefined;
         /**
          * Sets the height of the element.
          * @param height - The height to set.
          */
         set height(height: number);
         /**
-         * The size of the element.
-         * @returns The size of the element.
+         * Retrieves the height of the element, or undefined if deleted.
+         * @returns The height of the element, or undefined.
          */
-        get size(): Size;
+        getHeight(): number | undefined;
+        /**
+         * Sets the height of the element.
+         * @param height - The height to set.
+         * @returns This element for chaining.
+         */
+        setHeight(height: number): this;
+        /**
+         * The size of the element, or undefined if deleted.
+         * @returns The size of the element, or undefined.
+         */
+        get size(): Size | undefined;
         /**
          * Sets the size of the element.
          * @param params - The size to set.
          */
         set size(params: Size);
         /**
-         * The background color of the element.
-         * @returns The background color of the element.
+         * Retrieves the size of the element, or undefined if deleted.
+         * @param out - Optional target Size object to populate for zero allocations.
+         * @returns The size of the element, or undefined.
          */
-        get bgColor(): mod.Vector;
+        getSize(out?: Size): Size | undefined;
+        /**
+         * Sets the size of the element.
+         * @param params - The size to set.
+         * @returns This element for chaining.
+         */
+        setSize(params: Size): this;
+        /**
+         * The background color of the element, or undefined if deleted.
+         * @returns The background color of the element, or undefined.
+         */
+        get bgColor(): mod.Vector | undefined;
         /**
          * Sets the background color of the element.
          * @param color - The background color to set.
          */
         set bgColor(color: mod.Vector);
         /**
-         * The background alpha of the element.
-         * @returns The background alpha of the element.
+         * Retrieves the background color of the element, or undefined if deleted.
+         * @returns The background color vector, or undefined.
          */
-        get bgAlpha(): number;
+        getBgColor(): mod.Vector | undefined;
+        /**
+         * Sets the background color of the element.
+         * @param color - The background color to set.
+         * @returns This element for chaining.
+         */
+        setBgColor(color: mod.Vector): this;
+        /**
+         * The background alpha of the element, or undefined if deleted.
+         * @returns The background alpha of the element, or undefined.
+         */
+        get bgAlpha(): number | undefined;
         /**
          * Sets the background alpha of the element.
          * @param alpha - The background alpha to set.
          */
         set bgAlpha(alpha: number);
         /**
-         * The background fill of the element.
-         * @returns The background fill of the element.
+         * Retrieves the background alpha of the element, or undefined if deleted.
+         * @returns The background alpha, or undefined.
          */
-        get bgFill(): mod.UIBgFill;
+        getBgAlpha(): number | undefined;
+        /**
+         * Sets the background alpha of the element.
+         * @param alpha - The background alpha to set.
+         * @returns This element for chaining.
+         */
+        setBgAlpha(alpha: number): this;
+        /**
+         * The background fill of the element, or undefined if deleted.
+         * @returns The background fill of the element, or undefined.
+         */
+        get bgFill(): mod.UIBgFill | undefined;
         /**
          * Sets the background fill of the element.
          * @param fill - The background fill to set.
          */
         set bgFill(fill: mod.UIBgFill);
         /**
-         * The depth of the element.
-         * @returns The depth of the element.
+         * Retrieves the background fill of the element, or undefined if deleted.
+         * @returns The background fill, or undefined.
          */
-        get depth(): mod.UIDepth;
+        getBgFill(): mod.UIBgFill | undefined;
+        /**
+         * Sets the background fill of the element.
+         * @param fill - The background fill to set.
+         * @returns This element for chaining.
+         */
+        setBgFill(fill: mod.UIBgFill): this;
+        /**
+         * The depth of the element, or undefined if deleted.
+         * @returns The depth of the element, or undefined.
+         */
+        get depth(): mod.UIDepth | undefined;
         /**
          * Sets the depth of the element.
          * @param depth - The depth to set.
          */
         set depth(depth: mod.UIDepth);
         /**
-         * The anchor of the element.
-         * @returns The anchor of the element.
+         * Retrieves the depth of the element, or undefined if deleted.
+         * @returns The depth of the element, or undefined.
          */
-        get anchor(): mod.UIAnchor;
+        getDepth(): mod.UIDepth | undefined;
+        /**
+         * Sets the depth of the element.
+         * @param depth - The depth to set.
+         * @returns This element for chaining.
+         */
+        setDepth(depth: mod.UIDepth): this;
+        /**
+         * The anchor of the element, or undefined if deleted.
+         * @returns The anchor of the element, or undefined.
+         */
+        get anchor(): mod.UIAnchor | undefined;
         /**
          * Sets the anchor of the element.
          * @param anchor - The anchor to set.
          */
         set anchor(anchor: mod.UIAnchor);
         /**
-         * Whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
-         * @returns True if UI input mode is requested when visible, false otherwise.
+         * Retrieves the anchor of the element, or undefined if deleted.
+         * @returns The anchor of the element, or undefined.
          */
-        get uiInputModeWhenVisible(): boolean;
+        getAnchor(): mod.UIAnchor | undefined;
+        /**
+         * Sets the anchor of the element.
+         * @param anchor - The anchor to set.
+         * @returns This element for chaining.
+         */
+        setAnchor(anchor: mod.UIAnchor): this;
+        /**
+         * Whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @returns True if UI input mode is requested when visible, false if not, or undefined if deleted.
+         */
+        get uiInputModeWhenVisible(): boolean | undefined;
         /**
          * Sets whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
          * @param newValue - The new value.
          */
         set uiInputModeWhenVisible(newValue: boolean);
+        /**
+         * Retrieves whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @returns True if UI input mode is requested when visible, false if not, or undefined if deleted.
+         */
+        getUiInputModeWhenVisible(): boolean | undefined;
+        /**
+         * Sets whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
+         * @param newValue - The new value.
+         * @returns This element for chaining.
+         */
+        setUiInputModeWhenVisible(newValue: boolean): this;
     }
     /****** Constants ******/
     /**
@@ -471,9 +655,5 @@ export declare namespace UI {
         BF_YELLOW_BRIGHT: mod.Vector;
         BF_YELLOW_DARK: mod.Vector;
     };
-    /**
-     * The root node. This is the root of the UI tree and the default parent for all elements.
-     */
-    export const ROOT_NODE: Root;
     export {};
 }

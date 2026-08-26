@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 8.0.0
+// version: 9.0.0
 export class UIText extends UI.Element {
     protected _message: mod.Message;
 
@@ -33,7 +33,7 @@ export class UIText extends UI.Element {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 bgColor,
@@ -52,7 +52,7 @@ export class UIText extends UI.Element {
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
                 anchor,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 bgColor,
@@ -89,11 +89,11 @@ export class UIText extends UI.Element {
     }
 
     /**
-     * The message of the text. This is an opaque type and cannot be unpacked into a string or compared.
-     * @returns The message.
+     * The message of the text, or undefined if deleted.
+     * @returns The message, or undefined if deleted.
      */
-    public get message(): mod.Message {
-        return this._message;
+    public get message(): mod.Message | undefined {
+        return this.getMessage();
     }
 
     /**
@@ -101,17 +101,35 @@ export class UIText extends UI.Element {
      * @param message - The new message.
      */
     public set message(message: mod.Message) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextLabel(this._uiWidget, (this._message = message));
+        this.setMessage(message);
     }
 
     /**
-     * The alpha of the text.
-     * @returns The text alpha opacity.
+     * Retrieves the message of the text, or undefined if deleted.
+     * @returns The message, or undefined if deleted.
      */
-    public get textAlpha(): number {
-        return this._isDeletedCheck() ? 1 : mod.GetUITextAlpha(this._uiWidget);
+    public getMessage(): mod.Message | undefined {
+        return this._isDeletedCheck() ? undefined : this._message;
+    }
+
+    /**
+     * Sets the message of the text.
+     * @param message - The new message.
+     * @returns This text for chaining.
+     */
+    public setMessage(message: mod.Message): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUITextLabel(this._uiWidget, (this._message = message));
+        return this;
+    }
+
+    /**
+     * The alpha of the text, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
+     */
+    public get textAlpha(): number | undefined {
+        return this.getTextAlpha();
     }
 
     /**
@@ -119,17 +137,35 @@ export class UIText extends UI.Element {
      * @param alpha - The new alpha.
      */
     public set textAlpha(alpha: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextAlpha(this._uiWidget, alpha);
+        this.setTextAlpha(alpha);
     }
 
     /**
-     * The anchor of the text.
-     * @returns The text anchor alignment.
+     * Retrieves the alpha of the text, or undefined if deleted.
+     * @returns The text alpha opacity, or undefined if deleted.
      */
-    public get textAnchor(): mod.UIAnchor {
-        return this._isDeletedCheck() ? mod.UIAnchor.Center : mod.GetUITextAnchor(this._uiWidget);
+    public getTextAlpha(): number | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUITextAlpha(this._uiWidget);
+    }
+
+    /**
+     * Sets the alpha of the text.
+     * @param alpha - The new alpha.
+     * @returns This text for chaining.
+     */
+    public setTextAlpha(alpha: number): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUITextAlpha(this._uiWidget, alpha);
+        return this;
+    }
+
+    /**
+     * The anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
+     */
+    public get textAnchor(): mod.UIAnchor | undefined {
+        return this.getTextAnchor();
     }
 
     /**
@@ -137,17 +173,35 @@ export class UIText extends UI.Element {
      * @param anchor - The new anchor.
      */
     public set textAnchor(anchor: mod.UIAnchor) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextAnchor(this._uiWidget, anchor);
+        this.setTextAnchor(anchor);
     }
 
     /**
-     * The color of the text.
-     * @returns The text color vector.
+     * Retrieves the anchor of the text, or undefined if deleted.
+     * @returns The text anchor alignment, or undefined if deleted.
      */
-    public get textColor(): mod.Vector {
-        return this._isDeletedCheck() ? UI.COLORS.BLACK : mod.GetUITextColor(this._uiWidget);
+    public getTextAnchor(): mod.UIAnchor | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUITextAnchor(this._uiWidget);
+    }
+
+    /**
+     * Sets the anchor of the text.
+     * @param anchor - The new anchor.
+     * @returns This text for chaining.
+     */
+    public setTextAnchor(anchor: mod.UIAnchor): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUITextAnchor(this._uiWidget, anchor);
+        return this;
+    }
+
+    /**
+     * The color of the text, or undefined if deleted.
+     * @returns The text color vector, or undefined if deleted.
+     */
+    public get textColor(): mod.Vector | undefined {
+        return this.getTextColor();
     }
 
     /**
@@ -155,17 +209,35 @@ export class UIText extends UI.Element {
      * @param color - The new color.
      */
     public set textColor(color: mod.Vector) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextColor(this._uiWidget, color);
+        this.setTextColor(color);
     }
 
     /**
-     * The size of the text.
-     * @returns The text size.
+     * Retrieves the color of the text, or undefined if deleted.
+     * @returns The text color vector, or undefined if deleted.
      */
-    public get textSize(): number {
-        return this._isDeletedCheck() ? 36 : mod.GetUITextSize(this._uiWidget);
+    public getTextColor(): mod.Vector | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUITextColor(this._uiWidget);
+    }
+
+    /**
+     * Sets the color of the text.
+     * @param color - The new color.
+     * @returns This text for chaining.
+     */
+    public setTextColor(color: mod.Vector): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUITextColor(this._uiWidget, color);
+        return this;
+    }
+
+    /**
+     * The size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
+     */
+    public get textSize(): number | undefined {
+        return this.getTextSize();
     }
 
     /**
@@ -173,17 +245,35 @@ export class UIText extends UI.Element {
      * @param size - The new size.
      */
     public set textSize(size: number) {
-        if (this._isDeletedCheck()) return;
-
-        mod.SetUITextSize(this._uiWidget, size);
+        this.setTextSize(size);
     }
 
     /**
-     * The padding around the text.
-     * @returns The padding.
+     * Retrieves the size of the text, or undefined if deleted.
+     * @returns The text size, or undefined if deleted.
      */
-    public get padding(): number {
-        return this._isDeletedCheck() ? 0 : mod.GetUIWidgetPadding(this._uiWidget);
+    public getTextSize(): number | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUITextSize(this._uiWidget);
+    }
+
+    /**
+     * Sets the size of the text.
+     * @param size - The new size.
+     * @returns This text for chaining.
+     */
+    public setTextSize(size: number): this {
+        if (this._isDeletedCheck()) return this;
+
+        mod.SetUITextSize(this._uiWidget, size);
+        return this;
+    }
+
+    /**
+     * The padding around the text, or undefined if deleted.
+     * @returns The padding, or undefined if deleted.
+     */
+    public get padding(): number | undefined {
+        return this.getPadding();
     }
 
     /**
@@ -191,9 +281,27 @@ export class UIText extends UI.Element {
      * @param padding - The new padding.
      */
     public set padding(padding: number) {
-        if (this._isDeletedCheck()) return;
+        this.setPadding(padding);
+    }
+
+    /**
+     * Retrieves the padding around the text, or undefined if deleted.
+     * @returns The padding, or undefined if deleted.
+     */
+    public getPadding(): number | undefined {
+        return this._isDeletedCheck() ? undefined : mod.GetUIWidgetPadding(this._uiWidget);
+    }
+
+    /**
+     * Sets the padding around the text.
+     * @param padding - The new padding.
+     * @returns This text for chaining.
+     */
+    public setPadding(padding: number): this {
+        if (this._isDeletedCheck()) return this;
 
         mod.SetUIWidgetPadding(this._uiWidget, padding);
+        return this;
     }
 }
 

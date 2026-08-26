@@ -3,7 +3,7 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIGadgetImage } from '../gadget-image/index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
     /**
      * Creates a new gadget image button.
@@ -26,11 +26,19 @@ export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
     }
 
     /**
-     * The gadget of the gadget image button.
-     * @returns The gadget.
+     * The gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
      */
-    public get gadget(): mod.Gadgets {
-        return this._content.gadget;
+    public get gadget(): mod.Gadgets | undefined {
+        return this.getGadget();
+    }
+
+    /**
+     * Retrieves the gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    public getGadget(): mod.Gadgets | undefined {
+        return this._isDeletedCheck() ? undefined : this._content.gadget;
     }
 }
 

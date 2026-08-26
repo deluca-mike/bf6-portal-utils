@@ -104,9 +104,9 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
 });
 ```
 
-### Property Setter Example
+### Property Setter & Chaining Example
 
-Update properties directly via standard TypeScript property assignment:
+Update properties directly via standard TypeScript property assignment or chain method calls:
 
 ```ts
 import { UIButton } from 'bf6-portal-utils/ui/components/button';
@@ -120,13 +120,14 @@ const button = new UIButton({
     },
 });
 
-// Update properties directly
-button.position = { x: 150, y: 250 };
-button.size = { width: 250, height: 60 };
-button.baseColor = UI.COLORS.BLUE;
-button.baseAlpha = 0.9;
-button.enabled = true;
-button.visible = true;
+// Update properties directly or via fluent chaining
+button
+    .setPosition({ x: 150, y: 250 })
+    .setSize({ width: 250, height: 60 })
+    .setBaseColor(UI.COLORS.BLUE)
+    .setBaseAlpha(0.9)
+    .setEnabled(true)
+    .setVisible(true);
 
 // Or update text content
 const text = new UIText({
@@ -134,11 +135,26 @@ const text = new UIText({
     position: { x: 0, y: 0 },
 });
 
-text.message = mod.Message(mod.stringkeys.labels.updated); // 'Updated'
-text.position = { x: 10, y: 20 };
-text.bgColor = UI.COLORS.WHITE;
-text.bgAlpha = 0.5;
-text.visible = true;
+text.setMessage(mod.Message(mod.stringkeys.labels.updated))
+    .setPosition({ x: 10, y: 20 })
+    .setBgColor(UI.COLORS.WHITE)
+    .setBgAlpha(0.5)
+    .setVisible(true);
+```
+
+### Zero-Allocation Queries with `out` Parameters
+
+To avoid GC overhead when querying positions or sizes, pass pre-allocated destination objects:
+
+```ts
+const scratchPos: UI.Position = { x: 0, y: 0 };
+const scratchSize: UI.Size = { width: 0, height: 0 };
+
+// Populates and returns scratchPos without any new heap allocation
+container.getPosition(scratchPos);
+
+// Populates and returns scratchSize without any new heap allocation
+container.getSize(scratchSize);
 ```
 
 ### Parent-Child Management Example
@@ -159,19 +175,19 @@ const text = new UIText({
     parent: container1,
 });
 
-console.log(container1.children.length); // 1
-console.log(container2.children.length); // 0
+console.log(container1.children?.length); // 1
+console.log(container2.children?.length); // 0
 
-// Move the text element to container2
+// Move the text element to container2 via parent setter or setParent
 text.parent = container2;
 
-console.log(container1.children.length); // 0 (automatically removed)
-console.log(container2.children.length); // 1 (automatically added)
+console.log(container1.children?.length); // 0 (automatically removed)
+console.log(container2.children?.length); // 1 (automatically added)
 
 // Delete the text element
 text.delete();
 
-console.log(container2.children.length); // 0 (automatically removed)
+console.log(container2.children?.length); // 0 (automatically removed)
 ```
 
 </ai>
@@ -180,25 +196,26 @@ console.log(container2.children.length); // 0 (automatically removed)
 
 ## Core Concepts & Architecture
 
-- **Structure-of-Arrays (SoA) Core** – Pre-allocated flat `TypedArrays` (`Uint16Array`, `Int16Array`, `Float32Array`) manage tree relationships, bitflags, and coordinates up to 2048 widgets and 512 interactive buttons with zero per-widget array allocations.
-- **Thin OOP Handles (~24B)** – All classes (`UIButton`, `UIContainer`, `UIText`, etc.) are lightweight facade handles referencing an integer `id` slot in the SoA buffers.
-- **`UI` namespace** – Central container for UI constants, limits (`MAX_WIDGETS`, `MAX_BUTTONS`), types, receivers, and singleton logging.
-- **`UI.Node` base class** – Root of the UI hierarchy exposing `id: number` and `receiver`. The native widget handle (`_uiWidget`) is protected internally to prevent unsafe external mutations.
-- **`UI.Parent` interface** – Implemented by parent nodes (`Root` and `UIContainer`). Exposes `children: readonly Element[]` (safe snapshot array), `getChild()`, `forEachChild()` (zero-allocation iteration with `CallbackHandler` protection), `attachChild()`, and `detachChild()`.
-- **`UI.Root` class** – Singleton wrapping `mod.GetUIRoot()` at slot `0`, available as `UI.ROOT_NODE`. All elements default to this parent unless a custom `parent` is supplied.
-- **`UI.Element` base class** – Abstract base class for all UI components. Coordinates (`x`, `y`, `width`, `height`) are cached in `Float32Array` buffers to eliminate temporary vector allocations during coordinate mutations. Includes built-in safety (`_id = INVALID_INDEX`) to nullify handles and block operations on destroyed elements.
+- **Structure-of-Arrays (SoA) Core** – Pre-allocated flat `TypedArrays` (`Uint16Array`, `Int16Array`, `Float32Array`) manage tree relationships, bitflags, and coordinates up to 2048 widgets and 512 interactive buttons with zero per-widget array allocations. Elements use positive 1-based IDs (`1..2048`) mapping to 0-indexed array slots (`0..2047`).
+- **Thin OOP Handles (~24B)** – All classes (`UIButton`, `UIContainer`, `UIText`, etc.) are lightweight facade handles referencing an integer `id` in the SoA buffers.
+- **`UI` namespace** – Central container for UI limits (`MAX_WIDGETS`, `MAX_BUTTONS`), types, receivers, and singleton logging.
+- **`UI.Node` base class** – Root of the UI hierarchy exposing `receiver` and `getReceiver()`. The native widget handle (`_uiWidget`) is protected internally to prevent unsafe external mutations.
+- **`UI.Parent` interface** – Implemented by parent nodes (`Root` and `UIContainer`). Exposes `children: readonly Element[] | undefined` (safe snapshot array), `getChildren()`, `getChild(index)`, `getChildCount()`, and `forEachChild()` (zero-allocation iteration with `CallbackHandler` protection).
+- **`UI.ROOT_NODE` singleton** – Singleton `Root` instance wrapping `mod.GetUIRoot()` that does not occupy a slot in the SoA arrays. All top-level elements default to this parent.
+- **`UI.Element` base class** – Abstract base class for all UI components. Coordinates (`x`, `y`, `width`, `height`) are cached in `Float32Array` buffers to eliminate temporary vector allocations during coordinate mutations. Includes built-in safety to nullify handles and block operations on destroyed elements.
+- **Getter/Setter & Return Value Semantics**:
+    - **Deleted elements**: All getters and `get*()` methods on deleted elements return `undefined`.
+    - **Unset properties on alive elements**: Returns `null` (e.g., `receiver` for global elements, button event handlers when unassigned, `getChild(index)` when index is out of bounds, `ROOT_NODE.parent`).
 - **Singly-Linked LCRS Tree**:
-    - Elements created with a parent are automatically attached via `attachChild()`.
-    - Mutating `element.parent = newParent` automatically detaches from the previous parent and attaches to the new one.
+    - Mutating `element.parent = newParent` or calling `element.setParent(newParent)` automatically detaches from the previous parent and attaches to the new one.
     - Calling `delete()` recursively deletes all child elements, frees the button slot, removes active input mode requesters, and returns the slot to the intrusive free-list.
 - **Receiver Routing & Inheritance**:
-    - Every element has an optional target audience receiver (`mod.Player | mod.Team`). When omitted, elements automatically inherit their parent's receiver (or global `undefined` if parent is `UI.ROOT_NODE`).
-    - The `receiver` property (`mod.Player | mod.Team | undefined`) is exposed on `Node`.
+    - Every element has an optional target audience receiver (`mod.Player | mod.Team`). When omitted, elements automatically inherit their parent's receiver (or global `null` if parent is `UI.ROOT_NODE`).
+    - The `receiver` property (`mod.Player | mod.Team | null | undefined`) is exposed on `Node`.
     - UI input mode reference counting is automatically managed internally per-receiver scope without exposing internal receiver objects.
 - **`UI.Button` interface** – Button-like elements allocate a compact 1-indexed button slot in the upper bits of `_flags` (`Uint16Array`), routing native engine events (`ButtonDown`, `ButtonUp`, `FocusIn`, `FocusOut`) with $\mathcal{O}(1)$ direct array indexing.
 - **Sequential Widget Naming Scheme (`ui_${id}`)**:
-    - The root node is reserved at ID `0` (`'ui_0'`).
-    - All elements created by the `UI` module are sequentially assigned names in the format `'ui_1'`, `'ui_2'`, etc., based on their slot ID.
+    - All elements created by the `UI` module are sequentially assigned names in the format `'ui_1'`, `'ui_2'`, etc., based on their element ID.
 - **Default colors** – `UI.COLORS` provides prebuilt `mod.Vector` constants for standard colors and BF6 palette colors.
 - **Position & Size parameters** – Constructor params support either `x`/`y` or `position` (mutually exclusive), and either `width`/`height` or `size` (mutually exclusive).
 
@@ -293,23 +310,22 @@ Prebuilt `mod.Vector` colors for basic and Battlefield UI palettes.
 
 ### `UI.ROOT_NODE`
 
-The singleton root node wrapping `mod.GetUIRoot()` at slot `0`.
+The singleton root node wrapping `mod.GetUIRoot()`.
 
 ### `UI.Node`
 
 Base class for all UI nodes.
 
-- `id: number` (getter) – The internal slot index for this node.
-- `receiver: mod.Player | mod.Team | undefined` (getter) – Target audience receiver handle.
+- `receiver: mod.Player | mod.Team | null | undefined` (getter) / `getReceiver()` – Target audience receiver handle (or `null` if global, `undefined` if deleted).
 
 ### `UI.Button` (interface)
 
 Interface defining button-like behavior. Handlers may be sync or async and are invoked safely via `CallbackHandler`.
 
-- `onClickDown?: UI.ButtonHandler` – Press event (`mod.UIButtonEvent.ButtonDown`).
-- `onClickUp?: UI.ButtonHandler` – Release event (`mod.UIButtonEvent.ButtonUp`). Primary click handler.
-- `onFocusIn?: UI.ButtonHandler` – Focus gain (`mod.UIButtonEvent.FocusIn`).
-- `onFocusOut?: UI.ButtonHandler` – Focus loss (`mod.UIButtonEvent.FocusOut`).
+- `onClickDown?: UI.ButtonHandler | null` / `getOnClickDown()` – Press event (`mod.UIButtonEvent.ButtonDown`).
+- `onClickUp?: UI.ButtonHandler | null` / `getOnClickUp()` – Release event (`mod.UIButtonEvent.ButtonUp`). Primary click handler.
+- `onFocusIn?: UI.ButtonHandler | null` / `getOnFocusIn()` – Focus gain (`mod.UIButtonEvent.FocusIn`).
+- `onFocusOut?: UI.ButtonHandler | null` / `getOnFocusOut()` – Focus loss (`mod.UIButtonEvent.FocusOut`).
 
 #### Hover in/out (`HoverIn` / `HoverOut`) Note
 
@@ -319,32 +335,34 @@ Battlefield Portal supports `HoverIn` and `HoverOut` button events, but **this m
 
 Interface for parent nodes (`Root` and `UIContainer`).
 
-- `children: readonly Element[]` (getter) – Snapshot copy array of attached child elements.
-- `getChild(index: number): Element | undefined` – Retrieves a child element at the specified index without allocating a new array.
+- `children: readonly Element[] | undefined` (getter) – Snapshot copy array of attached child elements (or `undefined` if deleted).
+- `getChildren(): readonly Element[] | undefined` – Retrieves child elements.
+- `getChild(index: number): Element | null | undefined` – Retrieves a child element at the specified index (`null` if out of bounds, `undefined` if deleted).
+- `getChildCount(): number | undefined` – Retrieves direct child count.
 - `forEachChild(callback: (child: Element, index: number) => void): void` – Iterates over direct child elements without allocating an intermediate array (protected by `CallbackHandler`).
-- `attachChild(child: Element): void` – Adds a child element.
-- `detachChild(child: Element): void` – Removes a child element.
 
 ### `abstract class UI.Element extends UI.Node`
 
 Base class for all created widgets.
 
-| Property / Method        | Type                     | Description                                              |
-| :----------------------- | :----------------------- | :------------------------------------------------------- |
-| `parent`                 | `UI.Parent` (get/set)    | Parent node. Setting moves element between parents.      |
-| `visible`                | `boolean` (get/set)      | Visibility state.                                        |
-| `x`, `y`                 | `number` (get/set)       | Individual position coordinates.                         |
-| `position`               | `UI.Position` (get/set)  | Position as `{ x, y }`.                                  |
-| `width`, `height`        | `number` (get/set)       | Individual dimensions.                                   |
-| `size`                   | `UI.Size` (get/set)      | Dimensions as `{ width, height }`.                       |
-| `bgColor`                | `mod.Vector` (get/set)   | Background color.                                        |
-| `bgAlpha`                | `number` (get/set)       | Background opacity (`0-1`).                              |
-| `bgFill`                 | `mod.UIBgFill` (get/set) | Background fill style.                                   |
-| `anchor`                 | `mod.UIAnchor` (get/set) | Anchor alignment point.                                  |
-| `depth`                  | `mod.UIDepth` (get/set)  | Z-order depth.                                           |
-| `uiInputModeWhenVisible` | `boolean` (get/set)      | Auto-manage input mode on visibility.                    |
-| `deleted`                | `boolean` (get)          | `true` if element has been destroyed.                    |
-| `delete()`               | `void`                   | Recursively deletes widget from Portal & unlinks parent. |
+| Property / Getter | Method Chaining Setter | Type / Return Type | Description |
+| :-- | :-- | :-- | :-- |
+| `parent` / `getParent()` | `setParent(parent)` | `UI.Parent \| undefined` | Parent node. Setting moves element between parents. |
+| `visible` / `getVisible()` | `setVisible(visible)` | `boolean \| undefined` | Visibility state. |
+| `x` / `getX()` | `setX(x)` | `number \| undefined` | Individual X coordinate. |
+| `y` / `getY()` | `setY(y)` | `number \| undefined` | Individual Y coordinate. |
+| `position` / `getPosition(out?)` | `setPosition(pos)` | `UI.Position \| undefined` | Position as `{ x, y }`. Supports zero-allocation `out`. |
+| `width` / `getWidth()` | `setWidth(width)` | `number \| undefined` | Individual width. |
+| `height` / `getHeight()` | `setHeight(height)` | `number \| undefined` | Individual height. |
+| `size` / `getSize(out?)` | `setSize(size)` | `UI.Size \| undefined` | Dimensions as `{ width, height }`. Supports zero-allocation `out`. |
+| `bgColor` / `getBgColor()` | `setBgColor(color)` | `mod.Vector \| undefined` | Background color. |
+| `bgAlpha` / `getBgAlpha()` | `setBgAlpha(alpha)` | `number \| undefined` | Background opacity (`0-1`). |
+| `bgFill` / `getBgFill()` | `setBgFill(fill)` | `mod.UIBgFill \| undefined` | Background fill style. |
+| `anchor` / `getAnchor()` | `setAnchor(anchor)` | `mod.UIAnchor \| undefined` | Anchor alignment point. |
+| `depth` / `getDepth()` | `setDepth(depth)` | `mod.UIDepth \| undefined` | Z-order depth. |
+| `uiInputModeWhenVisible` / `getUiInputModeWhenVisible()` | `setUiInputModeWhenVisible(val)` | `boolean \| undefined` | Auto-manage input mode on visibility. |
+| `isDeleted` / `getIsDeleted()` | — | `boolean` | `true` if element has been destroyed. |
+| `delete()` | — | `void` | Recursively deletes widget from Portal & unlinks parent. |
 
 ---
 

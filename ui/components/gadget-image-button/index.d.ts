@@ -8,10 +8,15 @@ export declare class UIGadgetImageButton extends UIContentButton<UIGadgetImage> 
      */
     constructor(params: UIGadgetImageButton.Params);
     /**
-     * The gadget of the gadget image button.
-     * @returns The gadget.
+     * The gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
      */
-    get gadget(): mod.Gadgets;
+    get gadget(): mod.Gadgets | undefined;
+    /**
+     * Retrieves the gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    getGadget(): mod.Gadgets | undefined;
 }
 export declare namespace UIGadgetImageButton {
     /**

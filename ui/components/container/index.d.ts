@@ -6,31 +6,31 @@ export declare class UIContainer extends UI.Element implements UI.Parent {
      */
     constructor(params: UIContainer.Params);
     /**
-     * Returns a snapshot array of direct child elements.
-     * @returns Array of direct children.
+     * Returns a snapshot array of direct child elements, or undefined if deleted.
+     * @returns Array of direct children, or undefined if deleted.
      */
-    get children(): readonly UI.Element[];
+    get children(): readonly UI.Element[] | undefined;
+    /**
+     * Retrieves a snapshot array of direct child elements.
+     * @returns Array of direct children, or undefined if deleted.
+     */
+    getChildren(): readonly UI.Element[] | undefined;
     /**
      * Retrieves a child element at the specified index.
      * @param index - Zero-based index of the child.
-     * @returns The child element, or undefined if out of bounds.
+     * @returns The child element, null if out of bounds, or undefined if deleted.
      */
-    getChild(index: number): UI.Element | undefined;
+    getChild(index: number): UI.Element | null | undefined;
+    /**
+     * Retrieves the total direct child count of the container.
+     * @returns The number of direct children, or undefined if deleted.
+     */
+    getChildCount(): number | undefined;
     /**
      * Iterates over all direct child elements without allocating an intermediate array.
      * @param callback - Function invoked for each child.
      */
     forEachChild(callback: (child: UI.Element, index: number) => void): void;
-    /**
-     * Attaches a child to the container.
-     * @param child - The child to attach.
-     */
-    attachChild(child: UI.Element): void;
-    /**
-     * Detaches a child from the container.
-     * @param child - The child to detach.
-     */
-    detachChild(child: UI.Element): void;
 }
 export declare namespace UIContainer {
     /**

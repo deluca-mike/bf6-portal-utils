@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 3.0.0
+// version: 4.0.0
 export class UIGadgetImage extends UI.Element {
     protected _gadget: mod.Gadgets;
 
@@ -26,7 +26,7 @@ export class UIGadgetImage extends UI.Element {
                 mod.CreateVector(width, height, 0),
                 anchor,
                 params.gadget,
-                UI.Element._getNativeWidget(parent.id)!
+                UI.Element._getNativeWidget(parent)!
             );
         } else {
             mod.AddUIGadgetImage(
@@ -35,7 +35,7 @@ export class UIGadgetImage extends UI.Element {
                 mod.CreateVector(width, height, 0),
                 anchor,
                 params.gadget,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 receiver.nativeReceiver
             );
         }
@@ -66,11 +66,11 @@ export class UIGadgetImage extends UI.Element {
     }
 
     /**
-     * The gadget of the gadget image.
-     * @returns The gadget.
+     * The gadget of the gadget image, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
      */
-    public get gadget(): mod.Gadgets {
-        return this._gadget;
+    public get gadget(): mod.Gadgets | undefined {
+        return this.getGadget();
     }
 
     /**
@@ -80,9 +80,29 @@ export class UIGadgetImage extends UI.Element {
      * @param gadget - The new gadget.
      */
     public set gadget(gadget: mod.Gadgets) {
-        if (this._isDeletedCheck()) return;
+        this.setGadget(gadget);
+    }
+
+    /**
+     * Retrieves the gadget of the gadget image, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    public getGadget(): mod.Gadgets | undefined {
+        return this._isDeletedCheck() ? undefined : this._gadget;
+    }
+
+    /**
+     * Sets the gadget of the gadget image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the gadget after it has
+     * been created.
+     * @param gadget - The new gadget.
+     * @returns This gadget image for chaining.
+     */
+    public setGadget(gadget: mod.Gadgets): this {
+        if (this._isDeletedCheck()) return this;
 
         this._logging.log('Setting UIGadgetImage gadget not supported', UI.LogLevel.Warning);
+        return this;
     }
 }
 

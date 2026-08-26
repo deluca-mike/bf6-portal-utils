@@ -12,61 +12,120 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
     /**
      * @inheritdoc
      */
-    get enabled(): boolean;
+    get enabled(): boolean | undefined;
     /**
      * @inheritdoc
      */
     set enabled(enabled: boolean);
     /**
-     * The type of the image.
-     * @returns The image type.
+     * @inheritdoc
      */
-    get imageType(): mod.UIImageType;
+    setEnabled(enabled: boolean): this;
+    /**
+     * The type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
+     */
+    get imageType(): mod.UIImageType | undefined;
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      */
     set imageType(imageType: mod.UIImageType);
     /**
-     * The color of the image.
-     * @returns The image color vector.
+     * Retrieves the type of the image, or undefined if deleted.
+     * @returns The image type, or undefined if deleted.
      */
-    get imageColor(): mod.Vector;
+    getImageType(): mod.UIImageType | undefined;
+    /**
+     * Sets the type of the image.
+     * @param imageType - The new type of the image.
+     * @returns This image button for chaining.
+     */
+    setImageType(imageType: mod.UIImageType): this;
+    /**
+     * The color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
+     */
+    get imageColor(): mod.Vector | undefined;
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
     set imageColor(color: mod.Vector);
     /**
-     * The alpha of the image.
-     * @returns The image alpha opacity.
+     * Retrieves the color of the image, or undefined if deleted.
+     * @returns The image color vector, or undefined if deleted.
      */
-    get imageAlpha(): number;
+    getImageColor(): mod.Vector | undefined;
+    /**
+     * Sets the color of the image.
+     * @param color - The new color of the image.
+     * @returns This image button for chaining.
+     */
+    setImageColor(color: mod.Vector): this;
+    /**
+     * The alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
+     */
+    get imageAlpha(): number | undefined;
     /**
      * Sets the alpha of the image.
      * @param alpha - The new alpha of the image.
      */
     set imageAlpha(alpha: number);
     /**
-     * The disabled color of the image.
-     * @returns The disabled image color vector.
+     * Retrieves the alpha of the image, or undefined if deleted.
+     * @returns The image alpha opacity, or undefined if deleted.
      */
-    get imageDisabledColor(): mod.Vector;
+    getImageAlpha(): number | undefined;
+    /**
+     * Sets the alpha of the image.
+     * @param alpha - The new alpha of the image.
+     * @returns This image button for chaining.
+     */
+    setImageAlpha(alpha: number): this;
+    /**
+     * The disabled color of the image, or undefined if deleted.
+     * @returns The disabled image color vector, or undefined if deleted.
+     */
+    get imageDisabledColor(): mod.Vector | undefined;
     /**
      * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
      */
     set imageDisabledColor(color: mod.Vector);
     /**
-     * The disabled alpha of the image.
-     * @returns The disabled image alpha opacity.
+     * Retrieves the disabled color of the image, or undefined if deleted.
+     * @returns The disabled image color vector, or undefined if deleted.
      */
-    get imageDisabledAlpha(): number;
+    getImageDisabledColor(): mod.Vector | undefined;
+    /**
+     * Sets the disabled color of the image.
+     * @param color - The new disabled color of the image.
+     * @returns This image button for chaining.
+     */
+    setImageDisabledColor(color: mod.Vector): this;
+    /**
+     * The disabled alpha of the image, or undefined if deleted.
+     * @returns The disabled image alpha opacity, or undefined if deleted.
+     */
+    get imageDisabledAlpha(): number | undefined;
     /**
      * Sets the disabled alpha of the image.
      * @param alpha - The new disabled alpha.
      */
     set imageDisabledAlpha(alpha: number);
+    /**
+     * Retrieves the disabled alpha of the image, or undefined if deleted.
+     * @returns The disabled image alpha opacity, or undefined if deleted.
+     */
+    getImageDisabledAlpha(): number | undefined;
+    /**
+     * Sets the disabled alpha of the image.
+     * @param alpha - The new disabled alpha.
+     * @returns This image button for chaining.
+     */
+    setImageDisabledAlpha(alpha: number): this;
 }
 export declare namespace UIImageButton {
     /**

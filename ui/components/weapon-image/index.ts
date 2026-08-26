@@ -1,6 +1,6 @@
 import { UI } from '../../index.ts';
 
-// version: 3.0.0
+// version: 4.0.0
 export class UIWeaponImage extends UI.Element {
     protected _weapon: mod.Weapons;
     protected _weaponPackage: mod.WeaponPackage;
@@ -28,7 +28,7 @@ export class UIWeaponImage extends UI.Element {
                 mod.CreateVector(width, height, 0),
                 anchor,
                 params.weapon,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 weaponPackage
             );
         } else {
@@ -38,7 +38,7 @@ export class UIWeaponImage extends UI.Element {
                 mod.CreateVector(width, height, 0),
                 anchor,
                 params.weapon,
-                UI.Element._getNativeWidget(parent.id)!,
+                UI.Element._getNativeWidget(parent)!,
                 weaponPackage,
                 receiver.nativeReceiver
             );
@@ -71,11 +71,11 @@ export class UIWeaponImage extends UI.Element {
     }
 
     /**
-     * The weapon of the weapon image.
-     * @returns The weapon.
+     * The weapon of the weapon image, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    public get weapon(): mod.Weapons {
-        return this._weapon;
+    public get weapon(): mod.Weapons | undefined {
+        return this.getWeapon();
     }
 
     /**
@@ -85,17 +85,37 @@ export class UIWeaponImage extends UI.Element {
      * @param weapon - The new weapon.
      */
     public set weapon(weapon: mod.Weapons) {
-        if (this._isDeletedCheck()) return;
-
-        this._logging.log('Setting UIWeaponImage weapon not supported', UI.LogLevel.Warning);
+        this.setWeapon(weapon);
     }
 
     /**
-     * The weapon package of the weapon image.
-     * @returns The weapon package.
+     * Retrieves the weapon of the weapon image, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    public get weaponPackage(): mod.WeaponPackage {
-        return this._weaponPackage;
+    public getWeapon(): mod.Weapons | undefined {
+        return this._isDeletedCheck() ? undefined : this._weapon;
+    }
+
+    /**
+     * Sets the weapon of the weapon image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon after it has
+     * been created.
+     * @param weapon - The new weapon.
+     * @returns This weapon image for chaining.
+     */
+    public setWeapon(weapon: mod.Weapons): this {
+        if (this._isDeletedCheck()) return this;
+
+        this._logging.log('Setting UIWeaponImage weapon not supported', UI.LogLevel.Warning);
+        return this;
+    }
+
+    /**
+     * The weapon package of the weapon image, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    public get weaponPackage(): mod.WeaponPackage | undefined {
+        return this.getWeaponPackage();
     }
 
     /**
@@ -105,9 +125,29 @@ export class UIWeaponImage extends UI.Element {
      * @param weaponPackage - The new weapon package.
      */
     public set weaponPackage(weaponPackage: mod.WeaponPackage) {
-        if (this._isDeletedCheck()) return;
+        this.setWeaponPackage(weaponPackage);
+    }
+
+    /**
+     * Retrieves the weapon package of the weapon image, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    public getWeaponPackage(): mod.WeaponPackage | undefined {
+        return this._isDeletedCheck() ? undefined : this._weaponPackage;
+    }
+
+    /**
+     * Sets the weapon package of the weapon image.
+     * @deprecated Currently not supported as the underlying Portal API lacks the ability to set the weapon package
+     * after it has been created.
+     * @param weaponPackage - The new weapon package.
+     * @returns This weapon image for chaining.
+     */
+    public setWeaponPackage(weaponPackage: mod.WeaponPackage): this {
+        if (this._isDeletedCheck()) return this;
 
         this._logging.log('Setting UIWeaponImage weaponPackage not supported', UI.LogLevel.Warning);
+        return this;
     }
 }
 

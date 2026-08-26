@@ -1,5 +1,4 @@
 import { UI } from '../ui/index.ts';
-import { UIContainer } from '../ui/components/container/index.ts';
 export declare class Logger {
     private static readonly _ROW_HEIGHT;
     private static readonly _PADDING;
@@ -102,7 +101,7 @@ export declare namespace Logger {
         /**
          * The parent container for the logger.
          */
-        parent?: UI.Root | UIContainer;
+        parent?: UI.Parent;
         /**
          * The anchor for the logger.
          */

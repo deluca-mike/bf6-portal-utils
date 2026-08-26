@@ -82,7 +82,7 @@ button.pressedColor = UI.COLORS.GREEN;
 - **Background**: `bgColor`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
-- **Lifecycle**: `delete()`, `deleted`
+- **Lifecycle**: `delete()`, `isDeleted`
 - **Parent Management**: `parent`
 
 For complete documentation of these properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode).

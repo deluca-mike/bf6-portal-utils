@@ -8,15 +8,25 @@ export declare class UIWeaponImageButton extends UIContentButton<UIWeaponImage> 
      */
     constructor(params: UIWeaponImageButton.Params);
     /**
-     * The weapon of the weapon image button.
-     * @returns The weapon.
+     * The weapon of the weapon image button, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    get weapon(): mod.Weapons;
+    get weapon(): mod.Weapons | undefined;
     /**
-     * The weapon package of the weapon image button.
-     * @returns The weapon package.
+     * Retrieves the weapon of the weapon image button, or undefined if deleted.
+     * @returns The weapon, or undefined if deleted.
      */
-    get weaponPackage(): mod.WeaponPackage;
+    getWeapon(): mod.Weapons | undefined;
+    /**
+     * The weapon package of the weapon image button, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    get weaponPackage(): mod.WeaponPackage | undefined;
+    /**
+     * Retrieves the weapon package of the weapon image button, or undefined if deleted.
+     * @returns The weapon package, or undefined if deleted.
+     */
+    getWeaponPackage(): mod.WeaponPackage | undefined;
 }
 export declare namespace UIWeaponImageButton {
     /**

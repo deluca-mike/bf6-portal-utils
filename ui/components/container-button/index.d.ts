@@ -8,11 +8,16 @@ export declare class UIContainerButton extends UIContentButton<UIContainer> {
      */
     constructor(params: UIContainerButton.Params);
     /**
-     * The inner container of the container button. Use this as a normal UIContainer that can be used as a parent for
+     * The inner container of the container button, or undefined if deleted. Use this as a normal UIContainer that can be used as a parent for
      * other elements.
-     * @returns The inner UIContainer instance.
+     * @returns The inner UIContainer instance, or undefined if deleted.
      */
-    get innerContainer(): UIContainer;
+    get innerContainer(): UIContainer | undefined;
+    /**
+     * Retrieves the inner container of the container button, or undefined if deleted.
+     * @returns The inner UIContainer instance, or undefined if deleted.
+     */
+    getInnerContainer(): UIContainer | undefined;
 }
 export declare namespace UIContainerButton {
     /**
