@@ -253,7 +253,6 @@ export declare namespace UI {
         protected static readonly _INVALID_INDEX = -1;
         protected static readonly _scratchPos: Position;
         protected static readonly _scratchSize: Size;
-        protected _name: string;
         private get _slot();
         /**
          * The constructor for an element.

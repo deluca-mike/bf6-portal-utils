@@ -735,8 +735,6 @@ export namespace UI {
         protected static readonly _scratchPos: Position = { x: 0, y: 0 };
         protected static readonly _scratchSize: Size = { width: 0, height: 0 };
 
-        protected _name: string;
-
         private get _slot(): number {
             return this._id - 1;
         }
@@ -748,7 +746,6 @@ export namespace UI {
          */
         public constructor(id: number, params: FinalElementParams) {
             super(id);
-            this._name = params.name;
 
             const slot = id - 1;
             _nativeWidgets[slot] = mod.FindUIWidgetWithName(params.name) as mod.UIWidget;

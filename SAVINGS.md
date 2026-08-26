@@ -67,7 +67,7 @@ In v2.0.0, because of the flat TypedArrays and the `_tick` microtask optimizatio
 
 - **v8.0.0 (Pre-Refactor)**: Heavy OOP with per-instance dynamic property descriptors via `Object.defineProperty`, duplicate property caching, multi-closure unregister callbacks, and mock parent wrapper allocations.
 - **v9.0.0 (Prototype Refactor)**: Statically delegated prototypes, removed redundant in-memory property caches, and introduced swap-and-pop children arrays.
-- **v10.0.0 (Current: SoA Core with Thin OOP Handles)**: Pre-allocated Structure of Arrays (TypedArrays) backing a singly-linked Left-Child Right-Sibling (LCRS) tree, bit-packed button slot indexing, coordinate caching, zero unregister closures, and single-property `{ readonly id: number }` OOP class handles with ID nullification on disposal.
+- **v10.0.0 (Current: SoA Core with Thin OOP Handles)**: Pre-allocated Structure of Arrays (TypedArrays) backing a singly-linked Left-Child Right-Sibling (LCRS) tree, bit-packed button slot indexing, coordinate caching, zero unregister closures, and lightweight OOP class handles with internal ID nullification on disposal.
 
 ---
 
@@ -121,7 +121,7 @@ Creating a single `UIWeaponImageButton` resulted in an explosion of per-instance
     - `forEachChild` traverses the singly-linked `_nextSibling` TypedArray with **0 heap allocations**.
     - `.children` returns an isolated snapshot array on demand to guarantee underlying tree safety.
 - **Automatic ID Nullification on Disposal**:
-    - Invoking `.delete()` frees the slot on the intrusive free-list, recursively destroys children, and sets `_id = INVALID_INDEX` to disconnect the handle from internal buffers.
+    - Invoking `.delete()` frees the slot on the intrusive free-list, recursively destroys children, and sets `_id = -1` to disconnect the handle from internal buffers.
 
 > **v10.0.0 Total:** **~24 bytes** marginal heap memory and **0 closures** per widget instance.
 
@@ -144,8 +144,8 @@ Creating a single `UIWeaponImageButton` resulted in an explosion of per-instance
 
 In QuickJS and resource-constrained environments:
 
-1. **Teardown & GC Pressure:** Destroying a menu of 50 buttons sweeps only ~50 tiny 24-byte handle objects, with zero nested closure trees or bucket allocations.
-2. **Zero Coordinate Mutation Churn:** Setting `btn.x = 100` reads the cached `_y[id]` directly from a `Float32Array` buffer, eliminating `mod.GetUIWidgetPosition()` temporary vector garbage.
+1. **Teardown & GC Pressure:** Destroying a menu of 50 buttons sweeps only ~50 tiny ~24-byte handle objects, with zero nested closure trees or bucket allocations.
+2. **Zero Coordinate Mutation Churn:** Setting `btn.x = 100` reads the cached `_y[slot]` directly from a `Float32Array` buffer, eliminating `mod.GetUIWidgetPosition()` temporary vector garbage.
 3. **Zero Event Dispatch Garbage:** Button events look up handlers via integer indices in pre-allocated arrays, eliminating Map lookups and string key hashing during user clicks and focus transitions.
 
 ---

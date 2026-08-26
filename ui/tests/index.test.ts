@@ -373,7 +373,8 @@ describe('UI Module & Components Lifecycle Tests', () => {
     });
 
     describe('Composite Buttons & Specialized Components', () => {
-        it('should construct UITextButton with padding and synchronize disabled styling', () => {
+        it('should construct UITextButton with padding, synchronize disabled styling, and dispatch events', () => {
+            const clickSpy = vi.fn();
             const textButton = new UITextButton({
                 x: 0,
                 y: 0,
@@ -385,6 +386,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 textColor: mod.CreateVector(1, 1, 1),
                 textDisabledColor: mod.CreateVector(0.5, 0.5, 0.5),
                 enabled: true,
+                onClickUp: clickSpy,
             });
 
             expect(textButton.enabled).toBe(true);
@@ -393,6 +395,12 @@ describe('UI Module & Components Lifecycle Tests', () => {
             expect(textButton.getPadding()).toBe(5);
             expect(textButton.message).toEqual(mod.Message('Click Me'));
             expect(textButton.getMessage()).toEqual(mod.Message('Click Me'));
+
+            // Verify event dispatch via _b button widget
+            const fakePlayer = { _id: 10, _type: 1 } as unknown as mod.Player;
+            const nativeBtnWidget = (textButton as unknown as { _buttonWidget: mod.UIWidget })._buttonWidget;
+            Events.OnPlayerUIButtonEvent.trigger(fakePlayer, nativeBtnWidget, mod.UIButtonEvent.ButtonUp);
+            expect(clickSpy).toHaveBeenCalledTimes(1);
 
             // Toggle enabled state
             textButton.setEnabled(false);
