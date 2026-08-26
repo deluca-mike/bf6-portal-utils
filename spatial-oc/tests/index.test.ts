@@ -7,7 +7,9 @@ import { SpatialOC } from '../index.ts';
 
 describe('SpatialOC Module Integration Tests', () => {
     beforeEach(() => {
-        SpatialOC.ROOT_NODE.forEachChild((child) => child.destroy());
+        while (SpatialOC.ROOT_NODE.childCount! > 0) {
+            SpatialOC.ROOT_NODE.getChild(0)!.destroy();
+        }
         harness.objects.clear();
     });
 
@@ -177,7 +179,9 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(SpatialOC.getActiveNodeCount()).toBe(1);
 
             // Destroy all
-            SpatialOC.ROOT_NODE.forEachChild((c) => c.destroy());
+            while (SpatialOC.ROOT_NODE.childCount! > 0) {
+                SpatialOC.ROOT_NODE.getChild(0)!.destroy();
+            }
             expect(SpatialOC.ROOT_NODE.childCount).toBe(0);
             expect(SpatialOC.getActiveNodeCount()).toBe(0);
         });
@@ -519,13 +523,51 @@ describe('SpatialOC Module Integration Tests', () => {
             // Kinematics should clear lookAt
             node.setKinematics({ angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. setParent should clear tracker and follow on the child when attaching to ROOT_NODE
+            // 3. setParent should clear tracker and follow on the child when attaching away from ROOT_NODE
             const parent = SpatialOC.createEmpty()!;
             const child = SpatialOC.createEmpty()!;
             child.setFollow({ target });
             expect(child.parent).toBe(SpatialOC.ROOT_NODE);
             child.setParent(parent);
             expect(child.parent).toBe(parent);
+        });
+
+        it('should clear active tracker and follow controllers when reparenting away from ROOT_NODE', () => {
+            const parent = SpatialOC.createEmpty({ position: { x: 100, y: 0, z: 0 } })!;
+            const trackerNode = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const playerMock = harness.createMockObject(1);
+            playerMock.position = { x: 200, y: 50, z: 300 };
+
+            trackerNode.attachToPlayer(playerMock as unknown as mod.Player);
+            SpatialOC.update(0.016);
+            expect(trackerNode.worldPosition.x).toBeCloseTo(200);
+
+            // Reparent to parent (away from ROOT_NODE)
+            trackerNode.setParent(parent);
+            expect(trackerNode.parent).toBe(parent);
+            trackerNode.localPosition = { x: 0, y: 0, z: 0 };
+
+            // Move player and update
+            playerMock.position = { x: 999, y: 999, z: 999 };
+            SpatialOC.update(0.016);
+            // World pos should not track player anymore; it should be parent world pos (100) + local pos (0) = 100
+            expect(trackerNode.worldPosition.x).toBeCloseTo(100);
+
+            // Test follow controller reparenting
+            const follower = SpatialOC.createEmpty()!;
+            const target = SpatialOC.createEmpty({ position: { x: 500, y: 0, z: 0 } })!;
+            follower.setFollow({ target, smoothSpeed: 10 });
+            SpatialOC.update(0.1);
+            expect(follower.worldPosition.x).toBeGreaterThan(0);
+
+            // Reparent follower to parent
+            follower.setParent(parent);
+            follower.localPosition = { x: 5, y: 0, z: 0 };
+            target.localPosition = { x: 999, y: 0, z: 0 };
+            SpatialOC.update(0.1);
+            // Follower should not track target; local pos remains 5 and world pos is 105
+            expect(follower.localPosition.x).toBe(5);
+            expect(follower.worldPosition.x).toBeCloseTo(105);
         });
     });
 

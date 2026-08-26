@@ -7,7 +7,7 @@ import { SpatialSOA } from '../index.ts';
 
 describe('SpatialSOA Pure Functional Module Integration Tests', () => {
     beforeEach(() => {
-        SpatialSOA.destroyAll();
+        SpatialSOA.forEachChild(SpatialSOA.ROOT_NODE_ID, (childId) => SpatialSOA.destroy(childId));
         harness.objects.clear();
     });
 
@@ -196,7 +196,7 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(SpatialSOA.getActiveNodeCount()).toBe(1);
 
             // Destroy all
-            SpatialSOA.destroyAll();
+            SpatialSOA.forEachChild(SpatialSOA.ROOT_NODE_ID, (childId) => SpatialSOA.destroy(childId));
             expect(SpatialSOA.getChildCount(SpatialSOA.ROOT_NODE_ID)).toBe(0);
             expect(SpatialSOA.getActiveNodeCount()).toBe(0);
         });
@@ -381,13 +381,51 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             // Kinematics should clear lookAt
             SpatialSOA.setKinematics(node, { angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. setParent should clear tracker and follow on the child when attaching to ROOT_NODE_ID
+            // 3. setParent should clear tracker and follow on the child when attaching away from ROOT_NODE_ID
             const parent = SpatialSOA.createEmpty()!;
             const child = SpatialSOA.createEmpty()!;
             SpatialSOA.setFollow(child, { target });
             expect(SpatialSOA.getParent(child)).toBe(SpatialSOA.ROOT_NODE_ID);
             SpatialSOA.setParent(child, parent);
             expect(SpatialSOA.getParent(child)).toBe(parent);
+        });
+
+        it('should clear active tracker and follow controllers when reparenting away from ROOT_NODE_ID', () => {
+            const parent = SpatialSOA.createEmpty({ position: { x: 100, y: 0, z: 0 } })!;
+            const trackerNode = SpatialSOA.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const playerMock = harness.createMockObject(1);
+            playerMock.position = { x: 200, y: 50, z: 300 };
+
+            SpatialSOA.attachToPlayer(trackerNode, playerMock as unknown as mod.Player);
+            SpatialSOA.update(0.016);
+            expect(SpatialSOA.getWorldPosition(trackerNode)!.x).toBeCloseTo(200);
+
+            // Reparent away from ROOT_NODE_ID
+            SpatialSOA.setParent(trackerNode, parent);
+            expect(SpatialSOA.getParent(trackerNode)).toBe(parent);
+            SpatialSOA.setLocalPosition(trackerNode, { x: 0, y: 0, z: 0 });
+
+            // Move player and update
+            playerMock.position = { x: 999, y: 999, z: 999 };
+            SpatialSOA.update(0.016);
+            // World pos should not track player anymore; local pos is 0, so world is parent (100)
+            expect(SpatialSOA.getWorldPosition(trackerNode)!.x).toBeCloseTo(100);
+
+            // Test follow controller reparenting
+            const follower = SpatialSOA.createEmpty()!;
+            const target = SpatialSOA.createEmpty({ position: { x: 500, y: 0, z: 0 } })!;
+            SpatialSOA.setFollow(follower, { target, smoothSpeed: 10 });
+            SpatialSOA.update(0.1);
+            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeGreaterThan(0);
+
+            // Reparent follower to parent
+            SpatialSOA.setParent(follower, parent);
+            SpatialSOA.setLocalPosition(follower, { x: 5, y: 0, z: 0 });
+            SpatialSOA.setLocalPosition(target, { x: 999, y: 0, z: 0 });
+            SpatialSOA.update(0.1);
+            // Follower should not track target; local pos remains 5 and world pos is 105
+            expect(SpatialSOA.getLocalPosition(follower)!.x).toBe(5);
+            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeCloseTo(105);
         });
 
         it('should smoothly orbit a child around its parent using OrbitController', () => {

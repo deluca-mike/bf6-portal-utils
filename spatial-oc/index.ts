@@ -318,9 +318,7 @@ export namespace SpatialOC {
         public forEachChild(callback: (child: SpatialElement, index: number) => void): void {
             if (this._isDeleted()) return;
 
-            const count = this._children.length;
-
-            for (let i = 0; i < count; ++i) {
+            for (let i = 0; i < this._children.length; ++i) {
                 CallbackHandler.invoke(callback, this._children[i], i, undefined, undefined, logging, 'forEachChild');
             }
         }
@@ -537,14 +535,7 @@ export namespace SpatialOC {
 
             element.ensureWorldTransformUpdated();
 
-            const renderPos = element.computeRenderPosition(_renderPos);
-
-            if (!renderPos) {
-                element.destroy();
-                logging.log('Create runtime failed, failed to compute render position', LogLevel.Error);
-                return null;
-            }
-
+            const renderPos = element.computeRenderPosition(_renderPos)!;
             const rotEuler = Quaternions.toEuler(element._worldRot, _renderEuler);
             const scaleVec = Vectors.toVector(element._worldScale);
 
@@ -731,7 +722,7 @@ export namespace SpatialOC {
             this._parent = newParent;
             newParent._addChild(this);
 
-            if (newParent === ROOT_NODE) {
+            if (newParent !== ROOT_NODE) {
                 this._tracker = undefined;
                 this._followConfig = undefined;
             }
@@ -787,6 +778,8 @@ export namespace SpatialOC {
                 this._pivotOffset = undefined;
             }
 
+            // Pivot offset only affects visual model placement during engine sync (computeRenderPosition),
+            // not the mathematical scene graph transform hierarchy, so only FLAG_ENGINE_TRANSFORM_DIRTY is set.
             this._setFlag(FLAG_ENGINE_TRANSFORM_DIRTY);
             return this;
         }
@@ -986,12 +979,12 @@ export namespace SpatialOC {
         public setWorldPosition(worldPos: Vector3): this {
             if (this._isDeleted()) return this;
 
-            if (!(this._parent instanceof SpatialElement)) {
+            if (this._parent === ROOT_NODE) {
                 this.setLocalPosition(worldPos);
                 return this;
             }
 
-            this._parent.worldToLocalPoint(worldPos, _worldSetLocalPos);
+            (this._parent as SpatialElement).worldToLocalPoint(worldPos, _worldSetLocalPos);
             this.setLocalPosition(_worldSetLocalPos);
 
             return this;
@@ -1033,13 +1026,14 @@ export namespace SpatialOC {
         public setWorldRotation(worldRot: Quaternion): this {
             if (this._isDeleted()) return this;
 
-            if (!(this._parent instanceof SpatialElement)) {
+            if (this._parent === ROOT_NODE) {
                 this.setLocalRotation(worldRot);
                 return this;
             }
 
-            this._parent.ensureWorldTransformUpdated();
-            Quaternions.conjugate(this._parent._worldRot, _worldSetInvRot);
+            const parent = this._parent as SpatialElement;
+            parent.ensureWorldTransformUpdated();
+            Quaternions.conjugate(parent._worldRot, _worldSetInvRot);
             Quaternions.multiply(_worldSetInvRot, worldRot, _worldSetInvRot);
             this.setLocalRotation(_worldSetInvRot);
 
@@ -1810,23 +1804,24 @@ export namespace SpatialOC {
         public ensureWorldTransformUpdated(): void {
             if (!this._hasFlag(FLAG_DIRTY)) return;
 
-            if (this._parent instanceof SpatialElement) {
-                this._parent.ensureWorldTransformUpdated();
+            if (this._parent !== ROOT_NODE) {
+                const parent = this._parent as SpatialElement;
+                parent.ensureWorldTransformUpdated();
 
                 // World Scale = Parent World Scale * Local Scale
-                Vectors.hadamardMultiply(this._parent._worldScale, this._localScale, this._worldScale);
+                Vectors.hadamardMultiply(parent._worldScale, this._localScale, this._worldScale);
 
                 // World Rotation = Parent World Rotation * Local Rotation
-                Quaternions.multiply(this._parent._worldRot, this._localRot, this._worldRot);
+                Quaternions.multiply(parent._worldRot, this._localRot, this._worldRot);
 
                 // Scaled Local Position = Local Pos * Parent World Scale
-                Vectors.hadamardMultiply(this._localPos, this._parent._worldScale, _worldEvalScaledPos);
+                Vectors.hadamardMultiply(this._localPos, parent._worldScale, _worldEvalScaledPos);
 
                 // Rotate scaled local pos by parent world rotation
-                Quaternions.rotateVector(_worldEvalScaledPos, this._parent._worldRot, _worldEvalRotatedPos);
+                Quaternions.rotateVector(_worldEvalScaledPos, parent._worldRot, _worldEvalRotatedPos);
 
                 // World Position = Parent World Position + Rotated Scaled Local Position
-                Vectors.add(this._parent._worldPos, _worldEvalRotatedPos, this._worldPos);
+                Vectors.add(parent._worldPos, _worldEvalRotatedPos, this._worldPos);
             } else {
                 // Root Node
                 Vectors.copy(this._worldPos, this._localPos);

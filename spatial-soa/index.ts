@@ -262,7 +262,6 @@ export namespace SpatialSOA {
     const _controllers = new Array<ControllerRecord | undefined>(MAX_NODES).fill(undefined);
 
     let _firstRoot = INVALID_INDEX;
-    let _rootCount = 0;
     let _activeNodeCount = 0;
 
     const SERVER_START_TIME = Date.now();
@@ -723,7 +722,6 @@ export namespace SpatialSOA {
         _parent[index] = INVALID_INDEX;
         _nextSibling[index] = _firstRoot;
         _firstRoot = index;
-        ++_rootCount;
     }
 
     /**
@@ -736,7 +734,6 @@ export namespace SpatialSOA {
         if (_firstRoot === index) {
             _firstRoot = _nextSibling[index];
             _nextSibling[index] = INVALID_INDEX;
-            --_rootCount;
 
             return;
         }
@@ -746,7 +743,6 @@ export namespace SpatialSOA {
 
             _nextSibling[prev] = _nextSibling[index];
             _nextSibling[index] = INVALID_INDEX;
-            --_rootCount;
 
             return;
         }
@@ -1274,11 +1270,6 @@ export namespace SpatialSOA {
             _unlinkChild(oldParent, cIdx);
             _addRoot(cIdx);
 
-            if (_controllers[cIdx]) {
-                _controllers[cIdx].tracker = undefined;
-                _controllers[cIdx].follow = undefined;
-            }
-
             _markDirty(cIdx);
 
             return true;
@@ -1321,6 +1312,11 @@ export namespace SpatialSOA {
             _nextSibling[last] = cIdx;
         }
 
+        if (_controllers[cIdx]) {
+            _controllers[cIdx].tracker = undefined;
+            _controllers[cIdx].follow = undefined;
+        }
+
         _markDirty(cIdx);
 
         return true;
@@ -1349,15 +1345,17 @@ export namespace SpatialSOA {
      * @returns The number of direct children, or undefined if the node does not exist.
      */
     export function getChildCount(id: SpatialNodeID): number | undefined {
-        if (id === ROOT_NODE_ID) return _rootCount;
-
-        const idx = _resolveIndex(id);
+        const idx = id === ROOT_NODE_ID ? -2 : _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
 
         let count = 0;
 
-        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+        for (
+            let cIdx = id === ROOT_NODE_ID ? _firstRoot : _firstChild[idx];
+            cIdx !== INVALID_INDEX;
+            cIdx = _nextSibling[cIdx]
+        ) {
             ++count;
         }
 
@@ -1370,23 +1368,17 @@ export namespace SpatialSOA {
      * @returns Array of child node IDs, or undefined if the node does not exist.
      */
     export function getChildren(id: SpatialNodeID): SpatialNodeID[] | undefined {
-        if (id === ROOT_NODE_ID) {
-            const list: SpatialNodeID[] = [];
-
-            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
-                list.push(_encodeId(r));
-            }
-
-            return list;
-        }
-
-        const idx = _resolveIndex(id);
+        const idx = id === ROOT_NODE_ID ? -2 : _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
 
         const list: SpatialNodeID[] = [];
 
-        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+        for (
+            let cIdx = id === ROOT_NODE_ID ? _firstRoot : _firstChild[idx];
+            cIdx !== INVALID_INDEX;
+            cIdx = _nextSibling[cIdx]
+        ) {
             list.push(_encodeId(cIdx));
         }
 
@@ -1402,25 +1394,17 @@ export namespace SpatialSOA {
     export function getChild(id: SpatialNodeID, index: number): SpatialNodeID | null | undefined {
         if (index < 0) return null;
 
-        if (id === ROOT_NODE_ID) {
-            let currentIndex = 0;
-
-            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
-                if (currentIndex === index) return _encodeId(r);
-
-                ++currentIndex;
-            }
-
-            return null;
-        }
-
-        const idx = _resolveIndex(id);
+        const idx = id === ROOT_NODE_ID ? -2 : _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return undefined;
 
         let currentIndex = 0;
 
-        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+        for (
+            let cIdx = id === ROOT_NODE_ID ? _firstRoot : _firstChild[idx];
+            cIdx !== INVALID_INDEX;
+            cIdx = _nextSibling[cIdx]
+        ) {
             if (currentIndex === index) return _encodeId(cIdx);
 
             ++currentIndex;
@@ -1435,31 +1419,15 @@ export namespace SpatialSOA {
      * @param callback - Callback invoked for each child ID.
      */
     export function forEachChild(id: SpatialNodeID, callback: (childId: SpatialNodeID, index: number) => void): void {
-        if (id === ROOT_NODE_ID) {
-            let currentIndex = 0;
-
-            for (let r = _firstRoot; r !== INVALID_INDEX; r = _nextSibling[r]) {
-                CallbackHandler.invoke(
-                    callback,
-                    _encodeId(r),
-                    currentIndex++,
-                    undefined,
-                    undefined,
-                    logging,
-                    'forEachChild'
-                );
-            }
-
-            return;
-        }
-
-        const idx = _resolveIndex(id);
+        const idx = id === ROOT_NODE_ID ? -2 : _resolveIndex(id);
 
         if (idx === INVALID_INDEX) return;
 
         let currentIndex = 0;
 
-        for (let cIdx = _firstChild[idx]; cIdx !== INVALID_INDEX; cIdx = _nextSibling[cIdx]) {
+        for (let cIdx = id === ROOT_NODE_ID ? _firstRoot : _firstChild[idx]; cIdx !== INVALID_INDEX; ) {
+            const next = _nextSibling[cIdx];
+
             CallbackHandler.invoke(
                 callback,
                 _encodeId(cIdx),
@@ -1469,6 +1437,8 @@ export namespace SpatialSOA {
                 logging,
                 'forEachChild'
             );
+
+            cIdx = next;
         }
     }
 
@@ -1749,6 +1719,8 @@ export namespace SpatialSOA {
 
         if (idx === INVALID_INDEX) return;
 
+        // Pivot offset only affects visual model placement during engine sync (computeRenderPosition),
+        // not the mathematical scene graph transform hierarchy, so only FLAG_ENGINE_TRANSFORM_DIRTY is set.
         if (offset) {
             _copyVectorIntoArray(_pivotOffset, idx, offset);
             _setFlag(idx, FLAG_HAS_PIVOT | FLAG_ENGINE_TRANSFORM_DIRTY);
@@ -2431,16 +2403,5 @@ export namespace SpatialSOA {
      */
     export function getActiveNodeCount(): number {
         return _activeNodeCount;
-    }
-
-    /**
-     * Recursively destroys all managed nodes in the scene graph and unspawns runtime entities.
-     */
-    export function destroyAll(): void {
-        _lastUpdateTime = 0;
-
-        while (_firstRoot !== INVALID_INDEX) {
-            destroy(_encodeId(_firstRoot));
-        }
     }
 }

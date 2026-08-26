@@ -515,8 +515,4 @@ export declare namespace SpatialSOA {
      * @returns The number of active nodes.
      */
     function getActiveNodeCount(): number;
-    /**
-     * Recursively destroys all managed nodes in the scene graph and unspawns runtime entities.
-     */
-    function destroyAll(): void;
 }

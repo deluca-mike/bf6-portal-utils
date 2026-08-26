@@ -131,7 +131,6 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `createRuntime(prefab: RuntimeSpawnPrefab, options?: NodeOptions): SpatialNodeID | null` (returns `null` if spawning failed, pool is full, or `parentId` is invalid)
 - `createExisting(object: TransformableObject, options?: NodeOptions): SpatialNodeID | null` (returns `null` if pool is full or `parentId` is invalid)
 - `destroy(id: SpatialNodeID): void`
-- `destroyAll(): void`
 - `isValid(id: SpatialNodeID): boolean`
 - `isDeleted(id: SpatialNodeID): boolean`
 - `getActiveNodeCount(): number`
