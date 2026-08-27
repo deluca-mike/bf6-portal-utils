@@ -5,6 +5,27 @@ import { Vectors } from '../vectors/index.ts';
 
 // version: 1.0.0
 export namespace PlayerLocations {
+    const logging = new Logging('PL');
+
+    /**
+     * Re-export of the `Logging.LogLevel` enum.
+     */
+    export const LogLevel = Logging.LogLevel;
+
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeRawError - Whether to include the runtime error in the log.
+     */
+    export function setLogging(
+        log?: (text: string, error?: unknown) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeRawError?: boolean
+    ): void {
+        logging.setLogging(log, logLevel, includeRawError);
+    }
+
     // =========================================================================
     // Types & Callback Signatures
     // =========================================================================
@@ -64,6 +85,26 @@ export namespace PlayerLocations {
          * @param maxZ - New maximum Z coordinate in world meters.
          */
         update(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): void;
+    }
+
+    /** 2D Vertex representing a point on the XZ ground plane for polygonal prism volumes. */
+    export type PrismVertex = {
+        x: number;
+        z: number;
+    };
+
+    /** Handle returned by polygonal prism subscriptions to allow updating parameters or unsubscribing. */
+    export interface PrismHandle {
+        /** Cancels the subscription and removes the zone listener. Safe to call multiple times. */
+        unsubscribe(): void;
+        /**
+         * Updates the polygon vertices and elevation bounds on the fly.
+         * Has no effect if the subscription has already been unsubscribed.
+         * @param vertices - New polygon vertices on the XZ ground plane.
+         * @param minY - Optional new minimum Y elevation in meters (default: -Infinity).
+         * @param maxY - Optional new maximum Y elevation in meters (default: Infinity).
+         */
+        update(vertices: PrismVertex[], minY?: number, maxY?: number): void;
     }
 
     /** Handle returned by directional plane/boundary subscriptions to allow updating parameters or unsubscribing. */
@@ -142,6 +183,17 @@ export namespace PlayerLocations {
         maxZ: number;
     }
 
+    interface PrismListener extends BasePresenceMask {
+        coords: Float32Array;
+        vertexCount: number;
+        minX: number;
+        maxX: number;
+        minZ: number;
+        maxZ: number;
+        minY: number;
+        maxY: number;
+    }
+
     interface PlaneListener extends BasePresenceMask {
         axis: AxisType;
         threshold: number;
@@ -156,12 +208,22 @@ export namespace PlayerLocations {
         lastPlayerId: number | null;
     }
 
+    interface PrismBounds {
+        minX: number;
+        maxX: number;
+        minZ: number;
+        maxZ: number;
+    }
+
     // =========================================================================
     // Configuration & Pre-Allocated Storage (Zero-GC)
     // =========================================================================
 
     /** Maximum supported player slots in Battlefield 6 Portal (0-99). */
     export const MAX_PLAYERS = 100;
+
+    /** Maximum supported vertices per polygonal prism (32 vertices). */
+    export const MAX_PRISM_VERTICES = 32;
 
     /** Spatial Grid Voxel Size in world meters (25 meters). */
     const VOXEL_SIZE = 25;
@@ -204,16 +266,24 @@ export namespace PlayerLocations {
     // --- Reusable Output & Scratch Buffers (Zero Heap Allocations) ---
     const queryResultBuffer: number[] = [];
     const _scratchPos: Vectors.Vector3 = { x: 0, y: 0, z: 0 };
+    const _scratchCoords = new Float32Array(MAX_PRISM_VERTICES * 2);
+
+    const _scratchPrismBounds: PrismBounds = {
+        minX: 0,
+        maxX: 0,
+        minZ: 0,
+        maxZ: 0,
+    };
 
     // Pre-allocated Heap Buffers for K-Closest / K-Farthest queries
     const heapDist = new Float64Array(MAX_PLAYERS);
     const heapId = new Uint8Array(MAX_PLAYERS);
 
     // Event Subscriptions Storage (Separated by Geometry Type for Monomorphic Efficiency)
-    const logging = new Logging('PL');
     const sphereListeners: SphereListener[] = [];
     const cylinderListeners: CylinderListener[] = [];
     const aabbListeners: AABBListener[] = [];
+    const prismListeners: PrismListener[] = [];
     const planeListeners: PlaneListener[] = [];
     const extremaListeners: ExtremaListener[] = [];
 
@@ -358,6 +428,10 @@ export namespace PlayerLocations {
 
         for (let i = 0; i < aabbListeners.length; ++i) {
             _clearPlayerPresence(aabbListeners[i], id);
+        }
+
+        for (let i = 0; i < prismListeners.length; ++i) {
+            _clearPlayerPresence(prismListeners[i], id);
         }
 
         for (let i = 0; i < planeListeners.length; ++i) {
@@ -524,6 +598,46 @@ export namespace PlayerLocations {
         }
     }
 
+    function _evaluatePrismSubscriptions(): void {
+        const prismCount = prismListeners.length;
+
+        if (prismCount === 0) return;
+
+        for (let z = 0; z < prismCount; ++z) {
+            const l = prismListeners[z];
+            const count = l.vertexCount;
+
+            if (count < 3) continue;
+
+            const minX = l.minX;
+            const maxX = l.maxX;
+            const minZ = l.minZ;
+            const maxZ = l.maxZ;
+            const minY = l.minY;
+            const maxY = l.maxY;
+            const coords = l.coords;
+
+            for (let id = 0; id < MAX_PLAYERS; ++id) {
+                let isInside = false;
+
+                if (_isActive(id)) {
+                    const y = posY[id];
+
+                    if (y >= minY && y <= maxY) {
+                        const x = posX[id];
+                        const pz = posZ[id];
+
+                        if (x >= minX && x <= maxX && pz >= minZ && pz <= maxZ) {
+                            isInside = _isPointInPolygon(x, pz, coords, count);
+                        }
+                    }
+                }
+
+                _updateListenerPresence(l, id, isInside);
+            }
+        }
+    }
+
     function _evaluatePlaneSubscriptions(): void {
         const planeCount = planeListeners.length;
 
@@ -631,6 +745,7 @@ export namespace PlayerLocations {
         _evaluateSphereSubscriptions();
         _evaluateCylinderSubscriptions();
         _evaluateAabbSubscriptions();
+        _evaluatePrismSubscriptions();
         _evaluatePlaneSubscriptions();
         _evaluateExtremaSubscriptions();
     }
@@ -642,6 +757,87 @@ export namespace PlayerLocations {
     // =========================================================================
     // Internal Helper Math & Sorting
     // =========================================================================
+
+    /**
+     * Unpacks an array of PrismVertex points into a flat interleaved Float32Array buffer
+     * [x0, z0, x1, z1, ...] and computes the 2D bounding box (minX, maxX, minZ, maxZ).
+     *
+     * Bounding box values are written into the targetBounds target object to eliminate heap allocations.
+     * @param vertices - Array of {x, z} vertex objects defining the polygon.
+     * @param targetCoords - Target Float32Array to write interleaved coordinates [x0, z0, x1, z1, ...] into.
+     * @param targetBounds - Target object to populate with bounding box.
+     */
+    function _unpackVertices(vertices: PrismVertex[], targetCoords: Float32Array, targetBounds: PrismBounds): void {
+        const count = vertices.length;
+
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minZ = Infinity;
+        let maxZ = -Infinity;
+
+        for (let i = 0; i < count; ++i) {
+            const v = vertices[i];
+            const vx = v.x;
+            const vz = v.z;
+            const i2 = i << 1;
+
+            targetCoords[i2] = vx;
+            targetCoords[i2 + 1] = vz;
+
+            if (vx < minX) {
+                minX = vx;
+            }
+
+            if (vx > maxX) {
+                maxX = vx;
+            }
+
+            if (vz < minZ) {
+                minZ = vz;
+            }
+
+            if (vz > maxZ) {
+                maxZ = vz;
+            }
+        }
+
+        targetBounds.minX = minX;
+        targetBounds.maxX = maxX;
+        targetBounds.minZ = minZ;
+        targetBounds.maxZ = maxZ;
+    }
+
+    /**
+     * Determines whether a 2D point (px, pz) lies inside a polygon defined by interleaved coordinates.
+     * Uses the Jordan Curve Theorem (Ray-Casting even-odd rule).
+     * @param px - Point X coordinate in meters.
+     * @param pz - Point Z coordinate in meters.
+     * @param coords - Flat Float32Array of interleaved polygon coordinates [x0, z0, x1, z1, ...].
+     * @param count - Total number of vertices.
+     * @returns True if point is inside the polygon, false otherwise.
+     */
+    function _isPointInPolygon(px: number, pz: number, coords: Float32Array, count: number): boolean {
+        if (count < 3) return false;
+
+        let inside = false;
+
+        for (let i = 0, j = count - 1; i < count; j = i++) {
+            const i2 = i << 1;
+            const j2 = j << 1;
+            const xi = coords[i2];
+            const zi = coords[i2 + 1];
+            const xj = coords[j2];
+            const zj = coords[j2 + 1];
+
+            const intersect = zi > pz !== zj > pz && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi;
+
+            if (intersect) {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
 
     function _hashVoxel(gx: number, gy: number, gz: number): number {
         // Fast spatial integer hash mapped to 0..511
@@ -1387,6 +1583,115 @@ export namespace PlayerLocations {
         return outArray;
     }
 
+    /**
+     * Fast 2.5D Polygonal Prism Query (extruded polygon on XZ plane with vertical Y bounds).
+     * Uses 3-axis sweep-and-prune AABB filtering and ray-casting.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation in meters (default: Infinity).
+     * @param outArray - Optional target array to write results into. Defaults to reusable internal buffer.
+     * @returns Array of active player IDs within the prism volume, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    export function getPlayersInPrism(
+        vertices: PrismVertex[],
+        minY: number = -Infinity,
+        maxY: number = Infinity,
+        outArray: number[] = queryResultBuffer
+    ): number[] | null {
+        outArray.length = 0;
+
+        const count = vertices.length;
+
+        if (count < 3 || count > MAX_PRISM_VERTICES) {
+            logging.log(`Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`, LogLevel.Warning);
+            return null;
+        }
+
+        _unpackVertices(vertices, _scratchCoords, _scratchPrismBounds);
+
+        // 1. Let getPlayersInAABB perform Sweep-and-Prune candidate selection
+        const candidates = getPlayersInAABB(
+            _scratchPrismBounds.minX,
+            minY,
+            _scratchPrismBounds.minZ,
+            _scratchPrismBounds.maxX,
+            maxY,
+            _scratchPrismBounds.maxZ,
+            outArray
+        );
+
+        // 2. In-place filter candidate players against the 2D polygon with Zero-GC
+        let writeIdx = 0;
+
+        for (let i = 0; i < candidates.length; ++i) {
+            const id = candidates[i];
+
+            if (_isPointInPolygon(posX[id], posZ[id], _scratchCoords, count)) {
+                outArray[writeIdx++] = id;
+            }
+        }
+
+        outArray.length = writeIdx;
+
+        return outArray;
+    }
+
+    /**
+     * Returns all active players outside a 2.5D polygonal prism.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation in meters (default: Infinity).
+     * @param outArray - Optional target array to write results into. Defaults to reusable internal buffer.
+     * @returns Array of active player IDs strictly outside the prism volume, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    export function getPlayersOutsidePrism(
+        vertices: PrismVertex[],
+        minY: number = -Infinity,
+        maxY: number = Infinity,
+        outArray: number[] = queryResultBuffer
+    ): number[] | null {
+        outArray.length = 0;
+
+        const count = vertices.length;
+
+        if (count < 3 || count > MAX_PRISM_VERTICES) {
+            logging.log(`Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`, LogLevel.Warning);
+            return null;
+        }
+
+        _unpackVertices(vertices, _scratchCoords, _scratchPrismBounds);
+
+        const minX = _scratchPrismBounds.minX;
+        const maxX = _scratchPrismBounds.maxX;
+        const minZ = _scratchPrismBounds.minZ;
+        const maxZ = _scratchPrismBounds.maxZ;
+
+        for (let id = 0; id < MAX_PLAYERS; ++id) {
+            if (!_isActive(id)) continue;
+
+            const y = posY[id];
+
+            if (y < minY || y > maxY) {
+                outArray.push(id);
+                continue;
+            }
+
+            const x = posX[id];
+            const z = posZ[id];
+
+            if (x < minX || x > maxX || z < minZ || z > maxZ) {
+                outArray.push(id);
+                continue;
+            }
+
+            if (!_isPointInPolygon(x, z, _scratchCoords, count)) {
+                outArray.push(id);
+            }
+        }
+
+        return outArray;
+    }
+
     // =========================================================================
     // Exposed Directional & Extremum Query Functions
     // =========================================================================
@@ -1770,6 +2075,84 @@ export namespace PlayerLocations {
         return !isPlayerInAABB(id, minX, minY, minZ, maxX, maxY, maxZ);
     }
 
+    /**
+     * Checks if an active player lies within a 2.5D polygonal prism (extruded polygon on XZ plane with vertical Y bounds).
+     * @param player - The player slot ID (0-99) or engine mod.Player object.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
+     * @returns True if active and inside, false if active and outside or inactive, undefined if not connected, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    export function isPlayerInPrism(
+        player: number | mod.Player,
+        vertices: PrismVertex[],
+        minY: number = -Infinity,
+        maxY: number = Infinity
+    ): boolean | undefined | null {
+        const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
+
+        if (!_isActive(id)) return false;
+
+        const count = vertices.length;
+
+        if (count < 3 || count > MAX_PRISM_VERTICES) {
+            logging.log(`Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`, LogLevel.Warning);
+            return null;
+        }
+
+        _unpackVertices(vertices, _scratchCoords, _scratchPrismBounds);
+
+        if (
+            !isPlayerInAABB(
+                id,
+                _scratchPrismBounds.minX,
+                minY,
+                _scratchPrismBounds.minZ,
+                _scratchPrismBounds.maxX,
+                maxY,
+                _scratchPrismBounds.maxZ
+            )
+        ) {
+            return false;
+        }
+
+        return _isPointInPolygon(posX[id], posZ[id], _scratchCoords, count);
+    }
+
+    /**
+     * Checks if an active player lies strictly outside a 2.5D polygonal prism.
+     * @param player - The player slot ID (0-99) or engine mod.Player object.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
+     * @returns True if active and outside, false if active and inside or inactive, undefined if not connected, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    export function isPlayerOutsidePrism(
+        player: number | mod.Player,
+        vertices: PrismVertex[],
+        minY: number = -Infinity,
+        maxY: number = Infinity
+    ): boolean | undefined | null {
+        const id = _getPlayerId(player);
+
+        if (!_isConnected(id)) return undefined;
+
+        if (!_isActive(id)) return false;
+
+        const count = vertices.length;
+
+        if (count < 3 || count > MAX_PRISM_VERTICES) {
+            logging.log(`Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`, LogLevel.Warning);
+            return null;
+        }
+
+        const isInside = isPlayerInPrism(id, vertices, minY, maxY);
+
+        return typeof isInside === 'boolean' ? !isInside : isInside;
+    }
+
     // =========================================================================
     // Exposed Reactive Event Subscriptions
     // =========================================================================
@@ -2080,6 +2463,121 @@ export namespace PlayerLocations {
                 listener.maxX = newMaxX;
                 listener.maxY = newMaxY;
                 listener.maxZ = newMaxZ;
+            },
+        };
+    }
+
+    /**
+     * Subscribes to events when any player enters or exits a 2.5D polygonal prism (extruded polygon on XZ plane with vertical elevation bounds).
+     * At least one callback (onEnter or onExit) must be provided.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Minimum Y elevation in meters (pass undefined or -Infinity for unbounded).
+     * @param maxY - Maximum Y elevation in meters (pass undefined or Infinity for unbounded).
+     * @param onEnter - Callback invoked when a player enters the prism volume.
+     * @param onExit - Optional callback invoked when a player exits the prism volume.
+     * @returns A {@link PrismHandle} to update parameters or unsubscribe.
+     */
+    export function onPrism(
+        vertices: PrismVertex[],
+        minY: number | undefined,
+        maxY: number | undefined,
+        onEnter: PlayerZoneCallback,
+        onExit?: PlayerZoneCallback
+    ): PrismHandle | null;
+    /**
+     * Subscribes to events when any player exits a 2.5D polygonal prism.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Minimum Y elevation in meters (pass undefined or -Infinity for unbounded).
+     * @param maxY - Maximum Y elevation in meters (pass undefined or Infinity for unbounded).
+     * @param onEnter - Explicitly undefined to indicate no enter callback.
+     * @param onExit - Callback invoked when a player exits the prism volume.
+     * @returns A {@link PrismHandle} to update parameters or unsubscribe, or null if vertices are invalid (< 3 or > 32 vertices).
+     */
+    export function onPrism(
+        vertices: PrismVertex[],
+        minY: number | undefined,
+        maxY: number | undefined,
+        onEnter: undefined,
+        onExit: PlayerZoneCallback
+    ): PrismHandle | null;
+    /**
+     * Implementation for {@link onPrism} subscriptions.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Minimum Y elevation in meters (default: -Infinity).
+     * @param maxY - Maximum Y elevation in meters (default: Infinity).
+     * @param onEnter - Optional callback invoked when a player enters the prism volume.
+     * @param onExit - Optional callback invoked when a player exits the prism volume.
+     * @returns A {@link PrismHandle} to update parameters or unsubscribe, or null if vertices are invalid (< 3 or > 32 vertices).
+     */
+    export function onPrism(
+        vertices: PrismVertex[],
+        minY: number = -Infinity,
+        maxY: number = Infinity,
+        onEnter?: PlayerZoneCallback,
+        onExit?: PlayerZoneCallback
+    ): PrismHandle | null {
+        const count = vertices.length;
+
+        if (count < 3 || count > MAX_PRISM_VERTICES) {
+            logging.log(`Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`, LogLevel.Warning);
+            return null;
+        }
+
+        const coords = new Float32Array(MAX_PRISM_VERTICES * 2);
+        _unpackVertices(vertices, coords, _scratchPrismBounds);
+
+        const listener: PrismListener = {
+            coords,
+            vertexCount: count,
+            minX: _scratchPrismBounds.minX,
+            maxX: _scratchPrismBounds.maxX,
+            minZ: _scratchPrismBounds.minZ,
+            maxZ: _scratchPrismBounds.maxZ,
+            minY: minY !== undefined ? minY : -Infinity,
+            maxY: maxY !== undefined ? maxY : Infinity,
+            onEnter,
+            onExit,
+            mask0: 0,
+            mask1: 0,
+            mask2: 0,
+            mask3: 0,
+        };
+
+        prismListeners.push(listener);
+
+        return {
+            unsubscribe(): void {
+                const idx = prismListeners.indexOf(listener);
+
+                if (idx !== -1) {
+                    prismListeners.splice(idx, 1);
+                }
+            },
+            update(newVertices: PrismVertex[], newMinY?: number, newMaxY?: number): void {
+                const newCount = newVertices.length;
+
+                if (newCount < 3 || newCount > MAX_PRISM_VERTICES) {
+                    logging.log(
+                        `Polygonal prism requires between 3 and ${MAX_PRISM_VERTICES} vertices.`,
+                        LogLevel.Warning
+                    );
+                    listener.vertexCount = 0;
+                } else {
+                    _unpackVertices(newVertices, listener.coords, _scratchPrismBounds);
+                    listener.vertexCount = newCount;
+                    listener.minX = _scratchPrismBounds.minX;
+                    listener.maxX = _scratchPrismBounds.maxX;
+                    listener.minZ = _scratchPrismBounds.minZ;
+                    listener.maxZ = _scratchPrismBounds.maxZ;
+                }
+
+                if (newMinY !== undefined) {
+                    listener.minY = newMinY;
+                }
+
+                if (newMaxY !== undefined) {
+                    listener.maxY = newMaxY;
+                }
             },
         };
     }

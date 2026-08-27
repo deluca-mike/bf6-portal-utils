@@ -250,9 +250,9 @@ export namespace Sounds {
         };
 
         const startFade = () => {
-            const state = _states.get(sfxId);
+            const state = _getOrCreateState(sfxId);
 
-            if (!state || !isValid(sfxId)) return;
+            if (!isValid(sfxId)) return;
 
             state.fadeTimerId = Timers.setInterval(stepFade, stepDuration);
         };

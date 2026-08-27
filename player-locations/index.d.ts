@@ -1,5 +1,21 @@
+import { Logging } from '../logging/index.ts';
 import { Vectors } from '../vectors/index.ts';
 export declare namespace PlayerLocations {
+    /**
+     * Re-export of the `Logging.LogLevel` enum.
+     */
+    const LogLevel: typeof Logging.LogLevel;
+    /**
+     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
+     * @param log - The logger function to use. Pass undefined to disable logging.
+     * @param logLevel - The minimum log level to use.
+     * @param includeRawError - Whether to include the runtime error in the log.
+     */
+    function setLogging(
+        log?: (text: string, error?: unknown) => Promise<void> | void,
+        logLevel?: Logging.LogLevel,
+        includeRawError?: boolean
+    ): void;
     /** Callback invoked when a player enters or exits a spatial zone or crosses a boundary. */
     type PlayerZoneCallback = (playerId: number) => Promise<void> | void;
     /** Callback invoked when the identity of an extremum player changes. */
@@ -49,6 +65,24 @@ export declare namespace PlayerLocations {
          */
         update(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number): void;
     }
+    /** 2D Vertex representing a point on the XZ ground plane for polygonal prism volumes. */
+    type PrismVertex = {
+        x: number;
+        z: number;
+    };
+    /** Handle returned by polygonal prism subscriptions to allow updating parameters or unsubscribing. */
+    interface PrismHandle {
+        /** Cancels the subscription and removes the zone listener. Safe to call multiple times. */
+        unsubscribe(): void;
+        /**
+         * Updates the polygon vertices and elevation bounds on the fly.
+         * Has no effect if the subscription has already been unsubscribed.
+         * @param vertices - New polygon vertices on the XZ ground plane.
+         * @param minY - Optional new minimum Y elevation in meters (default: -Infinity).
+         * @param maxY - Optional new maximum Y elevation in meters (default: Infinity).
+         */
+        update(vertices: PrismVertex[], minY?: number, maxY?: number): void;
+    }
     /** Handle returned by directional plane/boundary subscriptions to allow updating parameters or unsubscribing. */
     interface PlaneHandle {
         /** Cancels the subscription and removes the boundary listener. Safe to call multiple times. */
@@ -78,6 +112,8 @@ export declare namespace PlayerLocations {
     }
     /** Maximum supported player slots in Battlefield 6 Portal (0-99). */
     const MAX_PLAYERS = 100;
+    /** Maximum supported vertices per polygonal prism (32 vertices). */
+    const MAX_PRISM_VERTICES = 32;
     /**
      * Gets world coordinates in meters for an active player.
      * Pass an `out` vector for zero-allocation reuse.
@@ -256,6 +292,35 @@ export declare namespace PlayerLocations {
         maxZ: number,
         outArray?: number[]
     ): number[];
+    /**
+     * Fast 2.5D Polygonal Prism Query (extruded polygon on XZ plane with vertical Y bounds).
+     * Uses 3-axis sweep-and-prune AABB filtering and ray-casting.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation in meters (default: Infinity).
+     * @param outArray - Optional target array to write results into. Defaults to reusable internal buffer.
+     * @returns Array of active player IDs within the prism volume, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    function getPlayersInPrism(
+        vertices: PrismVertex[],
+        minY?: number,
+        maxY?: number,
+        outArray?: number[]
+    ): number[] | null;
+    /**
+     * Returns all active players outside a 2.5D polygonal prism.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation in meters (default: Infinity).
+     * @param outArray - Optional target array to write results into. Defaults to reusable internal buffer.
+     * @returns Array of active player IDs strictly outside the prism volume, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    function getPlayersOutsidePrism(
+        vertices: PrismVertex[],
+        minY?: number,
+        maxY?: number,
+        outArray?: number[]
+    ): number[] | null;
     /**
      * Returns all active players located at or above a given Y elevation (altitude).
      * @param y - The elevation threshold in world meters.
@@ -491,6 +556,34 @@ export declare namespace PlayerLocations {
         maxZ: number
     ): boolean | undefined;
     /**
+     * Checks if an active player lies within a 2.5D polygonal prism (extruded polygon on XZ plane with vertical Y bounds).
+     * @param player - The player slot ID (0-99) or engine mod.Player object.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
+     * @returns True if active and inside, false if active and outside or inactive, undefined if not connected, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    function isPlayerInPrism(
+        player: number | mod.Player,
+        vertices: PrismVertex[],
+        minY?: number,
+        maxY?: number
+    ): boolean | undefined | null;
+    /**
+     * Checks if an active player lies strictly outside a 2.5D polygonal prism.
+     * @param player - The player slot ID (0-99) or engine mod.Player object.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Optional minimum Y elevation bound in meters (default: -Infinity).
+     * @param maxY - Optional maximum Y elevation bound in meters (default: Infinity).
+     * @returns True if active and outside, false if active and inside or inactive, undefined if not connected, or null if the vertices array is invalid (< 3 or > 32 vertices).
+     */
+    function isPlayerOutsidePrism(
+        player: number | mod.Player,
+        vertices: PrismVertex[],
+        minY?: number,
+        maxY?: number
+    ): boolean | undefined | null;
+    /**
      * Subscribes to events when any player enters or exits a 3D sphere.
      * At least one callback (onEnter or onExit) must be provided.
      * @param x - Sphere center X coordinate in world meters.
@@ -613,6 +706,39 @@ export declare namespace PlayerLocations {
         onEnter: undefined,
         onExit: PlayerZoneCallback
     ): AABBHandle;
+    /**
+     * Subscribes to events when any player enters or exits a 2.5D polygonal prism (extruded polygon on XZ plane with vertical elevation bounds).
+     * At least one callback (onEnter or onExit) must be provided.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Minimum Y elevation in meters (pass undefined or -Infinity for unbounded).
+     * @param maxY - Maximum Y elevation in meters (pass undefined or Infinity for unbounded).
+     * @param onEnter - Callback invoked when a player enters the prism volume.
+     * @param onExit - Optional callback invoked when a player exits the prism volume.
+     * @returns A {@link PrismHandle} to update parameters or unsubscribe.
+     */
+    function onPrism(
+        vertices: PrismVertex[],
+        minY: number | undefined,
+        maxY: number | undefined,
+        onEnter: PlayerZoneCallback,
+        onExit?: PlayerZoneCallback
+    ): PrismHandle | null;
+    /**
+     * Subscribes to events when any player exits a 2.5D polygonal prism.
+     * @param vertices - Array of polygon vertices ({x, z}). Capped at 32 vertices.
+     * @param minY - Minimum Y elevation in meters (pass undefined or -Infinity for unbounded).
+     * @param maxY - Maximum Y elevation in meters (pass undefined or Infinity for unbounded).
+     * @param onEnter - Explicitly undefined to indicate no enter callback.
+     * @param onExit - Callback invoked when a player exits the prism volume.
+     * @returns A {@link PrismHandle} to update parameters or unsubscribe, or null if vertices are invalid (< 3 or > 32 vertices).
+     */
+    function onPrism(
+        vertices: PrismVertex[],
+        minY: number | undefined,
+        maxY: number | undefined,
+        onEnter: undefined,
+        onExit: PlayerZoneCallback
+    ): PrismHandle | null;
     /**
      * Subscribes to events when any player crosses an altitude threshold (Y elevation).
      * At least one callback (onAbove or onBelow) must be provided.

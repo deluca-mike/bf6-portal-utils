@@ -17,6 +17,23 @@ export declare namespace SpatialSOA {
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
+    /**
+     * Unique generation-encoded identifier for a SpatialSOA node.
+     */
+    type SpatialNodeID = number & {
+        readonly __brand: 'SpatialNodeID';
+    };
+    /**
+     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
+     */
+    type Vector3 = Vectors.Vector3;
+    /**
+     * A transparent 4D Quaternion representing 3D spatial rotation.
+     */
+    type Quaternion = Quaternions.Quaternion;
+    /**
+     * Supported in-game transformable engine object types (players, vehicles, spawners, props, triggers).
+     */
     type TransformableObject =
         | mod.Bomb
         | mod.EmplacementSpawner
@@ -61,39 +78,6 @@ export declare namespace SpatialSOA {
         | mod.RuntimeSpawn_Subsurface
         | mod.RuntimeSpawn_Tungsten;
     /**
-     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
-     */
-    type Vector3 = Vectors.Vector3;
-    /**
-     * A transparent 4D Quaternion representing 3D spatial rotation.
-     */
-    type Quaternion = Quaternions.Quaternion;
-    /**
-     * Unique generation-encoded identifier for a SpatialSOA node.
-     */
-    type SpatialNodeID = number & {
-        readonly __brand: 'SpatialNodeID';
-    };
-    /**
-     * Constant representing the root anchor node ID in the scene graph.
-     */
-    const ROOT_NODE_ID: SpatialNodeID;
-    /**
-     * Common initialization options for creating SpatialNodes.
-     */
-    interface NodeOptions {
-        /** Optional parent node ID to attach this node to upon creation. If undefined, attaches to ROOT_NODE_ID. */
-        parentId?: SpatialNodeID;
-        /** Initial local or world position. */
-        position?: Vector3;
-        /** Initial local or world rotation (as a Quaternion or Euler angles in radians). */
-        rotation?: Vector3 | Quaternion;
-        /** Initial local or world scale (uniform or per-axis). Default: 1. */
-        scale?: Vector3 | number;
-        /** In-game model offset correction (to adjust prefab origins to mesh center). */
-        pivotOffset?: Vector3;
-    }
-    /**
      * Supported in-game trackable engine object types (players, vehicles, spawners, props, triggers).
      */
     type TrackableObject =
@@ -121,6 +105,21 @@ export declare namespace SpatialSOA {
      * @returns The updated world position.
      */
     type FollowSmoothingFunction = (current: Vector3, target: Vector3, dt: number, out?: Vector3) => Vector3;
+    /**
+     * Common initialization options for creating SpatialNodes.
+     */
+    interface NodeOptions {
+        /** Optional parent node ID to attach this node to upon creation. If undefined, attaches to ROOT_NODE_ID. */
+        parentId?: SpatialNodeID;
+        /** Initial local or world position. */
+        position?: Vector3;
+        /** Initial local or world rotation (as a Quaternion or Euler angles in radians). */
+        rotation?: Vector3 | Quaternion;
+        /** Initial local or world scale (uniform or per-axis). Default: 1. */
+        scale?: Vector3 | number;
+        /** In-game model offset correction (to adjust prefab origins to mesh center). */
+        pivotOffset?: Vector3;
+    }
     /**
      * Options for continuous orbital rotation motion.
      */
@@ -173,6 +172,10 @@ export declare namespace SpatialSOA {
         /** Angular acceleration vector (axis * radians per second squared) in local space. */
         angularAcceleration?: Vector3;
     }
+    /**
+     * Constant representing the root anchor node ID in the scene graph.
+     */
+    const ROOT_NODE_ID: SpatialNodeID;
     /**
      * Creates an empty SpatialNode (virtual parent anchor or child node).
      * @param options - Initialization options (including optional parentId).

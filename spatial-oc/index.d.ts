@@ -17,6 +17,17 @@ export declare namespace SpatialOC {
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
+    /**
+     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
+     */
+    type Vector3 = Vectors.Vector3;
+    /**
+     * A transparent 4D Quaternion representing 3D spatial rotation.
+     */
+    type Quaternion = Quaternions.Quaternion;
+    /**
+     * Supported in-game transformable engine object types (players, vehicles, spawners, props, triggers).
+     */
     type TransformableObject =
         | mod.Bomb
         | mod.EmplacementSpawner
@@ -60,14 +71,6 @@ export declare namespace SpatialOC {
         | mod.RuntimeSpawn_Sand
         | mod.RuntimeSpawn_Subsurface
         | mod.RuntimeSpawn_Tungsten;
-    /**
-     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
-     */
-    type Vector3 = Vectors.Vector3;
-    /**
-     * A transparent 4D Quaternion representing 3D spatial rotation.
-     */
-    type Quaternion = Quaternions.Quaternion;
     /**
      * Supported in-game trackable engine object types (players, vehicles, spawners, props, triggers).
      */

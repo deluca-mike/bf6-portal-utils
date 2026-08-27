@@ -180,6 +180,54 @@ export const GroundTruth = {
         return result;
     },
 
+    prism(
+        fixture: TestFixtureData,
+        vertices: { x: number; z: number }[],
+        minY: number = -Infinity,
+        maxY: number = Infinity
+    ): number[] | null {
+        const count = vertices.length;
+
+        if (count < 3 || count > 32) return null;
+
+        const vertX: number[] = [];
+        const vertZ: number[] = [];
+
+        for (let i = 0; i < count; ++i) {
+            vertX.push(vertices[i].x);
+            vertZ.push(vertices[i].z);
+        }
+
+        const result: number[] = [];
+
+        for (const id of fixture.activeIds) {
+            const p = fixture.positions.get(id)!;
+
+            if (p.y < minY || p.y > maxY) continue;
+
+            let inside = false;
+
+            for (let i = 0, j = count - 1; i < count; j = i++) {
+                const xi = vertX[i];
+                const zi = vertZ[i];
+                const xj = vertX[j];
+                const zj = vertZ[j];
+
+                const intersect = zi > p.z !== zj > p.z && p.x < ((xj - xi) * (p.z - zi)) / (zj - zi) + xi;
+
+                if (intersect) {
+                    inside = !inside;
+                }
+            }
+
+            if (inside) {
+                result.push(id);
+            }
+        }
+
+        return result;
+    },
+
     above(fixture: TestFixtureData, y: number): number[] {
         const result: number[] = [];
 

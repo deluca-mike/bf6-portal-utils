@@ -214,6 +214,141 @@ describe('PlayerLocations Integration Tests', () => {
                 }
             }
         });
+
+        it('should match ground truth for 2.5D Polygonal Prism queries (getPlayersInPrism & getPlayersOutsidePrism)', () => {
+            const testPrisms = [
+                // Triangle
+                {
+                    vertices: [
+                        { x: -3000, z: -3000 },
+                        { x: 3000, z: -3000 },
+                        { x: 0, z: 4000 },
+                    ],
+                    minY: -200,
+                    maxY: 600,
+                },
+                // Convex Quad
+                {
+                    vertices: [
+                        { x: -5000, z: -5000 },
+                        { x: 5000, z: -5000 },
+                        { x: 5000, z: 5000 },
+                        { x: -5000, z: 5000 },
+                    ],
+                    minY: -Infinity,
+                    maxY: Infinity,
+                },
+                // Concave L-shaped polygon
+                {
+                    vertices: [
+                        { x: 0, z: 0 },
+                        { x: 6000, z: 0 },
+                        { x: 6000, z: 3000 },
+                        { x: 3000, z: 3000 },
+                        { x: 3000, z: 6000 },
+                        { x: 0, z: 6000 },
+                    ],
+                    minY: -100,
+                    maxY: 800,
+                },
+                // Concave Star-like / Cross polygon
+                {
+                    vertices: [
+                        { x: -2000, z: -6000 },
+                        { x: 2000, z: -6000 },
+                        { x: 2000, z: -2000 },
+                        { x: 6000, z: -2000 },
+                        { x: 6000, z: 2000 },
+                        { x: 2000, z: 2000 },
+                        { x: 2000, z: 6000 },
+                        { x: -2000, z: 6000 },
+                        { x: -2000, z: 2000 },
+                        { x: -6000, z: 2000 },
+                        { x: -6000, z: -2000 },
+                        { x: -2000, z: -2000 },
+                    ],
+                    minY: -500,
+                    maxY: 1200,
+                },
+            ];
+
+            for (const { vertices, minY, maxY } of testPrisms) {
+                const actualIn = PlayerLocations.getPlayersInPrism(vertices, minY, maxY);
+                const expectedIn = GroundTruth.prism(fixture, vertices, minY, maxY);
+
+                expect(actualIn!.sort((a, b) => a - b)).toEqual(expectedIn!.sort((a, b) => a - b));
+
+                const actualOut = PlayerLocations.getPlayersOutsidePrism(vertices, minY, maxY);
+                expect(actualOut!.length).toBe(fixture.activeIds.length - expectedIn!.length);
+
+                for (const id of expectedIn!) {
+                    expect(actualOut).not.toContain(id);
+                    expect(PlayerLocations.isPlayerInPrism(id, vertices, minY, maxY)).toBe(true);
+                    expect(PlayerLocations.isPlayerOutsidePrism(id, vertices, minY, maxY)).toBe(false);
+                }
+
+                for (const id of actualOut!) {
+                    expect(PlayerLocations.isPlayerInPrism(id, vertices, minY, maxY)).toBe(false);
+                    expect(PlayerLocations.isPlayerOutsidePrism(id, vertices, minY, maxY)).toBe(true);
+                }
+            }
+
+            // Degenerate polygon (< 3 vertices) with logging verification
+            const logs: string[] = [];
+            PlayerLocations.setLogging((msg) => {
+                logs.push(msg);
+            }, PlayerLocations.LogLevel.Warning);
+
+            const degenerateVertices = [
+                { x: 0, z: 0 },
+                { x: 100, z: 100 },
+            ];
+            expect(PlayerLocations.getPlayersInPrism(degenerateVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            expect(PlayerLocations.getPlayersOutsidePrism(degenerateVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            expect(PlayerLocations.isPlayerInPrism(fixture.activeIds[0], degenerateVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            expect(PlayerLocations.isPlayerOutsidePrism(fixture.activeIds[0], degenerateVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            const degHandle = PlayerLocations.onPrism(degenerateVertices, undefined, undefined, () => {});
+            expect(degHandle).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            // Polygon exceeding MAX_PRISM_VERTICES = 32
+            logs.length = 0;
+            expect(PlayerLocations.MAX_PRISM_VERTICES).toBe(32);
+            const manyVertices = Array.from({ length: 40 }, (_, i) => {
+                const angle = (i / 40) * Math.PI * 2;
+                return { x: Math.cos(angle) * 5000, z: Math.sin(angle) * 5000 };
+            });
+            expect(PlayerLocations.getPlayersInPrism(manyVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            expect(PlayerLocations.getPlayersOutsidePrism(manyVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            expect(PlayerLocations.isPlayerInPrism(fixture.activeIds[0], manyVertices)).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            logs.length = 0;
+            const overHandle = PlayerLocations.onPrism(manyVertices, undefined, undefined, () => {});
+            expect(overHandle).toBeNull();
+            expect(logs.some((l) => l.includes('Polygonal prism requires between 3 and 32 vertices'))).toBe(true);
+
+            // Disable logging
+            PlayerLocations.setLogging(undefined);
+        });
     });
 
     describe('4. Directional Slice Scans & Altitude Extrema', () => {
@@ -463,6 +598,57 @@ describe('PlayerLocations Integration Tests', () => {
             harness.stepTick();
         });
 
+        it('should fire onEnter and onExit via onPrism', () => {
+            const entered: number[] = [];
+            const exited: number[] = [];
+
+            const triangleVertices = [
+                { x: 0, z: 0 },
+                { x: 100, z: 0 },
+                { x: 0, z: 100 },
+            ];
+
+            const handle = PlayerLocations.onPrism(
+                triangleVertices,
+                0,
+                50,
+                (id) => {
+                    entered.push(id);
+                },
+                (id) => {
+                    exited.push(id);
+                }
+            );
+
+            const testId = 96;
+
+            // Player connects inside triangle (20, 20) with Y = 25
+            harness.connectPlayer(testId, { x: 20, y: 25, z: 20 });
+            harness.stepTick();
+            expect(entered).toContain(testId);
+
+            // Move player outside the triangle to (80, 25, 80)
+            harness.setPlayer(testId, { position: { x: 80, y: 25, z: 80 } });
+            harness.stepTick();
+            expect(exited).toContain(testId);
+
+            // Move player back in
+            entered.length = 0;
+            exited.length = 0;
+            harness.setPlayer(testId, { position: { x: 10, y: 25, z: 10 } });
+            harness.stepTick();
+            expect(entered).toContain(testId);
+
+            // Move player above vertical bound (Y = 100)
+            harness.setPlayer(testId, { position: { x: 10, y: 100, z: 10 } });
+            harness.stepTick();
+            expect(exited).toContain(testId);
+
+            handle.unsubscribe();
+            harness.disconnectPlayer(testId);
+            harness.stepTick();
+        });
+
         it('should fire directional boundary crossing events (onCrossAltitude, onCrossEastWest, etc.)', () => {
             const aboveEvents: number[] = [];
             const belowEvents: number[] = [];
@@ -670,6 +856,57 @@ describe('PlayerLocations Integration Tests', () => {
             expect(lastExtrema.newId).toBe(playerB);
 
             extremaHandle.unsubscribe();
+
+            // 4. Dynamic Prism (polygonal vertices / altitude updates)
+            const prismEntered: number[] = [];
+            const prismExited: number[] = [];
+            const prismHandle = PlayerLocations.onPrism(
+                [
+                    { x: 0, z: 0 },
+                    { x: 100, z: 0 },
+                    { x: 0, z: 100 },
+                ],
+                0,
+                50,
+                (id) => {
+                    prismEntered.push(id);
+                },
+                (id) => {
+                    prismExited.push(id);
+                }
+            );
+
+            // Player at (200, 25, 200) - outside initial prism
+            harness.connectPlayer(testId, { x: 200, y: 25, z: 200 });
+            harness.stepTick();
+            expect(prismEntered).not.toContain(testId);
+
+            // Update prism vertices to cover (200, 200)
+            prismHandle.update([
+                { x: 150, z: 150 },
+                { x: 250, z: 150 },
+                { x: 250, z: 250 },
+                { x: 150, z: 250 },
+            ]);
+            harness.stepTick();
+            expect(prismEntered).toContain(testId);
+
+            // Update height range so player at Y=25 is outside [50, 100]
+            prismHandle.update(
+                [
+                    { x: 150, z: 150 },
+                    { x: 250, z: 150 },
+                    { x: 250, z: 250 },
+                    { x: 150, z: 250 },
+                ],
+                50,
+                100
+            );
+            harness.stepTick();
+            expect(prismExited).toContain(testId);
+
+            prismHandle.unsubscribe();
+
             harness.disconnectPlayer(testId);
             harness.disconnectPlayer(playerA);
             harness.disconnectPlayer(playerB);

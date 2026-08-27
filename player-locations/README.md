@@ -324,6 +324,8 @@ interface TargetExtremaHandle extends ExtremaHandle {
 | `getPlayersOutsideCylinder(centerX: number, centerZ: number, radiusMeters: number, minY?: number, maxY?: number, outArray?: number[])` | `number[]` | Returns all active player IDs strictly outside the specified 2.5D cylinder. |
 | `getPlayersInAABB(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, outArray?: number[])` | `number[]` | Fast 3D Axis-Aligned Bounding Box query using 3-Axis Sweep-and-Prune. |
 | `getPlayersOutsideAABB(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, outArray?: number[])` | `number[]` | Returns all active player IDs strictly outside the specified 3D bounding box. |
+| `getPlayersInPrism(vertices: PrismVertex[], minY?: number, maxY?: number, outArray?: number[])` | `number[] \| null` | Fast 2.5D polygonal prism query using 3-axis sweep-and-prune AABB filtering and ray-casting. Returns `null` if vertex count < 3 or > 32. |
+| `getPlayersOutsidePrism(vertices: PrismVertex[], minY?: number, maxY?: number, outArray?: number[])` | `number[] \| null` | Returns all active player IDs strictly outside the specified 2.5D polygonal prism. Returns `null` if vertex count < 3 or > 32. |
 
 ---
 
@@ -358,20 +360,23 @@ interface TargetExtremaHandle extends ExtremaHandle {
 | `isPlayerOutsideSphere(player: number \| mod.Player, centerX: number, centerY: number, centerZ: number, radiusMeters: number)` | `boolean \| undefined` | Tests if player is active and strictly outside a 3D sphere. Returns `undefined` if disconnected. |
 | `isPlayerInAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean \| undefined` | Tests if player is active and inside a 3D AABB bounding box (inclusive). Returns `undefined` if disconnected. |
 | `isPlayerOutsideAABB(player: number \| mod.Player, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number)` | `boolean \| undefined` | Tests if player is active and strictly outside a 3D AABB bounding box. Returns `undefined` if disconnected. |
+| `isPlayerInPrism(player: number \| mod.Player, vertices: PrismVertex[], minY?: number, maxY?: number)` | `boolean \| undefined \| null` | Tests if player is active and inside a 2.5D polygonal prism (inclusive). Returns `undefined` if disconnected, or `null` if vertices are invalid (< 3 or > 32). |
+| `isPlayerOutsidePrism(player: number \| mod.Player, vertices: PrismVertex[], minY?: number, maxY?: number)` | `boolean \| undefined \| null` | Tests if player is active and strictly outside a 2.5D polygonal prism. Returns `undefined` if disconnected, or `null` if vertices are invalid (< 3 or > 32). |
 
 ---
 
 #### Reactive Event Subscriptions & Dynamic Handles
 
-> **Dynamic Zone Updates & Safety**: All reactive subscriptions return an interactive handle (`SphereHandle`, `CylinderHandle`, etc.). You can modify spatial properties (e.g. moving a payload zone or resizing a capture radius) on the fly via `handle.update(...)` with **0 heap allocations**. Subscriptions can be cancelled at any time via `handle.unsubscribe()`, which is idempotent and safely ignores subsequent `update(...)` calls.
+> **Dynamic Zone Updates & Safety**: All reactive subscriptions return an interactive handle (`SphereHandle`, `CylinderHandle`, `AABBHandle`, `PrismHandle`, etc.). You can modify spatial properties (e.g. moving a payload zone or resizing a capture radius) on the fly via `handle.update(...)` with **0 heap allocations**. Subscriptions can be cancelled at any time via `handle.unsubscribe()`, which is idempotent and safely ignores subsequent `update(...)` calls.
 >
-> **Callback Requirements**: For multi-callback subscriptions (`onSphere`, `onCylinder`, `onAABB`, `onCrossAltitude`, `onCrossEastWest`, `onCrossNorthSouth`), TypeScript enforces that at least one callback must be provided. If only the secondary transition callback is needed, pass `undefined` as the first callback argument (e.g., `PlayerLocations.onSphere(x, y, z, r, undefined, onExit)`).
+> **Callback Requirements**: For multi-callback subscriptions (`onSphere`, `onCylinder`, `onAABB`, `onPrism`, `onCrossAltitude`, `onCrossEastWest`, `onCrossNorthSouth`), TypeScript enforces that at least one callback must be provided. If only the secondary transition callback is needed, pass `undefined` as the first callback argument (e.g., `PlayerLocations.onSphere(x, y, z, r, undefined, onExit)`).
 
 | Function | Return Type | Description |
 | :-- | :-- | :-- |
 | `onSphere(x, y, z, radiusMeters, onEnter?, onExit?)` | `SphereHandle` | Subscribes to events when any player enters or exits a 3D sphere. Supports `.update(x, y, z, radius?)`. |
 | `onCylinder(centerX, centerZ, radiusMeters, minY?, maxY?, onEnter?, onExit?)` | `CylinderHandle` | Subscribes to events when any player enters or exits a 2.5D cylinder. Supports `.update(centerX, centerZ, radius?, minY?, maxY?)`. |
 | `onAABB(minX, minY, minZ, maxX, maxY, maxZ, onEnter?, onExit?)` | `AABBHandle` | Subscribes to events when any player enters or exits a 3D AABB bounding box. Supports `.update(minX, minY, minZ, maxX, maxY, maxZ)`. |
+| `onPrism(vertices, minY?, maxY?, onEnter?, onExit?)` | `PrismHandle \| null` | Subscribes to events when any player enters or exits a 2.5D polygonal prism. Returns `null` if vertices are invalid (< 3 or > 32). Supports `.update(vertices, minY?, maxY?)`. |
 | `onCrossAltitude(y, onAbove?, onBelow?)` | `PlaneHandle` | Subscribes to events when any player crosses an altitude threshold ($Y$ elevation). Supports `.update(threshold)`. |
 | `onCrossEastWest(x, onEast?, onWest?)` | `PlaneHandle` | Subscribes to events when any player crosses an East-West threshold ($X$ axis). Supports `.update(threshold)`. |
 | `onCrossNorthSouth(z, onSouth?, onNorth?)` | `PlaneHandle` | Subscribes to events when any player crosses a North-South threshold ($Z$ axis). Supports `.update(threshold)`. |
@@ -491,7 +496,46 @@ export function findNearestTeammate(medic: mod.Player): number {
 
 <ai>
 
-### Pattern 3: High-Altitude Airstrike Warning
+### Pattern 5: Irregular Polygon Objective / Prismatic Capture Zone
+
+```ts
+import { PlayerLocations } from 'bf6-portal-utils/player-locations';
+
+// Define a concave, irregular compound perimeter on the XZ ground plane
+const COMPOUND_ZONE = [
+    { x: 100.0, z: 100.0 },
+    { x: 250.0, z: 120.0 },
+    { x: 280.0, z: 200.0 },
+    { x: 200.0, z: 260.0 },
+    { x: 80.0, z: 180.0 },
+];
+
+// Subscribe to entry/exit transitions within the 2.5D polygon column (0m to 50m altitude)
+const compoundHandle = PlayerLocations.onPrism(
+    COMPOUND_ZONE,
+    0.0,
+    50.0,
+    (playerId) => {
+        console.log(`Player ${playerId} entered the compound capture zone.`);
+        // Begin capture progress
+    },
+    (playerId) => {
+        console.log(`Player ${playerId} exited the compound capture zone.`);
+        // Halt capture progress
+    }
+);
+
+// Query all active players inside the compound on demand
+export function getDefendersInCompound(): number[] {
+    return PlayerLocations.getPlayersInPrism(COMPOUND_ZONE, 0.0, 50.0);
+}
+```
+
+</ai>
+
+<ai>
+
+### Pattern 6: High-Altitude Airstrike Warning
 
 ```ts
 import { PlayerLocations } from 'bf6-portal-utils/player-locations';
