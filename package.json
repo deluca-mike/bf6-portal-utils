@@ -7,8 +7,8 @@
         "node": ">=24.0.0"
     },
     "scripts": {
-        "test": "vitest run",
-        "test:watch": "vitest",
+        "test": "vitest run --exclude '**/*memory.test.ts'",
+        "test:memory": "NODE_OPTIONS=\"--expose-gc\" vitest run memory.test.ts --reporter=verbose",
         "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}' --log-level warn",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",

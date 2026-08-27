@@ -69,6 +69,34 @@ export declare namespace SpatialOC {
      */
     type Quaternion = Quaternions.Quaternion;
     /**
+     * Supported in-game trackable engine object types (players, vehicles, spawners, props, triggers).
+     */
+    type TrackableObject =
+        | mod.Player
+        | mod.Vehicle
+        | TransformableObject
+        | mod.CapturePoint
+        | mod.HQ
+        | mod.RingOfFire
+        | mod.Sector
+        | mod.SpawnPoint;
+    /**
+     * A plain object reference holding live position and optional rotation to track without closure allocations.
+     */
+    interface TransparentObject {
+        position: Vector3;
+        rotation?: Quaternion | Vector3;
+    }
+    /**
+     * Custom smoothing / interpolation function for follow motion.
+     * @param current - Current world position of the follower.
+     * @param target - Evaluated target world position (accounting for oriented offset).
+     * @param dt - Delta time in seconds.
+     * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+     * @returns The updated world position.
+     */
+    type FollowSmoothingFunction = (current: Vector3, target: Vector3, dt: number, out?: Vector3) => Vector3;
+    /**
      * Common initialization options for creating SpatialElements.
      */
     interface NodeOptions {
@@ -82,17 +110,6 @@ export declare namespace SpatialOC {
         scale?: number | Vector3;
         /** In-game model offset correction (to adjust prefab origins to mesh center). */
         pivotOffset?: Vector3;
-    }
-    /**
-     * Options for attaching a root node to follow an entity (player, vehicle, object) in real time.
-     */
-    interface AttachOptions {
-        /** Positional offset relative to the target's orientation coordinate frame. */
-        offset?: Vector3;
-        /** Whether to track and match the target's rotation. Default: true. */
-        trackRotation?: boolean;
-        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object. */
-        yawOnly?: boolean;
     }
     /**
      * Options for configuring an Orbit controller on a node.
@@ -121,15 +138,19 @@ export declare namespace SpatialOC {
         upAxis?: Vector3;
     }
     /**
-     * Options for configuring a Smooth Follow controller on a node.
+     * Options for configuring a Follow controller on a node.
      */
     interface FollowOptions {
-        /** The target to follow (SpatialElement or Player). */
-        target?: SpatialElement | mod.Player;
-        /** Desired offset from the target in world space. */
+        /** The target to follow (Player, Vehicle, TrackableObject, SpatialElement, or TransparentObject). */
+        target?: TrackableObject | SpatialElement | TransparentObject;
+        /** Desired offset. If tracking rotation or target has orientation, offset is oriented in target's frame. */
         offset?: Vector3;
-        /** Smooth damping / lerp speed factor (0 for instant snap, > 0 for smooth). Default: 10. */
-        smoothSpeed?: number;
+        /** Smooth damping speed factor (0 for instant snap, > 0 for smooth), or custom smoothing function. Default: 10. */
+        smoothing?: number | FollowSmoothingFunction;
+        /** Whether to track and match the target's rotation. Default: false. */
+        trackRotation?: boolean;
+        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: false. */
+        yawOnly?: boolean;
     }
     /**
      * Options for kinematic linear and angular velocity and acceleration integration.
@@ -273,10 +294,10 @@ export declare namespace SpatialOC {
         private _hasFlag;
         private _setFlag;
         private _clearFlag;
-        private _tracker?;
         private _orbitConfig?;
         private _lookAtConfig?;
         private _followConfig?;
+        private _followTargetType;
         private _linearVelocity?;
         private _angularVelocity?;
         private _linearAcceleration?;
@@ -593,63 +614,8 @@ export declare namespace SpatialOC {
          */
         private _computeFacingQuaternion;
         /**
-         * Applies computed attachment transform and offset to this element.
-         * @param pos - Evaluated position vector.
-         * @param rot - Evaluated rotation quaternion (if trackRotation is true).
-         * @param offset - Optional relative offset vector.
-         * @param trackRotation - Whether rotation tracking is active.
-         */
-        private _applyAttachmentTransform;
-        /**
-         * Attaches this element to follow a player's real-time position/orientation in world space.
-         * Automatically sets parent to ROOT_NODE.
-         * Clears any active follow, orbit, or linear kinematics.
-         * @param player - The player to track.
-         * @param options - Attachment options.
-         * @returns This element for chaining.
-         */
-        attachToPlayer(player: mod.Player, options?: AttachOptions): this;
-        /**
-         * Attaches this element to follow a vehicle's real-time position/orientation in world space.
-         * Automatically sets parent to ROOT_NODE.
-         * Clears any active follow, orbit, or linear kinematics.
-         * @param vehicle - The vehicle to track.
-         * @param options - Attachment options.
-         * @returns This element for chaining.
-         */
-        attachToVehicle(vehicle: mod.Vehicle, options?: AttachOptions): this;
-        /**
-         * Attaches this element to follow an in-game object (props, spawners, etc.) in real time in world space.
-         * Automatically sets parent to ROOT_NODE.
-         * Clears any active follow, orbit, or linear kinematics.
-         * @param object - The native in-game object to track (excluding Player and Vehicle).
-         * @param options - Attachment options.
-         * @returns This element for chaining.
-         */
-        attachToObject(object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): this;
-        /**
-         * Attaches a custom dynamic tracker callback in world space.
-         * Automatically sets parent to ROOT_NODE.
-         * Clears any active follow, orbit, or linear kinematics.
-         * @param tracker - Custom tracking function.
-         * @returns This element for chaining.
-         */
-        attachToTracker(
-            tracker: () =>
-                | {
-                      position: Vector3;
-                      rotation?: Quaternion | Vector3;
-                  }
-                | undefined
-        ): this;
-        /**
-         * Clears any active attachment tracker on this element.
-         * @returns This element for chaining.
-         */
-        detachTracker(): this;
-        /**
          * Configures orbital rotation motion on this element around an axis and pivot center.
-         * Clears any active attachment tracker, follow controller, or linear kinematics.
+         * Clears any active follow controller or linear kinematics.
          * @param options - Orbit configuration, or null/undefined to clear.
          * @returns This element for chaining.
          */
@@ -662,16 +628,17 @@ export declare namespace SpatialOC {
          */
         setLookAt(options?: LookAtOptions | null): this;
         /**
-         * Configures continuous smooth follow behavior on this element in world space.
+         * Configures continuous follow behavior on this element in world space.
          * Automatically sets parent to ROOT_NODE.
-         * Clears conflicting attachment trackers, orbit controllers, and linear kinematics.
+         * Clears conflicting orbit controllers and linear kinematics.
+         * Target type is classified once upon configuration to avoid per-frame engine type checks.
          * @param options - Follow configuration, or null/undefined to clear.
          * @returns This element for chaining.
          */
         setFollow(options?: FollowOptions | null): this;
         /**
          * Configures kinematic velocity and acceleration integration on this element.
-         * Setting linear kinematics clears conflicting positional controllers (orbit, follow, tracker).
+         * Setting linear kinematics clears conflicting positional controllers (orbit, follow).
          * Setting angular kinematics clears conflicting rotational controllers (lookAt, orbit spin).
          * @param options - Kinematics configuration, or null/undefined to clear.
          * @returns This element for chaining.

@@ -94,16 +94,33 @@ export declare namespace SpatialSOA {
         pivotOffset?: Vector3;
     }
     /**
-     * Options for continuous entity attachments.
+     * Supported in-game trackable engine object types (players, vehicles, spawners, props, triggers).
      */
-    interface AttachOptions {
-        /** Positional offset relative to the target's orientation coordinate frame. */
-        offset?: Vector3;
-        /** Whether to track and match the target's rotation. Default: true. */
-        trackRotation?: boolean;
-        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object. */
-        yawOnly?: boolean;
+    type TrackableObject =
+        | mod.Player
+        | mod.Vehicle
+        | TransformableObject
+        | mod.CapturePoint
+        | mod.HQ
+        | mod.RingOfFire
+        | mod.Sector
+        | mod.SpawnPoint;
+    /**
+     * A plain object reference holding live position and optional rotation to track without closure allocations.
+     */
+    interface TransparentObject {
+        position: Vector3;
+        rotation?: Quaternion | Vector3;
     }
+    /**
+     * Custom smoothing / interpolation function for follow motion.
+     * @param current - Current world position of the follower.
+     * @param target - Evaluated target world position (accounting for oriented offset).
+     * @param dt - Delta time in seconds.
+     * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+     * @returns The updated world position.
+     */
+    type FollowSmoothingFunction = (current: Vector3, target: Vector3, dt: number, out?: Vector3) => Vector3;
     /**
      * Options for continuous orbital rotation motion.
      */
@@ -129,15 +146,19 @@ export declare namespace SpatialSOA {
         upAxis?: Vector3;
     }
     /**
-     * Options for smooth follow behavior.
+     * Options for continuous follow behavior on a node.
      */
     interface FollowOptions {
-        /** The target to follow (SpatialNodeID or Player). */
-        target?: SpatialNodeID | mod.Player;
-        /** Desired offset from the target in world space. */
+        /** The target to follow (Player, Vehicle, TrackableObject, SpatialNodeID, or TransparentObject). */
+        target?: TrackableObject | SpatialNodeID | TransparentObject;
+        /** Desired offset. If tracking rotation or target has orientation, offset is oriented in target's frame. */
         offset?: Vector3;
-        /** Smooth damping / lerp speed factor (0 for instant snap, > 0 for smooth). Default: 10. */
-        smoothSpeed?: number;
+        /** Smooth damping speed factor (0 for instant snap, > 0 for smooth), or custom smoothing function. Default: 10. */
+        smoothing?: number | FollowSmoothingFunction;
+        /** Whether to track and match target rotation. Default: false. */
+        trackRotation?: boolean;
+        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: false. */
+        yawOnly?: boolean;
     }
     /**
      * Options for kinematic linear and angular velocity and acceleration integration.
@@ -416,60 +437,8 @@ export declare namespace SpatialSOA {
      */
     function worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined;
     /**
-     * Attaches a node to follow a player's real-time position/orientation in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param player - The target player.
-     * @param options - Attachment options.
-     */
-    function attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void;
-    /**
-     * Attaches a node to follow a vehicle's real-time position/orientation in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param vehicle - The target vehicle.
-     * @param options - Attachment options.
-     */
-    function attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void;
-    /**
-     * Attaches a node to follow an in-game object (props, spawners, etc.) in real time in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param object - The native in-game object to track (excluding Player and Vehicle).
-     * @param options - Attachment options.
-     */
-    function attachToObject(
-        id: SpatialNodeID,
-        object: Exclude<mod.Object, mod.Player | mod.Vehicle>,
-        options?: AttachOptions
-    ): void;
-    /**
-     * Attaches a custom dynamic tracker callback in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param tracker - Tracker callback function.
-     */
-    function attachToTracker(
-        id: SpatialNodeID,
-        tracker: () =>
-            | {
-                  position: Vector3;
-                  rotation?: Quaternion | Vector3;
-              }
-            | undefined
-    ): void;
-    /**
-     * Clears any active attachment tracker on a node.
-     * @param id - The node ID.
-     */
-    function detachTracker(id: SpatialNodeID): void;
-    /**
      * Configures orbital rotation motion on a node.
-     * Clears any active attachment tracker, follow controller, or linear kinematics.
+     * Clears any active follow controller or linear kinematics.
      * @param id - The node ID.
      * @param options - Orbit configuration or null to disable.
      */
@@ -482,16 +451,17 @@ export declare namespace SpatialSOA {
      */
     function setLookAt(id: SpatialNodeID, options?: LookAtOptions | null): void;
     /**
-     * Configures continuous smooth follow behavior on a node in world space.
+     * Configures continuous follow behavior on a node in world space.
      * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active attachment tracker, orbit controller, or linear kinematics.
+     * Clears any active orbit controller or linear kinematics.
+     * Target type is classified once upon configuration to avoid per-frame engine type checks.
      * @param id - The node ID.
      * @param options - Follow configuration or null to disable.
      */
     function setFollow(id: SpatialNodeID, options?: FollowOptions | null): void;
     /**
      * Configures kinematic velocity and acceleration integration on a node.
-     * Linear kinematics clear conflicting positional controllers (orbit, follow, tracker).
+     * Linear kinematics clear conflicting positional controllers (orbit, follow).
      * Angular kinematics clear conflicting rotational controllers (lookAt, orbit spin).
      * @param id - The node ID.
      * @param options - Kinematics configuration or null to disable.

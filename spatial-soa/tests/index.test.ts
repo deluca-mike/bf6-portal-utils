@@ -322,7 +322,7 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
 
             SpatialSOA.setFollow(follower, {
                 target,
-                smoothSpeed: 10,
+                smoothing: 10,
             });
 
             // Step half-way with small dt
@@ -331,7 +331,48 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(pos.x).toBeCloseTo(50);
         });
 
-        it('should automatically detach from parent and mutually clear when given attach options or follow options', () => {
+        it('should support custom follow smoothing functions with optional out vector', () => {
+            const follower = SpatialSOA.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const target = SpatialSOA.createEmpty({ position: { x: 100, y: 0, z: 0 } })!;
+
+            let receivedOut = false;
+            SpatialSOA.setFollow(follower, {
+                target,
+                smoothing: (current, tgt, dt, out) => {
+                    if (out) receivedOut = true;
+                    const dest = out ?? { x: 0, y: 0, z: 0 };
+                    dest.x = current.x + (tgt.x - current.x) * 0.5;
+                    dest.y = current.y + (tgt.y - current.y) * 0.5;
+                    dest.z = current.z + (tgt.z - current.z) * 0.5;
+                    return dest;
+                },
+            });
+
+            SpatialSOA.update(0.1);
+
+            expect(receivedOut).toBe(true);
+            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeCloseTo(50);
+        });
+
+        it('should snap instantly when smoothing is 0', () => {
+            const follower = SpatialSOA.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const target = SpatialSOA.createEmpty({ position: { x: 50, y: 10, z: -20 } })!;
+
+            SpatialSOA.setFollow(follower, {
+                target,
+                offset: { x: 0, y: 5, z: 0 },
+                smoothing: 0,
+            });
+
+            SpatialSOA.update(0.016);
+
+            const pos = SpatialSOA.getWorldPosition(follower)!;
+            expect(pos.x).toBeCloseTo(50);
+            expect(pos.y).toBeCloseTo(15);
+            expect(pos.z).toBeCloseTo(-20);
+        });
+
+        it('should automatically detach from parent and mutually clear when given follow options', () => {
             const parent = SpatialSOA.createEmpty()!;
             const child1 = SpatialSOA.createEmpty({ parentId: parent })!;
             const child2 = SpatialSOA.createEmpty({ parentId: parent })!;
@@ -344,20 +385,15 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             // setFollow first
             SpatialSOA.setFollow(child1, { target });
             expect(SpatialSOA.getParent(child1)).toBe(SpatialSOA.ROOT_NODE_ID);
-
-            // attachToPlayer should auto-detach to ROOT_NODE_ID and clear follow
-            const playerMock = harness.createMockObject(1);
-            SpatialSOA.attachToPlayer(child1, playerMock as unknown as mod.Player);
-            expect(SpatialSOA.getParent(child1)).toBe(SpatialSOA.ROOT_NODE_ID);
             expect(SpatialSOA.getChildCount(parent)).toBe(1);
 
-            // setFollow with target should auto-detach to ROOT_NODE_ID and clear tracker
-            SpatialSOA.attachToPlayer(child2, playerMock as unknown as mod.Player);
-            SpatialSOA.setFollow(child2, { target });
+            // setFollow with player should auto-detach to ROOT_NODE_ID
+            const playerMock = harness.createMockObject(1);
+            SpatialSOA.setFollow(child2, { target: playerMock as unknown as mod.Player });
             expect(SpatialSOA.getParent(child2)).toBe(SpatialSOA.ROOT_NODE_ID);
             expect(SpatialSOA.getChildCount(parent)).toBe(0);
 
-            // setOrbit should clear tracker and follow
+            // setOrbit should clear follow
             SpatialSOA.setOrbit(child2, { speedRadPerSec: 1 });
             SpatialSOA.setFollow(child2, { target });
             // Follow should clear orbit
@@ -381,7 +417,7 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             // Kinematics should clear lookAt
             SpatialSOA.setKinematics(node, { angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. setParent should clear tracker and follow on the child when attaching away from ROOT_NODE_ID
+            // 3. setParent should clear follow on the child when attaching away from ROOT_NODE_ID
             const parent = SpatialSOA.createEmpty()!;
             const child = SpatialSOA.createEmpty()!;
             SpatialSOA.setFollow(child, { target });
@@ -390,42 +426,42 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(SpatialSOA.getParent(child)).toBe(parent);
         });
 
-        it('should clear active tracker and follow controllers when reparenting away from ROOT_NODE_ID', () => {
+        it('should clear active follow controllers when reparenting away from ROOT_NODE_ID', () => {
             const parent = SpatialSOA.createEmpty({ position: { x: 100, y: 0, z: 0 } })!;
-            const trackerNode = SpatialSOA.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const follower = SpatialSOA.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             const playerMock = harness.createMockObject(1);
             playerMock.position = { x: 200, y: 50, z: 300 };
 
-            SpatialSOA.attachToPlayer(trackerNode, playerMock as unknown as mod.Player);
+            SpatialSOA.setFollow(follower, { target: playerMock as unknown as mod.Player, smoothing: 0 });
             SpatialSOA.update(0.016);
-            expect(SpatialSOA.getWorldPosition(trackerNode)!.x).toBeCloseTo(200);
+            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeCloseTo(200);
 
             // Reparent away from ROOT_NODE_ID
-            SpatialSOA.setParent(trackerNode, parent);
-            expect(SpatialSOA.getParent(trackerNode)).toBe(parent);
-            SpatialSOA.setLocalPosition(trackerNode, { x: 0, y: 0, z: 0 });
+            SpatialSOA.setParent(follower, parent);
+            expect(SpatialSOA.getParent(follower)).toBe(parent);
+            SpatialSOA.setLocalPosition(follower, { x: 0, y: 0, z: 0 });
 
             // Move player and update
             playerMock.position = { x: 999, y: 999, z: 999 };
             SpatialSOA.update(0.016);
             // World pos should not track player anymore; local pos is 0, so world is parent (100)
-            expect(SpatialSOA.getWorldPosition(trackerNode)!.x).toBeCloseTo(100);
+            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeCloseTo(100);
 
-            // Test follow controller reparenting
-            const follower = SpatialSOA.createEmpty()!;
+            // Test follow controller reparenting with target node
+            const follower2 = SpatialSOA.createEmpty()!;
             const target = SpatialSOA.createEmpty({ position: { x: 500, y: 0, z: 0 } })!;
-            SpatialSOA.setFollow(follower, { target, smoothSpeed: 10 });
+            SpatialSOA.setFollow(follower2, { target, smoothing: 10 });
             SpatialSOA.update(0.1);
-            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeGreaterThan(0);
+            expect(SpatialSOA.getWorldPosition(follower2)!.x).toBeGreaterThan(0);
 
             // Reparent follower to parent
-            SpatialSOA.setParent(follower, parent);
-            SpatialSOA.setLocalPosition(follower, { x: 5, y: 0, z: 0 });
+            SpatialSOA.setParent(follower2, parent);
+            SpatialSOA.setLocalPosition(follower2, { x: 5, y: 0, z: 0 });
             SpatialSOA.setLocalPosition(target, { x: 999, y: 0, z: 0 });
             SpatialSOA.update(0.1);
             // Follower should not track target; local pos remains 5 and world pos is 105
-            expect(SpatialSOA.getLocalPosition(follower)!.x).toBe(5);
-            expect(SpatialSOA.getWorldPosition(follower)!.x).toBeCloseTo(105);
+            expect(SpatialSOA.getLocalPosition(follower2)!.x).toBe(5);
+            expect(SpatialSOA.getWorldPosition(follower2)!.x).toBeCloseTo(105);
         });
 
         it('should smoothly orbit a child around its parent using OrbitController', () => {
@@ -472,7 +508,7 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             SpatialSOA.setFollow(follower, {
                 target: target,
                 offset: { x: 0, y: 2, z: -5 },
-                smoothSpeed: 10,
+                smoothing: 10,
             });
 
             // Move target
@@ -527,16 +563,18 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
     });
 
     describe('3. External Tracking & Top-Level Root Attachments', () => {
-        it('should track moving player positions and facing rotations in real time', () => {
+        it('should track moving player positions and facing rotations in real time with setFollow', () => {
             const playerMock = harness.createMockObject(1);
             playerMock.position = { x: 200, y: 50, z: 300 };
             playerMock.rotation = { x: 0, y: 0, z: 1 }; // Facing +Z
 
             const root = SpatialSOA.createEmpty()!;
-            SpatialSOA.attachToPlayer(root, playerMock as unknown as mod.Player, {
+            SpatialSOA.setFollow(root, {
+                target: playerMock as unknown as mod.Player,
                 offset: { x: 0, y: 2, z: 0 },
                 trackRotation: true,
                 yawOnly: true,
+                smoothing: 0,
             });
 
             const orbiter = SpatialSOA.createEmpty({ parentId: root, position: { x: 3, y: 0, z: 0 } })!;
@@ -564,15 +602,39 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(orbiterWorldPos2.x).toBeCloseTo(503);
         });
 
-        it('should track native objects using attachToObject with rotation offsets', () => {
-            const propMock = harness.createMockObject(2);
+        it('should track vehicle positions and facing rotations in real time with setFollow', () => {
+            const vehicleMock = harness.createMockObject(2);
+            vehicleMock.position = { x: 100, y: 10, z: 50 };
+            vehicleMock.rotation = { x: 0, y: 0, z: 1 }; // Facing +Z
+
+            const root = SpatialSOA.createEmpty()!;
+            SpatialSOA.setFollow(root, {
+                target: vehicleMock as unknown as mod.Vehicle,
+                offset: { x: 0, y: 2, z: -5 }, // 5m behind vehicle
+                trackRotation: true,
+                yawOnly: false,
+                smoothing: 0,
+            });
+
+            SpatialSOA.update(0.016);
+
+            const rootWorldPos = SpatialSOA.getWorldPosition(root)!;
+            expect(rootWorldPos.x).toBeCloseTo(100);
+            expect(rootWorldPos.y).toBeCloseTo(12);
+            expect(rootWorldPos.z).toBeCloseTo(45);
+        });
+
+        it('should track native objects using setFollow with rotation offsets', () => {
+            const propMock = harness.createMockObject(30);
             propMock.position = { x: 10, y: 0, z: 20 };
             propMock.rotation = { x: 0, y: Math.PI / 2, z: 0 }; // 90 deg yaw
 
             const root = SpatialSOA.createEmpty()!;
-            SpatialSOA.attachToObject(root, propMock as unknown as Exclude<mod.Object, mod.Player | mod.Vehicle>, {
+            SpatialSOA.setFollow(root, {
+                target: propMock as unknown as SpatialSOA.TrackableObject,
                 offset: { x: 0, y: 0, z: 5 }, // 5m forward in object's local frame
                 trackRotation: true,
+                smoothing: 0,
             });
 
             SpatialSOA.update(0.016);
@@ -582,6 +644,50 @@ describe('SpatialSOA Pure Functional Module Integration Tests', () => {
             expect(rootWorldPos.x).toBeCloseTo(15);
             expect(rootWorldPos.y).toBeCloseTo(0);
             expect(rootWorldPos.z).toBeCloseTo(20);
+        });
+
+        it('should track transparent plain objects using setFollow', () => {
+            const transparentObj: SpatialSOA.TransparentObject = {
+                position: { x: 50, y: 10, z: 50 },
+                rotation: { x: 0, y: 0, z: 0 },
+            };
+
+            const root = SpatialSOA.createEmpty()!;
+            SpatialSOA.setFollow(root, {
+                target: transparentObj,
+                offset: { x: 0, y: 5, z: 0 },
+                smoothing: 0,
+            });
+
+            SpatialSOA.update(0.016);
+            const rootWorldPos1 = SpatialSOA.getWorldPosition(root)!;
+            expect(rootWorldPos1.x).toBeCloseTo(50);
+            expect(rootWorldPos1.y).toBeCloseTo(15);
+            expect(rootWorldPos1.z).toBeCloseTo(50);
+
+            // Mutate transparent object without reallocating
+            transparentObj.position.x = 200;
+            SpatialSOA.update(0.016);
+            const rootWorldPos2 = SpatialSOA.getWorldPosition(root)!;
+            expect(rootWorldPos2.x).toBeCloseTo(200);
+        });
+
+        it('should log warning and clear follow config if target type cannot be determined in setFollow', () => {
+            const logs: string[] = [];
+            SpatialSOA.setLogging((text) => void logs.push(text), SpatialSOA.LogLevel.Warning);
+
+            const root = SpatialSOA.createEmpty({ position: { x: 10, y: 0, z: 0 } })!;
+            const invalidTarget = { foo: 'bar' };
+
+            SpatialSOA.setFollow(root, {
+                target: invalidTarget as unknown as SpatialSOA.TrackableObject,
+                smoothing: 0,
+            });
+
+            expect(logs.some((l) => l.includes('Unable to determine follow target type'))).toBe(true);
+
+            SpatialSOA.update(0.016);
+            expect(SpatialSOA.getWorldPosition(root)!.x).toBeCloseTo(10);
         });
 
         it('should support Quaternion or Euler Vector3 in NodeOptions.rotation', () => {

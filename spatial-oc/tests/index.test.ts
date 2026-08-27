@@ -247,7 +247,7 @@ describe('SpatialOC Module Integration Tests', () => {
             follower.setFollow({
                 target: target,
                 offset: { x: 0, y: 2, z: -5 },
-                smoothSpeed: 10,
+                smoothing: 10,
             });
 
             // Move target
@@ -260,6 +260,48 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(follower.worldPosition.x).toBeGreaterThan(0);
             expect(follower.worldPosition.y).toBeGreaterThan(0);
             expect(follower.worldPosition.z).toBeGreaterThan(0);
+        });
+
+        it('should support custom follow smoothing functions with optional out vector', () => {
+            const target = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const follower = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+
+            let receivedOut = false;
+            follower.setFollow({
+                target,
+                smoothing: (current, tgt, dt, out) => {
+                    if (out) receivedOut = true;
+                    const dest = out ?? { x: 0, y: 0, z: 0 };
+                    dest.x = current.x + (tgt.x - current.x) * 0.5;
+                    dest.y = current.y + (tgt.y - current.y) * 0.5;
+                    dest.z = current.z + (tgt.z - current.z) * 0.5;
+                    return dest;
+                },
+            });
+
+            target.localPosition = { x: 100, y: 0, z: 0 };
+            SpatialOC.update(0.1);
+
+            expect(receivedOut).toBe(true);
+            expect(follower.worldPosition.x).toBeCloseTo(50);
+        });
+
+        it('should snap instantly when smoothing is 0', () => {
+            const target = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const follower = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+
+            follower.setFollow({
+                target,
+                offset: { x: 0, y: 5, z: 0 },
+                smoothing: 0,
+            });
+
+            target.localPosition = { x: 50, y: 10, z: -20 };
+            SpatialOC.update(0.016);
+
+            expect(follower.worldPosition.x).toBeCloseTo(50);
+            expect(follower.worldPosition.y).toBeCloseTo(15);
+            expect(follower.worldPosition.z).toBeCloseTo(-20);
         });
 
         it('should integrate kinematic velocities accurately over time', () => {
@@ -299,16 +341,18 @@ describe('SpatialOC Module Integration Tests', () => {
     });
 
     describe('3. External Tracking & Top-Level Root Attachments', () => {
-        it('should track moving player positions and facing rotations in real time', () => {
+        it('should track moving player positions and facing rotations in real time with setFollow', () => {
             const playerMock = harness.createMockObject(1);
             playerMock.position = { x: 200, y: 50, z: 300 };
             playerMock.rotation = { x: 0, y: 0, z: 1 }; // Facing +Z
 
             const root = SpatialOC.createEmpty()!;
-            root.attachToPlayer(playerMock as unknown as mod.Player, {
+            root.setFollow({
+                target: playerMock as unknown as mod.Player,
                 offset: { x: 0, y: 2, z: 0 },
                 trackRotation: true,
                 yawOnly: true,
+                smoothing: 0,
             });
 
             const orbiter = SpatialOC.createEmpty({ parent: root, position: { x: 3, y: 0, z: 0 } })!;
@@ -332,15 +376,38 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(orbiter.worldPosition.x).toBeCloseTo(503);
         });
 
-        it('should track native objects using attachToObject with rotation offsets', () => {
-            const propMock = harness.createMockObject(2);
+        it('should track vehicle positions and facing rotations in real time with setFollow', () => {
+            const vehicleMock = harness.createMockObject(2);
+            vehicleMock.position = { x: 100, y: 10, z: 50 };
+            vehicleMock.rotation = { x: 0, y: 0, z: 1 }; // Facing +Z
+
+            const root = SpatialOC.createEmpty()!;
+            root.setFollow({
+                target: vehicleMock as unknown as mod.Vehicle,
+                offset: { x: 0, y: 2, z: -5 }, // 5m behind vehicle
+                trackRotation: true,
+                yawOnly: false,
+                smoothing: 0,
+            });
+
+            SpatialOC.update(0.016);
+
+            expect(root.worldPosition.x).toBeCloseTo(100);
+            expect(root.worldPosition.y).toBeCloseTo(12);
+            expect(root.worldPosition.z).toBeCloseTo(45);
+        });
+
+        it('should track native objects using setFollow with rotation offsets', () => {
+            const propMock = harness.createMockObject(30);
             propMock.position = { x: 10, y: 0, z: 20 };
             propMock.rotation = { x: 0, y: Math.PI / 2, z: 0 }; // 90 deg yaw
 
             const root = SpatialOC.createEmpty()!;
-            root.attachToObject(propMock as unknown as Exclude<mod.Object, mod.Player | mod.Vehicle>, {
+            root.setFollow({
+                target: propMock as unknown as SpatialOC.TrackableObject,
                 offset: { x: 0, y: 0, z: 5 }, // 5m forward in object's local frame
                 trackRotation: true,
+                smoothing: 0,
             });
 
             SpatialOC.update(0.016);
@@ -349,6 +416,48 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(root.worldPosition.x).toBeCloseTo(15);
             expect(root.worldPosition.y).toBeCloseTo(0);
             expect(root.worldPosition.z).toBeCloseTo(20);
+        });
+
+        it('should track transparent plain objects using setFollow', () => {
+            const transparentObj: SpatialOC.TransparentObject = {
+                position: { x: 50, y: 10, z: 50 },
+                rotation: { x: 0, y: 0, z: 0 },
+            };
+
+            const root = SpatialOC.createEmpty()!;
+            root.setFollow({
+                target: transparentObj,
+                offset: { x: 0, y: 5, z: 0 },
+                smoothing: 0,
+            });
+
+            SpatialOC.update(0.016);
+            expect(root.worldPosition.x).toBeCloseTo(50);
+            expect(root.worldPosition.y).toBeCloseTo(15);
+            expect(root.worldPosition.z).toBeCloseTo(50);
+
+            // Mutate transparent object without reallocating
+            transparentObj.position.x = 200;
+            SpatialOC.update(0.016);
+            expect(root.worldPosition.x).toBeCloseTo(200);
+        });
+
+        it('should log warning and clear follow config if target type cannot be determined in setFollow', () => {
+            const logs: string[] = [];
+            SpatialOC.setLogging((text) => void logs.push(text), SpatialOC.LogLevel.Warning);
+
+            const root = SpatialOC.createEmpty({ position: { x: 10, y: 0, z: 0 } })!;
+            const invalidTarget = { foo: 'bar' };
+
+            root.setFollow({
+                target: invalidTarget as unknown as SpatialOC.TrackableObject,
+                smoothing: 0,
+            });
+
+            expect(logs.some((l) => l.includes('Unable to determine follow target type'))).toBe(true);
+
+            SpatialOC.update(0.016);
+            expect(root.worldPosition.x).toBeCloseTo(10);
         });
 
         it('should return clones from transform getters so external mutation does not affect internal state', () => {
@@ -473,7 +582,7 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(node.localPosition.x).toBeGreaterThan(0);
         });
 
-        it('should automatically detach from parent and mutually clear when given attach options or follow options', () => {
+        it('should automatically detach from parent and mutually clear when given follow options', () => {
             const parent = SpatialOC.createEmpty()!;
             const child1 = SpatialOC.createEmpty({ parent })!;
             const child2 = SpatialOC.createEmpty({ parent })!;
@@ -486,20 +595,15 @@ describe('SpatialOC Module Integration Tests', () => {
             // setFollow first
             child1.setFollow({ target });
             expect(child1.parent).toBe(SpatialOC.ROOT_NODE);
-
-            // attachToPlayer should auto-detach to ROOT_NODE and clear follow
-            const playerMock = harness.createMockObject(1);
-            child1.attachToPlayer(playerMock as unknown as mod.Player);
-            expect(child1.parent).toBe(SpatialOC.ROOT_NODE);
             expect(parent.childCount).toBe(1);
 
-            // setFollow with target should auto-detach to ROOT_NODE and clear tracker
-            child2.attachToPlayer(playerMock as unknown as mod.Player);
-            child2.setFollow({ target });
+            // setFollow with player should auto-detach to ROOT_NODE
+            const playerMock = harness.createMockObject(1);
+            child2.setFollow({ target: playerMock as unknown as mod.Player });
             expect(child2.parent).toBe(SpatialOC.ROOT_NODE);
             expect(parent.childCount).toBe(0);
 
-            // setOrbit should clear tracker and follow
+            // setOrbit should clear follow
             child2.setOrbit({ speedRadPerSec: 1 });
             child2.setFollow({ target });
             // Follow should clear orbit
@@ -523,7 +627,7 @@ describe('SpatialOC Module Integration Tests', () => {
             // Kinematics should clear lookAt
             node.setKinematics({ angularVelocity: { x: 0, y: 2, z: 0 } });
 
-            // 3. setParent should clear tracker and follow on the child when attaching away from ROOT_NODE
+            // 3. setParent should clear follow on the child when attaching away from ROOT_NODE
             const parent = SpatialOC.createEmpty()!;
             const child = SpatialOC.createEmpty()!;
             child.setFollow({ target });
@@ -532,42 +636,42 @@ describe('SpatialOC Module Integration Tests', () => {
             expect(child.parent).toBe(parent);
         });
 
-        it('should clear active tracker and follow controllers when reparenting away from ROOT_NODE', () => {
+        it('should clear active follow controllers when reparenting away from ROOT_NODE', () => {
             const parent = SpatialOC.createEmpty({ position: { x: 100, y: 0, z: 0 } })!;
-            const trackerNode = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
+            const follower = SpatialOC.createEmpty({ position: { x: 0, y: 0, z: 0 } })!;
             const playerMock = harness.createMockObject(1);
             playerMock.position = { x: 200, y: 50, z: 300 };
 
-            trackerNode.attachToPlayer(playerMock as unknown as mod.Player);
+            follower.setFollow({ target: playerMock as unknown as mod.Player, smoothing: 0 });
             SpatialOC.update(0.016);
-            expect(trackerNode.worldPosition.x).toBeCloseTo(200);
+            expect(follower.worldPosition.x).toBeCloseTo(200);
 
             // Reparent to parent (away from ROOT_NODE)
-            trackerNode.setParent(parent);
-            expect(trackerNode.parent).toBe(parent);
-            trackerNode.localPosition = { x: 0, y: 0, z: 0 };
+            follower.setParent(parent);
+            expect(follower.parent).toBe(parent);
+            follower.localPosition = { x: 0, y: 0, z: 0 };
 
             // Move player and update
             playerMock.position = { x: 999, y: 999, z: 999 };
             SpatialOC.update(0.016);
             // World pos should not track player anymore; it should be parent world pos (100) + local pos (0) = 100
-            expect(trackerNode.worldPosition.x).toBeCloseTo(100);
+            expect(follower.worldPosition.x).toBeCloseTo(100);
 
-            // Test follow controller reparenting
-            const follower = SpatialOC.createEmpty()!;
+            // Test follow controller reparenting with target element
+            const follower2 = SpatialOC.createEmpty()!;
             const target = SpatialOC.createEmpty({ position: { x: 500, y: 0, z: 0 } })!;
-            follower.setFollow({ target, smoothSpeed: 10 });
+            follower2.setFollow({ target, smoothing: 10 });
             SpatialOC.update(0.1);
-            expect(follower.worldPosition.x).toBeGreaterThan(0);
+            expect(follower2.worldPosition.x).toBeGreaterThan(0);
 
             // Reparent follower to parent
-            follower.setParent(parent);
-            follower.localPosition = { x: 5, y: 0, z: 0 };
+            follower2.setParent(parent);
+            follower2.localPosition = { x: 5, y: 0, z: 0 };
             target.localPosition = { x: 999, y: 0, z: 0 };
             SpatialOC.update(0.1);
             // Follower should not track target; local pos remains 5 and world pos is 105
-            expect(follower.localPosition.x).toBe(5);
-            expect(follower.worldPosition.x).toBeCloseTo(105);
+            expect(follower2.localPosition.x).toBe(5);
+            expect(follower2.worldPosition.x).toBeCloseTo(105);
         });
     });
 

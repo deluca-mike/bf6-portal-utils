@@ -11,10 +11,34 @@ export declare namespace SolidUI {
      * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
+    /****** Tunable Scheduler Constants ******/
+    /**
+     * Maximum number of subscriber executions allowed in a single microtask flush loop.
+     *
+     * Performance vs Memory trade-offs:
+     * - Increasing this value allows very large UI trees or cascades of dependent signals to resolve
+     *   within a single microtask, improving throughput for complex UIs at the cost of higher CPU time
+     *   spent inside one microtask frame (potentially delaying engine ticks if effects loop).
+     * - Decreasing this value bounds execution time per flush and prevents runaway effect chains,
+     *   protecting the game simulation framerate, but may truncate valid deep dependency chains.
+     * - Memory impact: Static numeric limit; zero heap memory overhead.
+     */
+    export const MAX_EXECUTIONS_PER_FLUSH = 1000;
+    /**
+     * Maximum number of microtask flushes permitted within a single logical engine tick.
+     *
+     * Performance vs Memory trade-offs:
+     * - Protects against re-entrant deferTicks=0 effect loops that keep rescheduling microtask flushes
+     *   indefinitely within the same engine tick.
+     * - Increasing this value permits deeper chains of asynchronous signal-effect-signal flushes per tick.
+     * - Decreasing this value aborts runaway flush storms earlier to maintain game tick responsiveness.
+     * - Memory impact: Static numeric limit; zero heap memory overhead.
+     */
+    export const MAX_FLUSHES_PER_TICK = 1000;
     /**
      * A generic function that retrieves the current value of a reactive signal.
      * Key Concept: Calling an Accessor establishes a "dependency."
@@ -58,6 +82,7 @@ export declare namespace SolidUI {
     export type IndexOptions = {
         deferTicks?: number;
     };
+    /****** Reactivity Core ******/
     /**
      * Executes a function without creating dependencies.
      * Any signals read inside `fn` will return their current value, but the surrounding Effect will not subscribe to
@@ -127,6 +152,7 @@ export declare namespace SolidUI {
      *   - `setStore`: A setter function to update the store's properties.
      */
     export function createStore<T extends object>(initialState: T): [T, (fn: (state: T) => void) => void];
+    /****** Context (Theming & Dependency Injection) ******/
     /**
      * A definition object for a Context, used for dependency injection.
      * See {@link createContext}.
@@ -134,6 +160,7 @@ export declare namespace SolidUI {
     export interface Context<T> {
         id: symbol;
         defaultValue: T;
+        _stack: T[];
         /**
          * Runs the provided function within a scope where this Context is set to `value`.
          * @param value - The value to provide.

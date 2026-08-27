@@ -26,6 +26,28 @@ export namespace SpatialSOA {
         logging.setLogging(log, logLevel, includeRawError);
     }
 
+    // =========================================================================
+    // Types & Interfaces
+    // =========================================================================
+
+    /**
+     * Unique generation-encoded identifier for a SpatialSOA node.
+     */
+    export type SpatialNodeID = number & { readonly __brand: 'SpatialNodeID' };
+
+    /**
+     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
+     */
+    export type Vector3 = Vectors.Vector3;
+
+    /**
+     * A transparent 4D Quaternion representing 3D spatial rotation.
+     */
+    export type Quaternion = Quaternions.Quaternion;
+
+    /**
+     * Supported in-game transformable engine object types (players, vehicles, spawners, props, triggers).
+     */
     export type TransformableObject =
         | mod.Bomb
         | mod.EmplacementSpawner
@@ -71,46 +93,36 @@ export namespace SpatialSOA {
         | mod.RuntimeSpawn_Subsurface
         | mod.RuntimeSpawn_Tungsten;
 
-    // =========================================================================
-    // Quaternions & Rotations
-    // =========================================================================
+    /**
+     * Supported in-game trackable engine object types (players, vehicles, spawners, props, triggers).
+     */
+    export type TrackableObject =
+        | mod.Player
+        | mod.Vehicle
+        | TransformableObject
+        | mod.CapturePoint
+        | mod.HQ
+        | mod.RingOfFire
+        | mod.Sector
+        | mod.SpawnPoint;
 
     /**
-     * A transparent 3D vector representing a point, direction, scale, or euler rotation in 3D space.
+     * A plain object reference holding live position and optional rotation to track without closure allocations.
      */
-    export type Vector3 = Vectors.Vector3;
+    export interface TransparentObject {
+        position: Vector3;
+        rotation?: Quaternion | Vector3;
+    }
 
     /**
-     * A transparent 4D Quaternion representing 3D spatial rotation.
+     * Custom smoothing / interpolation function for follow motion.
+     * @param current - Current world position of the follower.
+     * @param target - Evaluated target world position (accounting for oriented offset).
+     * @param dt - Delta time in seconds.
+     * @param out - Optional target Vector3 to write into for zero-allocation reuse.
+     * @returns The updated world position.
      */
-    export type Quaternion = Quaternions.Quaternion;
-
-    /**
-     * Unique generation-encoded identifier for a SpatialSOA node.
-     */
-    export type SpatialNodeID = number & { readonly __brand: 'SpatialNodeID' };
-
-    /**
-     * Constant representing the root anchor node ID in the scene graph.
-     */
-    export const ROOT_NODE_ID = 0 as SpatialNodeID;
-
-    // Module-Level Configuration
-    const MAX_NODES = 1024;
-    const MAX_GENERATIONS = 65_535;
-    const GENERATION_MULTIPLIER = 100_000;
-    const INVALID_INDEX = -1;
-
-    // Node Lifecycle & State Bitmask Flags
-    const FLAG_ACTIVE = 1 << 0; // 1: Node is allocated and active
-    const FLAG_DIRTY = 1 << 1; // 2: Local transform changed, world matrices need evaluation
-    const FLAG_ENGINE_TRANSFORM_DIRTY = 1 << 2; // 4: Evaluated transform needs syncing to native mod.Object
-    const FLAG_RUNTIME_SPAWNED = 1 << 3; // 8: Created via SpawnObject; should be UnspawnObject'd on destroy
-    const FLAG_HAS_PIVOT = 1 << 4; // 16: Has non-zero pivot offset
-
-    // =========================================================================
-    // Options Interfaces
-    // =========================================================================
+    export type FollowSmoothingFunction = (current: Vector3, target: Vector3, dt: number, out?: Vector3) => Vector3;
 
     /**
      * Common initialization options for creating SpatialNodes.
@@ -126,18 +138,6 @@ export namespace SpatialSOA {
         scale?: Vector3 | number;
         /** In-game model offset correction (to adjust prefab origins to mesh center). */
         pivotOffset?: Vector3;
-    }
-
-    /**
-     * Options for continuous entity attachments.
-     */
-    export interface AttachOptions {
-        /** Positional offset relative to the target's orientation coordinate frame. */
-        offset?: Vector3;
-        /** Whether to track and match the target's rotation. Default: true. */
-        trackRotation?: boolean;
-        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object. */
-        yawOnly?: boolean;
     }
 
     /**
@@ -167,15 +167,19 @@ export namespace SpatialSOA {
     }
 
     /**
-     * Options for smooth follow behavior.
+     * Options for continuous follow behavior on a node.
      */
     export interface FollowOptions {
-        /** The target to follow (SpatialNodeID or Player). */
-        target?: SpatialNodeID | mod.Player;
-        /** Desired offset from the target in world space. */
+        /** The target to follow (Player, Vehicle, TrackableObject, SpatialNodeID, or TransparentObject). */
+        target?: TrackableObject | SpatialNodeID | TransparentObject;
+        /** Desired offset. If tracking rotation or target has orientation, offset is oriented in target's frame. */
         offset?: Vector3;
-        /** Smooth damping / lerp speed factor (0 for instant snap, > 0 for smooth). Default: 10. */
-        smoothSpeed?: number;
+        /** Smooth damping speed factor (0 for instant snap, > 0 for smooth), or custom smoothing function. Default: 10. */
+        smoothing?: number | FollowSmoothingFunction;
+        /** Whether to track and match target rotation. Default: false. */
+        trackRotation?: boolean;
+        /** When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: false. */
+        yawOnly?: boolean;
     }
 
     /**
@@ -190,6 +194,37 @@ export namespace SpatialSOA {
         linearAcceleration?: Vector3;
         /** Angular acceleration vector (axis * radians per second squared) in local space. */
         angularAcceleration?: Vector3;
+    }
+
+    // =========================================================================
+    // CONSTANTS & ENUMS
+    // =========================================================================
+
+    /**
+     * Constant representing the root anchor node ID in the scene graph.
+     */
+    export const ROOT_NODE_ID = 0 as SpatialNodeID;
+
+    // Module-Level Configuration
+    const MAX_NODES = 1024;
+    const MAX_GENERATIONS = 65_535;
+    const GENERATION_MULTIPLIER = 100_000;
+    const INVALID_INDEX = -1;
+
+    // Node Lifecycle & State Bitmask Flags
+    const FLAG_ACTIVE = 1 << 0; // 1: Node is allocated and active
+    const FLAG_DIRTY = 1 << 1; // 2: Local transform changed, world matrices need evaluation
+    const FLAG_ENGINE_TRANSFORM_DIRTY = 1 << 2; // 4: Evaluated transform needs syncing to native mod.Object
+    const FLAG_RUNTIME_SPAWNED = 1 << 3; // 8: Created via SpawnObject; should be UnspawnObject'd on destroy
+    const FLAG_HAS_PIVOT = 1 << 4; // 16: Has non-zero pivot offset
+
+    const enum FollowTargetType {
+        None = 0,
+        Player = 1,
+        Vehicle = 2,
+        TrackableObject = 3,
+        SpatialNode = 4,
+        TransparentObject = 5,
     }
 
     // =========================================================================
@@ -251,11 +286,14 @@ export namespace SpatialSOA {
         angularAcceleration?: Vector3;
     }
 
+    interface FollowState extends FollowOptions {
+        targetType: FollowTargetType;
+    }
+
     interface ControllerRecord {
-        tracker?: () => void;
         orbit?: OrbitState;
         lookAt?: LookAtOptions;
-        follow?: FollowOptions;
+        follow?: FollowState;
         kinematics?: KinematicsState;
     }
 
@@ -274,8 +312,10 @@ export namespace SpatialSOA {
         return Date.now() - SERVER_START_TIME;
     }
 
-    // Module-Level Contextual Scratch Variables
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // Contextual Scratch Variables for Zero-Allocation Math
+    // =========================================================================
+
     // World transform evaluation (_ensureWorldTransformUpdated)
     const _worldEvalScaledPos: Vector3 = { x: 0, y: 0, z: 0 };
     const _worldEvalRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
@@ -311,19 +351,6 @@ export namespace SpatialSOA {
     const _lookAtRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
     const _lookAtTargetPos: Vector3 = { x: 0, y: 0, z: 0 };
 
-    // Entity attachment & trackers (attachToPlayer, attachToVehicle, attachToObject, attachToTracker, _applyAttachmentTransform)
-    const _attachRotatedOffset: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachPlayerPos: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachPlayerFacing: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachPlayerRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
-    const _attachVehiclePos: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachVehicleFacing: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachVehicleRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
-    const _attachObjectPos: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachObjectEuler: Vector3 = { x: 0, y: 0, z: 0 };
-    const _attachObjectRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
-    const _trackerEulerRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
-
     // Active controllers & kinematics (_stepKinematics, _stepOrbit, _stepLookAt, _stepFollow)
     const _kinematicsStepDelta: Vector3 = { x: 0, y: 0, z: 0 };
     const _kinematicsAngularRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
@@ -333,7 +360,11 @@ export namespace SpatialSOA {
     const _orbitTangentCross: Vector3 = { x: 0, y: 0, z: 0 };
     const _orbitSpinRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
     const _lookAtPlayerPos: Vector3 = { x: 0, y: 0, z: 0 };
-    const _followPlayerPos: Vector3 = { x: 0, y: 0, z: 0 };
+    const _followTargetPos: Vector3 = { x: 0, y: 0, z: 0 };
+    const _followFacing: Vector3 = { x: 0, y: 0, z: 0 };
+    const _followEuler: Vector3 = { x: 0, y: 0, z: 0 };
+    const _followTargetRot: Quaternion = { w: 1, x: 0, y: 0, z: 0 };
+    const _followRotatedOffset: Vector3 = { x: 0, y: 0, z: 0 };
     const _followTargetWithOffset: Vector3 = { x: 0, y: 0, z: 0 };
     const _followLerpedPos: Vector3 = { x: 0, y: 0, z: 0 };
 
@@ -832,30 +863,6 @@ export namespace SpatialSOA {
         return Quaternions.setFromEuler(out, pitchRad, yawRad, 0);
     }
 
-    function _applyAttachmentTransform(
-        nodeId: SpatialNodeID,
-        pos: Vector3,
-        rot: Quaternion | undefined,
-        offset: Vector3 | undefined,
-        trackRotation: boolean
-    ): void {
-        if (trackRotation && rot) {
-            if (offset) {
-                Quaternions.rotateVector(offset, rot, _attachRotatedOffset);
-                Vectors.add(pos, _attachRotatedOffset, pos);
-            }
-
-            setWorldPosition(nodeId, pos);
-            setWorldRotation(nodeId, rot);
-        } else {
-            if (offset) {
-                Vectors.add(pos, offset, pos);
-            }
-
-            setWorldPosition(nodeId, pos);
-        }
-    }
-
     // =========================================================================
     // Scene Graph Updates & Controllers Evaluation
     // =========================================================================
@@ -961,29 +968,149 @@ export namespace SpatialSOA {
         }
     }
 
-    function _stepFollow(idx: number, dt: number, options?: FollowOptions): void {
-        if (!options?.target) return;
+    function _stepFollow(idx: number, dt: number, follow?: FollowState): void {
+        if (!follow || follow.targetType === FollowTargetType.None) return;
 
-        const target = options.target;
+        const target = follow.target;
+        if (target === undefined || target === null) return;
+
         const nodeId = _encodeId(idx);
         let targetPos: Vector3 | undefined;
+        let targetRot: Quaternion | undefined;
+        const trackRot = follow.trackRotation ?? false;
+        const yawOnly = follow.yawOnly ?? false;
 
-        if (typeof target === 'number') {
-            targetPos = getWorldPosition(target, _followTargetWithOffset);
-        } else if (mod.IsValid(target)) {
-            targetPos = Vectors.toVector3(mod.GetObjectPosition(target), _followPlayerPos);
+        switch (follow.targetType) {
+            case FollowTargetType.Player: {
+                const player = target as mod.Player;
+                if (!mod.IsValid(player)) return;
+
+                targetPos = Vectors.toVector3(mod.GetObjectPosition(player), _followTargetPos);
+
+                if (trackRot || follow.offset) {
+                    Vectors.toVector3(
+                        mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection),
+                        _followFacing
+                    );
+                    targetRot = _computeFacingQuaternion(_followFacing, yawOnly, _followTargetRot);
+                }
+                break;
+            }
+
+            case FollowTargetType.Vehicle: {
+                const vehicle = target as mod.Vehicle;
+                if (!mod.IsValid(vehicle)) return;
+
+                targetPos = Vectors.toVector3(
+                    mod.GetVehicleState(vehicle, mod.VehicleStateVector.VehiclePosition),
+                    _followTargetPos
+                );
+
+                if (trackRot || follow.offset) {
+                    Vectors.toVector3(
+                        mod.GetVehicleState(vehicle, mod.VehicleStateVector.FacingDirection),
+                        _followFacing
+                    );
+                    targetRot = _computeFacingQuaternion(_followFacing, yawOnly, _followTargetRot);
+                }
+                break;
+            }
+
+            case FollowTargetType.TrackableObject: {
+                const obj = target as mod.Object;
+                if (!mod.IsValid(obj)) return;
+
+                targetPos = Vectors.toVector3(mod.GetObjectPosition(obj), _followTargetPos);
+
+                if (trackRot || follow.offset) {
+                    Vectors.toVector3(mod.GetObjectRotation(obj), _followEuler);
+                    const pitch = yawOnly ? 0 : _followEuler.x;
+                    const roll = yawOnly ? 0 : _followEuler.z;
+                    targetRot = Quaternions.setFromEuler(_followTargetRot, pitch, _followEuler.y, roll);
+                }
+                break;
+            }
+
+            case FollowTargetType.SpatialNode: {
+                const targetNodeId = target as SpatialNodeID;
+                const tIdx = _resolveIndex(targetNodeId);
+                if (_isInvalidIndexAndLogWarning(tIdx)) return;
+
+                targetPos = getWorldPosition(targetNodeId, _followTargetPos);
+
+                if (trackRot || follow.offset) {
+                    targetRot = getWorldRotation(targetNodeId, _followTargetRot);
+                    if (targetRot && yawOnly) {
+                        const euler = Quaternions.toEuler(targetRot, _followEuler);
+                        targetRot = Quaternions.setFromEuler(_followTargetRot, 0, euler.y, 0);
+                    }
+                }
+                break;
+            }
+
+            case FollowTargetType.TransparentObject: {
+                const transparent = target as TransparentObject;
+                targetPos = transparent.position;
+
+                if (transparent.rotation && (trackRot || follow.offset)) {
+                    if ('w' in transparent.rotation) {
+                        targetRot = transparent.rotation as Quaternion;
+                        if (yawOnly) {
+                            const euler = Quaternions.toEuler(targetRot, _followEuler);
+                            targetRot = Quaternions.setFromEuler(_followTargetRot, 0, euler.y, 0);
+                        }
+                    } else {
+                        const euler = transparent.rotation as Vector3;
+                        const pitch = yawOnly ? 0 : euler.x;
+                        const roll = yawOnly ? 0 : euler.z;
+                        targetRot = Quaternions.setFromEuler(_followTargetRot, pitch, euler.y, roll);
+                    }
+                }
+                break;
+            }
         }
 
         if (!targetPos) return;
 
-        const smooth = options.smoothSpeed ?? 10;
-        const factor = smooth <= 0 ? 1 : Math.min(1, smooth * dt);
-        const off = options.offset ?? Vectors.ZERO;
+        const offset = follow.offset;
+        let finalTargetPos: Vector3;
 
-        Vectors.add(targetPos, off, _followTargetWithOffset);
-        getWorldPosition(nodeId, _followLerpedPos);
-        Vectors.lerp(_followLerpedPos, _followTargetWithOffset, factor, _followLerpedPos);
-        setWorldPosition(nodeId, _followLerpedPos);
+        if (offset) {
+            if (targetRot) {
+                Quaternions.rotateVector(offset, targetRot, _followRotatedOffset);
+                Vectors.add(targetPos, _followRotatedOffset, _followTargetWithOffset);
+            } else {
+                Vectors.add(targetPos, offset, _followTargetWithOffset);
+            }
+            finalTargetPos = _followTargetWithOffset;
+        } else {
+            finalTargetPos = targetPos;
+        }
+
+        const smoothing = follow.smoothing ?? 10;
+
+        if (typeof smoothing === 'function') {
+            const currentPos = getWorldPosition(nodeId, _followLerpedPos);
+
+            if (!currentPos) return;
+
+            const nextPos = smoothing(currentPos, finalTargetPos, dt, _followLerpedPos);
+            setWorldPosition(nodeId, nextPos);
+        } else if (smoothing <= 0) {
+            setWorldPosition(nodeId, finalTargetPos);
+        } else {
+            const currentPos = getWorldPosition(nodeId, _followLerpedPos);
+
+            if (!currentPos) return;
+
+            const factor = Math.min(1, smoothing * dt);
+            Vectors.lerp(currentPos, finalTargetPos, factor, _followLerpedPos);
+            setWorldPosition(nodeId, _followLerpedPos);
+        }
+
+        if (trackRot && targetRot) {
+            setWorldRotation(nodeId, targetRot);
+        }
     }
 
     function _updateNode(idx: number, dt: number): void {
@@ -992,10 +1119,6 @@ export namespace SpatialSOA {
         const controller = _controllers[idx];
 
         if (controller) {
-            if (controller.tracker) {
-                controller.tracker();
-            }
-
             _stepKinematics(idx, dt, controller.kinematics);
             _stepOrbit(idx, dt, controller.orbit);
             _stepLookAt(idx, controller.lookAt);
@@ -1313,7 +1436,6 @@ export namespace SpatialSOA {
         }
 
         if (_controllers[cIdx]) {
-            _controllers[cIdx].tracker = undefined;
             _controllers[cIdx].follow = undefined;
         }
 
@@ -1951,237 +2073,12 @@ export namespace SpatialSOA {
     }
 
     // -------------------------------------------------------------------------
-    // Entity Attachments & Controllers
+    // Entity Controllers
     // -------------------------------------------------------------------------
 
     /**
-     * Attaches a node to follow a player's real-time position/orientation in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param player - The target player.
-     * @param options - Attachment options.
-     */
-    export function attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void {
-        const idx = _resolveIndex(id);
-
-        if (_isInvalidIndexAndLogWarning(idx)) return;
-
-        setParent(id, ROOT_NODE_ID);
-
-        if (_controllers[idx]) {
-            _controllers[idx].follow = undefined;
-            _controllers[idx].orbit = undefined;
-
-            if (_controllers[idx].kinematics) {
-                _controllers[idx].kinematics.linearVelocity = undefined;
-                _controllers[idx].kinematics.linearAcceleration = undefined;
-            }
-        }
-
-        const offset = options?.offset ? Vectors.clone(options.offset) : undefined;
-        const trackRot = options?.trackRotation ?? true;
-        const yawOnly = options?.yawOnly ?? true;
-
-        const playerTracker = () => {
-            if (!mod.IsValid(player)) return;
-
-            Vectors.toVector3(mod.GetObjectPosition(player), _attachPlayerPos);
-
-            Vectors.toVector3(
-                mod.GetSoldierState(player, mod.SoldierStateVector.GetFacingDirection),
-                _attachPlayerFacing
-            );
-
-            const rot = trackRot ? _computeFacingQuaternion(_attachPlayerFacing, yawOnly, _attachPlayerRot) : undefined;
-            _applyAttachmentTransform(id, _attachPlayerPos, rot, offset, trackRot);
-        };
-
-        if (!_controllers[idx]) {
-            _controllers[idx] = {};
-        }
-
-        _controllers[idx].tracker = playerTracker;
-    }
-
-    /**
-     * Attaches a node to follow a vehicle's real-time position/orientation in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param vehicle - The target vehicle.
-     * @param options - Attachment options.
-     */
-    export function attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void {
-        const idx = _resolveIndex(id);
-
-        if (_isInvalidIndexAndLogWarning(idx)) return;
-
-        setParent(id, ROOT_NODE_ID);
-
-        if (_controllers[idx]) {
-            _controllers[idx].follow = undefined;
-            _controllers[idx].orbit = undefined;
-
-            if (_controllers[idx].kinematics) {
-                _controllers[idx].kinematics.linearVelocity = undefined;
-                _controllers[idx].kinematics.linearAcceleration = undefined;
-            }
-        }
-
-        const offset = options?.offset ? Vectors.clone(options.offset) : undefined;
-        const trackRot = options?.trackRotation ?? true;
-        const yawOnly = options?.yawOnly ?? false;
-
-        const vehicleTracker = () => {
-            if (!mod.IsValid(vehicle)) return;
-
-            Vectors.toVector3(mod.GetVehicleState(vehicle, mod.VehicleStateVector.VehiclePosition), _attachVehiclePos);
-
-            Vectors.toVector3(
-                mod.GetVehicleState(vehicle, mod.VehicleStateVector.FacingDirection),
-                _attachVehicleFacing
-            );
-
-            const rot = trackRot
-                ? _computeFacingQuaternion(_attachVehicleFacing, yawOnly, _attachVehicleRot)
-                : undefined;
-
-            _applyAttachmentTransform(id, _attachVehiclePos, rot, offset, trackRot);
-        };
-
-        if (!_controllers[idx]) {
-            _controllers[idx] = {};
-        }
-
-        _controllers[idx].tracker = vehicleTracker;
-    }
-
-    /**
-     * Attaches a node to follow an in-game object (props, spawners, etc.) in real time in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param object - The native in-game object to track (excluding Player and Vehicle).
-     * @param options - Attachment options.
-     */
-    export function attachToObject(
-        id: SpatialNodeID,
-        object: Exclude<mod.Object, mod.Player | mod.Vehicle>,
-        options?: AttachOptions
-    ): void {
-        const idx = _resolveIndex(id);
-
-        if (_isInvalidIndexAndLogWarning(idx)) return;
-
-        setParent(id, ROOT_NODE_ID);
-
-        if (_controllers[idx]) {
-            _controllers[idx].follow = undefined;
-            _controllers[idx].orbit = undefined;
-
-            if (_controllers[idx].kinematics) {
-                _controllers[idx].kinematics.linearVelocity = undefined;
-                _controllers[idx].kinematics.linearAcceleration = undefined;
-            }
-        }
-
-        const offset = options?.offset ? Vectors.clone(options.offset) : undefined;
-        const trackRot = options?.trackRotation ?? true;
-        const yawOnly = options?.yawOnly ?? false;
-
-        const objectTracker = () => {
-            if (!mod.IsValid(object)) return;
-
-            Vectors.toVector3(mod.GetObjectPosition(object), _attachObjectPos);
-
-            let rot: Quaternion | undefined;
-
-            if (trackRot) {
-                Vectors.toVector3(mod.GetObjectRotation(object), _attachObjectEuler);
-
-                const pitch = yawOnly ? 0 : _attachObjectEuler.x;
-                const roll = yawOnly ? 0 : _attachObjectEuler.z;
-                rot = Quaternions.setFromEuler(_attachObjectRot, pitch, _attachObjectEuler.y, roll);
-            }
-
-            _applyAttachmentTransform(id, _attachObjectPos, rot, offset, trackRot);
-        };
-
-        if (!_controllers[idx]) {
-            _controllers[idx] = {};
-        }
-
-        _controllers[idx].tracker = objectTracker;
-    }
-
-    /**
-     * Attaches a custom dynamic tracker callback in world space.
-     * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active follow, orbit, or linear kinematics.
-     * @param id - The node ID.
-     * @param tracker - Tracker callback function.
-     */
-    export function attachToTracker(
-        id: SpatialNodeID,
-        tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined
-    ): void {
-        const idx = _resolveIndex(id);
-
-        if (_isInvalidIndexAndLogWarning(idx)) return;
-
-        setParent(id, ROOT_NODE_ID);
-
-        if (_controllers[idx]) {
-            _controllers[idx].follow = undefined;
-            _controllers[idx].orbit = undefined;
-
-            if (_controllers[idx].kinematics) {
-                _controllers[idx].kinematics.linearVelocity = undefined;
-                _controllers[idx].kinematics.linearAcceleration = undefined;
-            }
-        }
-
-        const customTracker = () => {
-            const result = tracker();
-
-            if (!result) return;
-
-            setWorldPosition(id, result.position);
-
-            if (!result.rotation) return;
-
-            if ('w' in result.rotation) {
-                setWorldRotation(id, result.rotation as Quaternion);
-            } else {
-                const euler = result.rotation as Vector3;
-                Quaternions.setFromEuler(_trackerEulerRot, euler.x, euler.y, euler.z);
-                setWorldRotation(id, _trackerEulerRot);
-            }
-        };
-
-        if (!_controllers[idx]) {
-            _controllers[idx] = {};
-        }
-
-        _controllers[idx].tracker = customTracker;
-    }
-
-    /**
-     * Clears any active attachment tracker on a node.
-     * @param id - The node ID.
-     */
-    export function detachTracker(id: SpatialNodeID): void {
-        const idx = _resolveIndex(id);
-
-        if (_isInvalidIndexAndLogWarning(idx) || !_controllers[idx]) return;
-
-        _controllers[idx].tracker = undefined;
-    }
-
-    /**
      * Configures orbital rotation motion on a node.
-     * Clears any active attachment tracker, follow controller, or linear kinematics.
+     * Clears any active follow controller or linear kinematics.
      * @param id - The node ID.
      * @param options - Orbit configuration or null to disable.
      */
@@ -2202,7 +2099,6 @@ export namespace SpatialSOA {
             _controllers[idx] = {};
         }
 
-        _controllers[idx].tracker = undefined;
         _controllers[idx].follow = undefined;
 
         if (_controllers[idx].kinematics) {
@@ -2269,9 +2165,10 @@ export namespace SpatialSOA {
     }
 
     /**
-     * Configures continuous smooth follow behavior on a node in world space.
+     * Configures continuous follow behavior on a node in world space.
      * Automatically sets parent to ROOT_NODE_ID.
-     * Clears any active attachment tracker, orbit controller, or linear kinematics.
+     * Clears any active orbit controller or linear kinematics.
+     * Target type is classified once upon configuration to avoid per-frame engine type checks.
      * @param id - The node ID.
      * @param options - Follow configuration or null to disable.
      */
@@ -2280,30 +2177,56 @@ export namespace SpatialSOA {
 
         if (_isInvalidIndexAndLogWarning(idx)) return;
 
-        if (options?.target !== undefined) {
+        if (options?.target !== undefined && options.target !== null) {
             setParent(id, ROOT_NODE_ID);
 
             if (_controllers[idx]) {
-                _controllers[idx].tracker = undefined;
                 _controllers[idx].orbit = undefined;
 
                 if (_controllers[idx].kinematics) {
                     _controllers[idx].kinematics.linearVelocity = undefined;
                     _controllers[idx].kinematics.linearAcceleration = undefined;
                 }
+            } else {
+                _controllers[idx] = {};
+            }
+
+            const target = options.target;
+            let targetType = FollowTargetType.None;
+
+            if (typeof target === 'number') {
+                targetType = FollowTargetType.SpatialNode;
+            } else if (mod.IsType(target as mod.Object, mod.Types.Player)) {
+                targetType = FollowTargetType.Player;
+            } else if (mod.IsType(target as mod.Object, mod.Types.Vehicle)) {
+                targetType = FollowTargetType.Vehicle;
+            } else if (mod.IsValid(target as mod.Object)) {
+                targetType = FollowTargetType.TrackableObject;
+            } else if ('position' in target && typeof target.position === 'object') {
+                targetType = FollowTargetType.TransparentObject;
+            }
+
+            if (targetType === FollowTargetType.None) {
+                logging.log('Unable to determine follow target type', LogLevel.Warning);
+                _controllers[idx]!.follow = undefined;
+                return;
+            }
+
+            _controllers[idx]!.follow = {
+                ...options,
+                offset: options.offset ? Vectors.clone(options.offset) : undefined,
+                targetType,
+            };
+        } else {
+            if (_controllers[idx]) {
+                _controllers[idx].follow = undefined;
             }
         }
-
-        if (!_controllers[idx]) {
-            _controllers[idx] = {};
-        }
-
-        _controllers[idx].follow = options ?? undefined;
     }
 
     /**
      * Configures kinematic velocity and acceleration integration on a node.
-     * Linear kinematics clear conflicting positional controllers (orbit, follow, tracker).
+     * Linear kinematics clear conflicting positional controllers (orbit, follow).
      * Angular kinematics clear conflicting rotational controllers (lookAt, orbit spin).
      * @param id - The node ID.
      * @param options - Kinematics configuration or null to disable.
@@ -2328,7 +2251,6 @@ export namespace SpatialSOA {
         if (options.linearVelocity !== undefined || options.linearAcceleration !== undefined) {
             _controllers[idx].orbit = undefined;
             _controllers[idx].follow = undefined;
-            _controllers[idx].tracker = undefined;
         }
 
         if (options.angularVelocity !== undefined || options.angularAcceleration !== undefined) {

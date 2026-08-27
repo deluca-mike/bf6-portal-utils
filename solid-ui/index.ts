@@ -1,7 +1,7 @@
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 2.5.0
+// version: 2.6.0
 export namespace SolidUI {
     /****** Logging ******/
 
@@ -19,36 +19,125 @@ export namespace SolidUI {
      * @param includeRawError - Whether to include the runtime error in the log.
      */
     export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void {
         logging.setLogging(log, logLevel, includeRawError);
     }
 
+    /****** Tunable Scheduler Constants ******/
+
+    /**
+     * Maximum number of subscriber executions allowed in a single microtask flush loop.
+     *
+     * Performance vs Memory trade-offs:
+     * - Increasing this value allows very large UI trees or cascades of dependent signals to resolve
+     *   within a single microtask, improving throughput for complex UIs at the cost of higher CPU time
+     *   spent inside one microtask frame (potentially delaying engine ticks if effects loop).
+     * - Decreasing this value bounds execution time per flush and prevents runaway effect chains,
+     *   protecting the game simulation framerate, but may truncate valid deep dependency chains.
+     * - Memory impact: Static numeric limit; zero heap memory overhead.
+     */
+    export const MAX_EXECUTIONS_PER_FLUSH = 1_000;
+
+    /**
+     * Maximum number of microtask flushes permitted within a single logical engine tick.
+     *
+     * Performance vs Memory trade-offs:
+     * - Protects against re-entrant deferTicks=0 effect loops that keep rescheduling microtask flushes
+     *   indefinitely within the same engine tick.
+     * - Increasing this value permits deeper chains of asynchronous signal-effect-signal flushes per tick.
+     * - Decreasing this value aborts runaway flush storms earlier to maintain game tick responsiveness.
+     * - Memory impact: Static numeric limit; zero heap memory overhead.
+     */
+    export const MAX_FLUSHES_PER_TICK = 1_000;
+
     /****** Classes and Types ******/
 
-    type SubscriberList = Subscriber[];
+    /**
+     * Polymorphic subscriber representation to eliminate array allocations for 0- and 1-subscriber signals.
+     * - `null`: 0 subscribers (0 array allocation).
+     * - `Subscriber`: Exactly 1 subscriber (direct reference, 0 array allocation).
+     * - `Subscriber[]`: 2+ subscribers (promoted to array only on branch/multiplexing).
+     */
+    type Subs = Subscriber | Subscriber[] | null;
 
-    function removeSubscriber(list: SubscriberList, sub: Subscriber): void {
-        const idx = list.indexOf(sub);
-
-        if (idx === -1) return;
-
-        const last = list.pop()!;
-
-        if (idx < list.length) {
-            list[idx] = last;
+    function addSubscriber(subs: Subs, sub: Subscriber): Subs {
+        if (subs === null) return sub;
+        if (!Array.isArray(subs)) {
+            if (subs === sub) return subs;
+            return [subs, sub];
         }
+        if (subs.indexOf(sub) === -1) {
+            subs.push(sub);
+        }
+        return subs;
     }
 
+    function removeSubscriber(subs: Subs, sub: Subscriber): Subs {
+        if (subs === null) return null;
+        if (!Array.isArray(subs)) {
+            return subs === sub ? null : subs;
+        }
+        const idx = subs.indexOf(sub);
+        if (idx !== -1) {
+            const last = subs.pop()!;
+            if (idx < subs.length) {
+                subs[idx] = last;
+            }
+            if (subs.length === 1) {
+                return subs[0];
+            }
+            if (subs.length === 0) {
+                return null;
+            }
+        }
+        return subs;
+    }
+
+    /**
+     * Internal interface for dependency sources (Signals, Store properties).
+     */
+    interface DependencySource {
+        subs: Subs;
+        unsubscribe(sub: Subscriber): void;
+    }
+
+    /**
+     * Tracks dependency between a signal/source and the currently executing observer.
+     * Uses generation cursor checking (depCount) for zero-allocation O(1) steady-state re-runs.
+     * @param source - The dependency source to track.
+     * @param observer - The currently executing subscriber observer.
+     */
+    function trackDependency(source: DependencySource, observer: Subscriber): void {
+        const idx = observer.depCount++;
+        if (idx < observer.deps.length) {
+            if (observer.deps[idx] === source) {
+                // FAST PATH: Dependency is identical to previous execution.
+                // 0 array allocations, 0 unsubscriptions, 0 indexOf scans.
+                return;
+            }
+            // Branch changed: unsubscribe old dependency at this slot
+            observer.deps[idx].unsubscribe(observer);
+            observer.deps[idx] = source;
+        } else {
+            observer.deps.push(source);
+        }
+        source.subs = addSubscriber(source.subs, observer);
+    }
+
+    let activeObserver: Subscriber | null = null;
+    let currentCleanupList: (() => void)[] | null = null;
+
     class Subscriber {
-        public dependencies: SubscriberList[] = [];
+        public deps: DependencySource[] = [];
+        public depCount = 0;
+        public cleanups: (() => void)[] | null = null;
 
         public isPending = false;
-
         public deferTicks: number;
-
+        public targetTick = 0;
         public isDisposed = false;
 
         constructor(
@@ -61,20 +150,83 @@ export namespace SolidUI {
             this.execute();
         }
 
+        runCleanups(): void {
+            if (this.cleanups !== null) {
+                for (let i = 0; i < this.cleanups.length; ++i) {
+                    try {
+                        this.cleanups[i]();
+                    } catch (error: unknown) {
+                        logging.log('Error in cleanup:', LogLevel.Error, error);
+                    }
+                }
+                this.cleanups.length = 0;
+            }
+        }
+
         execute(): void {
-            cleanup(this);
-            context.push(this);
+            if (this.isDisposed) return;
+            this.runCleanups();
+
+            const prevObserver = activeObserver;
+            const prevCleanupList = currentCleanupList;
+
+            // eslint-disable-next-line @typescript-eslint/no-this-alias
+            activeObserver = this;
+            currentCleanupList = null; // Cleanups inside effect attach to this subscriber
+            this.depCount = 0;
 
             try {
                 this.fn();
             } finally {
-                context.pop();
+                activeObserver = prevObserver;
+                currentCleanupList = prevCleanupList;
+
+                // Prune any excess dependencies if conditional branching reduced dependency count
+                if (this.depCount < this.deps.length) {
+                    for (let i = this.depCount; i < this.deps.length; ++i) {
+                        this.deps[i].unsubscribe(this);
+                    }
+                    this.deps.length = this.depCount;
+                }
             }
         }
 
         dispose(): void {
+            if (this.isDisposed) return;
             this.isDisposed = true;
-            cleanup(this);
+            this.runCleanups();
+
+            for (let i = 0; i < this.deps.length; ++i) {
+                this.deps[i].unsubscribe(this);
+            }
+            this.deps.length = 0;
+            this.depCount = 0;
+        }
+    }
+
+    class SignalState<T> implements DependencySource {
+        public subs: Subs = null;
+
+        constructor(public value: T) {}
+
+        read(): T {
+            if (activeObserver !== null) {
+                trackDependency(this, activeObserver);
+            }
+            return this.value;
+        }
+
+        write(newValue: T | ((prev: T) => T)): void {
+            const nextValue = typeof newValue === 'function' ? (newValue as (prev: T) => T)(this.value) : newValue;
+
+            if (isEqual(this.value, nextValue)) return; // Don't trigger if value didn't change.
+
+            this.value = nextValue; // Update state immediately.
+            scheduleSubscribers(this.subs); // Triggers updates asynchronously (non-blocking).
+        }
+
+        unsubscribe(sub: Subscriber): void {
+            this.subs = removeSubscriber(this.subs, sub);
         }
     }
 
@@ -229,27 +381,23 @@ export namespace SolidUI {
         return false;
     }
 
+    function isEventHandlerProp(key: string): boolean {
+        return (
+            key.length > 2 &&
+            key.charCodeAt(0) === 111 /* 'o' */ &&
+            key.charCodeAt(1) === 110 /* 'n' */ &&
+            key.charCodeAt(2) >= 65 &&
+            key.charCodeAt(2) <= 90 /* 'A'-'Z' */
+        );
+    }
+
     /****** Tick Tracking & Scheduling ******/
 
     /**
      * Invariant: `currentTick` is a logical scheduler tick advanced by `Events.OngoingGlobal`, not an engine tick
      * boundary API value (none is available).
-     *
-     * This means:
-     * - Tick-relative scheduling (`deferTicks`) and per-tick flush guards are scoped to this logical tick.
-     * - Correctness assumes the `Events.OngoingGlobal` callback executes consistently once per engine tick.
-     * - If other subscribers run before this callback in a given engine tick, they still observe the previous logical
-     *   tick until this callback executes.
-     *
-     * The scheduler is intentionally defined around this event-driven model instead of wall-clock time because runtime
-     * tick duration can vary significantly under lag.
      */
     let currentTick = 0;
-
-    const MAX_EXECUTIONS_PER_FLUSH = 1_000;
-
-    // Protects against re-entrant deferTicks=0 storms that keep rescheduling microtask flushes.
-    const MAX_FLUSHES_PER_TICK = 1_000;
 
     let isFlushPending = false;
     let tickFlushCount = 0;
@@ -257,9 +405,9 @@ export namespace SolidUI {
     // Reusable static promise for zero-allocation microtask dispatch.
     const STATIC_PROMISE = Promise.resolve();
 
-    // Two-tier queues: flat array for immediate microtasks, flat array for deferred ticks.
+    // Two-tier flat queues: immediate microtasks and deferred ticks (storing flat Subscriber pointers with targetTick field).
     const _immediateQueue: Subscriber[] = [];
-    const _deferredQueue: { sub: Subscriber; targetTick: number }[] = [];
+    const _deferredQueue: Subscriber[] = [];
 
     function handleTick(): void {
         ++currentTick;
@@ -270,17 +418,17 @@ export namespace SolidUI {
             let writeIndex = 0;
 
             for (let i = 0; i < _deferredQueue.length; ++i) {
-                const item = _deferredQueue[i];
+                const sub = _deferredQueue[i];
 
-                if (item.targetTick > currentTick) {
-                    _deferredQueue[writeIndex++] = item;
+                if (sub.targetTick > currentTick) {
+                    _deferredQueue[writeIndex++] = sub;
                     continue;
                 }
 
-                if (item.sub.isDisposed) {
-                    item.sub.isPending = false;
+                if (sub.isDisposed) {
+                    sub.isPending = false;
                 } else {
-                    _immediateQueue.push(item.sub);
+                    _immediateQueue.push(sub);
                 }
             }
 
@@ -294,24 +442,19 @@ export namespace SolidUI {
 
     Events.OngoingGlobal.subscribe(handleTick);
 
-    // The function that processes the current microtask queue.
+    // Processes the microtask queue.
     function flush(): void {
         isFlushPending = false;
 
         if (_immediateQueue.length === 0) return;
 
-        // If the number of flushes this tick is greater than the maximum allowed, clear the pending effects and log an
-        // error. This is a safeguard to prevent a tick from executing very long chains of effect executions that may
-        // create new effect executions, etc, holding up the next tick.
         if (++tickFlushCount > MAX_FLUSHES_PER_TICK) {
             for (let i = 0; i < _immediateQueue.length; ++i) {
                 _immediateQueue[i].isPending = false;
             }
 
             _immediateQueue.length = 0;
-
             logging.log('Max flushes per tick exceeded', LogLevel.Error);
-
             return;
         }
 
@@ -325,9 +468,7 @@ export namespace SolidUI {
                 }
 
                 _immediateQueue.length = 0;
-
                 logging.log('Max executions per flush exceeded', LogLevel.Error);
-
                 return;
             }
 
@@ -339,7 +480,6 @@ export namespace SolidUI {
             try {
                 sub.execute();
             } catch (error: unknown) {
-                // Catch and log errors so one bad effect doesn't kill the whole UI.
                 logging.log('Error in effect:', LogLevel.Error, error);
             }
         }
@@ -347,27 +487,28 @@ export namespace SolidUI {
         _immediateQueue.length = 0;
     }
 
-    // Adds effects to the queue and schedules a flush if one isn't already pending.
-    function schedule(subscribers: SubscriberList): void {
-        let hasImmediate = false;
+    function scheduleOne(sub: Subscriber): void {
+        if (sub.isPending || sub.isDisposed) return;
 
-        for (let i = 0; i < subscribers.length; ++i) {
-            const sub = subscribers[i];
+        sub.isPending = true;
 
-            if (sub.isPending || sub.isDisposed) continue;
-
-            sub.isPending = true;
-
-            if (sub.deferTicks === 0) {
-                _immediateQueue.push(sub);
-                hasImmediate = true;
-            } else {
-                _deferredQueue.push({ sub, targetTick: currentTick + sub.deferTicks });
-            }
-        }
-
-        if (hasImmediate) {
+        if (sub.deferTicks === 0) {
+            _immediateQueue.push(sub);
             queueFlush();
+        } else {
+            sub.targetTick = currentTick + sub.deferTicks;
+            _deferredQueue.push(sub);
+        }
+    }
+
+    function scheduleSubscribers(subs: Subs): void {
+        if (subs === null) return;
+        if (!Array.isArray(subs)) {
+            scheduleOne(subs);
+            return;
+        }
+        for (let i = 0; i < subs.length; ++i) {
+            scheduleOne(subs[i]);
         }
     }
 
@@ -376,28 +517,10 @@ export namespace SolidUI {
         if (isFlushPending) return;
 
         isFlushPending = true;
-
-        // STATIC_PROMISE pushes the flush to the microtask queue without allocating a new Promise.
-        // This ensures setting a signal returns execution to game logic instantly, and UI updates happen after.
         STATIC_PROMISE.then(flush);
     }
 
     /****** Reactivity Core ******/
-
-    const context: (Subscriber | null)[] = [];
-
-    // The current "Owner" (e.g., the Component instance being created).
-    let currentCleanupList: (() => void)[] | null = null;
-
-    function cleanup(subscriber: Subscriber): void {
-        const deps = subscriber.dependencies;
-
-        for (let i = 0; i < deps.length; ++i) {
-            removeSubscriber(deps[i], subscriber);
-        }
-
-        deps.length = 0;
-    }
 
     /**
      * Executes a function without creating dependencies.
@@ -412,12 +535,13 @@ export namespace SolidUI {
      * @returns The return value of `fn`.
      */
     export function untrack<T>(fn: () => T): T {
-        context.push(null);
+        const prevObserver = activeObserver;
+        activeObserver = null;
 
         try {
             return fn();
         } finally {
-            context.pop();
+            activeObserver = prevObserver;
         }
     }
 
@@ -430,28 +554,10 @@ export namespace SolidUI {
      *   - `write`: A {@link Setter} to update the value.
      */
     export function createSignal<T>(initialValue: T): [Accessor<T>, Setter<T>] {
-        const subscriptions: Subscriber[] = [];
-        let value = initialValue;
+        const state = new SignalState<T>(initialValue);
 
-        const read: Accessor<T> = (): T => {
-            const observer = context[context.length - 1];
-
-            if (observer && subscriptions.indexOf(observer) === -1) {
-                subscriptions.push(observer);
-                observer.dependencies.push(subscriptions);
-            }
-
-            return value;
-        };
-
-        const write: Setter<T> = (newValue: T | ((prev: T) => T)): void => {
-            const nextValue = typeof newValue === 'function' ? (newValue as (prev: T) => T)(value) : newValue;
-
-            if (isEqual(value, nextValue)) return; // Don't trigger if value didn't change.
-
-            value = nextValue; // Update state immediately.
-            schedule(subscriptions); // Triggers updates asynchronously (non-blocking).
-        };
+        const read: Accessor<T> = (): T => state.read();
+        const write: Setter<T> = (newValue: T | ((prev: T) => T)): void => state.write(newValue);
 
         return [read, write];
     }
@@ -470,7 +576,13 @@ export namespace SolidUI {
      */
     export function createEffect(fn: () => void, options?: EffectOptions): () => void {
         const effect = new Subscriber(fn, options?.deferTicks ?? 0);
-        return () => effect.dispose();
+        const disposer = () => effect.dispose();
+
+        if (currentCleanupList !== null) {
+            currentCleanupList.push(disposer);
+        }
+
+        return disposer;
     }
 
     /**
@@ -485,13 +597,18 @@ export namespace SolidUI {
      * @returns The {@link Accessor} for the memoized value.
      */
     export function createMemo<T>(fn: () => T, options?: MemoOptions): Accessor<T> {
-        const [s, set] = createSignal<T>(fn());
+        let signal: [Accessor<T>, Setter<T>] | null = null;
+        const effectOptions: EffectOptions = { deferTicks: options?.deferTicks ?? 0 };
 
-        // Memos must update immediately to be consistent,
-        // but their downstream effects will still be batched by the signal's scheduler.
-        createEffect(() => set(fn()), { deferTicks: options?.deferTicks ?? 0 });
+        createEffect(() => {
+            if (signal === null) {
+                signal = createSignal<T>(fn());
+            } else {
+                signal[1](fn());
+            }
+        }, effectOptions);
 
-        return s;
+        return signal![0];
     }
 
     /**
@@ -504,56 +621,60 @@ export namespace SolidUI {
      * @returns The return value of `fn`.
      */
     export function createRoot<T>(fn: (dispose: () => void) => T): T {
-        // Create a list to track all cleanups (effects, onCleanup calls) for this component.
-        // Handles nested calls (e.g., a Container creating a Button inside its constructor) by creating a call stack
-        // for cleanup contexts.
+        const previousObserver = activeObserver;
         const previousCleanupList = currentCleanupList;
+
+        activeObserver = null; // createRoot is detached from any surrounding effect
         const cleanupList: (() => void)[] = [];
         currentCleanupList = cleanupList;
 
-        // Define Disposer
         const dispose = () => {
-            // Run all cleanups registered via `onCleanup()` or implicit effects.
             for (let i = 0; i < cleanupList.length; ++i) {
                 cleanupList[i]();
             }
             cleanupList.length = 0;
         };
 
-        const result = fn(dispose); // Run the user's code.
-
-        // Restore Parent Context (Root is DETACHED, so we don't add to parent).
-        currentCleanupList = previousCleanupList;
-
-        return result;
+        try {
+            return fn(dispose);
+        } finally {
+            activeObserver = previousObserver;
+            currentCleanupList = previousCleanupList;
+        }
     }
 
     /****** Store ******/
 
-    // Global map to track subscribers for every key of every proxy object.
-    // WeakMap ensures that if the object is deleted, the subscribers are garbage collected.
-    const storeSubscribers = new WeakMap<object, Map<string | symbol, SubscriberList>>();
+    const STORE_SUBS_KEY = Symbol('solid_store_subs');
+    const STORE_PROXY_KEY = Symbol('solid_store_proxy');
 
-    // WeakMap cache for created nested proxies to avoid allocating new Proxy instances on every read.
-    const proxyCache = new WeakMap<object, object>();
+    class StorePropertyState implements DependencySource {
+        public subs: Subs = null;
 
-    // Helper to get or create the subscriber list for a specific object key.
-    function getStoreSubscribers(target: object, key: string | symbol): SubscriberList {
-        let objMap = storeSubscribers.get(target);
+        constructor(
+            public target: object,
+            public key: string | symbol
+        ) {}
 
-        if (!objMap) {
-            objMap = new Map();
-            storeSubscribers.set(target, objMap);
+        unsubscribe(sub: Subscriber): void {
+            this.subs = removeSubscriber(this.subs, sub);
+        }
+    }
+
+    function getStorePropertyState(target: object, key: string | symbol): StorePropertyState {
+        let map = (target as Record<symbol, Record<string | symbol, StorePropertyState>>)[STORE_SUBS_KEY];
+        if (!map) {
+            map = Object.create(null);
+            (target as Record<symbol, Record<string | symbol, StorePropertyState>>)[STORE_SUBS_KEY] = map;
         }
 
-        let keyList = objMap.get(key);
-
-        if (!keyList) {
-            keyList = [];
-            objMap.set(key, keyList);
+        let propState = map[key];
+        if (!propState) {
+            propState = new StorePropertyState(target, key);
+            map[key] = propState;
         }
 
-        return keyList;
+        return propState;
     }
 
     /**
@@ -568,29 +689,24 @@ export namespace SolidUI {
      *   - `setStore`: A setter function to update the store's properties.
      */
     export function createStore<T extends object>(initialState: T): [T, (fn: (state: T) => void) => void] {
-        // Recursive handler to create proxies for nested objects
         const handler: ProxyHandler<object> = {
             get(target, key, receiver) {
-                const value = Reflect.get(target, key, receiver);
-
-                // If an effect is running, subscribe it to this specific key.
-                const observer = context[context.length - 1];
-
-                if (observer) {
-                    const subs = getStoreSubscribers(target, key);
-                    if (subs.indexOf(observer) === -1) {
-                        subs.push(observer);
-                        observer.dependencies.push(subs);
-                    }
+                if (key === STORE_SUBS_KEY || key === STORE_PROXY_KEY) {
+                    return Reflect.get(target, key, receiver);
                 }
 
-                // If the value is a plain object or array, wrap it in a cached Proxy (Lazy Proxying) so we can
-                // track its internal properties. Leave classes and host objects alone.
+                const value = Reflect.get(target, key, receiver);
+
+                if (activeObserver !== null) {
+                    const propState = getStorePropertyState(target, key);
+                    trackDependency(propState, activeObserver);
+                }
+
                 if (isPlainObject(value) || Array.isArray(value)) {
-                    let cached = proxyCache.get(value as object);
+                    let cached = (value as Record<symbol, object>)[STORE_PROXY_KEY];
                     if (!cached) {
                         cached = new Proxy(value as object, handler);
-                        proxyCache.set(value as object, cached);
+                        (value as Record<symbol, object>)[STORE_PROXY_KEY] = cached;
                     }
                     return cached;
                 }
@@ -599,12 +715,26 @@ export namespace SolidUI {
             },
             set(target, key, value, receiver) {
                 const oldValue = Reflect.get(target, key, receiver);
+                if (isEqual(oldValue, value)) return true;
 
-                if (isEqual(oldValue, value)) return true; // Don't trigger if value didn't change.
+                const isArr = Array.isArray(target);
+                const prevLength = isArr ? target.length : 0;
 
                 const result = Reflect.set(target, key, value, receiver);
 
-                schedule(getStoreSubscribers(target, key)); // Notify subscribers of this specific key.
+                const map = (target as Record<symbol, Record<string | symbol, StorePropertyState>>)[STORE_SUBS_KEY];
+                if (map) {
+                    const propState: StorePropertyState | undefined = map[key];
+                    if (propState && propState.subs !== null) {
+                        scheduleSubscribers(propState.subs);
+                    }
+                    if (isArr && key !== 'length' && target.length !== prevLength) {
+                        const lenState: StorePropertyState | undefined = map['length'];
+                        if (lenState && lenState.subs !== null) {
+                            scheduleSubscribers(lenState.subs);
+                        }
+                    }
+                }
 
                 return result;
             },
@@ -612,32 +742,32 @@ export namespace SolidUI {
                 const hasKey = Reflect.has(target, key);
                 const result = Reflect.deleteProperty(target, key);
 
-                // Only trigger an update if the key actually existed and was deleted
                 if (hasKey && result) {
-                    schedule(getStoreSubscribers(target, key));
+                    const map = (target as Record<symbol, Record<string | symbol, StorePropertyState>>)[STORE_SUBS_KEY];
+                    if (map) {
+                        const propState: StorePropertyState | undefined = map[key];
+                        if (propState && propState.subs !== null) {
+                            scheduleSubscribers(propState.subs);
+                        }
+                    }
                 }
 
                 return result;
             },
         };
 
-        let rootProxy = proxyCache.get(initialState) as T | undefined;
+        let rootProxy = (initialState as Record<symbol, T>)[STORE_PROXY_KEY];
         if (!rootProxy) {
             rootProxy = new Proxy(initialState, handler) as T;
-            proxyCache.set(initialState, rootProxy);
+            (initialState as Record<symbol, T>)[STORE_PROXY_KEY] = rootProxy;
         }
 
-        // A simplified setter that accepts a producer function (e.g. state => state.count++).
-        // We just run the producer on the proxy. The Proxy 'set' trap handles the rest automatically.
         const setStore = (producer: (state: T) => void) => producer(rootProxy!);
 
         return [rootProxy, setStore];
     }
 
     /****** Context (Theming & Dependency Injection) ******/
-
-    // A unique symbol map to hold the stacks for each context.
-    const contextValues = new Map<symbol, unknown[]>();
 
     /**
      * A definition object for a Context, used for dependency injection.
@@ -646,6 +776,7 @@ export namespace SolidUI {
     export interface Context<T> {
         id: symbol;
         defaultValue: T;
+        _stack: T[];
         /**
          * Runs the provided function within a scope where this Context is set to `value`.
          * @param value - The value to provide.
@@ -660,16 +791,13 @@ export namespace SolidUI {
      * @returns A {@link Context} object.
      */
     export function createContext<T>(defaultValue: T): Context<T> {
-        const id = Symbol('context');
-        contextValues.set(id, []);
-
+        const stack: T[] = [];
         return {
-            id,
+            id: Symbol('context'),
             defaultValue,
+            _stack: stack,
             provide(value: T, fn: () => void) {
-                const stack = contextValues.get(id)!;
                 stack.push(value);
-
                 try {
                     fn();
                 } finally {
@@ -686,9 +814,8 @@ export namespace SolidUI {
      * @returns The current value of the {@link Context}.
      */
     export function useContext<T>(context: Context<T>): T {
-        const stack = contextValues.get(context.id);
-
-        return stack && stack.length > 0 ? (stack[stack.length - 1] as T) : context.defaultValue;
+        const stack = context._stack;
+        return stack.length > 0 ? stack[stack.length - 1] : context.defaultValue;
     }
 
     /****** Factory ******/
@@ -702,12 +829,19 @@ export namespace SolidUI {
      * @param fn - The cleanup function to register.
      */
     export function onCleanup(fn: () => void): void {
-        currentCleanupList?.push(fn);
+        if (activeObserver !== null) {
+            if (activeObserver.cleanups === null) {
+                activeObserver.cleanups = [fn];
+            } else {
+                activeObserver.cleanups.push(fn);
+            }
+        } else if (currentCleanupList !== null) {
+            currentCleanupList.push(fn);
+        }
     }
 
     function setProperty<T>(instance: T, key: keyof T, value: unknown): void {
         try {
-            // We cast instance to a generic record to allow assignment. "Trust me, bro."
             (instance as unknown as Record<keyof T, unknown>)[key] = value;
         } catch {
             /* ignore read-only */
@@ -726,75 +860,68 @@ export namespace SolidUI {
         props: Reactive<P> = {},
         options?: ComponentOptions
     ): T {
-        // If the component is a function, just call it passing the raw 'props' (Reactive<P>) so the function can access
-        // the signals directly.
-        // The function is expected to call 'h' internally for a real UI Class, which will handle the bindings.
         if (!isClassConstructor(component)) return (component as FunctionalComponent<P, T>)(props);
 
         const ClassConstructor = component as Constructable<P, T>;
 
-        // Create a list to track all cleanups (effects, onCleanup calls) for this component.
-        // Handles nested calls (e.g., a Container creating a Button inside its constructor) by creating a call stack
-        // for cleanup contexts.
         const previousCleanupList = currentCleanupList;
-        const cleanupList: (() => void)[] = [];
-        currentCleanupList = cleanupList;
+        let localCleanupList: (() => void)[] | null = null;
+        currentCleanupList = null; // Lazy context during constructor execution
 
-        // Use a generic Record to build up the constructor parameters without Object.entries allocation.
         const constructorParams: Record<string, unknown> = {};
-        const effectOptions: EffectOptions = { deferTicks: options?.deferTicks ?? 0 };
+        let hasReactiveProps = false;
 
         for (const key in props) {
             if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
 
             const value = props[key];
 
-            if (/^on[A-Z]/.test(key) || !isAccessor(value)) {
+            if (isEventHandlerProp(key) || !isAccessor(value)) {
                 constructorParams[key] = value;
                 continue;
             }
 
+            hasReactiveProps = true;
             constructorParams[key] = (value as Accessor<unknown>)(); // Initial value.
         }
 
         const instance = new ClassConstructor(constructorParams as P);
 
-        // Setup reactive bindings.
-        for (const key in props) {
-            if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
+        // Setup reactive bindings only if reactive props exist
+        if (hasReactiveProps) {
+            if (localCleanupList === null) localCleanupList = [];
+            const effectOptions: EffectOptions = { deferTicks: options?.deferTicks ?? 0 };
 
-            const value = props[key];
+            for (const key in props) {
+                if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
 
-            if (/^on[A-Z]/.test(key) || !isAccessor(value)) continue;
+                const value = props[key];
 
-            const accessor = value as Accessor<unknown>;
-            const propKey = key as unknown as keyof T;
+                if (isEventHandlerProp(key) || !isAccessor(value)) continue;
 
-            const dispose = createEffect(() => {
-                setProperty(instance, propKey, accessor());
-            }, effectOptions);
+                const accessor = value as Accessor<unknown>;
+                const propKey = key as unknown as keyof T;
 
-            cleanupList.push(dispose); // Register this effect's disposer to the cleanup list.
+                const dispose = createEffect(() => {
+                    setProperty(instance, propKey, accessor());
+                }, effectOptions);
+
+                localCleanupList.push(dispose);
+            }
         }
 
-        if (cleanupList.length > 0) {
-            // If the instance has a 'delete' method, we monkey patch it to run all cleanups registered via onCleanup()
-            // or implicit effects when the instance is deleted.
-            // Using a structural type check (safer than 'any') because we don't know if T has 'delete', and we don't
-            // want to enforce an interface.
+        if (localCleanupList !== null && localCleanupList.length > 0) {
             const instanceWithDelete = instance as { delete?: (...args: unknown[]) => unknown };
             const originalDelete = instanceWithDelete.delete;
 
             if (typeof originalDelete === 'function') {
+                const cleanups = localCleanupList;
                 instanceWithDelete.delete = function (...args: unknown[]) {
-                    // Run all cleanups registered via onCleanup() or implicit effects.
-                    for (let i = 0; i < cleanupList.length; ++i) {
-                        cleanupList[i]();
+                    for (let i = 0; i < cleanups.length; ++i) {
+                        cleanups[i]();
                     }
 
-                    cleanupList.length = 0;
-
-                    // Call the original delete logic defined in the UI library.
+                    cleanups.length = 0;
                     return originalDelete.apply(this, args);
                 };
             }
@@ -802,8 +929,6 @@ export namespace SolidUI {
 
         currentCleanupList = previousCleanupList;
 
-        // Now that we are back in the parent's context, register this instance to be deleted if the parent scope is
-        // destroyed. Because of the monkey-patch above, calling `delete()` will also clean up all local effects.
         const instanceWithDelete = instance as { delete?: () => void };
 
         if (typeof instanceWithDelete.delete === 'function') {
@@ -828,8 +953,6 @@ export namespace SolidUI {
         render: (item: Accessor<T>, index: number) => unknown,
         options?: IndexOptions
     ): void {
-        // Track the disposers and data setters for every active row.
-        // We use this to update data without re-rendering, or kill rows on shrink.
         const rows: { setItem: Setter<T>; dispose: () => void }[] = [];
 
         createEffect(
@@ -838,7 +961,7 @@ export namespace SolidUI {
                 const newLength = list.length;
                 const oldLength = rows.length;
 
-                // If new rows are needed, updated the existing rows and create new ones.
+                // If new rows are needed, update existing rows and create new ones.
                 if (newLength > oldLength) {
                     for (let i = 0; i < oldLength; ++i) {
                         rows[i].setItem(list[i]);
@@ -846,24 +969,16 @@ export namespace SolidUI {
 
                     for (let i = oldLength; i < newLength; ++i) {
                         createRoot((dispose) => {
-                            // Create a specific signal for this row's data.
-                            // This allows the row to update its own properties without re-running the list effect.
                             const [item, setItem] = createSignal(list[i]);
-
-                            // Capture the UI element returned by the render function.
                             const uiElement = render(item, i);
 
-                            // Enhance the dispose function to ALSO delete the UI element.
                             const rowDispose = () => {
-                                dispose(); // Kills reactive effects.
-
-                                // Safely call `delete()` if the returned element supports it.
+                                dispose();
                                 if (uiElement && typeof (uiElement as { delete?: () => void }).delete === 'function') {
                                     (uiElement as { delete: () => void }).delete();
                                 }
                             };
 
-                            // Save control method to our tracker
                             rows.push({ setItem, dispose: rowDispose });
                         });
                     }
@@ -871,14 +986,14 @@ export namespace SolidUI {
                     return;
                 }
 
-                // If less rows are needed, dispose of the unnecessary ones.
+                // If fewer rows are needed, dispose of unnecessary ones.
                 if (newLength < oldLength) {
                     for (let i = oldLength - 1; i >= newLength; --i) {
-                        rows.pop()?.dispose(); // Kills effects and deletes the widget (via onCleanup in `h`).
+                        rows.pop()?.dispose();
                     }
                 }
 
-                // Update the remaining rows if the length is the same or after the shrink operation.
+                // Update remaining rows
                 for (let i = 0; i < newLength; ++i) {
                     rows[i].setItem(list[i]);
                 }

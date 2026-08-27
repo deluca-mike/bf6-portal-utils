@@ -52,12 +52,14 @@ SpatialOC.setLogging((text) => console.log(text), SpatialOC.LogLevel.Warning);
 let playerOrbitRoot: SpatialOC.SpatialElement | undefined;
 
 export function OnPlayerJoinGame(player: mod.Player) {
-    // 1. Create a virtual parent anchor attached to the player's position
+    // 1. Create a virtual parent anchor following the player's position and orientation
     playerOrbitRoot = SpatialOC.createEmpty();
-    playerOrbitRoot?.attachToPlayer(player, {
+    playerOrbitRoot?.setFollow({
+        target: player,
         offset: { x: 0, y: 1.5, z: 0 },
         trackRotation: true,
         yawOnly: true,
+        smoothing: 0, // Instant snap to match player motion exactly
     });
 
     const radius = 3.5;
@@ -267,14 +269,9 @@ The lightweight base hierarchy class extended by `ROOT_NODE` and `SpatialElement
 
 ##### Controllers & Trackers
 
-- `element.attachToPlayer(player: mod.Player, options?: AttachOptions): this` (attaches in world space; sets parent to `ROOT_NODE` and clears follow, orbit, and linear kinematics)
-- `element.attachToVehicle(vehicle: mod.Vehicle, options?: AttachOptions): this` (attaches in world space; sets parent to `ROOT_NODE` and clears follow, orbit, and linear kinematics)
-- `element.attachToObject(object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): this` (attaches in world space; sets parent to `ROOT_NODE` and clears follow, orbit, and linear kinematics)
-- `element.attachToTracker(tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined): this` (attaches in world space; sets parent to `ROOT_NODE` and clears follow, orbit, and linear kinematics)
-- `element.detachTracker(): this`
-- `element.setOrbit(options?: OrbitOptions | null): this` (orbits in parent space; clears attach trackers, follow options, and linear kinematics)
+- `element.setOrbit(options?: OrbitOptions | null): this` (orbits in parent space; clears follow options and linear kinematics)
 - `element.setLookAt(options?: LookAtOptions | null): this` (aims orientation at target; clears angular kinematics and disables orbit spin/tangent alignment)
-- `element.setFollow(options?: FollowOptions | null): this` (follows target in world space; sets parent to `ROOT_NODE` and clears attach trackers, orbit options, and linear kinematics)
+- `element.setFollow(options?: FollowOptions | null): this` (follows target in world space; sets parent to `ROOT_NODE` and clears orbit options and linear kinematics)
 - `element.setKinematics(options?: KinematicsOptions | null): this` (linear kinematics clear positional controllers; angular kinematics clear rotational controllers)
 
 ---
@@ -295,29 +292,14 @@ The lightweight base hierarchy class extended by `ROOT_NODE` and `SpatialElement
 - `upAxis?: Vector3` – Up axis reference vector. Default: (0, 1, 0).
 - _Note: Configuring look-at behavior clears angular kinematics and disables orbit spin/tangent alignment._
 
-#### `AttachOptions`
-
-- `offset?: Vector3` – Positional offset relative to the target's orientation coordinate frame.
-- `trackRotation?: boolean` – Whether to track and match the target's rotation. Default: true.
-- `yawOnly?: boolean` – When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object.
-- _Note: Attaching an element automatically sets its parent to `ROOT_NODE` and clears any active follow, orbit, or linear kinematics._
-
-#### `OrbitOptions`
-
-- `axis?: Vector3` – Rotation axis in parent or world space. Default: (0, 1, 0).
-- `speedRadPerSec: number` – Orbital speed in radians per second. Positive is counter-clockwise.
-- `radius?: number` – Orbit radius. If omitted, calculated from initial distance to center.
-- `center?: Vector3` – Custom orbit center in parent coordinates. Default: (0, 0, 0).
-- `faceTangent?: boolean` – Automatically align element forward direction tangent to the orbital path. Default: false.
-- `selfSpinSpeedRadPerSec?: number` – Simultaneous self-spin speed around local up axis in radians per second.
-- _Note: Configuring orbit behavior clears any active attachment trackers, follow controllers, or linear kinematics._
-
 #### `FollowOptions`
 
-- `target?: SpatialElement | mod.Player` – The target to follow (SpatialElement or Player).
-- `offset?: Vector3` – Desired offset from the target in world space.
-- `smoothSpeed?: number` – Damping speed factor (0 for instant snap, > 0 for smooth lerp). Default: 10.
-- _Note: Configuring follow behavior automatically sets the element's parent to `ROOT_NODE` and clears any active attachment trackers, orbit controllers, or linear kinematics._
+- `target?: TrackableObject | SpatialElement | TransparentObject` – The target to follow (Player, Vehicle, native TrackableObject prop/spawner, SpatialElement, or plain TransparentObject `{ position, rotation }`).
+- `offset?: Vector3` – Desired offset. If tracking rotation or the target has orientation, the offset is transformed into the target's coordinate frame.
+- `smoothing?: number | FollowSmoothingFunction` – Damping speed factor (`0` for instant rigid snap, `> 0` for smooth lerp), or a custom interpolation function `(current, target, dt, out?: Vector3) => Vector3`. Default: `10`.
+- `trackRotation?: boolean` – Whether to track and match the target's rotation. Default: `false`.
+- `yawOnly?: boolean` – When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: `false`.
+- _Note: Configuring follow behavior automatically sets the element's parent to `ROOT_NODE` and clears any active orbit controllers or linear kinematics._
 
 #### `KinematicsOptions`
 

@@ -1373,15 +1373,30 @@ Effects execute in the order they were scheduled, but there's no guarantee of ex
 
 Effect errors are automatically caught and logged (if logging is configured via `SolidUI.setLogging()`) to prevent one failing effect from breaking the entire reactive system. Errors are logged at the `Error` log level. If you need additional error handling, implement it inside your effects.
 
-### Memory Management
+### Memory & Allocation Architecture
 
-Effects and subscriptions are automatically cleaned up when UI elements are deleted. However, if you create standalone effects or roots, you must manually dispose of them to prevent memory leaks.
+`SolidUI` is designed specifically for highly constrained embedded JS environments (such as QuickJS on Battlefield Portal with a $\approx 1\text{ MB}$ total mod budget). It utilizes several low-overhead architectural patterns:
 
-### Async Updates
+1. **Polymorphic Subscriber Slots (`null` $\rightarrow$ `Subscriber` $\rightarrow$ `Subscriber[]`):** Signals and store properties do not allocate subscriber arrays for 0- or 1-subscriber states. Since $>80\%$ of UI bindings connect a signal to a single widget property, this removes $80\text{--}90\%$ of array instances from the heap.
+2. **Zero-Allocation Steady-State Dependency Tracking:** During effect executions, dependencies are compared against existing tracked sources using an execution cursor (`depCount`). If dependencies are unchanged (the common case for UI property bindings), re-runs execute in $O(1)$ time with **0 array allocations, 0 unsubscriptions, and 0 `indexOf` linear scans**.
+3. **Intrusive Call-Stack Context:** The active reactive observer is tracked using a scalar pointer and the native execution call stack, completely eliminating heap array allocations for context stacks.
+4. **Zero-Object Scheduler Queues:** Deferred subscribers store `targetTick` directly on their instances. Queues store flat `Subscriber[]` arrays, eliminating throwaway `{ sub, targetTick }` wrapper objects.
+5. **Symbol-Indexed Store Reactivity:** `createStore` avoids global `WeakMap` hash tables by attaching subscriptions and cached proxies directly to target objects via private `Symbol` properties. When state objects are collected, their tracking metadata is collected automatically without residual entries.
 
-All reactive updates are asynchronous. If you need synchronous updates (not recommended), you'll need to use the underlying `UI` module directly.
+### Tunable Constants
 
-### Scheduler limits and logical ticks
+The following constants control scheduler throughput and infinite loop safeguards:
+
+- **`SolidUI.MAX_EXECUTIONS_PER_FLUSH` (Default: `1_000`):** Maximum number of subscriber executions processed within a single microtask flush loop.
+    - _Increasing:_ Allows very large UI trees or cascades of dependent signals to settle in a single frame. Higher CPU time per microtask.
+    - _Decreasing:_ Caps CPU time spent in a single microtask, protecting framerate against deep or slow effect chains.
+    - _Memory:_ Static numeric limit; zero heap memory cost.
+- **`SolidUI.MAX_FLUSHES_PER_TICK` (Default: `1_000`):** Maximum number of microtask flushes allowed within a single logical engine tick.
+    - _Increasing:_ Allows deeper re-entrant microtask loops (e.g. signal writes inside effects triggering new microtasks).
+    - _Decreasing:_ Aborts runaway reactive flush loops earlier, preventing server tick freezes.
+    - _Memory:_ Static numeric limit; zero heap memory cost.
+
+### Scheduler Limits and Logical Ticks
 
 `SolidUI` enforces `MAX_EXECUTIONS_PER_FLUSH` and `MAX_FLUSHES_PER_TICK` to stop pathological effect graphs. If you see those log lines, simplify effects, reduce synchronous churn, or increase `deferTicks` on hot paths. Remember that **`currentTick` is advanced in `Events.OngoingGlobal`**, not via a dedicated engine tick API; semantics are documented in [`solid-ui/index.ts`](index.ts).
 

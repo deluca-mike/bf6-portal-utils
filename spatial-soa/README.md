@@ -61,13 +61,15 @@ SpatialSOA.setLogging((text) => console.log(text), SpatialSOA.LogLevel.Warning);
 let playerOrbitRoot: SpatialSOA.SpatialNodeID | undefined;
 
 export function OnPlayerJoinGame(player: mod.Player) {
-    // 1. Create a virtual parent anchor attached to the player's position
+    // 1. Create a virtual parent anchor following the player's position and orientation
     playerOrbitRoot = SpatialSOA.createEmpty() ?? undefined;
     if (playerOrbitRoot !== undefined) {
-        SpatialSOA.attachToPlayer(playerOrbitRoot, player, {
+        SpatialSOA.setFollow(playerOrbitRoot, {
+            target: player,
             offset: { x: 0, y: 1.5, z: 0 },
             trackRotation: true,
             yawOnly: true,
+            smoothing: 0, // Instant snap to match player motion exactly
         });
     }
 
@@ -170,16 +172,11 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `localToWorldVector(id: SpatialNodeID, localVec: Vector3, out?: Vector3): Vector3 | undefined`
 - `worldToLocalVector(id: SpatialNodeID, worldVec: Vector3, out?: Vector3): Vector3 | undefined`
 
-#### Attachments & Controllers
+#### Controllers & Trackers
 
-- `attachToPlayer(id: SpatialNodeID, player: mod.Player, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
-- `attachToVehicle(id: SpatialNodeID, vehicle: mod.Vehicle, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
-- `attachToObject(id: SpatialNodeID, object: Exclude<mod.Object, mod.Player | mod.Vehicle>, options?: AttachOptions): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
-- `attachToTracker(id: SpatialNodeID, tracker: () => { position: Vector3; rotation?: Quaternion | Vector3 } | undefined): void` (attaches in world space; sets parent to `ROOT_NODE_ID` and clears follow, orbit, and linear kinematics)
-- `detachTracker(id: SpatialNodeID): void`
-- `setOrbit(id: SpatialNodeID, options?: OrbitOptions | null): void` (orbits in parent space; clears attach trackers, follow options, and linear kinematics)
+- `setOrbit(id: SpatialNodeID, options?: OrbitOptions | null): void` (orbits in parent space; clears follow options and linear kinematics)
 - `setLookAt(id: SpatialNodeID, options?: LookAtOptions | null): void` (aims orientation at target; clears angular kinematics and disables orbit spin/tangent alignment)
-- `setFollow(id: SpatialNodeID, options?: FollowOptions | null): void` (follows target in world space; sets parent to `ROOT_NODE_ID` and clears attach trackers, orbit options, and linear kinematics)
+- `setFollow(id: SpatialNodeID, options?: FollowOptions | null): void` (follows target in world space; sets parent to `ROOT_NODE_ID` and clears orbit options and linear kinematics)
 - `setKinematics(id: SpatialNodeID, options?: KinematicsOptions | null): void` (linear kinematics clear positional controllers; angular kinematics clear rotational controllers)
 
 #### Engine Synchronization
@@ -205,28 +202,14 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `upAxis?: Vector3` – World up reference vector. Default: (0, 1, 0).
 - _Note: Configuring look-at behavior clears angular kinematics and disables orbit spin/tangent alignment._
 
-#### `AttachOptions`
-
-- `offset?: Vector3` – Positional offset relative to the target's orientation coordinate frame.
-- `trackRotation?: boolean` – Whether to track and match the target's rotation. Default: true.
-- `yawOnly?: boolean` – When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: true for Player, false for Vehicle and Object.
-- _Note: Attaching a node automatically sets its parent to `ROOT_NODE_ID` and clears any active follow, orbit, or linear kinematics._
-
-#### `OrbitOptions`
-
-- `axis?: Vector3` – Rotation axis in parent or world space. Default: (0, 1, 0).
-- `speedRadPerSec: number` – Orbital speed in radians per second. Positive is counter-clockwise.
-- `center?: Vector3` – Custom orbit center in parent coordinates. Default: (0, 0, 0).
-- `faceTangent?: boolean` – Automatically align node forward direction tangent to the orbital path. Default: false.
-- `selfSpinSpeedRadPerSec?: number` – Simultaneous self-spin speed around local up axis in radians per second.
-- _Note: Configuring orbit behavior clears any active attachment trackers, follow controllers, or linear kinematics._
-
 #### `FollowOptions`
 
-- `target?: SpatialNodeID | mod.Player` – The target to follow (SpatialNodeID or Player).
-- `offset?: Vector3` – Desired offset from the target in world space.
-- `smoothSpeed?: number` – Damping speed factor (0 for instant snap, > 0 for smooth lerp). Default: 10.
-- _Note: Configuring follow behavior automatically sets the node's parent to `ROOT_NODE_ID` and clears any active attachment trackers, orbit controllers, or linear kinematics._
+- `target?: TrackableObject | SpatialNodeID | TransparentObject` – The target to follow (Player, Vehicle, native TrackableObject prop/spawner, SpatialNodeID, or plain TransparentObject `{ position, rotation }`).
+- `offset?: Vector3` – Desired offset. If tracking rotation or the target has orientation, the offset is transformed into the target's coordinate frame.
+- `smoothing?: number | FollowSmoothingFunction` – Damping speed factor (`0` for instant rigid snap, `> 0` for smooth lerp), or a custom interpolation function `(current, target, dt, out?: Vector3) => Vector3`. Default: `10`.
+- `trackRotation?: boolean` – Whether to track and match target rotation. Default: `false`.
+- `yawOnly?: boolean` – When tracking rotation, whether to constrain rotation to yaw (horizontal) only. Default: `false`.
+- _Note: Configuring follow behavior automatically sets the node's parent to `ROOT_NODE_ID` and clears any active orbit controllers or linear kinematics._
 
 #### `KinematicsOptions`
 
@@ -234,4 +217,4 @@ export function OnPlayerLeaveGame(playerId: number) {
 - `angularVelocity?: Vector3` – Angular velocity vector (axis-angle in radians/second).
 - `linearAcceleration?: Vector3` – Linear acceleration vector (meters/second²).
 - `angularAcceleration?: Vector3` – Angular acceleration vector (radians/second²).
-- _Note: Specifying linear velocity/acceleration clears positional controllers (orbit, follow, attach); specifying angular velocity/acceleration clears look-at and orbit spin._
+- _Note: Specifying linear velocity/acceleration clears positional controllers (orbit, follow); specifying angular velocity/acceleration clears look-at and orbit spin._
