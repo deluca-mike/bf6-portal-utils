@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
     bundleModule,
     createQuickJSServerContext,
@@ -10,12 +10,15 @@ import {
 const benchmarkResults: QuickJSBenchmarkResult[] = [];
 
 describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simulation)', () => {
+    let bundleCode: string;
     let server: QuickJSServerInstance;
 
     beforeAll(async () => {
         const bundlePath = resolve(__dirname, 'bundleEntry.ts');
-        const bundleCode = await bundleModule(bundlePath, 'UIBundle');
+        bundleCode = await bundleModule(bundlePath, 'UIBundle');
+    });
 
+    beforeEach(async () => {
         server = await createQuickJSServerContext();
         server.evalCode(`
             ${bundleCode}
@@ -35,14 +38,16 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
         server.flushJobs();
     });
 
+    afterEach(() => {
+        server.dispose();
+    });
+
     afterAll(() => {
         console.log('\n========================================================================================');
         console.log('             UI MODULE QUICKJS / BF6 PORTAL ARC MEMORY PROFILING REPORT');
         console.log('========================================================================================');
         console.table(benchmarkResults);
         console.log('========================================================================================\n');
-
-        server.dispose();
     });
 
     it('Scenario 1: Massive Static Widget Grid (1,000 Core Widgets)', () => {

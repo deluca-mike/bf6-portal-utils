@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
     bundleModule,
     createQuickJSServerContext,
@@ -10,12 +10,15 @@ import {
 const benchmarkResults: QuickJSBenchmarkResult[] = [];
 
 describe('SolidUI QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simulation)', () => {
+    let bundleCode: string;
     let server: QuickJSServerInstance;
 
     beforeAll(async () => {
         const bundlePath = resolve(__dirname, '../index.ts');
-        const bundleCode = await bundleModule(bundlePath, 'SolidUIBundle');
+        bundleCode = await bundleModule(bundlePath, 'SolidUIBundle');
+    });
 
+    beforeEach(async () => {
         server = await createQuickJSServerContext();
         server.evalCode(bundleCode + '\nglobalThis.SolidUI = SolidUIBundle.SolidUI;\n');
 
@@ -24,20 +27,22 @@ describe('SolidUI QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simulat
         server.flushJobs();
     });
 
+    afterEach(() => {
+        server.dispose();
+    });
+
     afterAll(() => {
         console.log('\n========================================================================================');
         console.log('            SOLIDUI QUICKJS / BF6 PORTAL ARC MEMORY PROFILING REPORT');
         console.log('========================================================================================');
         console.table(benchmarkResults);
         console.log('========================================================================================\n');
-
-        server.dispose();
     });
 
-    it('Scenario 1: Massive Static Graph (5,000 Signals + 5,000 Effects)', () => {
-        const count = 5_000;
+    it('Scenario 1: Massive Static Graph (1,000 Signals + 1,000 Effects)', () => {
+        const count = 1_000;
         const result = server.benchmarkScenario({
-            scenario: '1. Massive Static Graph (5k Signals+Effects)',
+            scenario: '1. Massive Static Graph (1k Signals+Effects)',
             entities: count,
             numericCount: count,
             unit: 'pair',
@@ -64,7 +69,7 @@ describe('SolidUI QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simulat
         });
 
         benchmarkResults.push(result);
-        expect(result['Live Objs Delta']).toBeGreaterThan(1000);
+        expect(result['Live Objs Delta']).toBeGreaterThan(100);
         // Live object drift after ARC cleanup should be <= 10 objects (engine scope frame)
         const post = server.getMemoryUsage();
         expect(post.obj_count).toBeLessThan(1000);

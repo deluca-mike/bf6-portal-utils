@@ -33,22 +33,28 @@ export namespace SolidUISOA {
     /**
      * Maximum number of concurrent subscribers (effects, memos, and reactive property bindings) supported.
      *
-     * Performance vs Memory trade-offs:
-     * - Flat buffers allocate ~14 bytes of TypedArray memory per subscriber slot.
-     * - Increasing this value supports larger UI trees and more simultaneous effects.
-     * - Decreasing this value saves static startup heap memory.
+     * Static Memory Sizing:
+     * - Flat subscriber buffers allocate ~19 bytes per slot:
+     *   15 bytes (Uint8/Uint16/Uint32/Int16 TypedArrays & queues) + ~4 bytes (array references).
+     *
+     * Total Static Buffer Footprint Formula:
+     * - Static Heap (bytes) ≈ (19 * MAX_SUBSCRIBERS) + (5 * MAX_SIGNALS)
+     * - Default (1,024 subs, 2,048 sigs) ≈ ~24–30 KB.
      */
-    export const MAX_SUBSCRIBERS = 8_192;
+    export const MAX_SUBSCRIBERS = 1_024;
 
     /**
      * Maximum number of concurrent reactive signals supported across all components and stores.
      *
-     * Performance vs Memory trade-offs:
-     * - Flat buffers allocate ~10 bytes of TypedArray memory per signal slot.
-     * - Increasing this value supports more fine-grained state variables.
-     * - Decreasing this value reduces upfront resident memory.
+     * Static Memory Sizing:
+     * - Flat signal buffers allocate ~5 bytes per slot:
+     *   3 bytes (Uint8/Int16 TypedArrays) + ~2 bytes (array references).
+     *
+     * Total Static Buffer Footprint Formula:
+     * - Static Heap (bytes) ≈ (19 * MAX_SUBSCRIBERS) + (5 * MAX_SIGNALS)
+     * - Default (1,024 subs, 2,048 sigs) ≈ ~24–30 KB.
      */
-    export const MAX_SIGNALS = 8_192;
+    export const MAX_SIGNALS = 2_048;
 
     /**
      * Maximum number of subscriber executions allowed in a single microtask flush loop.
