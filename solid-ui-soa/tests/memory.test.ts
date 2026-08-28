@@ -71,8 +71,8 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         console.log('========================================================================================\n');
     });
 
-    it('Scenario 1: Massive Static Graph (1,000 Signals + 1,000 Effects)', async () => {
-        const count = 1_000;
+    it('Scenario 1: Massive Static Graph (5,000 Signals + 5,000 Effects)', async () => {
+        const count = 5_000;
         const initial = await getHeapAndGCMetrics();
 
         const signals: [SolidUI.Accessor<number>, SolidUI.Setter<number>][] = [];
@@ -98,7 +98,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         const drift = postCleanup.heap - initial.heap;
 
         benchmarkResults.push({
-            Scenario: '1. Massive Static Graph (1k Signals+Effects)',
+            Scenario: '1. Massive Static Graph (5k Signals+Effects)',
             Entities: count,
             'Heap Delta': formatBytes(allocatedDelta),
             'Per-Item': `${(allocatedDelta / count).toFixed(1)} B`,

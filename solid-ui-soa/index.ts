@@ -38,7 +38,7 @@ export namespace SolidUISOA {
      * - Increasing this value supports larger UI trees and more simultaneous effects.
      * - Decreasing this value saves static startup heap memory.
      */
-    export const MAX_SUBSCRIBERS = 4_096;
+    export const MAX_SUBSCRIBERS = 8_192;
 
     /**
      * Maximum number of concurrent reactive signals supported across all components and stores.

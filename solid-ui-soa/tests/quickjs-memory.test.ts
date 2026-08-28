@@ -34,10 +34,10 @@ describe('SolidUISOA QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simu
         server.dispose();
     });
 
-    it('Scenario 1: Massive Static Graph (1,000 Signals + 1,000 Effects)', () => {
-        const count = 1_000;
+    it('Scenario 1: Massive Static Graph (5,000 Signals + 5,000 Effects)', () => {
+        const count = 5_000;
         const result = server.benchmarkScenario({
-            scenario: '1. Massive Static Graph (1k Signals+Effects)',
+            scenario: '1. Massive Static Graph (5k Signals+Effects)',
             entities: count,
             numericCount: count,
             unit: 'pair',
