@@ -9,6 +9,8 @@
     "scripts": {
         "test": "vitest run --exclude '**/*memory.test.ts'",
         "test:memory": "NODE_OPTIONS=\"--expose-gc\" vitest run memory.test.ts",
+        "test:memory:node": "NODE_OPTIONS=\"--expose-gc\" vitest run --exclude '**/*quickjs-memory.test.ts' memory.test.ts",
+        "test:memory:quickjs": "vitest run quickjs-memory.test.ts",
         "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}' --log-level warn",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
@@ -35,6 +37,7 @@
         "eslint-plugin-jsdoc": "^62.6.0",
         "eslint-plugin-prettier": "^5.5.5",
         "prettier": "^3.8.1",
+        "quickjs-emscripten": "^0.32.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.56.0",

@@ -8,9 +8,18 @@ function forceGC(): void {
     }
 }
 
-function getHeapUsed(): number {
+let gcCount = 0;
+let gcTimeMs = 0;
+
+async function getHeapAndGCMetrics(): Promise<{ heap: number; gcRuns: number; gcTime: number }> {
     forceGC();
-    return process.memoryUsage().heapUsed;
+    forceGC();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    return {
+        heap: process.memoryUsage().heapUsed,
+        gcRuns: gcCount,
+        gcTime: gcTimeMs,
+    };
 }
 
 function formatBytes(bytes: number): string {
@@ -32,11 +41,9 @@ interface BenchmarkMetric {
 const benchmarkResults: BenchmarkMetric[] = [];
 
 describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
-    let gcCount = 0;
-    let gcTimeMs = 0;
     let obs: PerformanceObserver | null = null;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         try {
             obs = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
@@ -48,6 +55,8 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         } catch {
             // perf_hooks GC observer not supported in this runtime
         }
+
+        await getHeapAndGCMetrics();
     });
 
     afterAll(() => {
@@ -62,11 +71,9 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         console.log('========================================================================================\n');
     });
 
-    it('Scenario 1: Massive Static Graph (1,000 Signals + 1,000 Effects)', () => {
+    it('Scenario 1: Massive Static Graph (1,000 Signals + 1,000 Effects)', async () => {
         const count = 1_000;
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const signals: [SolidUI.Accessor<number>, SolidUI.Setter<number>][] = [];
         const disposers: (() => void)[] = [];
@@ -77,8 +84,8 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             disposers.push(SolidUI.createEffect(() => sig[0]()));
         }
 
-        const allocatedHeap = getHeapUsed();
-        const allocatedDelta = allocatedHeap - initialHeap;
+        const allocated = await getHeapAndGCMetrics();
+        const allocatedDelta = allocated.heap - initial.heap;
 
         // Dispose all effects
         for (let i = 0; i < disposers.length; ++i) {
@@ -87,16 +94,16 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         signals.length = 0;
         disposers.length = 0;
 
-        const postCleanupHeap = getHeapUsed();
-        const drift = postCleanupHeap - initialHeap;
+        const postCleanup = await getHeapAndGCMetrics();
+        const drift = postCleanup.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '1. Massive Static Graph (1k Signals+Effects)',
             Entities: count,
             'Heap Delta': formatBytes(allocatedDelta),
             'Per-Item': `${(allocatedDelta / count).toFixed(1)} B`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
@@ -122,9 +129,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             );
         }
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         for (let m = 0; m < mutations; ++m) {
             const idx = m % signalCount;
@@ -135,21 +140,23 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         }
         await Promise.resolve();
 
-        const endHeap = getHeapUsed();
-        const drift = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const drift = end.heap - initial.heap;
 
         for (let i = 0; i < disposers.length; ++i) {
             disposers[i]();
         }
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '2. High-Frequency Steady-State Mutations',
             Entities: `${mutations} updates`,
             'Heap Delta': formatBytes(drift),
             'Per-Item': `${(drift / mutations).toFixed(2)} B/op`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
 
         expect(totalEffectRuns).toBeGreaterThan(0);
@@ -180,9 +187,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             );
         }
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         for (let f = 0; f < flips; ++f) {
             const idx = f % branchCount;
@@ -193,21 +198,23 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         }
         await Promise.resolve();
 
-        const endHeap = getHeapUsed();
-        const delta = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const delta = end.heap - initial.heap;
 
         for (let i = 0; i < disposers.length; ++i) {
             disposers[i]();
         }
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '3. Dynamic Branching & Dependency Rewiring',
             Entities: `${flips} flips`,
             'Heap Delta': formatBytes(delta),
             'Per-Item': `${(delta / flips).toFixed(2)} B/flip`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
     });
 
@@ -227,9 +234,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             }
         }
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const widgetCount = 500;
         const widgets: MockWidget[] = [];
@@ -245,24 +250,24 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             widgets.push(widget);
         }
 
-        const peakHeap = getHeapUsed();
-        const peakDelta = peakHeap - initialHeap;
+        const peak = await getHeapAndGCMetrics();
+        const peakDelta = peak.heap - initial.heap;
 
         for (let i = 0; i < widgets.length; ++i) {
             widgets[i].delete();
         }
         widgets.length = 0;
 
-        const postTeardownHeap = getHeapUsed();
-        const drift = postTeardownHeap - initialHeap;
+        const postTeardown = await getHeapAndGCMetrics();
+        const drift = postTeardown.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '4. Component Lifecycle (500 Mount/Unmounts)',
             Entities: widgetCount,
             'Heap Delta': formatBytes(peakDelta),
             'Per-Item': `${(peakDelta / widgetCount).toFixed(1)} B/widget`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': postTeardown.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postTeardown.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
@@ -302,9 +307,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             ++scoreUpdates;
         });
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const ops = 5_000;
         for (let i = 0; i < ops; ++i) {
@@ -324,20 +327,22 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
         }
         await Promise.resolve();
 
-        const endHeap = getHeapUsed();
-        const delta = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const delta = end.heap - initial.heap;
 
         dispose1();
         dispose2();
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '5. Deep Store Property Mutations',
             Entities: `${ops} mutations`,
             'Heap Delta': formatBytes(delta),
             'Per-Item': `${(delta / ops).toFixed(2)} B/mutation`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
 
         expect(healthUpdates).toBeGreaterThan(0);
@@ -368,9 +373,7 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             });
         });
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const cycles = 50;
         for (let c = 0; c < cycles; ++c) {
@@ -383,19 +386,21 @@ describe('SolidUISOA Memory & Garbage Collection Profiling', () => {
             await Promise.resolve();
         }
 
-        const endHeap = getHeapUsed();
-        const delta = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const delta = end.heap - initial.heap;
 
         disposeRoot();
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '6. Index List Grow & Shrink Cycles',
             Entities: `${cycles} cycles (10<->100 items)`,
             'Heap Delta': formatBytes(delta),
             'Per-Item': `${(delta / cycles).toFixed(1)} B/cycle`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
     });
 });

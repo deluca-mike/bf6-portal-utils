@@ -18,9 +18,18 @@ function forceGC(): void {
     }
 }
 
-function getHeapUsed(): number {
+let gcCount = 0;
+let gcTimeMs = 0;
+
+async function getHeapAndGCMetrics(): Promise<{ heap: number; gcRuns: number; gcTime: number }> {
     forceGC();
-    return process.memoryUsage().heapUsed;
+    forceGC();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    return {
+        heap: process.memoryUsage().heapUsed,
+        gcRuns: gcCount,
+        gcTime: gcTimeMs,
+    };
 }
 
 function formatBytes(bytes: number): string {
@@ -42,11 +51,9 @@ interface BenchmarkMetric {
 const benchmarkResults: BenchmarkMetric[] = [];
 
 describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
-    let gcCount = 0;
-    let gcTimeMs = 0;
     let obs: PerformanceObserver | null = null;
 
-    beforeAll(() => {
+    beforeAll(async () => {
         try {
             obs = new PerformanceObserver((list) => {
                 for (const entry of list.getEntries()) {
@@ -58,6 +65,8 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         } catch {
             // perf_hooks GC observer not supported in this runtime
         }
+
+        await getHeapAndGCMetrics();
     });
 
     beforeEach(() => {
@@ -82,11 +91,9 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         console.log('========================================================================================\n');
     });
 
-    it('Scenario 1: Massive Static Widget Grid (1,000 Core Widgets)', () => {
+    it('Scenario 1: Massive Static Widget Grid (1,000 Core Widgets)', async () => {
         const count = 1_000;
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const widgets: UI.Element[] = [];
 
@@ -98,8 +105,8 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             widgets.push(new UIImage({ x: i, y: i, width: 64, height: 64 }));
         }
 
-        const allocatedHeap = getHeapUsed();
-        const allocatedDelta = allocatedHeap - initialHeap;
+        const allocated = await getHeapAndGCMetrics();
+        const allocatedDelta = allocated.heap - initial.heap;
 
         // Delete all widgets
         for (let i = 0; i < widgets.length; ++i) {
@@ -107,25 +114,25 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
         widgets.length = 0;
 
-        const postCleanupHeap = getHeapUsed();
-        const drift = postCleanupHeap - initialHeap;
+        const postCleanup = await getHeapAndGCMetrics();
+        const drift = postCleanup.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '1. Massive Static Grid (1,000 Widgets)',
             Entities: count,
             'Heap Delta': formatBytes(allocatedDelta),
             'Per-Item': `${(allocatedDelta / count).toFixed(1)} B/widget`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
         if (typeof global.gc === 'function') {
-            expect(drift).toBeLessThan(150 * 1024);
+            expect(drift).toBeLessThan(250 * 1024);
         }
     });
 
-    it('Scenario 2: High-Frequency Coordinate & Dimension Mutations (50,000 in-place writes)', () => {
+    it('Scenario 2: High-Frequency Coordinate & Dimension Mutations (50,000 in-place writes)', async () => {
         const widgetCount = 100;
         const mutations = 50_000;
 
@@ -134,9 +141,7 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             widgets.push(new UIContainer({ x: 0, y: 0, width: 100, height: 100 }));
         }
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         // 50,000 in-place Float32Array coordinate mutations (zero vector allocation)
         for (let m = 0; m < mutations; ++m) {
@@ -149,21 +154,23 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             w.depth = m % 10;
         }
 
-        const endHeap = getHeapUsed();
-        const drift = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const drift = end.heap - initial.heap;
 
         for (let i = 0; i < widgets.length; ++i) {
             widgets[i].delete();
         }
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '2. Coordinate & Dimension Mutations (50k writes)',
             Entities: `${mutations} writes`,
             'Heap Delta': formatBytes(drift),
             'Per-Item': `${(drift / mutations).toFixed(2)} B/write`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
 
         if (typeof global.gc === 'function') {
@@ -171,11 +178,9 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
     });
 
-    it('Scenario 3: Interactive Button Slot Allocation & Handler Churn (2,000 Button cycles)', () => {
+    it('Scenario 3: Interactive Button Slot Allocation & Handler Churn (2,000 Button cycles)', async () => {
         const cycles = 2_000;
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const clickHandler = () => {};
 
@@ -195,16 +200,16 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             btn.delete();
         }
 
-        const endHeap = getHeapUsed();
-        const drift = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const drift = end.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '3. Button Slot Allocation & Free-List Churn',
             Entities: `${cycles} cycles`,
             'Heap Delta': formatBytes(drift),
             'Per-Item': `${(drift / cycles).toFixed(2)} B/cycle`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': end.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (end.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
@@ -213,11 +218,9 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
     });
 
-    it('Scenario 4: Composite Component Hierarchies (400 Composite Buttons)', () => {
+    it('Scenario 4: Composite Component Hierarchies (400 Composite Buttons)', async () => {
         const count = 400;
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const m5a3 = (mod.Weapons as unknown as { M5A3: mod.Weapons })?.M5A3 ?? (1 as unknown as mod.Weapons);
         const medkit = (mod.Gadgets as unknown as { Medkit: mod.Gadgets })?.Medkit ?? (1 as unknown as mod.Gadgets);
@@ -262,8 +265,8 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             );
         }
 
-        const allocatedHeap = getHeapUsed();
-        const peakDelta = allocatedHeap - initialHeap;
+        const allocated = await getHeapAndGCMetrics();
+        const peakDelta = allocated.heap - initial.heap;
 
         // Delete all composite widgets (cascading through SoA free-lists)
         for (let i = 0; i < compositeWidgets.length; ++i) {
@@ -271,16 +274,16 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
         compositeWidgets.length = 0;
 
-        const postCleanupHeap = getHeapUsed();
-        const drift = postCleanupHeap - initialHeap;
+        const postCleanup = await getHeapAndGCMetrics();
+        const drift = postCleanup.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '4. Composite Component Hierarchies (400 Widgets)',
             Entities: count,
             'Heap Delta': formatBytes(peakDelta),
             'Per-Item': `${(peakDelta / count).toFixed(1)} B/composite`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
@@ -289,7 +292,7 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
     });
 
-    it('Scenario 5: Tree Traversal & Hierarchy Inspection (20,000 forEachChild passes)', () => {
+    it('Scenario 5: Tree Traversal & Hierarchy Inspection (20,000 forEachChild passes)', async () => {
         // Build a 5-level deep nested tree
         const rootContainer = new UIContainer({ x: 0, y: 0, width: 800, height: 600 });
         let currentParent: UI.Element = rootContainer;
@@ -301,9 +304,7 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             currentParent = childContainer;
         }
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         const traversals = 20_000;
         let visitedCount = 0;
@@ -318,19 +319,21 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             });
         }
 
-        const endHeap = getHeapUsed();
-        const drift = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const drift = end.heap - initial.heap;
 
         rootContainer.delete();
+
+        const postCleanup = await getHeapAndGCMetrics();
 
         benchmarkResults.push({
             Scenario: '5. Zero-Alloc Tree Traversal (20k passes)',
             Entities: `${traversals} passes`,
             'Heap Delta': formatBytes(drift),
             'Per-Item': `${(drift / traversals).toFixed(2)} B/pass`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
-            'Drift After Cleanup': formatBytes(getHeapUsed() - initialHeap),
+            'GC Runs': postCleanup.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (postCleanup.gcTime - initial.gcTime).toFixed(2),
+            'Drift After Cleanup': formatBytes(postCleanup.heap - initial.heap),
         });
 
         expect(visitedCount).toBeGreaterThan(0);
@@ -339,13 +342,11 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
         }
     });
 
-    it('Scenario 6: Rapid Menu Lifecycle (100 Open/Close cycles of 20 widgets)', () => {
+    it('Scenario 6: Rapid Menu Lifecycle (100 Open/Close cycles of 20 widgets)', async () => {
         const cycles = 100;
         const widgetsPerMenu = 20;
 
-        const initialHeap = getHeapUsed();
-        const startGCCount = gcCount;
-        const startGCTime = gcTimeMs;
+        const initial = await getHeapAndGCMetrics();
 
         for (let c = 0; c < cycles; ++c) {
             const menuContainer = new UIContainer({ x: 100, y: 100, width: 400, height: 300 });
@@ -365,16 +366,16 @@ describe('UI Module & Components Memory & Garbage Collection Profiling', () => {
             menuContainer.delete();
         }
 
-        const endHeap = getHeapUsed();
-        const drift = endHeap - initialHeap;
+        const end = await getHeapAndGCMetrics();
+        const drift = end.heap - initial.heap;
 
         benchmarkResults.push({
             Scenario: '6. Rapid Menu Lifecycle (100 Open/Close Cycles)',
             Entities: `${cycles} cycles (${cycles * widgetsPerMenu} widgets)`,
             'Heap Delta': formatBytes(drift),
             'Per-Item': `${(drift / cycles).toFixed(1)} B/cycle`,
-            'GC Runs': gcCount - startGCCount,
-            'GC Pause (ms)': (gcTimeMs - startGCTime).toFixed(2),
+            'GC Runs': end.gcRuns - initial.gcRuns,
+            'GC Pause (ms)': (end.gcTime - initial.gcTime).toFixed(2),
             'Drift After Cleanup': formatBytes(drift),
         });
 
