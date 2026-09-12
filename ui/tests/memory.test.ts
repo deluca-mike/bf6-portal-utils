@@ -36,6 +36,7 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
             globalThis.UIImageButton = UIBundle.UIImageButton;
             globalThis.UIGadgetImageButton = UIBundle.UIGadgetImageButton;
             globalThis.UIWeaponImageButton = UIBundle.UIWeaponImageButton;
+            globalThis.UIQRCode = UIBundle.UIQRCode;
         `);
 
         // Warm up
@@ -453,5 +454,43 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
         });
 
         benchmarkResults.push(result);
+    });
+
+    it('Scenario 10: UIQRCode Instantiation, Dynamic Mutations & Disposal', () => {
+        const count = 50;
+        const result = server.benchmarkScenario({
+            scenario: '10. UIQRCode Dynamic Lifecycle (50 QR Codes)',
+            entities: `${count} QR codes`,
+            numericCount: count,
+            unit: 'qrcode',
+            run: `
+                (() => {
+                    const qrs = [];
+                    for (let i = 0; i < ${count}; ++i) {
+                        const qr = new UIQRCode({
+                            text: 'https://battlefield.portal/match/' + i,
+                            scale: 1,
+                            x: i * 10,
+                            y: i * 10,
+                        });
+                        qr.setText('https://battlefield.portal/match/' + (i + 100));
+                        qr.scale = 2;
+                        qrs.push(qr);
+                    }
+                    globalThis.__s10 = qrs;
+                })();
+            `,
+            cleanup: `
+                (() => {
+                    for (let i = 0; i < globalThis.__s10.length; ++i) {
+                        globalThis.__s10[i].delete();
+                    }
+                    delete globalThis.__s10;
+                })();
+            `,
+        });
+
+        benchmarkResults.push(result);
+        expect(result['Live Objs Delta']).toBeGreaterThan(0);
     });
 });

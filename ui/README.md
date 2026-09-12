@@ -17,6 +17,7 @@ This TypeScript `UI` namespace wraps Battlefield Portal's `mod` UI APIs with an 
     ```ts
     import { UI } from 'bf6-portal-utils/ui';
     import { UIContainer } from 'bf6-portal-utils/ui/components/container';
+    import { UIQRCode } from 'bf6-portal-utils/ui/components/qr-code';
     import { Events } from 'bf6-portal-utils/events';
     ```
 3. Use the `Events` module for all event subscription; do not export any Portal event handlers.
@@ -300,6 +301,26 @@ menu.visible = false;
 - Avoid mixing manual `mod.EnableUIInputMode` calls with `uiInputModeWhenVisible`, as the engine provides no way to query input mode state.
 
 </ai>
+
+---
+
+## Built-in UI Components
+
+| Component | Description | Documentation |
+| --- | --- | --- |
+| `UIContainer` | Lightweight container element for nesting and grouping child widgets. | [`ui/components/container`](components/container/README.md) |
+| `UIButton` | Interactive clickable button with state styling and event handlers. | [`ui/components/button`](components/button/README.md) |
+| `UIText` | Localized text label element with customizable typography. | [`ui/components/text`](components/text/README.md) |
+| `UIImage` | Engine image widget for UI icons and graphics. | [`ui/components/image`](components/image/README.md) |
+| `UIGadgetImage` | Image widget specifically for displaying BF6 gadget icons. | [`ui/components/gadget-image`](components/gadget-image/README.md) |
+| `UIWeaponImage` | Image widget specifically for displaying BF6 weapon icons. | [`ui/components/weapon-image`](components/weapon-image/README.md) |
+| `UIContentButton` | Generic button wrapping custom inner content elements. | [`ui/components/content-button`](components/content-button/README.md) |
+| `UIContainerButton` | Button wrapping an inner `UIContainer`. | [`ui/components/container-button`](components/container-button/README.md) |
+| `UITextButton` | Compound button with centered text label. | [`ui/components/text-button`](components/text-button/README.md) |
+| `UIImageButton` | Compound button with centered image icon. | [`ui/components/image-button`](components/image-button/README.md) |
+| `UIGadgetImageButton` | Compound button with centered gadget icon. | [`ui/components/gadget-image-button`](components/gadget-image-button/README.md) |
+| `UIWeaponImageButton` | Compound button with centered weapon icon. | [`ui/components/weapon-image-button`](components/weapon-image-button/README.md) |
+| `UIQRCode` | High-performance QR code with Z-index layering and rectilinear merging. | [`ui/components/qr-code`](components/qr-code/README.md) |
 
 ---
 

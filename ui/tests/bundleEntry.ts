@@ -12,3 +12,4 @@ export { UITextButton } from '../components/text-button/index.ts';
 export { UIImageButton } from '../components/image-button/index.ts';
 export { UIGadgetImageButton } from '../components/gadget-image-button/index.ts';
 export { UIWeaponImageButton } from '../components/weapon-image-button/index.ts';
+export { UIQRCode } from '../components/qr-code/index.ts';
