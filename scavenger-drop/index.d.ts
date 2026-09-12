@@ -5,19 +5,6 @@ export declare namespace ScavengerDrop {
      */
     const LogLevel: typeof Logging.LogLevel;
     /**
-     * The options for a scavenger drop.
-     */
-    interface Options {
-        /**
-         * The duration of the scavenger drop in milliseconds (clamped to positive integer range, max 2,147,483,647 ms).
-         */
-        duration?: number;
-        /**
-         * The interval at which to check for scavengers in milliseconds (clamped between 1 and 65,535 ms).
-         */
-        checkInterval?: number;
-    }
-    /**
      * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
      * the text of the log message.
      * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
@@ -39,25 +26,22 @@ export declare namespace ScavengerDrop {
         readonly __brand: 'DropID';
     };
     /**
-     * Maximum check interval in milliseconds (unsigned 16-bit integer limit: 65,535 ms).
-     */
-    const MAX_CHECK_INTERVAL_MS = 65535;
-    /**
      * Maximum drop duration in milliseconds (signed 32-bit integer limit: 2,147,483,647 ms).
      */
     const MAX_DURATION_MS = 2147483647;
     /**
      * Creates a new scavenger drop.
      * Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid.
+     * Subscribes to `PlayerLocations.onSphere` for a 2-meter radius to reactively detect scavengers.
      * @param body - The body of the player that the scavenger drop is on.
      * @param onScavenge - The callback to invoke when a scavenger is found.
-     * @param options - The options for the scavenger drop.
-     * @returns A generational drop ID, or null if the pre-allocated drop pool is full.
+     * @param duration - The duration of the scavenger drop in milliseconds (clamped to positive integer range, max 2,147,483,647 ms, default: 37,000 ms).
+     * @returns A generational drop ID, or null if the pre-allocated drop pool is full or the player position is unavailable.
      */
     function create(
         body: mod.Player,
         onScavenge: (player: mod.Player) => Promise<void> | void,
-        options?: Options
+        duration?: number
     ): DropID | null;
     /**
      * Stops/cancels an active scavenger drop by ID.

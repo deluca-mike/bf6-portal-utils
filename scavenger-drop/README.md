@@ -4,9 +4,9 @@
 
 The `ScavengerDrop` namespace provides functionality for Battlefield Portal experiences to detect when a player scavenges a dead player's kit bag. In Battlefield 6, when a player dies, they drop a bag containing their kit that despawns after approximately 37 seconds. Players can pick up weapons from these bags, but the default behavior does not replenish the scavenging player's ammo. This module allows you to perform custom actions (such as resupplying ammo, displaying messages, or any other logic) when the first player gets within 2 meters of a dead player's body.
 
-**Why use ScavengerDrop?** The `ScavengerDrop` module offers significant advantages: automatic detection of players scavenging dead bodies, performance-optimized checking that scales frequency based on proximity, support for custom callbacks to handle scavenging events, and automatic cleanup when drops expire or are scavenged. Ideal for ammo resupply systems, custom loot mechanics, achievement tracking, or any scenario where you need to detect and respond to players picking up dropped kits.
+**Why use ScavengerDrop?** The `ScavengerDrop` module offers significant advantages: automatic detection of players scavenging dead bodies powered by zero-GC reactive spatial tracking (`PlayerLocations.onSphere`), support for custom callbacks to handle scavenging events, and automatic cleanup when drops expire or are scavenged. Ideal for ammo resupply systems, custom loot mechanics, achievement tracking, or any scenario where you need to detect and respond to players picking up dropped kits.
 
-Key features include adaptive check frequency that increases as players get closer to drops (reducing overhead when drops are far away), automatic expiration after the configured duration (defaulting to 37 seconds to match the game's bag despawn time), graceful error handling that prevents callback failures from crashing your mod, and configurable logging for debugging scavenger drop behavior. The module runs entirely on `Events.OngoingGlobal` using flat typed arrays (Struct-of-Arrays) for zero runtime heap allocations.
+Key features include zero-polling reactive proximity detection using 2-meter sphere zone subscriptions (`PlayerLocations.onSphere`), automatic expiration after the configured duration (defaulting to 37 seconds to match the game's bag despawn time), graceful error handling that prevents callback failures from crashing your mod, and configurable logging for debugging scavenger drop behavior. The module runs on flat typed arrays (Struct-of-Arrays) with an intrusive `Int8Array` free-list for zero runtime heap allocations.
 
 </ai>
 
@@ -61,11 +61,10 @@ export function OnPlayerDied(
 
 ## Core Concepts
 
-- **Drop Creation** – A scavenger drop is registered with a dead player's body (`mod.Player` object) via `ScavengerDrop.create()`. The drop tracks the position of the body and monitors for nearby players.
-- **Proximity Detection** – The module uses `mod.ClosestPlayerTo()` to find the nearest player to the drop position. When a player gets within 2 meters, the callback is triggered.
-- **Adaptive Check Frequency** – To optimize performance, the module adjusts how frequently it checks for nearby players based on distance. When players are far away (more than 2 meters), checks occur less frequently. When players are close, checks occur more frequently to ensure accurate detection.
-- **Automatic Expiration** – Drops automatically expire after the configured duration (default 37 seconds, matching the game's bag despawn time). Once expired, the drop stops checking and automatically deactivates.
-- **Single Trigger** – Each drop triggers its callback only once—when the first player gets within range. After triggering, the drop slot is automatically recycled.
+- **Drop Creation** – A scavenger drop is registered with a dead player's body (`mod.Player` object) via `ScavengerDrop.create()`. The module retrieves the player's position via `PlayerLocations.getPosition()` and sets up a 2-meter reactive sphere zone.
+- **Proximity Detection** – The module subscribes to `PlayerLocations.onSphere()` with a 2-meter radius centered at the drop position. When any player enters the sphere (`onEnter`), the scavenging callback is invoked and the drop is automatically recycled.
+- **Automatic Expiration** – Drops automatically expire after the configured duration (default 37 seconds, matching the game's bag despawn time). Once expired, the drop unsubscribes from `PlayerLocations` and automatically deactivates.
+- **Single Trigger** – Each drop triggers its callback only once—when the first player gets within 2 meters. After triggering, the drop slot is automatically recycled.
 - **Generational IDs** – Each created drop receives a unique generational ID (e.g., `10005`), preventing stale handle errors (ABA problem) if a drop is stopped after being reallocated.
 - **Error Handling** – Callback errors (both synchronous and asynchronous) are caught and logged (if logging is configured) but do not prevent the drop from functioning. This ensures that callback failures don't crash your mod.
 - **Configurable Error Logging** – Callback errors are automatically logged using the `Logging` module. Use `ScavengerDrop.setLogging()` to configure a logger function, minimum log level, and whether to include error details.
@@ -94,7 +93,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 | Method | Description |
 | --- | --- |
 | `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Configures logging for the ScavengerDrop module. Callback errors (both synchronous and asynchronous) are automatically caught and logged using the configured logger. Pass `undefined` (or `null`) for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. |
-| `create(body: mod.Player, onScavenge: (player: mod.Player) => Promise<void> \| void, options?: ScavengerDrop.Options): DropID \| null` | Creates a new scavenger drop. Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid. Returns a generational `DropID`, or `null` if the pre-allocated drop pool is full. |
+| `create(body: mod.Player, onScavenge: (player: mod.Player) => Promise<void> \| void, duration?: number): DropID \| null` | Creates a new scavenger drop. Should be called immediately after a player dies in the `OnPlayerDied` event handler so that the player's position is still valid. Takes an optional `duration` in milliseconds (clamped to `[0, MAX_DURATION_MS]`, default: 37,000 ms). Returns a generational `DropID`, or `null` if the pre-allocated drop pool is full or the player position is unavailable. |
 | `stop(id: DropID): void` | Manually stops an active scavenger drop by its ID, preventing the callback from being triggered. |
 | `stopAll(): void` | Stops and cleans up all currently active scavenger drops. |
 | `isActive(id: DropID): boolean` | Checks whether the given drop ID is currently active. |
@@ -104,17 +103,7 @@ For more details on log levels, see the [`Logging` module documentation](../logg
 
 | Constant | Type | Value | Description |
 | --- | --- | --- | --- |
-| `MAX_CHECK_INTERVAL_MS` | `number` | `65_535` | Maximum check interval in milliseconds (unsigned 16-bit limit). |
 | `MAX_DURATION_MS` | `number` | `2_147_483_647` | Maximum drop duration in milliseconds (signed 32-bit positive limit). |
-
-#### `ScavengerDrop.Options`
-
-An interface for configuring scavenger drop behavior.
-
-| Property | Type | Default | Description |
-| --- | --- | --- | --- |
-| `duration` | `number` | `37000` | The duration of the scavenger drop in milliseconds (clamped to `[0, MAX_DURATION_MS]`). After this time, the drop expires and stops checking for players. Defaults to 37 seconds to match the game's bag despawn time. |
-| `checkInterval` | `number` | `200` | The base interval at which to check for scavengers in milliseconds (clamped to `[1, MAX_CHECK_INTERVAL_MS]`). The actual check frequency adapts based on player proximity (see [How It Works](#how-it-works)). Defaults to 0.2 seconds (200ms). |
 
 ---
 
@@ -134,7 +123,7 @@ An interface for configuring scavenger drop behavior.
 
 <ai>
 
-### Example: Custom Duration, Check Interval, and Async Callback Handling
+### Example: Custom Duration and Async Callback Handling
 
 ```ts
 import { ScavengerDrop } from 'bf6-portal-utils/scavenger-drop';
@@ -145,7 +134,7 @@ export function OnPlayerDied(
     deathType: mod.DeathType,
     weapon: mod.WeaponUnlock
 ): void {
-    // Create a drop that lasts 20 seconds with checks every 100ms if a player is nearby.
+    // Create a drop that lasts 20 seconds
     ScavengerDrop.create(
         victim,
         async (scavenger: mod.Player) => {
@@ -157,10 +146,7 @@ export function OnPlayerDied(
             // Log to external service, update statistics, etc.
             await logScavengeEvent(scavenger, victim);
         },
-        {
-            duration: 20_000, // 20 seconds
-            checkInterval: 100, // 100ms base check interval
-        }
+        20_000 // 20 seconds duration
     );
 }
 ```
@@ -171,30 +157,22 @@ export function OnPlayerDied(
 
 ## How It Works
 
-The `ScavengerDrop` module implements scavenger detection using Battlefield Portal's `mod.ClosestPlayerTo()` API and `Events.OngoingGlobal` for centralized zero-allocation tick processing:
+The `ScavengerDrop` module implements scavenger detection by integrating with the `PlayerLocations` module and `Events.OngoingGlobal` for centralized zero-allocation lifecycle management:
 
 1. **Pre-allocated Zero-Allocation Pool** – State is stored across flat, contiguous typed arrays (Struct of Arrays) for up to 128 concurrent drops:
     - `_generations` (`Uint16Array`) – Generational counters for ABA safety. When a slot reaches the maximum generation of `65_535`, it is permanently retired to prevent generational wrap-around collisions.
     - `_expirationTimes` (`Uint32Array`) – Expiration timestamps based on server uptime (with `0` indicating an inactive slot).
-    - `_checkIntervalMs` (`Uint16Array`) – Configured check interval.
-    - `_nextCheckTimes` (`Int32Array`) – Next scheduled proximity check timestamp, or link in the intrusive free list (`_firstFree`).
-    - `_positions` & `_callbacks` – Fixed-size object references. If the pool is full when `create()` is called, it logs an error and returns `null` without throwing an exception.
+    - `_freeList` (`Int8Array`) – Intrusive free-list tracking available slot indices (`0..127`, with `-1` indicating the end of the free list).
+    - `_handles` (`Array<PlayerLocations.SphereHandle | null>`) – Fixed-size array storing active `PlayerLocations.onSphere` subscription handles. If the pool is full when `create()` is called, it logs an error and returns `null` without throwing an exception.
 
-2. **Centralized Engine Loop** – Instead of creating individual interval and timeout timers per drop, all active drops are evaluated in a single global tick handler (`Events.OngoingGlobal`). When no drops are active (`_activeDropCount === 0`), the handler returns immediately in a single comparison.
+2. **Reactive Spatial Subscriptions** – When `create()` is called:
+    - The module queries `PlayerLocations.getPosition(body)` to get the dead player's world position with zero heap allocation.
+    - Subscribes to `PlayerLocations.onSphere(x, y, z, 2, onEnter)` with a 2-meter radius.
+    - When any player enters the 2-meter sphere, the `onEnter` callback fires, automatically cleans up the drop subscription via `_destroy(index)`, and invokes the user's `onScavenge` callback via `CallbackHandler.invoke`.
 
-3. **Adaptive Check Frequency** – To optimize performance, the module uses an adaptive checking strategy:
-    - When no valid player is found within range, the module waits 10 check intervals before calling `mod.ClosestPlayerTo()` again.
-    - When a player is found but is more than 2 meters away, the check frequency scales based on distance: `Math.min(10, Math.max(1, Math.floor(distance / 4)))`. This means:
-        - Players within 4 meters: check every interval (200ms default)
-        - Players 4-8 meters away: check every 1-2 intervals
-        - Players 8-40 meters away: check every 2-10 intervals (scaled by distance)
-        - No players nearby: wait 10 intervals before checking again
+3. **Centralized Expiration Loop** – Expiration is evaluated in a single global tick handler (`Events.OngoingGlobal`). When no drops are active (`_activeDropCount === 0`), the handler returns immediately in a single comparison. Drops that exceed their configured duration are automatically unsubscribed and recycled.
 
-4. **Proximity Detection** – On each scheduled check:
-    - The module calls `mod.ClosestPlayerTo(position)` to find the nearest player to the drop.
-    - If a valid player is within 2 meters or less, the callback is triggered via `CallbackHandler.invoke` to avoid argument array allocations.
-
-5. **Drop Expiration & Cleanup** – Drops that exceed their configured duration are automatically recycled. Calling `stop(id)` or `stopAll()` immediately frees slots without memory leaks.
+4. **Drop Cleanup** – Calling `stop(id)` or `stopAll()` immediately unsubscribes the sphere handle from `PlayerLocations` and frees slots without memory leaks.
 
 ---
 
@@ -203,8 +181,8 @@ The `ScavengerDrop` module implements scavenger detection using Battlefield Port
 ## Known Limitations & Caveats
 
 - **Pool Capacity** – The drop pool is pre-allocated to 128 concurrent slots (`MAX_DROPS`). If the pool is full when calling `create()`, it logs an error via `Logging` and returns `null` without throwing an exception.
-- **Position Capture** – The drop captures the position of the dead player's body at creation time. If the body moves (e.g., due to physics or explosions), the drop will continue checking the original position. Always create the drop immediately in `OnPlayerDied` to ensure the position is accurate.
-- **Single Trigger** – Each drop triggers its callback only once—when the first player gets within 2 meters. If multiple players are close when the check occurs, only the closest player triggers the callback.
+- **Position Capture** – The drop captures the position of the dead player's body at creation time. If the body moves (e.g., due to physics or explosions), the drop will continue monitoring the original position. Always create the drop immediately in `OnPlayerDied` to ensure the position is accurate.
+- **Single Trigger** – Each drop triggers its callback only once—when the first player gets within 2 meters. If multiple players enter simultaneously, only the first triggering player receives the callback.
 - **Distance Precision** – The 2-meter threshold is fixed and matches typical interaction ranges in Battlefield Portal.
 - **Async Callbacks** – Callbacks can be synchronous or asynchronous (returning `void` or `Promise<void>`). Async callbacks are not awaited by the drop; errors or rejections are caught and logged via `CallbackHandler`.
 
@@ -214,6 +192,7 @@ The `ScavengerDrop` module implements scavenger detection using Battlefield Port
 
 ## Further Reference
 
+- [PlayerLocations module](../player-locations/README.md) – Used for reactive spatial proximity subscriptions and player position tracking.
 - [Events module](../events/README.md) – Used internally for global tick subscription.
 - [Logging module](../logging/README.md) – Used for internal error and debug logging.
 - [`bf6-portal-mod-types`](https://deluca-mike.github.io/bf6-portal-mod-types/) – Official Battlefield Portal type declarations.
