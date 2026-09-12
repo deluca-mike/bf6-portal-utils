@@ -1,9 +1,18 @@
+import { Clocks } from '../clocks/index.ts';
 import { Logging } from '../logging/index.ts';
-export declare namespace FFASpawnPoints {
+import { Timers } from '../timers/index.ts';
+import { UIContainer } from '../ui/components/container/index.ts';
+import { UIText } from '../ui/components/text/index.ts';
+/**
+ * Class managing Free-For-All player spawn points, fitness scoring, and spawning queues.
+ * @version 7.0.0
+ */
+export declare class FFASpawnPoints {
+    static readonly logging: Logging;
     /**
-     * Log levels for controlling logging verbosity.
+     * Timestamp (in ms) when the server runtime started.
      */
-    const LogLevel: typeof Logging.LogLevel;
+    static readonly SERVER_START_TIME: number;
     /**
      * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
      * the text of the log message.
@@ -14,37 +23,200 @@ export declare namespace FFASpawnPoints {
      * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
      *                          to the text of the log message.
      */
-    function setLogging(
+    static setLogging(
         log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
+    private static readonly _scratchVector;
+    private readonly _count;
+    private readonly _posX;
+    private readonly _posY;
+    private readonly _posZ;
+    private readonly _orientations;
+    private readonly _lastUsedTimes;
+    private readonly _topIndices;
+    private readonly _topScores;
+    private readonly _spawnPoints;
+    private readonly _players;
+    private readonly _spawnQueue;
+    private readonly _leaveGameUnsubscribe;
+    private readonly _customScorer;
+    private readonly _initialPromptDelay;
+    private readonly _promptDelay;
+    private readonly _queueProcessingDelay;
+    private _queueProcessingEnabled;
+    private _queueProcessingActive;
+    private _queueProcessingTimerId;
     /**
-     * Type for defining spawn point data when initializing the system:
+     * Initializes the spawning system with the given spawn points and options.
+     * @param spawns - Array of spawn point tuples: [x, y, z, orientation].
+     * @param options - Optional configuration overrides for scoring, delays, and thresholds.
+     */
+    constructor(spawns: FFASpawnPoints.SpawnData[], options?: FFASpawnPoints.Options);
+    /**
+     * Total number of spawn points managed by this instance.
+     * @returns The spawn count.
+     */
+    get spawnCount(): number;
+    /**
+     * Adds and registers a player to be managed by this spawning system.
+     * Usually called in `Events.OnPlayerJoinGame`.
+     * @param player - The player to add.
+     * @param showDebugPosition - Whether to display a debug position HUD for this player.
+     */
+    addPlayer(player: mod.Player, showDebugPosition?: boolean): void;
+    /**
+     * Removes and unregisters a player from the spawning system.
+     * @param playerOrId - The player or player ID to remove.
+     * @returns Whether the player was found and removed.
+     */
+    removePlayer(playerOrId: mod.Player | number): boolean;
+    /**
+     * Starts the countdown before prompting the player to spawn or delay again.
+     * Usually called in `Events.OnPlayerJoinGame` or `Events.OnPlayerUndeploy`.
+     * AI soldiers skip the countdown and are added to the spawn queue immediately.
+     * @param playerOrId - The player or player ID.
+     * @param delay - Delay in seconds (defaults to initialPromptDelay).
+     */
+    startDelayForPrompt(playerOrId: mod.Player | number, delay?: number): void;
+    /**
+     * Forces a player into the spawn queue immediately, skipping any countdown and prompt.
+     * @param playerOrId - The player or player ID to force into the queue.
+     */
+    forceIntoQueue(playerOrId: mod.Player | number): void;
+    /**
+     * Evaluates all spawn points using multi-factor fitness scoring and selects the best candidate.
+     * @returns The zero-based index of the chosen spawn point, or null if no spawn points are set.
+     */
+    getBestSpawnIndex(): number | null;
+    /**
+     * Enables automatic processing of the spawn queue.
+     */
+    enableSpawnQueueProcessing(): void;
+    /**
+     * Disables automatic processing of the spawn queue.
+     */
+    disableSpawnQueueProcessing(): void;
+    /**
+     * Destroys this `FFASpawnPoints` instance, removing all player UI, timers, and event listeners.
+     */
+    destroy(): void;
+    private _addToQueue;
+    private _processSpawnQueue;
+    private _isPlayerRecordValid;
+    private _getPlayerPosition;
+    private _getPlayerRecord;
+    /**
+     * Default fitness scoring algorithm evaluating proximity sweet-spot, sector crowding, temporal cooldown, and facing alignment.
+     * @param x - X coordinate of candidate spawn.
+     * @param y - Y coordinate of candidate spawn.
+     * @param z - Z coordinate of candidate spawn.
+     * @param orientation - Compass facing angle (in degrees).
+     * @param elapsed - Milliseconds elapsed since last used.
+     * @param options - Optional configuration overrides for thresholds, weights, and radius.
+     * @returns Computed fitness score.
+     */
+    static defaultScorer(
+        x: number,
+        y: number,
+        z: number,
+        orientation: number,
+        elapsed: number,
+        options?: FFASpawnPoints.DefaultScorerOptions
+    ): number;
+}
+export declare namespace FFASpawnPoints {
+    /**
+     * A re-export of the `Logging.LogLevel` enum.
+     */
+    const LogLevel: typeof Logging.LogLevel;
+    /**
+     * Type for defining spawn point data:
      * <x, y, z> world position where the player should spawn.
      * Orientation is the compass angle (0-360) for spawn direction.
      */
     type SpawnData = [x: number, y: number, z: number, orientation: number];
     /**
-     * Optional overrides for spawn selection thresholds, delays, and candidate limits when calling `initialize()`:
+     * Internal player tracking record for FFA spawning and UI timers.
      */
-    type InitializeOptions = {
+    interface PlayerRecord {
+        player: mod.Player;
+        playerId: number;
+        isAI: boolean;
+        delayCountdownClockId: Clocks.ClockID | null;
+        promptUI?: UIContainer;
+        countdownUI?: UIText;
+        updatePositionIntervalId: Timers.TimerID | null;
+        debugPositionUI?: UIText;
+    }
+    /**
+     * Fitness scoring function signature.
+     * @param x - X coordinate of the candidate spawn point.
+     * @param y - Y coordinate of the candidate spawn point.
+     * @param z - Z coordinate of the candidate spawn point.
+     * @param orientation - Compass facing angle (in degrees) of the candidate spawn point.
+     * @param elapsedSinceLastUsedMs - Milliseconds elapsed since this spawn point was last used (Infinity if never used).
+     * @returns The computed numerical fitness score.
+     */
+    type Scorer = (x: number, y: number, z: number, orientation: number, elapsedSinceLastUsedMs: number) => number;
+    /**
+     * Optional configuration overrides for the default fitness scoring algorithm.
+     */
+    type DefaultScorerOptions = {
         /**
-         * The maximum number of random spawns to consider when trying to find a spawn point for a player.
+         * Minimum distance (in meters) to any enemy player for a spawn to be considered safe.
+         * Spawns with enemies closer than this receive severe danger penalties. (Default: 20m)
          */
-        maxSpawnCandidates?: number;
+        minSafeDistance?: number;
         /**
-         * The minimum distance a spawn point must be to another player to be considered safe.
+         * Target ideal distance (in meters) to the closest enemy. Spawns near this distance receive
+         * the highest proximity score. (Default: 35m)
          */
-        minimumSafeDistance?: number;
+        idealDistance?: number;
         /**
-         * The maximum distance a spawn point must be to another player to be considered acceptable.
+         * Maximum distance (in meters) beyond which a spawn is considered too far from the action
+         * and receives zero proximity score. (Default: 80m)
          */
-        maximumInterestingDistance?: number;
+        maxDistance?: number;
         /**
-         * The amount to scale the midpoint between the `minimumSafeDistance` and `maximumInterestingDistance` to evaluate a fallback spawn.
+         * Radius (in meters) around a spawn point to evaluate enemy crowding and crossfire risk. (Default: 50m)
          */
-        safeOverInterestingFallbackFactor?: number;
+        crowdingRadius?: number;
+        /**
+         * Penalty weight subtracted per extra enemy in the crowding radius beyond the first. (Default: 0.25)
+         */
+        crowdingWeight?: number;
+        /**
+         * Cooldown time (in milliseconds) before a recently used spawn point regains full fitness.
+         * Prevents consecutive respawns on the same spot. (Default: 4000ms)
+         */
+        spawnCooldownMs?: number;
+        /**
+         * Bonus weight added when the spawn point's forward orientation points toward the closest enemy
+         * (action direction). (Default: 0.15)
+         */
+        facingWeight?: number;
+    };
+    /**
+     * Optional configuration overrides for spawn selection, scoring, delays, and candidate limits:
+     */
+    type Options = {
+        /**
+         * Optional configuration overrides for the default fitness scoring algorithm.
+         * Only used when `customScorer` is not provided.
+         */
+        defaultScorerOptions?: DefaultScorerOptions;
+        /**
+         * Number of top-scoring candidate spawns to randomly select from (Top-K selection).
+         * Prevents deterministic spawn trapping while guaranteeing high quality. (Default: 3)
+         */
+        selectionPoolSize?: number;
+        /**
+         * Optional custom scoring function for mod developers who want full control over spawn fitness.
+         * Receives the spawn coordinates, orientation, and elapsed time since the spawn point was last used (in milliseconds).
+         */
+        customScorer?: Scorer;
         /**
          * The initial delay before prompting the player to spawn (in seconds).
          */
@@ -58,74 +230,4 @@ export declare namespace FFASpawnPoints {
          */
         queueProcessingDelay?: number;
     };
-    /**
-     * Initializes the spawning system. Should be called in the `OnGameModeStarted()` event.
-     * @param spawns - The spawn points to use.
-     * @param options - The options to use for overriding the defaults.
-     */
-    function initialize(spawns: SpawnData[], options?: InitializeOptions): void;
-    /**
-     * Enables the processing of the spawn queue.
-     */
-    function enableSpawnQueueProcessing(): void;
-    /**
-     * Disables the processing of the spawn queue.
-     */
-    function disableSpawnQueueProcessing(): void;
-    /**
-     * Class representing a soldier whose spawning will be managed by this module.
-     */
-    class Soldier {
-        private static readonly _ALL_SOLDIERS;
-        private static _deleteSoldierIfNotValid;
-        private static _getPosition;
-        /**
-         * Starts the countdown before prompting the player to spawn or delay again.
-         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-         * AI soldiers will skip the countdown and spawn immediately.
-         * @param player - The player to start the delay for.
-         */
-        static startDelayForPrompt(player: mod.Player): void;
-        /**
-         * Forces a player to be added to the spawn queue, skipping the countdown and prompt.
-         * @param player - The player to force into the queue.
-         */
-        static forceIntoQueue(player: mod.Player): void;
-        /**
-         * Every player that should be handled by this spawning system should be instantiated as a `Soldier`,
-         * usually in the `OnPlayerJoinGame()` event.
-         * @param player - The player to instantiate the `Soldier` for.
-         * @param showDebugPosition - Whether to show the debug position.
-         */
-        constructor(player: mod.Player, showDebugPosition?: boolean);
-        private _player;
-        private _playerId;
-        private _isAISoldier;
-        private _delayCountdownClockId;
-        private _promptUI?;
-        private _countdownUI?;
-        private _updatePositionIntervalId;
-        private _debugPositionUI?;
-        /**
-         * @returns The player associated with this `Soldier` instance.
-         */
-        get player(): mod.Player;
-        /**
-         * @returns The unique ID of the player associated with this instance.
-         */
-        get playerId(): number;
-        /**
-         * Starts the countdown before prompting the player to spawn or delay again.
-         * Usually called in the `OnPlayerJoinGame()` and `OnPlayerUndeploy()` events.
-         * AI soldiers will skip the countdown and spawn immediately.
-         * @param delay - The delay to start the countdown for (in seconds). Defaults to the initial prompt delay.
-         */
-        startDelayForPrompt(delay?: number): void;
-        /**
-         * Deletes the `Soldier` instance if the player is no longer valid.
-         * @returns Whether the `Soldier` instance was deleted.
-         */
-        deleteIfNotValid(): boolean;
-        private _addToQueue;
-    }
 }
