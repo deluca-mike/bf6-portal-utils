@@ -5,6 +5,7 @@ import { UI } from '../../index.ts';
 export class UIText extends UI.Element {
     private static readonly _labels = new Array<mod.Message | null>(UI.MAX_ELEMENTS);
     private static readonly _textRgba = new Uint32Array(UI.MAX_ELEMENTS);
+    private static readonly _textAnchor = new Uint8Array(UI.MAX_ELEMENTS);
 
     private static _setTextRgba(slot: number, color: Colors.Color, alpha: number): void {
         const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
@@ -60,54 +61,59 @@ export class UIText extends UI.Element {
         const { x, y } = UI.Element._getPosition(params);
         const { width, height } = UI.Element._getSize(params);
         const padding = params.padding ?? 0;
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
         const bgColor = params.bgColor ?? UI.COLORS.WHITE;
         const bgAlpha = params.bgAlpha ?? 0;
-        const bgFill = params.bgFill ?? mod.UIBgFill.None;
-        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const bgFill = params.bgFill ?? UI.BgFill.None;
+        const depth = params.depth ?? UI.Depth.AboveGameUI;
         const textSize = params.textSize ?? 36;
         const textColor = params.textColor ?? UI.COLORS.BLACK;
         const textAlpha = params.textAlpha ?? 1;
-        const textAnchor = params.textAnchor ?? mod.UIAnchor.Center;
+        const textAnchor = params.textAnchor ?? UI.Anchor.Center;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
+        const nativeBgFill = UI.Element._getNativeBgFill(bgFill);
+        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const nativeTextAnchor = UI.Element._getNativeAnchor(textAnchor);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIText(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
+                nativeBgFill,
                 params.label,
                 textSize,
                 Colors.toVector(textColor),
                 textAlpha,
-                textAnchor,
-                depth
+                nativeTextAnchor,
+                nativeDepth
             );
         } else {
             mod.AddUIText(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
+                nativeBgFill,
                 params.label,
                 textSize,
                 Colors.toVector(textColor),
                 textAlpha,
-                textAnchor,
-                depth,
+                nativeTextAnchor,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }
@@ -116,6 +122,7 @@ export class UIText extends UI.Element {
 
         const slot = this._slot;
         UIText._labels[slot] = params.label;
+        UIText._textAnchor[slot] = textAnchor;
         UIText._setTextRgba(slot, textColor, textAlpha);
     }
 
@@ -128,6 +135,7 @@ export class UIText extends UI.Element {
         if (slot === UI.Element._INVALID_INDEX) return;
 
         UIText._labels[slot] = null;
+        UIText._textAnchor[slot] = 0;
         UIText._textRgba[slot] = 0;
         super.delete();
     }
@@ -205,15 +213,17 @@ export class UIText extends UI.Element {
      * The anchor of the text, or undefined if deleted.
      * @returns The text anchor alignment, or undefined if deleted.
      */
-    public get textAnchor(): mod.UIAnchor | undefined {
-        return this._isValid ? mod.GetUITextAnchor(this._uiWidget) : undefined;
+    public get textAnchor(): UI.Anchor | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIText._textAnchor[slot] as UI.Anchor);
     }
 
     /**
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      */
-    public set textAnchor(anchor: mod.UIAnchor) {
+    public set textAnchor(anchor: UI.Anchor) {
         this.setTextAnchor(anchor);
     }
 
@@ -222,10 +232,13 @@ export class UIText extends UI.Element {
      * @param anchor - The new anchor.
      * @returns This text for chaining.
      */
-    public setTextAnchor(anchor: mod.UIAnchor): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setTextAnchor(anchor: UI.Anchor): this {
+        const slot = this._getSlotAndLogWarning();
 
-        mod.SetUITextAnchor(this._uiWidget, anchor);
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIText._textAnchor[slot] = anchor;
+        mod.SetUITextAnchor(this._uiWidget, UI.Element._getNativeAnchor(anchor));
 
         return this;
     }
@@ -343,7 +356,7 @@ export namespace UIText {
         textSize?: number;
         textColor?: Colors.Color;
         textAlpha?: number;
-        textAnchor?: mod.UIAnchor;
+        textAnchor?: UI.Anchor;
         padding?: number;
     };
 }

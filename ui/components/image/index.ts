@@ -4,6 +4,7 @@ import { UI } from '../../index.ts';
 // version: 10.0.0
 export class UIImage extends UI.Element {
     private static readonly _imageRgba = new Uint32Array(UI.MAX_ELEMENTS);
+    private static readonly _imageType = new Uint8Array(UI.MAX_ELEMENTS);
 
     private static _setImageRgba(slot: number, color: Colors.Color, alpha: number): void {
         const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
@@ -58,48 +59,53 @@ export class UIImage extends UI.Element {
         const name = this._name;
         const { x, y } = UI.Element._getPosition(params);
         const { width, height } = UI.Element._getSize(params);
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
         const bgColor = params.bgColor ?? UI.COLORS.WHITE;
         const bgAlpha = params.bgAlpha ?? 0;
-        const bgFill = params.bgFill ?? mod.UIBgFill.None;
-        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const bgFill = params.bgFill ?? UI.BgFill.None;
+        const depth = params.depth ?? UI.Depth.AboveGameUI;
         const imageColor = params.imageColor ?? UI.COLORS.WHITE;
         const imageAlpha = params.imageAlpha ?? 1;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
+        const nativeBgFill = UI.Element._getNativeBgFill(bgFill);
+        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const nativeImageType = UI.Element._getNativeImageType(params.imageType);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIImage(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
-                params.imageType,
+                nativeBgFill,
+                nativeImageType,
                 Colors.toVector(imageColor),
                 imageAlpha,
-                depth
+                nativeDepth
             );
         } else {
             mod.AddUIImage(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
-                params.imageType,
+                nativeBgFill,
+                nativeImageType,
                 Colors.toVector(imageColor),
                 imageAlpha,
-                depth,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }
@@ -107,6 +113,7 @@ export class UIImage extends UI.Element {
         this._bindNativeWidget(name);
 
         const slot = this._slot;
+        UIImage._imageType[slot] = params.imageType;
         UIImage._setImageRgba(slot, imageColor, imageAlpha);
     }
 
@@ -118,6 +125,7 @@ export class UIImage extends UI.Element {
 
         if (slot === UI.Element._INVALID_INDEX) return;
 
+        UIImage._imageType[slot] = 0;
         UIImage._imageRgba[slot] = 0;
         super.delete();
     }
@@ -126,15 +134,17 @@ export class UIImage extends UI.Element {
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.
      */
-    public get imageType(): mod.UIImageType | undefined {
-        return this._isValid ? mod.GetUIImageType(this._uiWidget) : undefined;
+    public get imageType(): UI.ImageType | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : (UIImage._imageType[slot] as UI.ImageType);
     }
 
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      */
-    public set imageType(imageType: mod.UIImageType) {
+    public set imageType(imageType: UI.ImageType) {
         this.setImageType(imageType);
     }
 
@@ -143,10 +153,13 @@ export class UIImage extends UI.Element {
      * @param imageType - The new type of the image.
      * @returns This image for chaining.
      */
-    public setImageType(imageType: mod.UIImageType): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setImageType(imageType: UI.ImageType): this {
+        const slot = this._getSlotAndLogWarning();
 
-        mod.SetUIImageType(this._uiWidget, imageType);
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIImage._imageType[slot] = imageType;
+        mod.SetUIImageType(this._uiWidget, UI.Element._getNativeImageType(imageType));
 
         return this;
     }
@@ -236,7 +249,7 @@ export namespace UIImage {
      * The parameters for creating a new image.
      */
     export type Params = UI.ElementParams & {
-        imageType: mod.UIImageType;
+        imageType: UI.ImageType;
         imageColor?: Colors.Color;
         imageAlpha?: number;
     };

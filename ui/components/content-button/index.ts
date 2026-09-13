@@ -109,38 +109,43 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         const name = this._name;
         const { x, y } = UI.Element._getPosition(params);
         const { width, height } = UI.Element._getSize(params);
-        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const depth = params.depth ?? UI.Depth.AboveGameUI;
         const padding = params.padding ?? 0;
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
+        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const nativeBgFillNone = UI.Element._getNativeBgFill(UI.BgFill.None);
+        const nativeCenterAnchor = UI.Element._getNativeAnchor(UI.Anchor.Center);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 Colors.toVector(UI.COLORS.WHITE),
                 0,
-                mod.UIBgFill.None,
-                depth
+                nativeBgFillNone,
+                nativeDepth
             );
         } else {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
                 Colors.toVector(UI.COLORS.WHITE),
                 0,
-                mod.UIBgFill.None,
-                depth,
+                nativeBgFillNone,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }
@@ -151,7 +156,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         const enabled = params.enabled ?? true;
         const bgColor = params.bgColor ?? UI.COLORS.WHITE;
         const bgAlpha = params.bgAlpha ?? 1;
-        const bgFill = params.bgFill ?? mod.UIBgFill.Solid;
+        const bgFill = params.bgFill ?? UI.BgFill.Solid;
         const baseColor = params.baseColor ?? UI.COLORS.BF_GREY_2;
         const baseAlpha = params.baseAlpha ?? 1;
         const disabledColor = params.disabledColor ?? UI.COLORS.BF_GREY_3;
@@ -161,18 +166,20 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         const focusedColor = params.focusedColor ?? UI.COLORS.BF_GREY_1;
         const focusedAlpha = params.focusedAlpha ?? 1;
 
+        const nativeBtnBgFill = UI.Element._getNativeBgFill(bgFill);
+
         if (!receiver.nativeReceiver) {
             mod.AddUIButton(
                 buttonName,
                 mod.CreateVector(0, 0, 0),
                 mod.CreateVector(width, height, 0),
-                mod.UIAnchor.Center,
+                nativeCenterAnchor,
                 this._uiWidget,
                 true,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
+                nativeBtnBgFill,
                 enabled,
                 Colors.toVector(baseColor),
                 baseAlpha,
@@ -184,20 +191,20 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
                 focusedAlpha,
                 Colors.toVector(focusedColor),
                 focusedAlpha,
-                depth
+                nativeDepth
             );
         } else {
             mod.AddUIButton(
                 buttonName,
                 mod.CreateVector(0, 0, 0),
                 mod.CreateVector(width, height, 0),
-                mod.UIAnchor.Center,
+                nativeCenterAnchor,
                 this._uiWidget,
                 true,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
+                nativeBtnBgFill,
                 enabled,
                 Colors.toVector(baseColor),
                 baseAlpha,
@@ -209,7 +216,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
                 focusedAlpha,
                 Colors.toVector(focusedColor),
                 focusedAlpha,
-                depth,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }

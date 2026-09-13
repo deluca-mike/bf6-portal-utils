@@ -20,7 +20,7 @@ import { UI } from 'bf6-portal-utils/ui';
 
 // Create an image
 const image = new UIImage({
-    imageType: mod.UIImageType.QuestionMark,
+    imageType: UI.ImageType.QuestionMark,
     position: { x: 0, y: 0 },
     size: { width: 64, height: 64 },
     imageColor: UI.COLORS.WHITE,
@@ -29,7 +29,7 @@ const image = new UIImage({
 });
 
 // Update image properties
-image.imageType = mod.UIImageType.Icon;
+image.imageType = UI.ImageType.CrownOutline;
 image.imageColor = UI.COLORS.BLUE;
 image.imageAlpha = 0.8;
 ```
@@ -46,16 +46,16 @@ image.imageAlpha = 0.8;
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
 | `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.None` | Fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
-| `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
+| `imageType` | `UI.ImageType` | **Required.** The type of image to display. |
 | `imageColor` | `UI.Color = UI.COLORS.WHITE` | Image color tint. |
 | `imageAlpha` | `number = 1` | Image opacity. |
 
@@ -79,7 +79,7 @@ For complete documentation of these properties, see the [main UI documentation](
 
 ### Image-Specific
 
-- **`imageType: mod.UIImageType`** (getter/setter) – The type of image to display.
+- **`imageType: UI.ImageType`** (getter/setter) – The type of image to display.
 - **`imageColor: UI.Color`** (getter/setter) – Image color tint. Supports zero-allocation `getImageColor(out?)`.
 - **`imageAlpha: number`** (getter/setter) – Image opacity.
 
@@ -91,7 +91,7 @@ For complete documentation of these properties, see the [main UI documentation](
 
 ```ts
 type Params = UI.ElementParams & {
-    imageType: mod.UIImageType; // Required (no default)
+    imageType: UI.ImageType; // Required (no default)
     imageColor?: UI.Color; // Default: UI.COLORS.WHITE
     imageAlpha?: number; // Default: 1
 };

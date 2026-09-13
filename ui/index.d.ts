@@ -33,6 +33,55 @@ export declare namespace UI {
      * @returns The active element count.
      */
     export function getActiveElementCount(): number;
+    /****** Enums ******/
+    /**
+     * Anchor alignment positions for UI elements.
+     */
+    export enum Anchor {
+        TopLeft = 0,
+        TopCenter = 1,
+        TopRight = 2,
+        CenterLeft = 3,
+        Center = 4,
+        CenterRight = 5,
+        BottomLeft = 6,
+        BottomCenter = 7,
+        BottomRight = 8,
+    }
+    /**
+     * Background fill styles for UI elements.
+     */
+    export enum BgFill {
+        None = 0,
+        Solid = 1,
+        Blur = 2,
+        GradientBottom = 3,
+        GradientLeft = 4,
+        GradientRight = 5,
+        GradientTop = 6,
+        OutlineThick = 7,
+        OutlineThin = 8,
+    }
+    /**
+     * Z-order rendering depth for UI elements.
+     */
+    export enum Depth {
+        AboveGameUI = 0,
+        BelowGameUI = 1,
+    }
+    /**
+     * Available image glyph / icon types.
+     */
+    export enum ImageType {
+        None = 0,
+        CrownOutline = 1,
+        CrownSolid = 2,
+        QuestionMark = 3,
+        RifleAmmo = 4,
+        SelfHeal = 5,
+        SpawnBeacon = 6,
+        TEMP_PortalIcon = 7,
+    }
     /****** Types ******/
     /**
      * The type of a button handler.
@@ -50,13 +99,13 @@ export declare namespace UI {
         forEachChild(callback: (child: Element, index: number) => void): void;
     }
     type BaseParams = {
-        anchor?: mod.UIAnchor;
+        anchor?: Anchor;
         parent?: Parent;
         visible?: boolean;
         bgColor?: Colors.Color;
         bgAlpha?: number;
-        bgFill?: mod.UIBgFill;
-        depth?: mod.UIDepth;
+        bgFill?: BgFill;
+        depth?: Depth;
         receiver?: mod.Player | mod.Team;
         uiInputModeWhenVisible?: boolean;
     };
@@ -246,6 +295,10 @@ export declare namespace UI {
          */
         protected constructor(params?: ElementParams);
         /****** Protected Static Helpers for Subclasses ******/
+        protected static _getNativeAnchor(anchor: Anchor): mod.UIAnchor;
+        protected static _getNativeBgFill(bgFill: BgFill): mod.UIBgFill;
+        protected static _getNativeDepth(depth: Depth): mod.UIDepth;
+        protected static _getNativeImageType(imageType: ImageType): mod.UIImageType;
         protected static _resolveSlot(id: number): number;
         protected static _getNextSibling(slot: number): number;
         protected static _getInstance(slot: number): Element | undefined;
@@ -471,50 +524,50 @@ export declare namespace UI {
          * The background fill of the element, or undefined if deleted.
          * @returns The background fill of the element, or undefined.
          */
-        get bgFill(): mod.UIBgFill | undefined;
+        get bgFill(): BgFill | undefined;
         /**
          * Sets the background fill of the element.
          * @param fill - The background fill to set.
          */
-        set bgFill(fill: mod.UIBgFill);
+        set bgFill(fill: BgFill);
         /**
          * Sets the background fill of the element.
          * @param fill - The background fill to set.
          * @returns This element for chaining.
          */
-        setBgFill(fill: mod.UIBgFill): this;
+        setBgFill(fill: BgFill): this;
         /**
          * The depth of the element, or undefined if deleted.
          * @returns The depth of the element, or undefined.
          */
-        get depth(): mod.UIDepth | undefined;
+        get depth(): Depth | undefined;
         /**
          * Sets the depth of the element.
          * @param depth - The depth to set.
          */
-        set depth(depth: mod.UIDepth);
+        set depth(depth: Depth);
         /**
          * Sets the depth of the element.
          * @param depth - The depth to set.
          * @returns This element for chaining.
          */
-        setDepth(depth: mod.UIDepth): this;
+        setDepth(depth: Depth): this;
         /**
          * The anchor of the element, or undefined if deleted.
          * @returns The anchor of the element, or undefined.
          */
-        get anchor(): mod.UIAnchor | undefined;
+        get anchor(): Anchor | undefined;
         /**
          * Sets the anchor of the element.
          * @param anchor - The anchor to set.
          */
-        set anchor(anchor: mod.UIAnchor);
+        set anchor(anchor: Anchor);
         /**
          * Sets the anchor of the element.
          * @param anchor - The anchor to set.
          * @returns This element for chaining.
          */
-        setAnchor(anchor: mod.UIAnchor): this;
+        setAnchor(anchor: Anchor): this;
         /**
          * Whether the element will request UI input mode to be enabled for its receiver when it becomes visible.
          * @returns True if UI input mode is requested when visible, false if not, or undefined if deleted.

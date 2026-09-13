@@ -110,7 +110,7 @@ export class UIQRCode extends UI.Element {
                       visible: params.visible,
                       bgColor: lightColor,
                       bgAlpha: lightAlpha,
-                      bgFill: mod.UIBgFill.Solid,
+                      bgFill: UI.BgFill.Solid,
                       depth: params.depth,
                       receiver: params.receiver,
                       uiInputModeWhenVisible: params.uiInputModeWhenVisible,
@@ -125,7 +125,7 @@ export class UIQRCode extends UI.Element {
                       visible: params.visible,
                       bgColor: lightColor,
                       bgAlpha: lightAlpha,
-                      bgFill: mod.UIBgFill.Solid,
+                      bgFill: UI.BgFill.Solid,
                       depth: params.depth,
                       receiver: params.receiver,
                       uiInputModeWhenVisible: params.uiInputModeWhenVisible,
@@ -137,37 +137,41 @@ export class UIQRCode extends UI.Element {
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = this._receiver!;
         const name = this._name;
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
-        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const depth = params.depth ?? UI.Depth.AboveGameUI;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
+        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const nativeBgFillSolid = UI.Element._getNativeBgFill(UI.BgFill.Solid);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(baseWidth, baseHeight, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(lightColor),
                 lightAlpha,
-                mod.UIBgFill.Solid,
-                depth
+                nativeBgFillSolid,
+                nativeDepth
             );
         } else {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(baseWidth, baseHeight, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(lightColor),
                 lightAlpha,
-                mod.UIBgFill.Solid,
-                depth,
+                nativeBgFillSolid,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }
@@ -257,7 +261,7 @@ export class UIQRCode extends UI.Element {
         const slot = this._slot;
         const parentWidget = this._uiWidget;
         const receiver = this._receiver!;
-        const depth = this.depth ?? mod.UIDepth.AboveGameUI;
+        const depth = this.depth ?? UI.Depth.AboveGameUI;
         const N = matrix.length;
 
         if (N === 0) return;
@@ -271,6 +275,10 @@ export class UIQRCode extends UI.Element {
 
         const childWidgets: mod.UIWidget[] = [];
         let drawCalls = 1; // 1 for the root background canvas
+
+        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const nativeTopLeft = UI.Element._getNativeAnchor(UI.Anchor.TopLeft);
+        const nativeBgFillSolid = UI.Element._getNativeBgFill(UI.BgFill.Solid);
 
         // Reset visited tracking buffer
         const totalCells = N * N;
@@ -314,28 +322,28 @@ export class UIQRCode extends UI.Element {
                     childName,
                     mod.CreateVector(x0, y0, 0),
                     mod.CreateVector(w, h, 0),
-                    mod.UIAnchor.TopLeft,
+                    nativeTopLeft,
                     parentWidget,
                     true,
                     0,
                     color,
                     alpha,
-                    mod.UIBgFill.Solid,
-                    depth
+                    nativeBgFillSolid,
+                    nativeDepth
                 );
             } else {
                 mod.AddUIContainer(
                     childName,
                     mod.CreateVector(x0, y0, 0),
                     mod.CreateVector(w, h, 0),
-                    mod.UIAnchor.TopLeft,
+                    nativeTopLeft,
                     parentWidget,
                     true,
                     0,
                     color,
                     alpha,
-                    mod.UIBgFill.Solid,
-                    depth,
+                    nativeBgFillSolid,
+                    nativeDepth,
                     receiver.nativeReceiver
                 );
             }

@@ -3,6 +3,7 @@ import { UI } from '../../index.ts';
 export declare class UIText extends UI.Element {
     private static readonly _labels;
     private static readonly _textRgba;
+    private static readonly _textAnchor;
     private static _setTextRgba;
     private static _setTextColor;
     private static _setTextAlpha;
@@ -53,18 +54,18 @@ export declare class UIText extends UI.Element {
      * The anchor of the text, or undefined if deleted.
      * @returns The text anchor alignment, or undefined if deleted.
      */
-    get textAnchor(): mod.UIAnchor | undefined;
+    get textAnchor(): UI.Anchor | undefined;
     /**
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      */
-    set textAnchor(anchor: mod.UIAnchor);
+    set textAnchor(anchor: UI.Anchor);
     /**
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      * @returns This text for chaining.
      */
-    setTextAnchor(anchor: mod.UIAnchor): this;
+    setTextAnchor(anchor: UI.Anchor): this;
     /**
      * The color of the text, or undefined if deleted.
      * @returns The text color, or undefined if deleted.
@@ -129,7 +130,7 @@ export declare namespace UIText {
         textSize?: number;
         textColor?: Colors.Color;
         textAlpha?: number;
-        textAnchor?: mod.UIAnchor;
+        textAnchor?: UI.Anchor;
         padding?: number;
     };
 }

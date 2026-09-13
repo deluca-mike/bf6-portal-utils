@@ -300,6 +300,7 @@ export namespace Colors {
             const rChar = cleanHex.charAt(0);
             const gChar = cleanHex.charAt(1);
             const bChar = cleanHex.charAt(2);
+
             r = parseInt(rChar + rChar, 16) / 255;
             g = parseInt(gChar + gChar, 16) / 255;
             b = parseInt(bChar + bChar, 16) / 255;

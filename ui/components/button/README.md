@@ -46,13 +46,13 @@ button.pressedColor = UI.COLORS.GREEN;
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
 | `bgColor` | `UI.Color = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
 | `bgAlpha` | `number = 1` | Button background opacity. Note: Alphas are multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.Solid` | Button fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.Solid` | Button fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `enabled` | `boolean = true` | Initial enabled state. |

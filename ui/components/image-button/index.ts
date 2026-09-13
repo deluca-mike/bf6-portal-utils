@@ -110,7 +110,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.
      */
-    public get imageType(): mod.UIImageType | undefined {
+    public get imageType(): UI.ImageType | undefined {
         return this._isValid ? this.content?.imageType : undefined;
     }
 
@@ -118,7 +118,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      */
-    public set imageType(imageType: mod.UIImageType) {
+    public set imageType(imageType: UI.ImageType) {
         this.setImageType(imageType);
     }
 
@@ -127,7 +127,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param imageType - The new type of the image.
      * @returns This image button for chaining.
      */
-    public setImageType(imageType: mod.UIImageType): this {
+    public setImageType(imageType: UI.ImageType): this {
         if (this._getIsInvalidAndLogWarning()) return this;
 
         this.content?.setImageType(imageType);

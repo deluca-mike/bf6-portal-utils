@@ -44,7 +44,7 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
         testMenu = new UIContainer({
             position: { x: 0, y: 0 },
             size: { width: 200, height: 300 },
-            anchor: mod.UIAnchor.Center,
+            anchor: UI.Anchor.Center,
             receiver: eventPlayer,
             visible: true,
             uiInputModeWhenVisible: true,
@@ -53,7 +53,7 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
                     type: UITextButton,
                     position: { x: 0, y: 0 },
                     size: { width: 200, height: 50 },
-                    anchor: mod.UIAnchor.TopCenter,
+                    anchor: UI.Anchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
                     onClickUp: (player: mod.Player) => {
@@ -67,7 +67,7 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
                     type: UITextButton,
                     position: { x: 0, y: 50 },
                     size: { width: 200, height: 50 },
-                    anchor: mod.UIAnchor.TopCenter,
+                    anchor: UI.Anchor.TopCenter,
                     bgColor: UI.COLORS.GREY_25,
                     baseColor: UI.COLORS.BLACK,
                     onClickUp: (player: mod.Player) => {
@@ -85,7 +85,7 @@ Events.OnPlayerDeployed.subscribe((eventPlayer: mod.Player) => {
             parent: testMenu,
             position: { x: 0, y: 0 },
             size: { width: 50, height: 50 },
-            anchor: mod.UIAnchor.BottomCenter,
+            anchor: UI.Anchor.BottomCenter,
             bgColor: UI.COLORS.GREY_25,
             baseColor: UI.COLORS.BLACK,
             onClickUp: (player: mod.Player) => {
@@ -377,9 +377,9 @@ Base class for all created widgets.
 | `size` / `getSize(out?)` | `setSize(size)` | `UI.Size \| undefined` | Dimensions as `{ width, height }`. Supports zero-allocation `out`. |
 | `bgColor` / `getBgColor(out?)` | `setBgColor(color)` | `UI.Color \| undefined` | Background color. Supports zero-allocation `out`. |
 | `bgAlpha` | `setBgAlpha(alpha)` | `number \| undefined` | Background opacity (`0-1`). |
-| `bgFill` | `setBgFill(fill)` | `mod.UIBgFill \| undefined` | Background fill style. |
-| `anchor` | `setAnchor(anchor)` | `mod.UIAnchor \| undefined` | Anchor alignment point. |
-| `depth` | `setDepth(depth)` | `mod.UIDepth \| undefined` | Z-order depth. |
+| `bgFill` | `setBgFill(fill)` | `UI.BgFill \| undefined` | Background fill style. |
+| `anchor` | `setAnchor(anchor)` | `UI.Anchor \| undefined` | Anchor alignment point. |
+| `depth` | `setDepth(depth)` | `UI.Depth \| undefined` | Z-order depth. |
 | `uiInputModeWhenVisible` | `setUiInputModeWhenVisible(val)` | `boolean \| undefined` | Auto-manage input mode on visibility. |
 | `isDeleted` | — | `boolean \| undefined` | `true` if element has been deleted, `false` if active, `undefined` if invalid. |
 | `isValid` | — | `boolean` | `true` if active in the current generation, `false` otherwise. |

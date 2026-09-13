@@ -558,7 +558,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
         });
 
         it('should construct UIImage and UIImageButton and update image properties', () => {
-            const imageType = (mod.UIImageType as unknown as { Icon: mod.UIImageType }).Icon;
+            const imageType = UI.ImageType.CrownOutline;
             const image = new UIImage({
                 x: 0,
                 y: 0,

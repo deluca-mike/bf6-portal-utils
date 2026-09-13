@@ -170,7 +170,7 @@ export class UITextButton extends UIContentButton<UIText> {
      * The anchor of the text, or undefined if deleted.
      * @returns The text anchor alignment, or undefined if deleted.
      */
-    public get textAnchor(): mod.UIAnchor | undefined {
+    public get textAnchor(): UI.Anchor | undefined {
         return this._isValid ? this.content?.textAnchor : undefined;
     }
 
@@ -178,7 +178,7 @@ export class UITextButton extends UIContentButton<UIText> {
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      */
-    public set textAnchor(anchor: mod.UIAnchor) {
+    public set textAnchor(anchor: UI.Anchor) {
         this.setTextAnchor(anchor);
     }
 
@@ -187,7 +187,7 @@ export class UITextButton extends UIContentButton<UIText> {
      * @param anchor - The new anchor.
      * @returns This text button for chaining.
      */
-    public setTextAnchor(anchor: mod.UIAnchor): this {
+    public setTextAnchor(anchor: UI.Anchor): this {
         if (this._getIsInvalidAndLogWarning()) return this;
 
         this.content?.setTextAnchor(anchor);

@@ -2,6 +2,7 @@ import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIImage extends UI.Element {
     private static readonly _imageRgba;
+    private static readonly _imageType;
     private static _setImageRgba;
     private static _setImageColor;
     private static _setImageAlpha;
@@ -20,18 +21,18 @@ export declare class UIImage extends UI.Element {
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.
      */
-    get imageType(): mod.UIImageType | undefined;
+    get imageType(): UI.ImageType | undefined;
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      */
-    set imageType(imageType: mod.UIImageType);
+    set imageType(imageType: UI.ImageType);
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      * @returns This image for chaining.
      */
-    setImageType(imageType: mod.UIImageType): this;
+    setImageType(imageType: UI.ImageType): this;
     /**
      * The alpha of the image, or undefined if deleted.
      * @returns The image alpha opacity, or undefined if deleted.
@@ -76,7 +77,7 @@ export declare namespace UIImage {
      * The parameters for creating a new image.
      */
     type Params = UI.ElementParams & {
-        imageType: mod.UIImageType;
+        imageType: UI.ImageType;
         imageColor?: Colors.Color;
         imageAlpha?: number;
     };

@@ -1,4 +1,5 @@
 import { Colors } from '../../../colors/index.ts';
+import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIImage } from '../image/index.ts';
@@ -33,18 +34,18 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.
      */
-    get imageType(): mod.UIImageType | undefined;
+    get imageType(): UI.ImageType | undefined;
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      */
-    set imageType(imageType: mod.UIImageType);
+    set imageType(imageType: UI.ImageType);
     /**
      * Sets the type of the image.
      * @param imageType - The new type of the image.
      * @returns This image button for chaining.
      */
-    setImageType(imageType: mod.UIImageType): this;
+    setImageType(imageType: UI.ImageType): this;
     /**
      * The color of the image, or undefined if deleted.
      * @returns The image color, or undefined if deleted.

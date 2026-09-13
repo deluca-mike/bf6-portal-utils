@@ -22,7 +22,7 @@ import { UI } from 'bf6-portal-utils/ui';
 const button = new UIImageButton({
     position: { x: 0, y: 0 },
     size: { width: 64, height: 64 },
-    imageType: mod.UIImageType.CrownOutline,
+    imageType: UI.ImageType.CrownOutline,
     imageColor: UI.COLORS.WHITE,
     onClickUp: async (player: mod.Player) => {
         console.log(`Player ${mod.GetObjId(player)} released the button!`);
@@ -31,7 +31,7 @@ const button = new UIImageButton({
 });
 
 // Update button and image properties
-button.imageType = mod.UIImageType.CrownSolid;
+button.imageType = UI.ImageType.CrownSolid;
 button.imageColor = UI.COLORS.BLUE;
 button.enabled = false;
 ```
@@ -45,7 +45,7 @@ button.enabled = false;
 | Param | Type / Default | Notes |
 | --- | --- | --- |
 | All parameters from `UIBaseButton.Params`, plus: |
-| `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
+| `imageType` | `UI.ImageType` | **Required.** The type of image to display. |
 | `imageColor` | `UI.Color = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
 | `imageAlpha` | `number = 1` | Image opacity (used when button is enabled). |
 | `imageDisabledColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
@@ -84,7 +84,7 @@ All button properties are forwarded to the underlying button widget:
 
 ### Delegated from Internal Image
 
-- **`imageType: mod.UIImageType`** (getter/setter) – The type of image to display.
+- **`imageType: UI.ImageType`** (getter/setter) – The type of image to display.
 
 ### ImageButton-Specific
 

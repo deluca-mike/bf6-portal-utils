@@ -47,7 +47,7 @@ button.enabled = false;
 | `textSize` | `number = 36` | Font size. |
 | `textColor` | `UI.Color = UI.COLORS.BLACK` | Text color (used when button is enabled). |
 | `textAlpha` | `number = 1` | Text opacity (used when button is enabled). |
-| `textAnchor` | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget. |
+| `textAnchor` | `UI.Anchor = UI.Anchor.Center` | Alignment inside the text widget. |
 | `textDisabledColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Text color when button is disabled. |
 | `textDisabledAlpha` | `number = 1` | Text opacity when button is disabled. |
 | `padding` | `number = 0` | Container padding. |
@@ -80,7 +80,7 @@ For complete documentation of base properties, see the [main UI documentation](.
 
 - **`label: mod.Message`** (getter/setter) – The text label content.
 - **`textSize: number`** (getter/setter) – Font size.
-- **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
+- **`textAnchor: UI.Anchor`** (getter/setter) – Alignment inside the text widget.
 
 ### TextButton-Specific
 

@@ -28,7 +28,7 @@ const qrCode = new UIQRCode({
     ecc: UIQRCode.ECC.Medium,
     scale: 1, // Default: 10 pixels per module
     position: { x: 0, y: 0 },
-    anchor: mod.UIAnchor.Center,
+    anchor: UI.Anchor.Center,
     darkColor: UI.COLORS.BLACK,
     lightColor: UI.COLORS.WHITE,
     margin: 2, // 2 modules quiet zone
@@ -100,10 +100,10 @@ const qrCode = new UIQRCode({
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number \| undefined` | Explicit size in screen units. When omitted, automatically computed from `(matrixSize + 2 * margin) * 10 * scale`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. |
 | `visible` | `boolean = true` | Initial visibility. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order depth. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order depth. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience for the UI element. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility. |
 

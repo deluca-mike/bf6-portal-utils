@@ -45,21 +45,21 @@ text.textSize = 36;
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment position. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
 | `padding` | `number = 0` | Container padding. |
 | `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.None` | Fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `label` | `mod.Message` | **Required.** Text label content (see `mod` namespace for `mod.Message` helpers). Note: `mod.Message` is opaque and cannot be unpacked into a string. |
 | `textSize` | `number = 36` | Font size. |
 | `textColor` | `UI.Color = UI.COLORS.BLACK` | Text color. |
 | `textAlpha` | `number = 1` | Text opacity. |
-| `textAnchor` | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget. |
+| `textAnchor` | `UI.Anchor = UI.Anchor.Center` | Alignment inside the text widget. |
 
 ---
 
@@ -85,7 +85,7 @@ For complete documentation of these properties, see the [main UI documentation](
 - **`textSize: number`** (getter/setter) – Font size.
 - **`textColor: UI.Color`** (getter/setter) – Text color. Supports zero-allocation `getTextColor(out?)`.
 - **`textAlpha: number`** (getter/setter) – Text opacity.
-- **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
+- **`textAnchor: UI.Anchor`** (getter/setter) – Alignment inside the text widget.
 - **`padding: number`** (getter/setter) – Container padding.
 
 ---
@@ -100,7 +100,7 @@ type Params = UI.ElementParams & {
     textSize?: number; // Default: 36
     textColor?: UI.Color; // Default: UI.COLORS.BLACK
     textAlpha?: number; // Default: 1
-    textAnchor?: mod.UIAnchor; // Default: mod.UIAnchor.Center
+    textAnchor?: UI.Anchor; // Default: UI.Anchor.Center
     padding?: number; // Default: 0
 };
 ```

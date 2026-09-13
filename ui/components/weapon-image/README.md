@@ -45,10 +45,10 @@ const weaponImage = new UIWeaponImage({
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. Note: The underlying Portal API lacks the ability to define starting invisibility, so visibility is set manually after construction. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `weapon` | `mod.Weapons` | **Required.** The weapon to display. |

@@ -169,7 +169,7 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                 (() => {
                     const m5a3 = mod.Weapons?.M5A3 ?? 1;
                     const medkit = mod.Gadgets?.Medkit ?? 1;
-                    const icon = mod.UIImageType?.Icon ?? 1;
+                    const icon = UI.ImageType?.CrownOutline ?? 1;
                     const compositeWidgets = [];
 
                     for (let i = 0; i < ${count / 5}; ++i) {
@@ -360,7 +360,7 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                     const images = [];
                     const ak24 = mod.Weapons?.AK24 ?? 2;
                     const medkit = mod.Gadgets?.Medkit ?? 1;
-                    const icon = mod.UIImageType?.Icon ?? 1;
+                    const icon = UI.ImageType?.CrownOutline ?? 1;
 
                     for (let i = 0; i < ${count / 4}; ++i) {
                         images.push(new UIImage({ x: i, y: i, width: 32, height: 32, imageType: icon }));
@@ -372,7 +372,7 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                     for (let m = 0; m < ${mutations}; ++m) {
                         const img = images[m % images.length];
                         if (img instanceof UIImage) {
-                            img.imageColor = { x: 0, y: 1, z: 0 };
+                            img.imageColor = { r: 0, g: 1, b: 0 };
                             img.imageAlpha = 0.5;
                         }
                         img.x = m % 1920;
@@ -407,7 +407,7 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
             run: `
                 (() => {
                     const buttons = [];
-                    const icon = mod.UIImageType?.Icon ?? 1;
+                    const icon = UI.ImageType?.CrownOutline ?? 1;
 
                     for (let i = 0; i < ${count / 2}; ++i) {
                         buttons.push(new UITextButton({
@@ -416,8 +416,8 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                             width: 120,
                             height: 35,
                             label: 'Btn ' + i,
-                            textColor: { x: 1, y: 1, z: 1 },
-                            textDisabledColor: { x: 0.5, y: 0.5, z: 0.5 },
+                            textColor: { r: 1, g: 1, b: 1 },
+                            textDisabledColor: { r: 0.5, g: 0.5, b: 0.5 },
                         }));
                         buttons.push(new UIImageButton({
                             x: i,
@@ -425,8 +425,8 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                             width: 40,
                             height: 40,
                             imageType: icon,
-                            imageColor: { x: 1, y: 0, z: 0 },
-                            imageDisabledColor: { x: 0.3, y: 0.3, z: 0.3 },
+                            imageColor: { r: 1, g: 0, b: 0 },
+                            imageDisabledColor: { r: 0.3, g: 0.3, b: 0.3 },
                         }));
                     }
 
@@ -434,9 +434,9 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                         const btn = buttons[t % buttons.length];
                         btn.enabled = t % 2 === 0;
                         if (btn instanceof UITextButton) {
-                            btn.textColor = { x: 0.8, y: 0.8, z: 0.8 };
+                            btn.textColor = { r: 0.8, g: 0.8, b: 0.8 };
                         } else if (btn instanceof UIImageButton) {
-                            btn.imageColor = { x: 0, y: 0.8, z: 0 };
+                            btn.imageColor = { r: 0, g: 0.8, b: 0 };
                         }
                     }
 

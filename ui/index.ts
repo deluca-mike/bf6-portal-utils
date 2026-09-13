@@ -142,142 +142,65 @@ export namespace UI {
         return _hasFlag(slot, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
     }
 
-    function _encodeAnchor(anchor: mod.UIAnchor): number {
-        switch (anchor) {
-            case mod.UIAnchor.TopLeft:
-                return 0;
-            case mod.UIAnchor.TopCenter:
-                return 1;
-            case mod.UIAnchor.TopRight:
-                return 2;
-            case mod.UIAnchor.CenterLeft:
-                return 3;
-            case mod.UIAnchor.Center:
-                return 4;
-            case mod.UIAnchor.CenterRight:
-                return 5;
-            case mod.UIAnchor.BottomLeft:
-                return 6;
-            case mod.UIAnchor.BottomCenter:
-                return 7;
-            case mod.UIAnchor.BottomRight:
-                return 8;
-            default:
-                return 4;
-        }
+    const _NATIVE_ANCHORS: readonly mod.UIAnchor[] = [
+        mod.UIAnchor.TopLeft,
+        mod.UIAnchor.TopCenter,
+        mod.UIAnchor.TopRight,
+        mod.UIAnchor.CenterLeft,
+        mod.UIAnchor.Center,
+        mod.UIAnchor.CenterRight,
+        mod.UIAnchor.BottomLeft,
+        mod.UIAnchor.BottomCenter,
+        mod.UIAnchor.BottomRight,
+    ];
+
+    const _NATIVE_BG_FILLS: readonly mod.UIBgFill[] = [
+        mod.UIBgFill.None,
+        mod.UIBgFill.Solid,
+        mod.UIBgFill.Blur,
+        mod.UIBgFill.GradientBottom,
+        mod.UIBgFill.GradientLeft,
+        mod.UIBgFill.GradientRight,
+        mod.UIBgFill.GradientTop,
+        mod.UIBgFill.OutlineThick,
+        mod.UIBgFill.OutlineThin,
+    ];
+
+    const _NATIVE_DEPTHS: readonly mod.UIDepth[] = [mod.UIDepth.AboveGameUI, mod.UIDepth.BelowGameUI];
+
+    const _NATIVE_IMAGE_TYPES: readonly mod.UIImageType[] = [
+        mod.UIImageType.None,
+        mod.UIImageType.CrownOutline,
+        mod.UIImageType.CrownSolid,
+        mod.UIImageType.QuestionMark,
+        mod.UIImageType.RifleAmmo,
+        mod.UIImageType.SelfHeal,
+        mod.UIImageType.SpawnBeacon,
+        mod.UIImageType.TEMP_PortalIcon,
+    ];
+
+    function _setAnchor(slot: number, anchor: Anchor): void {
+        _flags[slot] = (_flags[slot] & ~(ANCHOR_MASK << ANCHOR_SHIFT)) | ((anchor & ANCHOR_MASK) << ANCHOR_SHIFT);
     }
 
-    function _decodeAnchor(code: number): mod.UIAnchor {
-        switch (code) {
-            case 0:
-                return mod.UIAnchor.TopLeft;
-            case 1:
-                return mod.UIAnchor.TopCenter;
-            case 2:
-                return mod.UIAnchor.TopRight;
-            case 3:
-                return mod.UIAnchor.CenterLeft;
-            case 4:
-                return mod.UIAnchor.Center;
-            case 5:
-                return mod.UIAnchor.CenterRight;
-            case 6:
-                return mod.UIAnchor.BottomLeft;
-            case 7:
-                return mod.UIAnchor.BottomCenter;
-            case 8:
-                return mod.UIAnchor.BottomRight;
-            default:
-                return mod.UIAnchor.Center;
-        }
+    function _getAnchor(slot: number): Anchor {
+        return ((_flags[slot] >>> ANCHOR_SHIFT) & ANCHOR_MASK) as Anchor;
     }
 
-    function _encodeBgFill(fill: mod.UIBgFill): number {
-        switch (fill) {
-            case mod.UIBgFill.None:
-                return 0;
-            case mod.UIBgFill.Solid:
-                return 1;
-            case mod.UIBgFill.Blur:
-                return 2;
-            case mod.UIBgFill.GradientBottom:
-                return 3;
-            case mod.UIBgFill.GradientLeft:
-                return 4;
-            case mod.UIBgFill.GradientRight:
-                return 5;
-            case mod.UIBgFill.GradientTop:
-                return 6;
-            case mod.UIBgFill.OutlineThick:
-                return 7;
-            case mod.UIBgFill.OutlineThin:
-                return 8;
-            default:
-                return 0;
-        }
+    function _setBgFill(slot: number, fill: BgFill): void {
+        _flags[slot] = (_flags[slot] & ~(BG_FILL_MASK << BG_FILL_SHIFT)) | ((fill & BG_FILL_MASK) << BG_FILL_SHIFT);
     }
 
-    function _decodeBgFill(code: number): mod.UIBgFill {
-        switch (code) {
-            case 0:
-                return mod.UIBgFill.None;
-            case 1:
-                return mod.UIBgFill.Solid;
-            case 2:
-                return mod.UIBgFill.Blur;
-            case 3:
-                return mod.UIBgFill.GradientBottom;
-            case 4:
-                return mod.UIBgFill.GradientLeft;
-            case 5:
-                return mod.UIBgFill.GradientRight;
-            case 6:
-                return mod.UIBgFill.GradientTop;
-            case 7:
-                return mod.UIBgFill.OutlineThick;
-            case 8:
-                return mod.UIBgFill.OutlineThin;
-            default:
-                return mod.UIBgFill.None;
-        }
+    function _getBgFill(slot: number): BgFill {
+        return ((_flags[slot] >>> BG_FILL_SHIFT) & BG_FILL_MASK) as BgFill;
     }
 
-    function _encodeDepth(depth: mod.UIDepth): number {
-        return depth === mod.UIDepth.BelowGameUI ? 1 : 0;
+    function _setDepth(slot: number, depth: Depth): void {
+        _flags[slot] = (_flags[slot] & ~(DEPTH_MASK << DEPTH_SHIFT)) | ((depth & DEPTH_MASK) << DEPTH_SHIFT);
     }
 
-    function _decodeDepth(code: number): mod.UIDepth {
-        return code === 1 ? mod.UIDepth.BelowGameUI : mod.UIDepth.AboveGameUI;
-    }
-
-    function _setAnchor(slot: number, anchor: mod.UIAnchor): void {
-        const code = _encodeAnchor(anchor);
-        _flags[slot] = (_flags[slot] & ~(ANCHOR_MASK << ANCHOR_SHIFT)) | ((code & ANCHOR_MASK) << ANCHOR_SHIFT);
-    }
-
-    function _getAnchor(slot: number): mod.UIAnchor {
-        const code = (_flags[slot] >>> ANCHOR_SHIFT) & ANCHOR_MASK;
-        return _decodeAnchor(code);
-    }
-
-    function _setBgFill(slot: number, fill: mod.UIBgFill): void {
-        const code = _encodeBgFill(fill);
-        _flags[slot] = (_flags[slot] & ~(BG_FILL_MASK << BG_FILL_SHIFT)) | ((code & BG_FILL_MASK) << BG_FILL_SHIFT);
-    }
-
-    function _getBgFill(slot: number): mod.UIBgFill {
-        const code = (_flags[slot] >>> BG_FILL_SHIFT) & BG_FILL_MASK;
-        return _decodeBgFill(code);
-    }
-
-    function _setDepth(slot: number, depth: mod.UIDepth): void {
-        const code = _encodeDepth(depth);
-        _flags[slot] = (_flags[slot] & ~(DEPTH_MASK << DEPTH_SHIFT)) | ((code & DEPTH_MASK) << DEPTH_SHIFT);
-    }
-
-    function _getDepth(slot: number): mod.UIDepth {
-        const code = (_flags[slot] >>> DEPTH_SHIFT) & DEPTH_MASK;
-        return _decodeDepth(code);
+    function _getDepth(slot: number): Depth {
+        return ((_flags[slot] >>> DEPTH_SHIFT) & DEPTH_MASK) as Depth;
     }
 
     function _setBgRgba(slot: number, color: Colors.Color, alpha: number): void {
@@ -503,6 +426,60 @@ export namespace UI {
         return receiver !== undefined && mod.IsType(receiver, mod.Types.Player);
     }
 
+    /****** Enums ******/
+
+    /**
+     * Anchor alignment positions for UI elements.
+     */
+    export enum Anchor {
+        TopLeft = 0,
+        TopCenter = 1,
+        TopRight = 2,
+        CenterLeft = 3,
+        Center = 4,
+        CenterRight = 5,
+        BottomLeft = 6,
+        BottomCenter = 7,
+        BottomRight = 8,
+    }
+
+    /**
+     * Background fill styles for UI elements.
+     */
+    export enum BgFill {
+        None = 0,
+        Solid = 1,
+        Blur = 2,
+        GradientBottom = 3,
+        GradientLeft = 4,
+        GradientRight = 5,
+        GradientTop = 6,
+        OutlineThick = 7,
+        OutlineThin = 8,
+    }
+
+    /**
+     * Z-order rendering depth for UI elements.
+     */
+    export enum Depth {
+        AboveGameUI = 0,
+        BelowGameUI = 1,
+    }
+
+    /**
+     * Available image glyph / icon types.
+     */
+    export enum ImageType {
+        None = 0,
+        CrownOutline = 1,
+        CrownSolid = 2,
+        QuestionMark = 3,
+        RifleAmmo = 4,
+        SelfHeal = 5,
+        SpawnBeacon = 6,
+        TEMP_PortalIcon = 7,
+    }
+
     /****** Types ******/
 
     /**
@@ -523,13 +500,13 @@ export namespace UI {
     }
 
     type BaseParams = {
-        anchor?: mod.UIAnchor;
+        anchor?: Anchor;
         parent?: Parent;
         visible?: boolean;
         bgColor?: Colors.Color;
         bgAlpha?: number;
-        bgFill?: mod.UIBgFill;
-        depth?: mod.UIDepth;
+        bgFill?: BgFill;
+        depth?: Depth;
         receiver?: mod.Player | mod.Team;
         uiInputModeWhenVisible?: boolean;
     };
@@ -983,9 +960,9 @@ export namespace UI {
             const { width, height } = Element._getSize(params);
             const visible = params.visible ?? true;
             const uiInputModeWhenVisible = params.uiInputModeWhenVisible ?? false;
-            const anchor = params.anchor ?? mod.UIAnchor.Center;
-            const bgFill = params.bgFill ?? mod.UIBgFill.None;
-            const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+            const anchor = params.anchor ?? Anchor.Center;
+            const bgFill = params.bgFill ?? BgFill.None;
+            const depth = params.depth ?? Depth.AboveGameUI;
             const bgColor = params.bgColor ?? Colors.WHITE;
             const bgAlpha = params.bgAlpha ?? 0;
 
@@ -998,9 +975,9 @@ export namespace UI {
             _height[slot] = height;
 
             let flags = FLAG_IN_USE;
-            flags |= (_encodeDepth(depth) & DEPTH_MASK) << DEPTH_SHIFT;
-            flags |= (_encodeBgFill(bgFill) & BG_FILL_MASK) << BG_FILL_SHIFT;
-            flags |= (_encodeAnchor(anchor) & ANCHOR_MASK) << ANCHOR_SHIFT;
+            flags |= (depth & DEPTH_MASK) << DEPTH_SHIFT;
+            flags |= (bgFill & BG_FILL_MASK) << BG_FILL_SHIFT;
+            flags |= (anchor & ANCHOR_MASK) << ANCHOR_SHIFT;
 
             if (visible) {
                 flags |= FLAG_VISIBLE;
@@ -1022,6 +999,22 @@ export namespace UI {
         }
 
         /****** Protected Static Helpers for Subclasses ******/
+
+        protected static _getNativeAnchor(anchor: Anchor): mod.UIAnchor {
+            return _NATIVE_ANCHORS[anchor];
+        }
+
+        protected static _getNativeBgFill(bgFill: BgFill): mod.UIBgFill {
+            return _NATIVE_BG_FILLS[bgFill];
+        }
+
+        protected static _getNativeDepth(depth: Depth): mod.UIDepth {
+            return _NATIVE_DEPTHS[depth];
+        }
+
+        protected static _getNativeImageType(imageType: ImageType): mod.UIImageType {
+            return _NATIVE_IMAGE_TYPES[imageType];
+        }
 
         protected static _resolveSlot(id: number): number {
             return _resolveSlot(id);
@@ -1624,7 +1617,7 @@ export namespace UI {
          * The background fill of the element, or undefined if deleted.
          * @returns The background fill of the element, or undefined.
          */
-        public get bgFill(): mod.UIBgFill | undefined {
+        public get bgFill(): BgFill | undefined {
             const slot = this._slot;
 
             return slot === INVALID_INDEX ? undefined : _getBgFill(slot);
@@ -1634,7 +1627,7 @@ export namespace UI {
          * Sets the background fill of the element.
          * @param fill - The background fill to set.
          */
-        public set bgFill(fill: mod.UIBgFill) {
+        public set bgFill(fill: BgFill) {
             this.setBgFill(fill);
         }
 
@@ -1643,13 +1636,13 @@ export namespace UI {
          * @param fill - The background fill to set.
          * @returns This element for chaining.
          */
-        public setBgFill(fill: mod.UIBgFill): this {
+        public setBgFill(fill: BgFill): this {
             const slot = this._getSlotAndLogWarning();
 
             if (slot === INVALID_INDEX) return this;
 
             _setBgFill(slot, fill);
-            mod.SetUIWidgetBgFill(this._uiWidget, fill);
+            mod.SetUIWidgetBgFill(this._uiWidget, _NATIVE_BG_FILLS[fill]);
 
             return this;
         }
@@ -1658,7 +1651,7 @@ export namespace UI {
          * The depth of the element, or undefined if deleted.
          * @returns The depth of the element, or undefined.
          */
-        public get depth(): mod.UIDepth | undefined {
+        public get depth(): Depth | undefined {
             const slot = this._slot;
 
             return slot === INVALID_INDEX ? undefined : _getDepth(slot);
@@ -1668,7 +1661,7 @@ export namespace UI {
          * Sets the depth of the element.
          * @param depth - The depth to set.
          */
-        public set depth(depth: mod.UIDepth) {
+        public set depth(depth: Depth) {
             this.setDepth(depth);
         }
 
@@ -1677,13 +1670,13 @@ export namespace UI {
          * @param depth - The depth to set.
          * @returns This element for chaining.
          */
-        public setDepth(depth: mod.UIDepth): this {
+        public setDepth(depth: Depth): this {
             const slot = this._getSlotAndLogWarning();
 
             if (slot === INVALID_INDEX) return this;
 
             _setDepth(slot, depth);
-            mod.SetUIWidgetDepth(this._uiWidget, depth);
+            mod.SetUIWidgetDepth(this._uiWidget, _NATIVE_DEPTHS[depth]);
 
             return this;
         }
@@ -1692,7 +1685,7 @@ export namespace UI {
          * The anchor of the element, or undefined if deleted.
          * @returns The anchor of the element, or undefined.
          */
-        public get anchor(): mod.UIAnchor | undefined {
+        public get anchor(): Anchor | undefined {
             const slot = this._slot;
 
             return slot === INVALID_INDEX ? undefined : _getAnchor(slot);
@@ -1702,7 +1695,7 @@ export namespace UI {
          * Sets the anchor of the element.
          * @param anchor - The anchor to set.
          */
-        public set anchor(anchor: mod.UIAnchor) {
+        public set anchor(anchor: Anchor) {
             this.setAnchor(anchor);
         }
 
@@ -1711,13 +1704,13 @@ export namespace UI {
          * @param anchor - The anchor to set.
          * @returns This element for chaining.
          */
-        public setAnchor(anchor: mod.UIAnchor): this {
+        public setAnchor(anchor: Anchor): this {
             const slot = this._getSlotAndLogWarning();
 
             if (slot === INVALID_INDEX) return this;
 
             _setAnchor(slot, anchor);
-            mod.SetUIWidgetAnchor(this._uiWidget, anchor);
+            mod.SetUIWidgetAnchor(this._uiWidget, _NATIVE_ANCHORS[anchor]);
 
             return this;
         }

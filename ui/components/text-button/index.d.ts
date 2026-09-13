@@ -1,4 +1,5 @@
 import { Colors } from '../../../colors/index.ts';
+import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
@@ -65,18 +66,18 @@ export declare class UITextButton extends UIContentButton<UIText> {
      * The anchor of the text, or undefined if deleted.
      * @returns The text anchor alignment, or undefined if deleted.
      */
-    get textAnchor(): mod.UIAnchor | undefined;
+    get textAnchor(): UI.Anchor | undefined;
     /**
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      */
-    set textAnchor(anchor: mod.UIAnchor);
+    set textAnchor(anchor: UI.Anchor);
     /**
      * Sets the anchor of the text.
      * @param anchor - The new anchor.
      * @returns This text button for chaining.
      */
-    setTextAnchor(anchor: mod.UIAnchor): this;
+    setTextAnchor(anchor: UI.Anchor): this;
     /**
      * The color of the text when the button is enabled, or undefined if deleted.
      * @returns The text color, or undefined if deleted.

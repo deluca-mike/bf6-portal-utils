@@ -191,7 +191,7 @@ export declare namespace Logger {
         /**
          * The anchor for the logger.
          */
-        anchor?: mod.UIAnchor;
+        anchor?: UI.Anchor;
         /**
          * The x position of the logger.
          */
@@ -219,7 +219,7 @@ export declare namespace Logger {
         /**
          * The background fill of the logger.
          */
-        bgFill?: mod.UIBgFill;
+        bgFill?: UI.BgFill;
         /**
          * The text color of the logger.
          */

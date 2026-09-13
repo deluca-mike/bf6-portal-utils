@@ -30,14 +30,14 @@ const button = new UIContainerButton({
         {
             type: UIText,
             label: mod.Message(mod.stringkeys.labels.click), // 'Click'
-            anchor: mod.UIAnchor.TopCenter,
+            anchor: UI.Anchor.TopCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
         } as UIContainer.ChildParams<UIText.Params>,
         {
             type: UIText,
             label: mod.Message(mod.stringkeys.labels.me), // 'Me'
-            anchor: mod.UIAnchor.BottomCenter,
+            anchor: UI.Anchor.BottomCenter,
             position: { x: 0, y: 0 },
             size: { width: 200, height: 50 },
         } as UIContainer.ChildParams<UIText.Params>,

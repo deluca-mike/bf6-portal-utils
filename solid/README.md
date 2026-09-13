@@ -57,7 +57,7 @@ function createCounterUI(player: mod.Player): void {
     // Create text that updates when count changes (using a getter function)
     Solid.h(UI.Text, {
         parent: container,
-        anchor: mod.UIAnchor.TopCenter,
+        anchor: UI.Anchor.TopCenter,
         width: 200,
         message: () => mod.Message(mod.stringkeys.count, Solid.read(countSig)),
         textSize: 30,
@@ -69,7 +69,7 @@ function createCounterUI(player: mod.Player): void {
         UI.Text,
         {
             parent: container,
-            anchor: mod.UIAnchor.Center,
+            anchor: UI.Anchor.Center,
             width: 200,
             message: () => mod.Message(mod.stringkeys.count, Solid.read(countSig)),
             textSize: 30,
@@ -81,7 +81,7 @@ function createCounterUI(player: mod.Player): void {
     // Create a button that increments the count
     Solid.h(UI.TextButton, {
         parent: container,
-        anchor: mod.UIAnchor.BottomCenter,
+        anchor: UI.Anchor.BottomCenter,
         width: 200,
         message: mod.Message(mod.stringkeys.increment),
         textSize: 30,
@@ -658,7 +658,7 @@ function createModalUI(player: mod.Player): () => void {
         height: 300,
         bgColor: UI.COLORS.BLACK,
         bgAlpha: 0.9,
-        bgFill: mod.UIBgFill.Blur,
+        bgFill: UI.BgFill.Blur,
     });
 
     Solid.h(UI.TextButton, {
@@ -790,12 +790,12 @@ function createSpawnUI(player: mod.Player): void {
         y: 0,
         width: 440,
         height: 140,
-        anchor: mod.UIAnchor.Center,
+        anchor: UI.Anchor.Center,
         visible: () => Solid.read(delayCountdownSig) === 0,
         uiInputModeWhenVisible: true,
         bgColor: UI.COLORS.BF_GREY_4,
         bgAlpha: 0.5,
-        bgFill: mod.UIBgFill.Blur,
+        bgFill: UI.BgFill.Blur,
     });
 
     // Spawn button
@@ -804,7 +804,7 @@ function createSpawnUI(player: mod.Player): void {
         y: 20,
         width: 400,
         height: 40,
-        anchor: mod.UIAnchor.TopCenter,
+        anchor: UI.Anchor.TopCenter,
         message: mod.Message(mod.stringkeys.spawnNow),
         textSize: 30,
         textColor: UI.COLORS.BF_GREEN_BRIGHT,
@@ -820,7 +820,7 @@ function createSpawnUI(player: mod.Player): void {
         y: 60,
         width: 400,
         height: 50,
-        anchor: mod.UIAnchor.TopCenter,
+        anchor: UI.Anchor.TopCenter,
         message: () => mod.Message(mod.stringkeys.spawningIn, Solid.read(delayCountdownSig)),
         textSize: 30,
         textColor: UI.COLORS.BF_GREEN_BRIGHT,

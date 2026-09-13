@@ -251,10 +251,10 @@ export class Logger {
             width: this._width,
             height: this._height,
             parent: options?.parent,
-            anchor: options?.anchor ?? mod.UIAnchor.TopLeft,
+            anchor: options?.anchor ?? UI.Anchor.TopLeft,
             bgColor: options?.bgColor ?? UI.COLORS.BF_GREY_4,
             bgAlpha: options?.bgAlpha ?? 0.5,
-            bgFill: options?.bgFill ?? mod.UIBgFill.Blur,
+            bgFill: options?.bgFill ?? UI.BgFill.Blur,
             visible: options?.visible ?? false,
             receiver: player,
         });
@@ -409,9 +409,9 @@ export class Logger {
                 y: Logger._PADDING + rowIndex * Logger._ROW_HEIGHT,
                 width: this._width - Logger._PADDING * 2,
                 height: Logger._ROW_HEIGHT,
-                anchor: mod.UIAnchor.TopLeft,
+                anchor: UI.Anchor.TopLeft,
                 parent: this._window,
-                bgFill: mod.UIBgFill.None,
+                bgFill: UI.BgFill.None,
             });
 
             this._staticRowsList[rowIndex] = row;
@@ -447,9 +447,9 @@ export class Logger {
                 y: bottomY,
                 width: this._width - Logger._PADDING * 2,
                 height: Logger._ROW_HEIGHT,
-                anchor: mod.UIAnchor.TopLeft,
+                anchor: UI.Anchor.TopLeft,
                 parent: this._window,
-                bgFill: mod.UIBgFill.None,
+                bgFill: UI.BgFill.None,
             });
 
             this._dynamicRows.push(newRow);
@@ -545,12 +545,12 @@ export class Logger {
                 y: 0,
                 width: partWidth,
                 height: Logger._ROW_HEIGHT,
-                anchor: mod.UIAnchor.CenterLeft,
+                anchor: UI.Anchor.CenterLeft,
                 parent: row,
                 label: Logger._buildMessage(part),
                 textSize: Logger._TEXT_SIZE,
                 textColor: this._textColor,
-                textAnchor: mod.UIAnchor.CenterLeft,
+                textAnchor: UI.Anchor.CenterLeft,
             });
         }
 
@@ -597,7 +597,7 @@ export namespace Logger {
         /**
          * The anchor for the logger.
          */
-        anchor?: mod.UIAnchor;
+        anchor?: UI.Anchor;
         /**
          * The x position of the logger.
          */
@@ -625,7 +625,7 @@ export namespace Logger {
         /**
          * The background fill of the logger.
          */
-        bgFill?: mod.UIBgFill;
+        bgFill?: UI.BgFill;
         /**
          * The text color of the logger.
          */

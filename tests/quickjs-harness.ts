@@ -492,20 +492,39 @@ export async function createQuickJSServerContext(options?: {
 
     // Enums
     setEnum('UIAnchor', {
-        Center: 0,
-        TopLeft: 1,
-        TopCenter: 2,
-        TopRight: 3,
-        CenterLeft: 4,
+        TopLeft: 0,
+        TopCenter: 1,
+        TopRight: 2,
+        CenterLeft: 3,
+        Center: 4,
         CenterRight: 5,
         BottomLeft: 6,
         BottomCenter: 7,
         BottomRight: 8,
     });
-    setEnum('UIBgFill', { None: 0, Solid: 1 });
-    setEnum('UIDepth', { BehindGameUI: 0, GameUI: 1, AboveGameUI: 2 });
+    setEnum('UIBgFill', {
+        None: 0,
+        Solid: 1,
+        Blur: 2,
+        GradientBottom: 3,
+        GradientLeft: 4,
+        GradientRight: 5,
+        GradientTop: 6,
+        OutlineThick: 7,
+        OutlineThin: 8,
+    });
+    setEnum('UIDepth', { AboveGameUI: 0, BelowGameUI: 1 });
     setEnum('UIButtonEvent', { ButtonDown: 0, ButtonUp: 1, FocusIn: 2, FocusOut: 3 });
-    setEnum('UIImageType', { None: 0, Icon: 1 });
+    setEnum('UIImageType', {
+        None: 0,
+        CrownOutline: 1,
+        CrownSolid: 2,
+        QuestionMark: 3,
+        RifleAmmo: 4,
+        SelfHeal: 5,
+        SpawnBeacon: 6,
+        TEMP_PortalIcon: 7,
+    });
     setEnum('Weapons', { M5A3: 1, AK24: 2 });
     setEnum('Gadgets', { Medkit: 1 });
     setEnum('Types', { Player: 1, Vehicle: 2, Team: 3 });

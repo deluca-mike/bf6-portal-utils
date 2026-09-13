@@ -23,7 +23,7 @@ import { UI } from 'bf6-portal-utils/ui';
 const container = new UIContainer({
     position: { x: 0, y: 0 },
     size: { width: 300, height: 400 },
-    anchor: mod.UIAnchor.Center,
+    anchor: UI.Anchor.Center,
     bgColor: UI.COLORS.BF_GREY_3,
     bgAlpha: 0.9,
     childrenParams: [
@@ -56,13 +56,13 @@ container.delete();
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
 | `width`, `height` | `number = 0` | Size in screen units. Mutually exclusive with `size`. |
 | `size` | `UI.Size \| undefined` | Size as `{ width: number; height: number }`. Mutually exclusive with `width`/`height`. |
-| `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
+| `anchor` | `UI.Anchor = UI.Anchor.Center` | Anchor alignment point. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
 | `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
-| `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
-| `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
+| `bgFill` | `UI.BgFill = UI.BgFill.None` | Fill mode. |
+| `depth` | `UI.Depth = UI.Depth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `childrenParams` | `Array<UIContainer.ChildParams<any>> = []` | Nested elements automatically receive this container as `parent`. Each child must have a `type` property set to the class constructor (e.g., `UIContainer`, `UIText`, `UIButton`, `UITextButton`). |

@@ -18,40 +18,44 @@ export class UIContainer extends UI.Element implements UI.Parent {
         const name = this._name;
         const { x, y } = UI.Element._getPosition(params);
         const { width, height } = UI.Element._getSize(params);
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
         const bgColor = params.bgColor ?? UI.COLORS.WHITE;
         const bgAlpha = params.bgAlpha ?? 0;
-        const bgFill = params.bgFill ?? mod.UIBgFill.None;
-        const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+        const bgFill = params.bgFill ?? UI.BgFill.None;
+        const depth = params.depth ?? UI.Depth.AboveGameUI;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
+        const nativeBgFill = UI.Element._getNativeBgFill(bgFill);
+        const nativeDepth = UI.Element._getNativeDepth(depth);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
-                depth
+                nativeBgFill,
+                nativeDepth
             );
         } else {
             mod.AddUIContainer(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
                 Colors.toVector(bgColor),
                 bgAlpha,
-                bgFill,
-                depth,
+                nativeBgFill,
+                nativeDepth,
                 receiver.nativeReceiver
             );
         }

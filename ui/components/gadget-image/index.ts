@@ -18,15 +18,17 @@ export class UIGadgetImage extends UI.Element {
         const name = this._name;
         const { x, y } = UI.Element._getPosition(params);
         const { width, height } = UI.Element._getSize(params);
-        const anchor = params.anchor ?? mod.UIAnchor.Center;
+        const anchor = params.anchor ?? UI.Anchor.Center;
         const visible = params.visible ?? true;
+
+        const nativeAnchor = UI.Element._getNativeAnchor(anchor);
 
         if (!receiver.nativeReceiver) {
             mod.AddUIGadgetImage(
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 params.gadget,
                 UI.Element._getNativeWidget(parent)!
             );
@@ -35,7 +37,7 @@ export class UIGadgetImage extends UI.Element {
                 name,
                 mod.CreateVector(x, y, 0),
                 mod.CreateVector(width, height, 0),
-                anchor,
+                nativeAnchor,
                 params.gadget,
                 UI.Element._getNativeWidget(parent)!,
                 receiver.nativeReceiver
