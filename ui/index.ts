@@ -203,14 +203,6 @@ export namespace UI {
         return ((_flags[slot] >>> DEPTH_SHIFT) & DEPTH_MASK) as Depth;
     }
 
-    function _setBgRgba(slot: number, color: Colors.Color, alpha: number): void {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        _bgRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
     function _setBgColor(slot: number, color: Colors.Color): void {
         const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
         const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
@@ -229,12 +221,14 @@ export namespace UI {
         const r = (rgba >>> 24) / 255;
         const g = ((rgba >>> 16) & 0xff) / 255;
         const b = ((rgba >>> 8) & 0xff) / 255;
+
         if (out) {
             out.r = r;
             out.g = g;
             out.b = b;
             return out;
         }
+
         return { r, g, b };
     }
 
@@ -993,7 +987,8 @@ export namespace UI {
             }
 
             _flags[slot] = flags;
-            _setBgRgba(slot, bgColor, bgAlpha);
+            _setBgAlpha(slot, bgAlpha);
+            _setBgColor(slot, bgColor);
 
             _attachChild(_resolveNodeSlotAndLogWarning(parent), slot);
         }
