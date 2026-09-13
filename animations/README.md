@@ -8,6 +8,7 @@ Key features include:
 
 - **Structure of Arrays Engine (`Animations`)** – Pooled state management using single-precision and unsigned TypedArrays (`Float32Array`, `Uint32Array`, `Uint8Array`) for zero GC pressure during continuous animation playback.
 - **Purely Functional ID-Based Control** – Returns unboxed primitive `AnimationID`s (or `null` when the pool is full) for zero heap allocations when starting or controlling animations.
+- **Update Rate Throttling (`minUpdateDeltaMs`)** – Configurable update frequency per animation to throttle server `onUpdate` execution while preserving accurate continuous physics and guaranteed completion frames.
 - **Server Uptime Delta-Time Scaling** – Measures high-precision frame deltas (`dt`) relative to server start time to ensure smooth and identical playback speed across 30Hz and 60Hz tick rates.
 - **Zero GC Memory Purging** – Callback references (`onUpdate`, `onComplete`) are nulled out upon completion to eliminate closure memory retention.
 

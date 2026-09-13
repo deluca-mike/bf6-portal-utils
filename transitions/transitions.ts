@@ -148,6 +148,45 @@ export namespace Transitions {
         return n1 * t4 * t4 + 0.984375;
     }
 
+    function _easeInBounce(t: number): number {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return 1 - _easeOutBounce(1 - t);
+    }
+
+    function _easeInOutBounce(t: number): number {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return t < 0.5 ? (1 - _easeOutBounce(1 - 2 * t)) / 2 : (1 + _easeOutBounce(2 * t - 1)) / 2;
+    }
+
+    function _easeInBack(t: number): number {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return c3 * t * t * t - c1 * t * t;
+    }
+
+    function _easeOutBack(t: number): number {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        const t1 = t - 1;
+        return 1 + c3 * t1 * t1 * t1 + c1 * t1 * t1;
+    }
+
+    function _easeInOutBack(t: number): number {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        const c1 = 1.70158;
+        const c2 = c1 * 1.525;
+        return t < 0.5
+            ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+            : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (2 * t - 2) + c2) + 2) / 2;
+    }
+
     /**
      * Map of standard and pre-configured easing curves (frozen).
      */
@@ -156,8 +195,16 @@ export namespace Transitions {
         inQuad: EasingFn;
         outQuad: EasingFn;
         inOutQuad: EasingFn;
+        inCubic: EasingFn;
+        outCubic: EasingFn;
+        inOutCubic: EasingFn;
+        inBack: EasingFn;
+        outBack: EasingFn;
+        inOutBack: EasingFn;
         outExpo: EasingFn;
+        inBounce: EasingFn;
         outBounce: EasingFn;
+        inOutBounce: EasingFn;
         ease: EasingFn;
         easeIn: EasingFn;
         easeOut: EasingFn;
@@ -167,8 +214,16 @@ export namespace Transitions {
         inQuad: (t: number): number => t * t,
         outQuad: (t: number): number => t * (2 - t),
         inOutQuad: (t: number): number => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+        inCubic: (t: number): number => t * t * t,
+        outCubic: (t: number): number => 1 - Math.pow(1 - t, 3),
+        inOutCubic: (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
+        inBack: _easeInBack,
+        outBack: _easeOutBack,
+        inOutBack: _easeInOutBack,
         outExpo: (t: number): number => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+        inBounce: _easeInBounce,
         outBounce: _easeOutBounce,
+        inOutBounce: _easeInOutBounce,
         ease: cubicBezier(0.25, 0.1, 0.25, 1.0),
         easeIn: cubicBezier(0.42, 0.0, 1.0, 1.0),
         easeOut: cubicBezier(0.0, 0.0, 0.58, 1.0),

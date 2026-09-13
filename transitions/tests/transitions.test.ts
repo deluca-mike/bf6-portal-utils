@@ -61,6 +61,48 @@ describe('Transitions Math Module', () => {
             expect(Transitions.Easing.outBounce(0.95)).toBeGreaterThan(0.95);
         });
 
+        it('inBounce should invert outBounce and settle at 1', () => {
+            expect(Transitions.Easing.inBounce(0)).toBe(0);
+            expect(Transitions.Easing.inBounce(1)).toBe(1);
+            expect(Transitions.Easing.inBounce(0.5)).toBeCloseTo(1 - Transitions.Easing.outBounce(0.5), 6);
+        });
+
+        it('inOutBounce should bounce symmetrically at boundaries', () => {
+            expect(Transitions.Easing.inOutBounce(0)).toBe(0);
+            expect(Transitions.Easing.inOutBounce(0.5)).toBeCloseTo(0.5, 6);
+            expect(Transitions.Easing.inOutBounce(1)).toBe(1);
+        });
+
+        it('Cubic curves inCubic, outCubic, inOutCubic should scale cubic powers', () => {
+            expect(Transitions.Easing.inCubic(0)).toBe(0);
+            expect(Transitions.Easing.inCubic(0.5)).toBe(0.125);
+            expect(Transitions.Easing.inCubic(1)).toBe(1);
+
+            expect(Transitions.Easing.outCubic(0)).toBe(0);
+            expect(Transitions.Easing.outCubic(0.5)).toBe(0.875);
+            expect(Transitions.Easing.outCubic(1)).toBe(1);
+
+            expect(Transitions.Easing.inOutCubic(0)).toBe(0);
+            expect(Transitions.Easing.inOutCubic(0.5)).toBe(0.5);
+            expect(Transitions.Easing.inOutCubic(1)).toBe(1);
+        });
+
+        it('Back curves inBack, outBack, inOutBack should anticipate and overshoot', () => {
+            expect(Transitions.Easing.inBack(0)).toBe(0);
+            expect(Transitions.Easing.inBack(1)).toBe(1);
+            // inBack dips negative before rising
+            expect(Transitions.Easing.inBack(0.2)).toBeLessThan(0);
+
+            expect(Transitions.Easing.outBack(0)).toBe(0);
+            expect(Transitions.Easing.outBack(1)).toBe(1);
+            // outBack overshoots > 1 before settling at 1
+            expect(Transitions.Easing.outBack(0.8)).toBeGreaterThan(1);
+
+            expect(Transitions.Easing.inOutBack(0)).toBe(0);
+            expect(Transitions.Easing.inOutBack(0.5)).toBeCloseTo(0.5, 5);
+            expect(Transitions.Easing.inOutBack(1)).toBe(1);
+        });
+
         it('pre-configured cubic bezier curves ease, easeIn, easeOut, easeInOut work as expected', () => {
             expect(Transitions.Easing.ease(0)).toBe(0);
             expect(Transitions.Easing.ease(1)).toBe(1);

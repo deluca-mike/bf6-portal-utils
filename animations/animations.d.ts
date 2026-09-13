@@ -41,6 +41,11 @@ export declare namespace Animations {
          */
         duration: number;
         /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
+        /**
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
@@ -81,6 +86,11 @@ export declare namespace Animations {
          * Precision threshold to determine when the spring has settled at the target (default: 0.001).
          */
         precision?: number;
+        /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
         /**
          * Callback fired on every tick with the current spring position value.
          */

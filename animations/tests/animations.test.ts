@@ -270,6 +270,99 @@ describe('Animations Engine Module', () => {
         });
     });
 
+    describe('Update Throttling with minUpdateDeltaMs', () => {
+        it('should throttle onUpdate invocations when ticks occur faster than minUpdateDeltaMs', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.start({
+                from: 0,
+                to: 100,
+                duration: 200,
+                minUpdateDeltaMs: 50, // Only fire at most every 50ms
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // Tick at 10ms (1st tick after start, fires and records timestamp)
+            vi.advanceTimersByTime(10);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+
+            // Tick at 20ms (elapsed 10ms < 50ms, skipped)
+            vi.advanceTimersByTime(10);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+
+            // Tick at 30ms (elapsed 20ms < 50ms, skipped)
+            vi.advanceTimersByTime(10);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+
+            // Tick at 60ms (elapsed 50ms >= 50ms, fires!)
+            vi.advanceTimersByTime(30);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(2);
+
+            // Advance to end of animation (200ms total)
+            vi.advanceTimersByTime(140);
+            Events.OngoingGlobal.trigger();
+
+            expect(completed).toBe(true);
+            // Final frame must always fire with exact target value
+            expect(updates[updates.length - 1]).toBe(100);
+        });
+
+        it('should throttle spring onUpdate while calculating accurate physics', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.startSpring({
+                from: 0,
+                to: 50,
+                stiffness: 100,
+                damping: 20,
+                precision: 0.01,
+                minUpdateDeltaMs: 100,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // 1st tick fires
+            vi.advanceTimersByTime(20);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+
+            // Next 3 ticks within 60ms are skipped (< 100ms)
+            vi.advanceTimersByTime(20);
+            Events.OngoingGlobal.trigger();
+            vi.advanceTimersByTime(20);
+            Events.OngoingGlobal.trigger();
+            vi.advanceTimersByTime(20);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+
+            // 100ms elapsed since last update -> fires
+            vi.advanceTimersByTime(40);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(2);
+
+            // Let spring run to completion
+            for (let i = 0; i < 50; ++i) {
+                vi.advanceTimersByTime(50);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(updates[updates.length - 1]).toBe(50);
+        });
+    });
+
     describe('Callback Safety and Error Resilience', () => {
         it('should catch errors in onUpdate without breaking other animations', () => {
             let healthyUpdated = false;

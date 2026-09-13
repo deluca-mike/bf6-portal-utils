@@ -54,6 +54,11 @@ export namespace Animations {
          */
         duration: number;
         /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
+        /**
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
@@ -95,6 +100,11 @@ export namespace Animations {
          * Precision threshold to determine when the spring has settled at the target (default: 0.001).
          */
         precision?: number;
+        /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
         /**
          * Callback fired on every tick with the current spring position value.
          */
@@ -180,6 +190,8 @@ export namespace Animations {
     const _durationMs = new Uint32Array(MAX_ANIMATIONS);
     const _accumulatedMs = new Uint32Array(MAX_ANIMATIONS);
     const _lastResumeTime = new Uint32Array(MAX_ANIMATIONS);
+    const _minUpdateDeltaMs = new Uint16Array(MAX_ANIMATIONS);
+    const _lastUpdateTime = new Uint32Array(MAX_ANIMATIONS);
 
     // Structure of Arrays (Function references, cleared to null on slot release)
     const _onUpdate = new Array<((val: number) => void) | null>(MAX_ANIMATIONS);
@@ -265,6 +277,8 @@ export namespace Animations {
         _removeFromRunning(slot);
 
         _flags[slot] = 0;
+        _minUpdateDeltaMs[slot] = 0;
+        _lastUpdateTime[slot] = 0;
         _onUpdate[slot] = null;
         _onComplete[slot] = null;
         _easing[slot] = null;
@@ -280,7 +294,7 @@ export namespace Animations {
         }
     }
 
-    function _tickSpring(slot: number, dtSec: number): void {
+    function _tickSpring(slot: number, dtSec: number, now: number): void {
         const target = _to[slot];
         const precision = _precision[slot];
 
@@ -305,15 +319,20 @@ export namespace Animations {
             _velocity[slot] = 0;
         }
 
-        const updateCb = _onUpdate[slot];
-        const completeCb = _onComplete[slot];
+        const minDelta = _minUpdateDeltaMs[slot];
+        const lastUpdate = _lastUpdateTime[slot];
 
-        CallbackHandler.invoke(updateCb, _currentValue[slot], undefined, undefined, undefined, logging, 'onUpdate');
+        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isSettled) {
+            _lastUpdateTime[slot] = now;
+            const updateCb = _onUpdate[slot];
+            CallbackHandler.invoke(updateCb, _currentValue[slot], undefined, undefined, undefined, logging, 'onUpdate');
+        }
 
         if (!isSettled) return;
 
         _clearFlag(slot, FLAG_RUNNING);
         _setFlag(slot, FLAG_COMPLETE);
+        const completeCb = _onComplete[slot];
         _freeSlot(slot);
 
         CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
@@ -330,15 +349,21 @@ export namespace Animations {
 
         _currentValue[slot] = value;
 
-        const updateCb = _onUpdate[slot];
-        const completeCb = _onComplete[slot];
+        const minDelta = _minUpdateDeltaMs[slot];
+        const lastUpdate = _lastUpdateTime[slot];
+        const isComplete = progress >= 1;
 
-        CallbackHandler.invoke(updateCb, value, undefined, undefined, undefined, logging, 'onUpdate');
+        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isComplete) {
+            _lastUpdateTime[slot] = now;
+            const updateCb = _onUpdate[slot];
+            CallbackHandler.invoke(updateCb, value, undefined, undefined, undefined, logging, 'onUpdate');
+        }
 
-        if (progress < 1) return;
+        if (!isComplete) return;
 
         _clearFlag(slot, FLAG_RUNNING);
         _setFlag(slot, FLAG_COMPLETE);
+        const completeCb = _onComplete[slot];
         _freeSlot(slot);
 
         CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
@@ -361,7 +386,7 @@ export namespace Animations {
             if (!_isInUse(flags) || !_isRunning(flags)) continue;
 
             if (_isSpring(flags)) {
-                _tickSpring(slot, dtSec);
+                _tickSpring(slot, dtSec, now);
             } else {
                 _tickTween(slot, now);
             }
@@ -390,6 +415,8 @@ export namespace Animations {
         _durationMs[slot] = Math.max(0, config.duration);
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
+        _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
+        _lastUpdateTime[slot] = 0;
 
         _easing[slot] = config.easing ?? null;
         _onUpdate[slot] = config.onUpdate;
@@ -421,6 +448,8 @@ export namespace Animations {
         _precision[slot] = config.precision ?? 0.001;
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
+        _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
+        _lastUpdateTime[slot] = 0;
 
         _easing[slot] = null;
         _onUpdate[slot] = config.onUpdate;

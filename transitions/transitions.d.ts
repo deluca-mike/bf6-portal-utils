@@ -60,8 +60,16 @@ export declare namespace Transitions {
         inQuad: EasingFn;
         outQuad: EasingFn;
         inOutQuad: EasingFn;
+        inCubic: EasingFn;
+        outCubic: EasingFn;
+        inOutCubic: EasingFn;
+        inBack: EasingFn;
+        outBack: EasingFn;
+        inOutBack: EasingFn;
         outExpo: EasingFn;
+        inBounce: EasingFn;
         outBounce: EasingFn;
+        inOutBounce: EasingFn;
         ease: EasingFn;
         easeIn: EasingFn;
         easeOut: EasingFn;
