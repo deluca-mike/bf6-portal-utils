@@ -39,41 +39,44 @@ export declare namespace Timelines {
         /**
          * Optional callback fired when the timeline reaches full completion.
          */
-        onComplete?: () => void;
+        onComplete?: () => Promise<void> | void;
         /**
          * Optional callback fired at the end of each completed loop iteration.
          */
-        onLoop?: (completedLoops: number) => void;
+        onLoop?: (completedLoops: number) => Promise<void> | void;
         /**
          * Optional callback fired whenever the timeline transitions to a new step.
          */
-        onStep?: (stepIndex: number) => void;
+        onStep?: (stepIndex: number) => Promise<void> | void;
+    }
+    /**
+     * Common base configuration shared across timeline animation steps.
+     */
+    interface BaseAnimationStepConfig {
+        /** Starting numeric value (default: 0). */
+        from?: number;
+        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
+        minUpdateDeltaMs?: number;
+        /** Callback fired on every tick with the interpolated/current value. */
+        onUpdate: (value: number) => Promise<void> | void;
+        /** Optional callback fired when this step finishes or settles. */
+        onComplete?: () => Promise<void> | void;
     }
     /**
      * Configuration for a single tween animation step.
      */
-    interface TweenStepConfig {
-        /** Starting numeric value (default: 0). */
-        from?: number;
+    interface TweenStepConfig extends BaseAnimationStepConfig {
         /** Target ending numeric value (default: 1). */
         to?: number;
         /** Total duration in milliseconds. */
         duration: number;
-        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
-        minUpdateDeltaMs?: number;
         /** Optional easing function mapping normalized progress (0..1) to eased progress. */
         easing?: (t: number) => number;
-        /** Callback fired on every tick with the interpolated value. */
-        onUpdate: (value: number) => void;
-        /** Optional callback fired when this step finishes. */
-        onComplete?: () => void;
     }
     /**
      * Configuration for a single spring physics animation step.
      */
-    interface SpringStepConfig {
-        /** Starting numeric value (default: 0). */
-        from?: number;
+    interface SpringStepConfig extends BaseAnimationStepConfig {
         /** Target ending numeric value (default: 1). */
         to?: number;
         /** Initial velocity (default: 0). */
@@ -84,23 +87,31 @@ export declare namespace Timelines {
         damping?: number;
         /** Precision threshold to determine settling (default: 0.001). */
         precision?: number;
-        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
-        minUpdateDeltaMs?: number;
-        /** Callback fired on every tick with the spring position. */
-        onUpdate: (value: number) => void;
-        /** Optional callback fired when the spring settles. */
-        onComplete?: () => void;
+    }
+    /**
+     * Configuration for a single friction-based decay/inertia animation step.
+     */
+    interface DecayStepConfig extends BaseAnimationStepConfig {
+        /** Initial velocity (e.g. units per second). */
+        velocity: number;
+        /** Deceleration friction coefficient (default: 0.997). */
+        deceleration?: number;
+        /** Precision threshold (default: 0.01). */
+        precision?: number;
     }
     /**
      * Child step config for parallel multi-track steps.
      */
     type ParallelChildConfig =
         | ({
-              type?: 'tween';
+              type: 'tween';
           } & TweenStepConfig)
         | ({
               type: 'spring';
-          } & SpringStepConfig);
+          } & SpringStepConfig)
+        | ({
+              type: 'decay';
+          } & DecayStepConfig);
     /**
      * Internal discriminated union for timeline steps.
      */
@@ -112,6 +123,10 @@ export declare namespace Timelines {
         | {
               readonly type: 'spring';
               readonly config: SpringStepConfig;
+          }
+        | {
+              readonly type: 'decay';
+              readonly config: DecayStepConfig;
           }
         | {
               readonly type: 'parallel';
@@ -154,6 +169,13 @@ export declare namespace Timelines {
      * @returns True if added successfully, false if the timeline is invalid or step limit reached.
      */
     function addSpring(id: TimelineID, config: SpringStepConfig): boolean;
+    /**
+     * Appends a friction-based decay/inertia step to a timeline.
+     * @param id - The timeline ID.
+     * @param config - Decay configuration.
+     * @returns True if added successfully, false if the timeline is invalid or step limit reached.
+     */
+    function addDecay(id: TimelineID, config: DecayStepConfig): boolean;
     /**
      * Appends a parallel multi-track step to a timeline.
      * @param id - The timeline ID.
@@ -300,6 +322,7 @@ export declare namespace Timelines {
         get currentStep(): number | undefined;
         addTween(config: TweenStepConfig): this;
         addSpring(config: SpringStepConfig): this;
+        addDecay(config: DecayStepConfig): this;
         addParallel(children: readonly ParallelChildConfig[]): this;
         addWait(durationMs: number): this;
         addCall(callback: () => void | Promise<void>): this;

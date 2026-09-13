@@ -10,6 +10,7 @@ Key features include:
 - **Frozen Easing Library (`Transitions.Easing`)** – Pure easing curves (`linear`, `inQuad`, `outQuad`, `inOutQuad`, `outExpo`, `outBounce`, `ease`, `easeIn`, `easeOut`, `easeInOut`).
 - **Configurable Cubic Bezier Generator (`Transitions.cubicBezier`)** – High-precision `cubicBezier(p1x, p1y, p2x, p2y)` curve generator using Newton-Raphson iterations with bisection fallback.
 - **Zero-Allocation Spring Physics (`Transitions.calculateSpring`)** – Damped harmonic physics with sub-stepped semi-implicit Euler integration, configurable physical constants, and optional `out` parameter for zero-allocation performance in tight loops.
+- **Zero-Allocation Decay Physics (`Transitions.calculateDecay`)** – Continuous-time exponential friction decay integration with exact closed-form displacement and zero-allocation `out` parameter reuse.
 - **Keyframe Interpolation (`Transitions.interpolateKeyframes`)** – Multi-segment timeline interpolation with boundary clamping and optional per-segment easing curves.
 
 </ai>
@@ -53,7 +54,17 @@ const result = Transitions.calculateSpring(
     scratch // writes to scratch without heap allocation
 );
 
-// 5. Multi-segment keyframe interpolation
+// 5. Exponential decay physics calculation
+const decayScratch: Transitions.DecayResult = { value: 0, velocity: 0 };
+const decayResult = Transitions.calculateDecay(
+    currentValue,
+    currentVelocity,
+    dt,
+    0.997, // deceleration coefficient per ms
+    decayScratch
+);
+
+// 6. Multi-segment keyframe interpolation
 const keyframes: Transitions.Keyframe[] = [
     { time: 0.0, value: 0, easing: Transitions.Easing.inQuad },
     { time: 0.5, value: 100 },

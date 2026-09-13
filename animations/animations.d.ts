@@ -25,13 +25,31 @@ export declare namespace Animations {
         readonly __brand: 'AnimationID';
     };
     /**
-     * Configuration options for starting a standard tween animation.
+     * Common base configuration shared across all animation drivers.
      */
     interface AnimationConfig {
         /**
          * Starting numeric value.
          */
         from: number;
+        /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
+        /**
+         * Callback fired on every tick with the current/interpolated value.
+         */
+        onUpdate: (value: number) => Promise<void> | void;
+        /**
+         * Optional callback fired when the animation successfully reaches completion or settles.
+         */
+        onComplete?: () => Promise<void> | void;
+    }
+    /**
+     * Configuration options for starting a standard tween animation.
+     */
+    interface TweenAnimationConfig extends AnimationConfig {
         /**
          * Target ending numeric value.
          */
@@ -41,31 +59,14 @@ export declare namespace Animations {
          */
         duration: number;
         /**
-         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
-         * When omitted or 0, updates fire on every server tick.
-         */
-        minUpdateDeltaMs?: number;
-        /**
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
-        /**
-         * Callback fired on every tick with the interpolated value.
-         */
-        onUpdate: (value: number) => void;
-        /**
-         * Optional callback fired when the animation successfully reaches completion.
-         */
-        onComplete?: () => void;
     }
     /**
      * Configuration options for starting a physics-driven spring animation.
      */
-    interface SpringAnimationConfig {
-        /**
-         * Starting numeric value.
-         */
-        from: number;
+    interface SpringAnimationConfig extends AnimationConfig {
         /**
          * Target ending numeric value.
          */
@@ -86,19 +87,24 @@ export declare namespace Animations {
          * Precision threshold to determine when the spring has settled at the target (default: 0.001).
          */
         precision?: number;
+    }
+    /**
+     * Configuration options for starting a friction-based decay/inertia animation.
+     */
+    interface DecayAnimationConfig extends AnimationConfig {
         /**
-         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
-         * When omitted or 0, updates fire on every server tick.
+         * Initial velocity (e.g. units per second).
          */
-        minUpdateDeltaMs?: number;
+        velocity: number;
         /**
-         * Callback fired on every tick with the current spring position value.
+         * Deceleration friction coefficient between 0.0 and 1.0 (default: 0.997 per millisecond).
+         * Values closer to 1.0 glide longer; values closer to 0.0 stop sooner.
          */
-        onUpdate: (value: number) => void;
+        deceleration?: number;
         /**
-         * Optional callback fired when the spring settles at the target value.
+         * Precision threshold to determine when velocity has settled (default: 0.01).
          */
-        onComplete?: () => void;
+        precision?: number;
     }
     /**
      * Maximum number of concurrent animations supported by the engine pool.
@@ -110,13 +116,19 @@ export declare namespace Animations {
      * @param config - Animation parameters and callbacks.
      * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
      */
-    function start(config: AnimationConfig): AnimationID | null;
+    function start(config: TweenAnimationConfig): AnimationID | null;
     /**
      * Starts a new spring physics animation from config.
      * @param config - Spring animation parameters and callbacks.
      * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
      */
     function startSpring(config: SpringAnimationConfig): AnimationID | null;
+    /**
+     * Starts a new friction-based decay/inertia animation from config.
+     * @param config - Decay animation parameters and callbacks.
+     * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
+     */
+    function startDecay(config: DecayAnimationConfig): AnimationID | null;
     /**
      * Stops an animation immediately and frees resources.
      * @param id - The ID of the animation to stop.

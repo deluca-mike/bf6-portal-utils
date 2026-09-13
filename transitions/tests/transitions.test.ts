@@ -248,4 +248,48 @@ describe('Transitions Math Module', () => {
             expect(Transitions.interpolateKeyframes(keyframes, 0.5)).toBe(25);
         });
     });
+
+    describe('calculateDecay', () => {
+        it('should smoothly decay velocity and advance position', () => {
+            const scratch: Transitions.DecayResult = { value: 0, velocity: 0 };
+            let current = 0;
+            let velocity = 500; // 500 units/s
+
+            // Step 1: 50ms
+            Transitions.calculateDecay(current, velocity, 0.05, 0.997, scratch);
+            expect(scratch.velocity).toBeLessThan(500);
+            expect(scratch.velocity).toBeGreaterThan(0);
+            expect(scratch.value).toBeGreaterThan(0);
+
+            // Integrate over 100 steps
+            current = scratch.value;
+            velocity = scratch.velocity;
+            for (let i = 0; i < 100; ++i) {
+                Transitions.calculateDecay(current, velocity, 0.016, 0.997, scratch);
+                current = scratch.value;
+                velocity = scratch.velocity;
+            }
+
+            // Velocity should have decayed significantly towards 0
+            expect(velocity).toBeLessThan(50);
+            expect(current).toBeGreaterThan(100);
+        });
+
+        it('should handle zero velocity and zero dt as no-ops', () => {
+            const res1 = Transitions.calculateDecay(100, 0, 0.1);
+            expect(res1.value).toBe(100);
+            expect(res1.velocity).toBe(0);
+
+            const res2 = Transitions.calculateDecay(100, 50, 0);
+            expect(res2.value).toBe(100);
+            expect(res2.velocity).toBe(50);
+        });
+
+        it('should mutate out target object without allocations', () => {
+            const out: Transitions.DecayResult = { value: 0, velocity: 0 };
+            const returned = Transitions.calculateDecay(0, 100, 0.05, 0.997, out);
+            expect(returned).toBe(out);
+            expect(out.value).toBeGreaterThan(0);
+        });
+    });
 });

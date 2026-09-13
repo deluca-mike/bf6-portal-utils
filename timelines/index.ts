@@ -52,43 +52,47 @@ export namespace Timelines {
         /**
          * Optional callback fired when the timeline reaches full completion.
          */
-        onComplete?: () => void;
+        onComplete?: () => Promise<void> | void;
         /**
          * Optional callback fired at the end of each completed loop iteration.
          */
-        onLoop?: (completedLoops: number) => void;
+        onLoop?: (completedLoops: number) => Promise<void> | void;
         /**
          * Optional callback fired whenever the timeline transitions to a new step.
          */
-        onStep?: (stepIndex: number) => void;
+        onStep?: (stepIndex: number) => Promise<void> | void;
+    }
+
+    /**
+     * Common base configuration shared across timeline animation steps.
+     */
+    export interface BaseAnimationStepConfig {
+        /** Starting numeric value (default: 0). */
+        from?: number;
+        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
+        minUpdateDeltaMs?: number;
+        /** Callback fired on every tick with the interpolated/current value. */
+        onUpdate: (value: number) => Promise<void> | void;
+        /** Optional callback fired when this step finishes or settles. */
+        onComplete?: () => Promise<void> | void;
     }
 
     /**
      * Configuration for a single tween animation step.
      */
-    export interface TweenStepConfig {
-        /** Starting numeric value (default: 0). */
-        from?: number;
+    export interface TweenStepConfig extends BaseAnimationStepConfig {
         /** Target ending numeric value (default: 1). */
         to?: number;
         /** Total duration in milliseconds. */
         duration: number;
-        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
-        minUpdateDeltaMs?: number;
         /** Optional easing function mapping normalized progress (0..1) to eased progress. */
         easing?: (t: number) => number;
-        /** Callback fired on every tick with the interpolated value. */
-        onUpdate: (value: number) => void;
-        /** Optional callback fired when this step finishes. */
-        onComplete?: () => void;
     }
 
     /**
      * Configuration for a single spring physics animation step.
      */
-    export interface SpringStepConfig {
-        /** Starting numeric value (default: 0). */
-        from?: number;
+    export interface SpringStepConfig extends BaseAnimationStepConfig {
         /** Target ending numeric value (default: 1). */
         to?: number;
         /** Initial velocity (default: 0). */
@@ -99,18 +103,27 @@ export namespace Timelines {
         damping?: number;
         /** Precision threshold to determine settling (default: 0.001). */
         precision?: number;
-        /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
-        minUpdateDeltaMs?: number;
-        /** Callback fired on every tick with the spring position. */
-        onUpdate: (value: number) => void;
-        /** Optional callback fired when the spring settles. */
-        onComplete?: () => void;
+    }
+
+    /**
+     * Configuration for a single friction-based decay/inertia animation step.
+     */
+    export interface DecayStepConfig extends BaseAnimationStepConfig {
+        /** Initial velocity (e.g. units per second). */
+        velocity: number;
+        /** Deceleration friction coefficient (default: 0.997). */
+        deceleration?: number;
+        /** Precision threshold (default: 0.01). */
+        precision?: number;
     }
 
     /**
      * Child step config for parallel multi-track steps.
      */
-    export type ParallelChildConfig = ({ type?: 'tween' } & TweenStepConfig) | ({ type: 'spring' } & SpringStepConfig);
+    export type ParallelChildConfig =
+        | ({ type: 'tween' } & TweenStepConfig)
+        | ({ type: 'spring' } & SpringStepConfig)
+        | ({ type: 'decay' } & DecayStepConfig);
 
     /**
      * Internal discriminated union for timeline steps.
@@ -118,6 +131,7 @@ export namespace Timelines {
     export type TimelineStep =
         | { readonly type: 'tween'; readonly config: TweenStepConfig }
         | { readonly type: 'spring'; readonly config: SpringStepConfig }
+        | { readonly type: 'decay'; readonly config: DecayStepConfig }
         | { readonly type: 'parallel'; readonly children: readonly ParallelChildConfig[] }
         | { readonly type: 'wait'; readonly durationMs: number }
         | { readonly type: 'call'; readonly callback: () => void | Promise<void> };
@@ -186,9 +200,9 @@ export namespace Timelines {
     const _activeAnimIds = new Array<Animations.AnimationID[] | null>(MAX_TIMELINES);
 
     // Structure of Arrays (Callbacks & async promise resolvers)
-    const _onComplete = new Array<(() => void) | null>(MAX_TIMELINES);
-    const _onLoop = new Array<((completedLoops: number) => void) | null>(MAX_TIMELINES);
-    const _onStep = new Array<((stepIndex: number) => void) | null>(MAX_TIMELINES);
+    const _onComplete = new Array<(() => Promise<void> | void) | null>(MAX_TIMELINES);
+    const _onLoop = new Array<((completedLoops: number) => Promise<void> | void) | null>(MAX_TIMELINES);
+    const _onStep = new Array<((stepIndex: number) => Promise<void> | void) | null>(MAX_TIMELINES);
     const _asyncResolvers = new Array<(() => void) | null>(MAX_TIMELINES);
 
     for (let i = 0; i < MAX_TIMELINES; ++i) {
@@ -255,8 +269,8 @@ export namespace Timelines {
         const slot = _firstFree;
         _firstFree = _currentStep[slot];
         _currentStep[slot] = 0;
-
         ++_activeCount;
+
         return slot;
     }
 
@@ -264,9 +278,11 @@ export namespace Timelines {
         if (id < 0) return INVALID_INDEX;
 
         const slot = id % GENERATION_MULTIPLIER;
+
         if (slot >= MAX_TIMELINES) return INVALID_INDEX;
 
         const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
+
         if (_generations[slot] !== expectedGen || !_isInUse(_flags[slot])) return INVALID_INDEX;
 
         return slot;
@@ -283,9 +299,11 @@ export namespace Timelines {
 
     function _removeFromRunning(slot: number): void {
         const pos = _slotToRunningPos[slot];
+
         if (pos === INVALID_INDEX) return;
 
         const lastPos = _runningIndicesCount - 1;
+
         if (pos < lastPos) {
             const lastSlot = _runningIndices[lastPos];
             _runningIndices[pos] = lastSlot;
@@ -298,12 +316,14 @@ export namespace Timelines {
 
     function _stopActiveChildAnimations(slot: number): void {
         const animIds = _activeAnimIds[slot];
-        if (animIds) {
-            for (let i = 0; i < animIds.length; ++i) {
-                Animations.stop(animIds[i]);
-            }
-            _activeAnimIds[slot] = null;
+
+        if (!animIds) return;
+
+        for (let i = 0; i < animIds.length; ++i) {
+            Animations.stop(animIds[i]);
         }
+
+        _activeAnimIds[slot] = null;
     }
 
     function _freeSlot(slot: number): void {
@@ -319,6 +339,7 @@ export namespace Timelines {
         _onStep[slot] = null;
 
         const resolver = _asyncResolvers[slot];
+
         if (resolver) {
             _asyncResolvers[slot] = null;
             resolver();
@@ -341,9 +362,11 @@ export namespace Timelines {
         if (!_isInUse(_flags[slot]) || !_isRunning(_flags[slot])) return;
 
         const animIds = _activeAnimIds[slot];
+
         if (!animIds) return;
 
         const idx = animIds.indexOf(animId);
+
         if (idx !== -1) {
             animIds.splice(idx, 1);
         }
@@ -366,6 +389,7 @@ export namespace Timelines {
             _completedLoops[slot] = completed;
 
             const onLoopCb = _onLoop[slot];
+
             if (onLoopCb) {
                 CallbackHandler.invoke(onLoopCb, completed, undefined, undefined, undefined, logging, 'onLoop');
             }
@@ -373,6 +397,7 @@ export namespace Timelines {
             if (_isInfinite(_flags[slot]) || completed < _targetLoops[slot]) {
                 _currentStep[slot] = 0;
                 _startCurrentStep(slot, now);
+
                 return;
             }
 
@@ -386,11 +411,13 @@ export namespace Timelines {
             if (onCompleteCb) {
                 CallbackHandler.invokeNoArgs(onCompleteCb, logging, 'onComplete');
             }
+
             return;
         }
 
         const step = stepList[stepIdx];
         const onStepCb = _onStep[slot];
+
         if (onStepCb) {
             CallbackHandler.invoke(onStepCb, stepIdx, undefined, undefined, undefined, logging, 'onStep');
         }
@@ -402,10 +429,12 @@ export namespace Timelines {
             case 'wait': {
                 _setFlag(slot, FLAG_WAITING);
                 _stepWaitMs[slot] = Math.max(0, step.durationMs);
+
                 if (step.durationMs <= 0) {
                     _clearFlag(slot, FLAG_WAITING);
                     _advanceStep(slot, now);
                 }
+
                 break;
             }
 
@@ -419,6 +448,7 @@ export namespace Timelines {
                 _setFlag(slot, FLAG_STEP_ANIMATING);
                 const from = step.config.from ?? 0;
                 const to = step.config.to ?? 1;
+
                 const animId = Animations.start({
                     from,
                     to,
@@ -440,6 +470,7 @@ export namespace Timelines {
                     _clearFlag(slot, FLAG_STEP_ANIMATING);
                     _advanceStep(slot, now);
                 }
+
                 break;
             }
 
@@ -447,6 +478,7 @@ export namespace Timelines {
                 _setFlag(slot, FLAG_STEP_ANIMATING);
                 const from = step.config.from ?? 0;
                 const to = step.config.to ?? 1;
+
                 const animId = Animations.startSpring({
                     from,
                     to,
@@ -473,9 +505,38 @@ export namespace Timelines {
                 break;
             }
 
+            case 'decay': {
+                _setFlag(slot, FLAG_STEP_ANIMATING);
+                const from = step.config.from ?? 0;
+
+                const animId = Animations.startDecay({
+                    from,
+                    velocity: step.config.velocity,
+                    deceleration: step.config.deceleration,
+                    precision: step.config.precision,
+                    minUpdateDeltaMs:
+                        step.config.minUpdateDeltaMs ??
+                        (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
+                    onUpdate: step.config.onUpdate,
+                    onComplete: () => {
+                        step.config.onComplete?.();
+                        _onChildAnimComplete(slot, animId!);
+                    },
+                });
+
+                if (animId !== null) {
+                    _activeAnimIds[slot] = [animId];
+                } else {
+                    _clearFlag(slot, FLAG_STEP_ANIMATING);
+                    _advanceStep(slot, now);
+                }
+                break;
+            }
+
             case 'parallel': {
                 _setFlag(slot, FLAG_STEP_ANIMATING);
                 const children = step.children;
+
                 if (children.length === 0) {
                     _clearFlag(slot, FLAG_STEP_ANIMATING);
                     _advanceStep(slot, now);
@@ -488,12 +549,11 @@ export namespace Timelines {
                 for (let i = 0; i < children.length; ++i) {
                     const child = children[i];
                     const from = child.from ?? 0;
-                    const to = child.to ?? 1;
 
                     if (child.type === 'spring') {
                         const childAnimId = Animations.startSpring({
                             from,
-                            to,
+                            to: child.to ?? 1,
                             velocity: child.velocity,
                             stiffness: child.stiffness,
                             damping: child.damping,
@@ -507,13 +567,33 @@ export namespace Timelines {
                                 _onChildAnimComplete(slot, childAnimId!);
                             },
                         });
+
                         if (childAnimId !== null) {
                             animIds.push(childAnimId);
                         }
-                    } else {
+                    } else if (child.type === 'decay') {
+                        const childAnimId = Animations.startDecay({
+                            from,
+                            velocity: child.velocity,
+                            deceleration: child.deceleration,
+                            precision: child.precision,
+                            minUpdateDeltaMs:
+                                child.minUpdateDeltaMs ??
+                                (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
+                            onUpdate: child.onUpdate,
+                            onComplete: () => {
+                                child.onComplete?.();
+                                _onChildAnimComplete(slot, childAnimId!);
+                            },
+                        });
+
+                        if (childAnimId !== null) {
+                            animIds.push(childAnimId);
+                        }
+                    } else if (child.type === 'tween') {
                         const childAnimId = Animations.start({
                             from,
-                            to,
+                            to: child.to ?? 1,
                             duration: child.duration,
                             minUpdateDeltaMs:
                                 child.minUpdateDeltaMs ??
@@ -525,6 +605,7 @@ export namespace Timelines {
                                 _onChildAnimComplete(slot, childAnimId!);
                             },
                         });
+
                         if (childAnimId !== null) {
                             animIds.push(childAnimId);
                         }
@@ -536,6 +617,7 @@ export namespace Timelines {
                     _clearFlag(slot, FLAG_STEP_ANIMATING);
                     _advanceStep(slot, now);
                 }
+
                 break;
             }
         }
@@ -559,12 +641,13 @@ export namespace Timelines {
 
             if (!_isInUse(flags) || !_isRunning(flags)) continue;
 
-            if (_isWaiting(flags)) {
-                const elapsed = _stepElapsedMs[slot] + (now - _stepStartUptime[slot]);
-                if (elapsed >= _stepWaitMs[slot]) {
-                    _clearFlag(slot, FLAG_WAITING);
-                    _advanceStep(slot, now);
-                }
+            if (!_isWaiting(flags)) continue;
+
+            const elapsed = _stepElapsedMs[slot] + (now - _stepStartUptime[slot]);
+
+            if (elapsed >= _stepWaitMs[slot]) {
+                _clearFlag(slot, FLAG_WAITING);
+                _advanceStep(slot, now);
             }
         }
     }
@@ -580,6 +663,7 @@ export namespace Timelines {
      */
     export function create(config?: TimelineConfig): TimelineID | null {
         const slot = _allocateSlot();
+
         if (slot === INVALID_INDEX) return null;
 
         let flags = FLAG_IN_USE;
@@ -612,6 +696,7 @@ export namespace Timelines {
             logging.log(`Timeline step limit of ${MAX_STEPS_PER_TIMELINE} reached`, LogLevel.Warning);
             return false;
         }
+
         return true;
     }
 
@@ -623,9 +708,11 @@ export namespace Timelines {
      */
     export function addTween(id: TimelineID, config: TweenStepConfig): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
 
         _steps[slot].push({ type: 'tween', config });
+
         return true;
     }
 
@@ -637,9 +724,27 @@ export namespace Timelines {
      */
     export function addSpring(id: TimelineID, config: SpringStepConfig): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
 
         _steps[slot].push({ type: 'spring', config });
+
+        return true;
+    }
+
+    /**
+     * Appends a friction-based decay/inertia step to a timeline.
+     * @param id - The timeline ID.
+     * @param config - Decay configuration.
+     * @returns True if added successfully, false if the timeline is invalid or step limit reached.
+     */
+    export function addDecay(id: TimelineID, config: DecayStepConfig): boolean {
+        const slot = _resolveSlot(id);
+
+        if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
+
+        _steps[slot].push({ type: 'decay', config });
+
         return true;
     }
 
@@ -651,9 +756,11 @@ export namespace Timelines {
      */
     export function addParallel(id: TimelineID, children: readonly ParallelChildConfig[]): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
 
         _steps[slot].push({ type: 'parallel', children });
+
         return true;
     }
 
@@ -665,9 +772,11 @@ export namespace Timelines {
      */
     export function addWait(id: TimelineID, durationMs: number): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
 
         _steps[slot].push({ type: 'wait', durationMs: Math.max(0, durationMs) });
+
         return true;
     }
 
@@ -679,9 +788,11 @@ export namespace Timelines {
      */
     export function addCall(id: TimelineID, callback: () => void | Promise<void>): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX || !_canAddStep(slot)) return false;
 
         _steps[slot].push({ type: 'call', callback });
+
         return true;
     }
 
@@ -692,9 +803,11 @@ export namespace Timelines {
      */
     export function play(id: TimelineID): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return false;
 
         const flags = _flags[slot];
+
         if (_isRunning(flags)) return true;
 
         _clearFlag(slot, FLAG_PAUSED | FLAG_COMPLETE);
@@ -703,20 +816,23 @@ export namespace Timelines {
         const now = getUptime();
         _addToRunning(slot);
 
-        if (_isPaused(flags)) {
-            // Resume paused child animations or wait
-            if (_isWaiting(flags)) {
-                _stepStartUptime[slot] = now;
-            }
-            const animIds = _activeAnimIds[slot];
-            if (animIds) {
-                for (let i = 0; i < animIds.length; ++i) {
-                    Animations.resume(animIds[i]);
-                }
-            }
-        } else {
+        if (!_isPaused(flags)) {
             // Start from current step
             _startCurrentStep(slot, now);
+            return true;
+        }
+
+        // Resume paused child animations or wait
+        if (_isWaiting(flags)) {
+            _stepStartUptime[slot] = now;
+        }
+
+        const animIds = _activeAnimIds[slot];
+
+        if (!animIds) return true;
+
+        for (let i = 0; i < animIds.length; ++i) {
+            Animations.resume(animIds[i]);
         }
 
         return true;
@@ -730,6 +846,7 @@ export namespace Timelines {
     export function playAsync(id: TimelineID): Promise<void> {
         return new Promise<void>((resolve) => {
             const slot = _resolveSlot(id);
+
             if (slot === INVALID_INDEX) {
                 resolve();
                 return;
@@ -747,20 +864,24 @@ export namespace Timelines {
      */
     export function pause(id: TimelineID): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return false;
 
         const flags = _flags[slot];
+
         if (!_isRunning(flags)) return false;
 
         _clearFlag(slot, FLAG_RUNNING);
         _setFlag(slot, FLAG_PAUSED);
 
         const now = getUptime();
+
         if (_isWaiting(flags)) {
             _stepElapsedMs[slot] += now - _stepStartUptime[slot];
         }
 
         const animIds = _activeAnimIds[slot];
+
         if (animIds) {
             for (let i = 0; i < animIds.length; ++i) {
                 Animations.pause(animIds[i]);
@@ -778,6 +899,7 @@ export namespace Timelines {
      */
     export function resume(id: TimelineID): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return false;
 
         if (!_isPaused(_flags[slot])) return false;
@@ -791,6 +913,7 @@ export namespace Timelines {
      */
     export function stop(id: TimelineID): void {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return;
 
         _freeSlot(slot);
@@ -814,6 +937,7 @@ export namespace Timelines {
      */
     export function restart(id: TimelineID): boolean {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return false;
 
         _stopActiveChildAnimations(slot);
@@ -841,6 +965,7 @@ export namespace Timelines {
      */
     export function isRunning(id: TimelineID): boolean | undefined {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return undefined;
 
         return _isRunning(_flags[slot]);
@@ -853,6 +978,7 @@ export namespace Timelines {
      */
     export function isPaused(id: TimelineID): boolean | undefined {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return undefined;
 
         return _isPaused(_flags[slot]);
@@ -865,6 +991,7 @@ export namespace Timelines {
      */
     export function isComplete(id: TimelineID): boolean | undefined {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return undefined;
 
         return _isComplete(_flags[slot]);
@@ -877,6 +1004,7 @@ export namespace Timelines {
      */
     export function getCurrentStep(id: TimelineID): number | undefined {
         const slot = _resolveSlot(id);
+
         if (slot === INVALID_INDEX) return undefined;
 
         return _currentStep[slot];
@@ -909,9 +1037,9 @@ export namespace Timelines {
 
         public constructor(config?: TimelineConfig) {
             const id = create(config);
-            if (id === null) {
-                throw new Error('Failed to allocate timeline: pool is full');
-            }
+
+            if (id === null) throw new Error('Pool is full');
+
             this._id = id;
         }
 
@@ -924,8 +1052,10 @@ export namespace Timelines {
             if (!isActive(id)) return null;
 
             const instance = Object.create(Timeline.prototype) as Timeline;
+
             // @ts-expect-error - Assign readonly _id
             instance._id = id;
+
             return instance;
         }
 
@@ -984,6 +1114,11 @@ export namespace Timelines {
 
         public addSpring(config: SpringStepConfig): this {
             addSpring(this._id, config);
+            return this;
+        }
+
+        public addDecay(config: DecayStepConfig): this {
+            addDecay(this._id, config);
             return this;
         }
 

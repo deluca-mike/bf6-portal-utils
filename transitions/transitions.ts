@@ -21,6 +21,20 @@ export namespace Transitions {
     };
 
     /**
+     * Result of a single decay integration step.
+     */
+    export type DecayResult = {
+        /**
+         * New position/value after the time step.
+         */
+        value: number;
+        /**
+         * New velocity after the time step.
+         */
+        velocity: number;
+    };
+
+    /**
      * Keyframe representation for keyframe interpolation.
      */
     export type Keyframe = {
@@ -145,43 +159,57 @@ export namespace Transitions {
         }
 
         const t4 = t - 2.625 / d1;
+
         return n1 * t4 * t4 + 0.984375;
     }
 
     function _easeInBounce(t: number): number {
         if (t <= 0) return 0;
+
         if (t >= 1) return 1;
+
         return 1 - _easeOutBounce(1 - t);
     }
 
     function _easeInOutBounce(t: number): number {
         if (t <= 0) return 0;
+
         if (t >= 1) return 1;
+
         return t < 0.5 ? (1 - _easeOutBounce(1 - 2 * t)) / 2 : (1 + _easeOutBounce(2 * t - 1)) / 2;
     }
 
     function _easeInBack(t: number): number {
         if (t <= 0) return 0;
+
         if (t >= 1) return 1;
+
         const c1 = 1.70158;
         const c3 = c1 + 1;
+
         return c3 * t * t * t - c1 * t * t;
     }
 
     function _easeOutBack(t: number): number {
         if (t <= 0) return 0;
+
         if (t >= 1) return 1;
+
         const c1 = 1.70158;
         const c3 = c1 + 1;
         const t1 = t - 1;
+
         return 1 + c3 * t1 * t1 * t1 + c1 * t1 * t1;
     }
 
     function _easeInOutBack(t: number): number {
         if (t <= 0) return 0;
+
         if (t >= 1) return 1;
+
         const c1 = 1.70158;
         const c2 = c1 * 1.525;
+
         return t < 0.5
             ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
             : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (2 * t - 2) + c2) + 2) / 2;
@@ -277,6 +305,48 @@ export namespace Transitions {
             vel += acceleration * step;
             val += vel * step;
         }
+
+        if (!out) return { value: val, velocity: vel };
+
+        out.value = val;
+        out.velocity = vel;
+
+        return out;
+    }
+
+    /**
+     * Calculates the new position and velocity of a friction-based exponential decay system.
+     * Evaluates exact closed-form continuous time integration across arbitrary time deltas.
+     * Accepts an optional `out` parameter to enable zero-allocation calls in high-frequency game loops.
+     * @param current - Current position value.
+     * @param velocity - Current velocity.
+     * @param dt - Delta time step in seconds.
+     * @param deceleration - Deceleration friction coefficient (default: 0.997 per millisecond).
+     * @param out - Optional target {@link DecayResult} to write results into for zero-allocation reuse.
+     * @returns The updated value and velocity in the `out` target or a new {@link DecayResult}.
+     */
+    export function calculateDecay(
+        current: number,
+        velocity: number,
+        dt: number,
+        deceleration: number = 0.997,
+        out?: DecayResult
+    ): DecayResult {
+        if (dt <= 0 || velocity === 0) {
+            if (!out) return { value: current, velocity };
+
+            out.value = current;
+            out.velocity = velocity;
+
+            return out;
+        }
+
+        const d = Math.max(0.0001, Math.min(0.9999, deceleration));
+        const k = -1000 * Math.log(d);
+
+        const decayFactor = Math.exp(-k * dt);
+        const val = current + (velocity * (1 - decayFactor)) / k;
+        const vel = velocity * decayFactor;
 
         if (!out) return { value: val, velocity: vel };
 

@@ -6,10 +6,12 @@ The `Animations` namespace provides a high-performance UI animation engine tailo
 
 Key features include:
 
-- **Structure of Arrays Engine (`Animations`)** – Pooled state management using single-precision and unsigned TypedArrays (`Float32Array`, `Uint32Array`, `Uint8Array`) for zero GC pressure during continuous animation playback.
+- **Structure of Arrays Engine (`Animations`)** – Pooled state management using single-precision and unsigned TypedArrays (`Float32Array`, `Uint32Array`, `Uint16Array`, `Int16Array`) with dual-duty free-list state machines for zero GC pressure during continuous animation playback.
+- **Three Core Animation Drivers** – Native support for **Tween** (parametric easing), **Spring** (harmonic physics), and **Decay** (friction/inertia momentum).
 - **Purely Functional ID-Based Control** – Returns unboxed primitive `AnimationID`s (or `null` when the pool is full) for zero heap allocations when starting or controlling animations.
 - **Update Rate Throttling (`minUpdateDeltaMs`)** – Configurable update frequency per animation to throttle server `onUpdate` execution while preserving accurate continuous physics and guaranteed completion frames.
 - **Server Uptime Delta-Time Scaling** – Measures high-precision frame deltas (`dt`) relative to server start time to ensure smooth and identical playback speed across 30Hz and 60Hz tick rates.
+- **Sync & Async Callback Safety** – Callbacks (`onUpdate`, `onComplete`) accept both synchronous `void` and asynchronous `Promise<void>` functions, with automatic unhandled rejection catching via `CallbackHandler`.
 - **Zero GC Memory Purging** – Callback references (`onUpdate`, `onComplete`) are nulled out upon completion to eliminate closure memory retention.
 
 </ai>
@@ -77,6 +79,25 @@ const springId = Animations.startSpring({
     },
     onComplete: () => {
         // Spring settled at target
+    },
+});
+```
+
+#### 3. Decay / Inertia Momentum Animation
+
+```ts
+import { Animations } from 'bf6-portal-utils/animations/animations.ts';
+
+const decayId = Animations.startDecay({
+    from: 0,
+    velocity: 500, // units per second
+    deceleration: 0.997, // friction per ms
+    precision: 0.01,
+    onUpdate: (value) => {
+        widget.scrollOffset = value;
+    },
+    onComplete: () => {
+        // Decay settled
     },
 });
 ```

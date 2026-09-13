@@ -18,6 +18,19 @@ export declare namespace Transitions {
         velocity: number;
     };
     /**
+     * Result of a single decay integration step.
+     */
+    type DecayResult = {
+        /**
+         * New position/value after the time step.
+         */
+        value: number;
+        /**
+         * New velocity after the time step.
+         */
+        velocity: number;
+    };
+    /**
      * Keyframe representation for keyframe interpolation.
      */
     type Keyframe = {
@@ -97,6 +110,24 @@ export declare namespace Transitions {
         damping?: number,
         out?: SpringResult
     ): SpringResult;
+    /**
+     * Calculates the new position and velocity of a friction-based exponential decay system.
+     * Evaluates exact closed-form continuous time integration across arbitrary time deltas.
+     * Accepts an optional `out` parameter to enable zero-allocation calls in high-frequency game loops.
+     * @param current - Current position value.
+     * @param velocity - Current velocity.
+     * @param dt - Delta time step in seconds.
+     * @param deceleration - Deceleration friction coefficient (default: 0.997 per millisecond).
+     * @param out - Optional target {@link DecayResult} to write results into for zero-allocation reuse.
+     * @returns The updated value and velocity in the `out` target or a new {@link DecayResult}.
+     */
+    function calculateDecay(
+        current: number,
+        velocity: number,
+        dt: number,
+        deceleration?: number,
+        out?: DecayResult
+    ): DecayResult;
     /**
      * Interpolates across an array of keyframes for a normalized time t (0.0 to 1.0).
      * @param keyframes - Array of keyframes sorted or unsorted by time.

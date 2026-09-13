@@ -6,7 +6,7 @@ export namespace SolidTweenAdapter {
     /**
      * Options for creating a reactive tween.
      */
-    export type TweenOptions = Omit<Animations.AnimationConfig, 'from' | 'to' | 'onUpdate'>;
+    export type TweenOptions = Omit<Animations.TweenAnimationConfig, 'from' | 'to' | 'onUpdate'>;
 
     /**
      * Creates a reactive tween that smoothly interpolates from its current value to new target values.

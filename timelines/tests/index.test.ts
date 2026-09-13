@@ -113,6 +113,38 @@ describe('Timelines Module', () => {
             expect(completed).toBe(true);
             expect(updates[updates.length - 1]).toBeCloseTo(50, 0);
         });
+
+        it('should execute decay physics step inside a timeline', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            const id = Timelines.create({
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            Timelines.addDecay(id!, {
+                from: 0,
+                velocity: 300,
+                deceleration: 0.99,
+                precision: 1.0,
+                onUpdate: (v) => updates.push(v),
+            });
+
+            Timelines.play(id!);
+            expect(Timelines.isRunning(id!)).toBe(true);
+
+            for (let i = 0; i < 100; ++i) {
+                vi.advanceTimersByTime(16.67);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(updates.length).toBeGreaterThan(1);
+            expect(updates[updates.length - 1]).toBeGreaterThan(0);
+        });
     });
 
     describe('Parallel Step Execution', () => {
@@ -129,12 +161,14 @@ describe('Timelines Module', () => {
 
             Timelines.addParallel(id!, [
                 {
+                    type: 'tween',
                     from: 0,
                     to: 100,
                     duration: 100,
                     onUpdate: (v) => track1.push(v),
                 },
                 {
+                    type: 'tween',
                     from: 0,
                     to: 500,
                     duration: 300,
@@ -160,6 +194,48 @@ describe('Timelines Module', () => {
             expect(track2[track2.length - 1]).toBe(500);
             expect(parallelDone).toBe(true);
             expect(Timelines.isActive(id!)).toBe(false);
+        });
+
+        it('should support decay animation in parallel child tracks', () => {
+            const trackTween: number[] = [];
+            const trackDecay: number[] = [];
+            let completed = false;
+
+            const id = Timelines.create({
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            Timelines.addParallel(id!, [
+                {
+                    type: 'tween',
+                    from: 0,
+                    to: 100,
+                    duration: 100,
+                    onUpdate: (v) => trackTween.push(v),
+                },
+                {
+                    type: 'decay',
+                    from: 0,
+                    velocity: 200,
+                    deceleration: 0.98,
+                    precision: 1.0,
+                    onUpdate: (v) => trackDecay.push(v),
+                },
+            ]);
+
+            Timelines.play(id!);
+
+            for (let i = 0; i < 50; ++i) {
+                vi.advanceTimersByTime(20);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(trackTween[trackTween.length - 1]).toBe(100);
+            expect(trackDecay.length).toBeGreaterThan(1);
         });
     });
 

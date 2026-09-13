@@ -8,9 +8,10 @@ Key features include:
 
 - **Structure of Arrays Engine (`Timelines`)** – Pooled state management using TypedArrays (`Uint8Array`, `Uint16Array`, `Uint32Array`, `Int16Array`) with a dual-duty free-list array (`_currentStep`) to eliminate GC pressure during playback.
 - **Dual API Access** – Exposes both a pure, unboxed primitive `TimelineID` functional API (`Timelines.play(id)`, `Timelines.stop(id)`) for zero-allocation game loops, and an optional, thin object-oriented wrapper (`new Timelines.Timeline()`).
-- **Flexible Step Choreography** – Supports single tweens (`addTween`), spring physics (`addSpring`), parallel multi-track batches (`addParallel`), delays (`addWait`), and action/event triggers (`addCall`).
+- **Flexible Step Choreography** – Supports single tweens (`addTween`), spring physics (`addSpring`), friction-based decay (`addDecay`), parallel multi-track batches (`addParallel`), delays (`addWait`), and action/event triggers (`addCall`).
 - **Update Rate Throttling (`minUpdateDeltaMs`)** – Configurable default throttle rate per timeline with step-level overrides to minimize server tick processing overhead.
 - **Looping & Lifecycle Events** – Supports finite or infinite looping (`loop: true | number`) with `onStep`, `onLoop`, and `onComplete` event callbacks.
+- **Sync & Async Callback Safety** – Callbacks (`onStep`, `onLoop`, `onComplete`, `addCall`, and step `onUpdate`/`onComplete`) accept both synchronous `void` and asynchronous `Promise<void>` functions with integrated rejection catching via `CallbackHandler`.
 - **Target Agnostic & Strict Encapsulation** – Does not directly mutate engine objects. Operates on progress values ($0 \to 1$) and numbers, allowing seamless choreography across `UI`, `Spatial`, audio, and custom gameplay state.
 
 </ai>
@@ -64,20 +65,19 @@ if (id !== null) {
     // 2. Pause for 1.5 seconds
     Timelines.addWait(id, 1500);
 
-    // 3. Fire custom event
-    Timelines.addCall(id, () => {
-        Events.OnNotificationDismissed.trigger(player);
+    // 3. Fling / decay panel out with velocity
+    Timelines.addDecay(id, {
+        from: 0,
+        velocity: 1200,
+        deceleration: 0.995,
+        onUpdate: (x) => {
+            panel.position.x = x;
+        },
     });
 
-    // 4. Slide out
-    Timelines.addTween(id, {
-        from: 0,
-        to: 1,
-        duration: 200,
-        easing: Transitions.Easing.inCubic,
-        onUpdate: (t) => {
-            panel.bgAlpha = (1 - t) * 0.9;
-        },
+    // 4. Fire custom event
+    Timelines.addCall(id, () => {
+        Events.OnNotificationDismissed.trigger(player);
     });
 
     // Playback control
@@ -107,6 +107,7 @@ const tl = new Timelines.Timeline({ loop: 2 })
     .addWait(200)
     .addParallel([
         {
+            type: 'tween',
             duration: 250,
             easing: Transitions.Easing.inQuad,
             onUpdate: (t) => {
@@ -121,6 +122,15 @@ const tl = new Timelines.Timeline({ loop: 2 })
             damping: 28,
             onUpdate: (val) => {
                 widget.width = val;
+            },
+        },
+        {
+            type: 'decay',
+            from: 0,
+            velocity: 600,
+            deceleration: 0.997,
+            onUpdate: (val) => {
+                widget.x = val;
             },
         },
     ])

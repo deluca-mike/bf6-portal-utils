@@ -106,6 +106,14 @@ describe('Animations Engine Module', () => {
             });
             expect(overflowSpringId).toBeNull();
 
+            // Decay allocation also returns null when full
+            const overflowDecayId = Animations.startDecay({
+                from: 0,
+                velocity: 100,
+                onUpdate: () => {},
+            });
+            expect(overflowDecayId).toBeNull();
+
             // Free one slot
             Animations.stop(allocatedIds[0]);
             expect(Animations.getActiveCount()).toBe(Animations.MAX_ANIMATIONS - 1);
@@ -267,6 +275,78 @@ describe('Animations Engine Module', () => {
             expect(updates[updates.length - 1]).toBe(50);
             expect(Animations.isRunning(id!)).toBeUndefined();
             expect(Animations.isActive(id!)).toBe(false);
+        });
+    });
+
+    describe('Decay / Inertia Physics Animations', () => {
+        it('should simulate friction decay and settle when velocity drops below precision', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            const id = Animations.startDecay({
+                from: 0,
+                velocity: 300,
+                deceleration: 0.99,
+                precision: 1.0,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            expect(Animations.isRunning(id!)).toBe(true);
+
+            // Step through ticks until completion
+            for (let i = 0; i < 100; ++i) {
+                vi.advanceTimersByTime(16.67);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(updates.length).toBeGreaterThan(1);
+            expect(updates[updates.length - 1]).toBeGreaterThan(0);
+            expect(Animations.isActive(id!)).toBe(false);
+        });
+
+        it('should support pause and resume for decay animations', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            const id = Animations.startDecay({
+                from: 0,
+                velocity: 500,
+                deceleration: 0.995,
+                precision: 0.5,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+
+            const valAtPause = updates[updates.length - 1];
+            Animations.pause(id!);
+            expect(Animations.isPaused(id!)).toBe(true);
+
+            // Ticks while paused do not alter value
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates[updates.length - 1]).toBe(valAtPause);
+
+            Animations.resume(id!);
+            expect(Animations.isRunning(id!)).toBe(true);
+
+            for (let i = 0; i < 100; ++i) {
+                vi.advanceTimersByTime(20);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(updates[updates.length - 1]).toBeGreaterThan(valAtPause);
         });
     });
 

@@ -38,13 +38,32 @@ export namespace Animations {
     export type AnimationID = number & { readonly __brand: 'AnimationID' };
 
     /**
-     * Configuration options for starting a standard tween animation.
+     * Common base configuration shared across all animation drivers.
      */
     export interface AnimationConfig {
         /**
          * Starting numeric value.
          */
         from: number;
+        /**
+         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
+         * When omitted or 0, updates fire on every server tick.
+         */
+        minUpdateDeltaMs?: number;
+        /**
+         * Callback fired on every tick with the current/interpolated value.
+         */
+        onUpdate: (value: number) => Promise<void> | void;
+        /**
+         * Optional callback fired when the animation successfully reaches completion or settles.
+         */
+        onComplete?: () => Promise<void> | void;
+    }
+
+    /**
+     * Configuration options for starting a standard tween animation.
+     */
+    export interface TweenAnimationConfig extends AnimationConfig {
         /**
          * Target ending numeric value.
          */
@@ -54,32 +73,15 @@ export namespace Animations {
          */
         duration: number;
         /**
-         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
-         * When omitted or 0, updates fire on every server tick.
-         */
-        minUpdateDeltaMs?: number;
-        /**
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
-        /**
-         * Callback fired on every tick with the interpolated value.
-         */
-        onUpdate: (value: number) => void;
-        /**
-         * Optional callback fired when the animation successfully reaches completion.
-         */
-        onComplete?: () => void;
     }
 
     /**
      * Configuration options for starting a physics-driven spring animation.
      */
-    export interface SpringAnimationConfig {
-        /**
-         * Starting numeric value.
-         */
-        from: number;
+    export interface SpringAnimationConfig extends AnimationConfig {
         /**
          * Target ending numeric value.
          */
@@ -100,19 +102,25 @@ export namespace Animations {
          * Precision threshold to determine when the spring has settled at the target (default: 0.001).
          */
         precision?: number;
+    }
+
+    /**
+     * Configuration options for starting a friction-based decay/inertia animation.
+     */
+    export interface DecayAnimationConfig extends AnimationConfig {
         /**
-         * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
-         * When omitted or 0, updates fire on every server tick.
+         * Initial velocity (e.g. units per second).
          */
-        minUpdateDeltaMs?: number;
+        velocity: number;
         /**
-         * Callback fired on every tick with the current spring position value.
+         * Deceleration friction coefficient between 0.0 and 1.0 (default: 0.997 per millisecond).
+         * Values closer to 1.0 glide longer; values closer to 0.0 stop sooner.
          */
-        onUpdate: (value: number) => void;
+        deceleration?: number;
         /**
-         * Optional callback fired when the spring settles at the target value.
+         * Precision threshold to determine when velocity has settled (default: 0.01).
          */
-        onComplete?: () => void;
+        precision?: number;
     }
 
     /****** Constants & SoA Memory Storage ******/
@@ -131,49 +139,59 @@ export namespace Animations {
     const MAX_GENERATIONS = 65_535;
     const GENERATION_MULTIPLIER = 10_000;
     const INVALID_INDEX = -1;
+    const END_OF_FREE_LIST = MAX_ANIMATIONS;
 
     const FLAG_IN_USE = 1 << 0;
     const FLAG_RUNNING = 1 << 1;
     const FLAG_PAUSED = 1 << 2;
     const FLAG_COMPLETE = 1 << 3;
-    const FLAG_SPRING = 1 << 4;
 
-    // Slot state and intrusive free-list
-    const _flags = new Uint8Array(MAX_ANIMATIONS);
+    const DRIVER_MASK = 0x30;
+    const DRIVER_TWEEN = 0 << 4;
+    const DRIVER_SPRING = 1 << 4;
+    const DRIVER_DECAY = 2 << 4;
+
+    // Dual-duty slot state and intrusive free-list:
+    // - Free slots (>= 0): Index of next free slot (0..1023) or END_OF_FREE_LIST (1024).
+    // - In-use slots (< 0): Encoded bitflags & driver type (-flags).
+    const _stateOrNextFree = new Int16Array(MAX_ANIMATIONS);
     const _generations = new Uint16Array(MAX_ANIMATIONS);
-    const _nextFree = new Int16Array(MAX_ANIMATIONS);
 
     for (let i = 0; i < MAX_ANIMATIONS - 1; ++i) {
-        _nextFree[i] = i + 1;
+        _stateOrNextFree[i] = i + 1;
     }
-    _nextFree[MAX_ANIMATIONS - 1] = INVALID_INDEX;
+    _stateOrNextFree[MAX_ANIMATIONS - 1] = END_OF_FREE_LIST;
 
     let _firstFree = 0;
     let _activeCount = 0;
 
-    // Bit flag helper functions
-    function _isInUse(flags: number): boolean {
-        return (flags & FLAG_IN_USE) !== 0;
+    // Bit flag & state helper functions
+    function _isInUse(slot: number): boolean {
+        return _stateOrNextFree[slot] < 0;
     }
 
-    function _isRunning(flags: number): boolean {
-        return (flags & FLAG_RUNNING) !== 0;
+    function _isRunning(slot: number): boolean {
+        const state = _stateOrNextFree[slot];
+        return state < 0 && (-state & FLAG_RUNNING) !== 0;
     }
 
-    function _isPaused(flags: number): boolean {
-        return (flags & FLAG_PAUSED) !== 0;
+    function _isPaused(slot: number): boolean {
+        const state = _stateOrNextFree[slot];
+        return state < 0 && (-state & FLAG_PAUSED) !== 0;
     }
 
-    function _isSpring(flags: number): boolean {
-        return (flags & FLAG_SPRING) !== 0;
+    function _getDriver(slot: number): number {
+        return -_stateOrNextFree[slot] & DRIVER_MASK;
     }
 
     function _setFlag(slot: number, flag: number): void {
-        _flags[slot] |= flag;
+        const flags = -_stateOrNextFree[slot];
+        _stateOrNextFree[slot] = -(flags | flag);
     }
 
     function _clearFlag(slot: number, flag: number): void {
-        _flags[slot] &= ~flag;
+        const flags = -_stateOrNextFree[slot];
+        _stateOrNextFree[slot] = -(flags & ~flag);
     }
 
     // Structure of Arrays (Numeric values in Float32Array for memory efficiency and cache locality)
@@ -182,11 +200,11 @@ export namespace Animations {
     const _currentValue = new Float32Array(MAX_ANIMATIONS);
     const _velocity = new Float32Array(MAX_ANIMATIONS);
 
-    const _stiffness = new Float32Array(MAX_ANIMATIONS);
+    const _stiffnessOrDeceleration = new Float32Array(MAX_ANIMATIONS);
     const _damping = new Float32Array(MAX_ANIMATIONS);
     const _precision = new Float32Array(MAX_ANIMATIONS);
 
-    // Structure of Arrays (Time values in Uint32Array based on server uptime milliseconds)
+    // Structure of Arrays (Time values in Uint32Array / Uint16Array based on server uptime milliseconds)
     const _durationMs = new Uint32Array(MAX_ANIMATIONS);
     const _accumulatedMs = new Uint32Array(MAX_ANIMATIONS);
     const _lastResumeTime = new Uint32Array(MAX_ANIMATIONS);
@@ -194,8 +212,8 @@ export namespace Animations {
     const _lastUpdateTime = new Uint32Array(MAX_ANIMATIONS);
 
     // Structure of Arrays (Function references, cleared to null on slot release)
-    const _onUpdate = new Array<((val: number) => void) | null>(MAX_ANIMATIONS);
-    const _onComplete = new Array<(() => void) | null>(MAX_ANIMATIONS);
+    const _onUpdate = new Array<((val: number) => Promise<void> | void) | null>(MAX_ANIMATIONS);
+    const _onComplete = new Array<(() => Promise<void> | void) | null>(MAX_ANIMATIONS);
     const _easing = new Array<((t: number) => number) | null>(MAX_ANIMATIONS);
 
     for (let i = 0; i < MAX_ANIMATIONS; ++i) {
@@ -214,7 +232,9 @@ export namespace Animations {
 
     let _runningIndicesCount = 0;
     let _lastTickTimestamp = getUptime();
+
     const _springScratch: Transitions.SpringResult = { value: 0, velocity: 0 };
+    const _decayScratch: Transitions.DecayResult = { value: 0, velocity: 0 };
 
     /****** Internal Helper Functions ******/
 
@@ -225,8 +245,8 @@ export namespace Animations {
         }
 
         const slot = _firstFree;
-        _firstFree = _nextFree[slot];
-        _nextFree[slot] = INVALID_INDEX;
+        const next = _stateOrNextFree[slot];
+        _firstFree = next === END_OF_FREE_LIST ? INVALID_INDEX : next;
 
         ++_activeCount;
 
@@ -242,13 +262,17 @@ export namespace Animations {
 
         const expectedGen = Math.floor(id / GENERATION_MULTIPLIER);
 
-        if (_generations[slot] !== expectedGen || !_isInUse(_flags[slot])) return INVALID_INDEX;
+        if (_generations[slot] !== expectedGen || !_isInUse(slot)) return INVALID_INDEX;
 
         return slot;
     }
 
     function _addToRunning(slot: number): void {
         if (_slotToRunningPos[slot] !== INVALID_INDEX) return;
+
+        if (_runningIndicesCount === 0) {
+            _lastTickTimestamp = getUptime();
+        }
 
         const pos = _runningIndicesCount;
         _runningIndices[pos] = slot;
@@ -276,7 +300,6 @@ export namespace Animations {
     function _freeSlot(slot: number): void {
         _removeFromRunning(slot);
 
-        _flags[slot] = 0;
         _minUpdateDeltaMs[slot] = 0;
         _lastUpdateTime[slot] = 0;
         _onUpdate[slot] = null;
@@ -287,9 +310,10 @@ export namespace Animations {
 
         if (_generations[slot] < MAX_GENERATIONS) {
             ++_generations[slot];
-            _nextFree[slot] = _firstFree;
+            _stateOrNextFree[slot] = _firstFree === INVALID_INDEX ? END_OF_FREE_LIST : _firstFree;
             _firstFree = slot;
         } else {
+            _stateOrNextFree[slot] = END_OF_FREE_LIST;
             logging.log(`Animation slot ${slot} exhausted max generations and was retired`, LogLevel.Warning);
         }
     }
@@ -303,7 +327,7 @@ export namespace Animations {
             target,
             _velocity[slot],
             dtSec,
-            _stiffness[slot],
+            _stiffnessOrDeceleration[slot],
             _damping[slot],
             _springScratch
         );
@@ -338,7 +362,44 @@ export namespace Animations {
         CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
     }
 
-    function _tickTween(slot: number, now: number): void {
+    function _tickDecay(slot: number, dtSec: number, now: number): void {
+        Transitions.calculateDecay(
+            _currentValue[slot],
+            _velocity[slot],
+            dtSec,
+            _stiffnessOrDeceleration[slot],
+            _decayScratch
+        );
+
+        _currentValue[slot] = _decayScratch.value;
+        _velocity[slot] = _decayScratch.velocity;
+
+        const isSettled = Math.abs(_decayScratch.velocity) <= _precision[slot];
+
+        if (isSettled) {
+            _velocity[slot] = 0;
+        }
+
+        const minDelta = _minUpdateDeltaMs[slot];
+        const lastUpdate = _lastUpdateTime[slot];
+
+        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isSettled) {
+            _lastUpdateTime[slot] = now;
+            const updateCb = _onUpdate[slot];
+            CallbackHandler.invoke(updateCb, _currentValue[slot], undefined, undefined, undefined, logging, 'onUpdate');
+        }
+
+        if (!isSettled) return;
+
+        _clearFlag(slot, FLAG_RUNNING);
+        _setFlag(slot, FLAG_COMPLETE);
+        const completeCb = _onComplete[slot];
+        _freeSlot(slot);
+
+        CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
+    }
+
+    function _tickTween(slot: number, dtSec: number, now: number): void {
         const duration = _durationMs[slot];
         const elapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
         const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
@@ -381,14 +442,17 @@ export namespace Animations {
         // Iterate backwards through dense running indices for zero-allocation swap-and-pop safety
         for (let i = _runningIndicesCount - 1; i >= 0; --i) {
             const slot = _runningIndices[i];
-            const flags = _flags[slot];
 
-            if (!_isInUse(flags) || !_isRunning(flags)) continue;
+            if (!_isInUse(slot) || !_isRunning(slot)) continue;
 
-            if (_isSpring(flags)) {
+            const driver = _getDriver(slot);
+
+            if (driver === DRIVER_TWEEN) {
+                _tickTween(slot, dtSec, now);
+            } else if (driver === DRIVER_SPRING) {
                 _tickSpring(slot, dtSec, now);
-            } else {
-                _tickTween(slot, now);
+            } else if (driver === DRIVER_DECAY) {
+                _tickDecay(slot, dtSec, now);
             }
         }
     }
@@ -402,12 +466,12 @@ export namespace Animations {
      * @param config - Animation parameters and callbacks.
      * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
      */
-    export function start(config: AnimationConfig): AnimationID | null {
+    export function start(config: TweenAnimationConfig): AnimationID | null {
         const slot = _allocateSlot();
 
         if (slot === INVALID_INDEX) return null;
 
-        _flags[slot] = FLAG_IN_USE | FLAG_RUNNING;
+        _stateOrNextFree[slot] = -(FLAG_IN_USE | FLAG_RUNNING | DRIVER_TWEEN);
         _from[slot] = config.from;
         _to[slot] = config.to;
         _currentValue[slot] = config.from;
@@ -438,14 +502,47 @@ export namespace Animations {
 
         if (slot === INVALID_INDEX) return null;
 
-        _flags[slot] = FLAG_IN_USE | FLAG_RUNNING | FLAG_SPRING;
+        _stateOrNextFree[slot] = -(FLAG_IN_USE | FLAG_RUNNING | DRIVER_SPRING);
         _from[slot] = config.from;
         _to[slot] = config.to;
         _currentValue[slot] = config.from;
         _velocity[slot] = config.velocity ?? 0;
-        _stiffness[slot] = config.stiffness ?? 170;
+        _stiffnessOrDeceleration[slot] = config.stiffness ?? 170;
         _damping[slot] = config.damping ?? 26;
         _precision[slot] = config.precision ?? 0.001;
+        _accumulatedMs[slot] = 0;
+        _lastResumeTime[slot] = getUptime();
+        _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
+        _lastUpdateTime[slot] = 0;
+
+        _easing[slot] = null;
+        _onUpdate[slot] = config.onUpdate;
+        _onComplete[slot] = config.onComplete ?? null;
+
+        const id = (slot + GENERATION_MULTIPLIER * _generations[slot]) as AnimationID;
+        _addToRunning(slot);
+
+        return id;
+    }
+
+    /**
+     * Starts a new friction-based decay/inertia animation from config.
+     * @param config - Decay animation parameters and callbacks.
+     * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
+     */
+    export function startDecay(config: DecayAnimationConfig): AnimationID | null {
+        const slot = _allocateSlot();
+
+        if (slot === INVALID_INDEX) return null;
+
+        _stateOrNextFree[slot] = -(FLAG_IN_USE | FLAG_RUNNING | DRIVER_DECAY);
+        _from[slot] = config.from;
+        _to[slot] = 0;
+        _currentValue[slot] = config.from;
+        _velocity[slot] = config.velocity;
+        _stiffnessOrDeceleration[slot] = config.deceleration ?? 0.997;
+        _damping[slot] = 0;
+        _precision[slot] = config.precision ?? 0.01;
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
         _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
@@ -482,9 +579,7 @@ export namespace Animations {
 
         if (slot === INVALID_INDEX) return;
 
-        const flags = _flags[slot];
-
-        if (!_isRunning(flags)) return;
+        if (!_isRunning(slot)) return;
 
         _clearFlag(slot, FLAG_RUNNING);
         _setFlag(slot, FLAG_PAUSED);
@@ -502,9 +597,7 @@ export namespace Animations {
 
         if (slot === INVALID_INDEX) return;
 
-        const flags = _flags[slot];
-
-        if (!_isPaused(flags)) return;
+        if (!_isPaused(slot)) return;
 
         _clearFlag(slot, FLAG_PAUSED);
         _setFlag(slot, FLAG_RUNNING);
@@ -532,7 +625,7 @@ export namespace Animations {
 
         if (slot === INVALID_INDEX) return undefined;
 
-        return _isPaused(_flags[slot]);
+        return _isPaused(slot);
     }
 
     /**
@@ -545,7 +638,7 @@ export namespace Animations {
 
         if (slot === INVALID_INDEX) return undefined;
 
-        return _isRunning(_flags[slot]);
+        return _isRunning(slot);
     }
 
     /**
