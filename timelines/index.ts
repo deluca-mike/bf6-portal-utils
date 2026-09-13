@@ -379,39 +379,229 @@ export namespace Timelines {
         }
     }
 
+    function _resolveStepThrottle(slot: number, stepDelta?: number): number | undefined {
+        return stepDelta ?? (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined);
+    }
+
+    function _executeWaitStep(slot: number, durationMs: number, now: number): void {
+        _setFlag(slot, FLAG_WAITING);
+        _stepWaitMs[slot] = Math.max(0, durationMs);
+
+        if (durationMs <= 0) {
+            _clearFlag(slot, FLAG_WAITING);
+            _advanceStep(slot, now);
+        }
+    }
+
+    function _executeCallStep(slot: number, callback: () => void | Promise<void>, now: number): void {
+        CallbackHandler.invokeNoArgs(callback, logging, 'callStep');
+        _advanceStep(slot, now);
+    }
+
+    function _executeTweenStep(slot: number, config: TweenStepConfig, now: number): void {
+        _setFlag(slot, FLAG_STEP_ANIMATING);
+
+        const animId = Animations.start({
+            from: config.from ?? 0,
+            to: config.to ?? 1,
+            duration: config.duration,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
+            easing: config.easing,
+            onUpdate: config.onUpdate,
+            onComplete: () => {
+                config.onComplete?.();
+                _onChildAnimComplete(slot, animId!);
+            },
+        });
+
+        if (animId !== null) {
+            _activeAnimIds[slot] = [animId];
+        } else {
+            _clearFlag(slot, FLAG_STEP_ANIMATING);
+            _advanceStep(slot, now);
+        }
+    }
+
+    function _executeSpringStep(slot: number, config: SpringStepConfig, now: number): void {
+        _setFlag(slot, FLAG_STEP_ANIMATING);
+
+        const animId = Animations.startSpring({
+            from: config.from ?? 0,
+            to: config.to ?? 1,
+            velocity: config.velocity,
+            stiffness: config.stiffness,
+            damping: config.damping,
+            precision: config.precision,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
+            onUpdate: config.onUpdate,
+            onComplete: () => {
+                config.onComplete?.();
+                _onChildAnimComplete(slot, animId!);
+            },
+        });
+
+        if (animId !== null) {
+            _activeAnimIds[slot] = [animId];
+        } else {
+            _clearFlag(slot, FLAG_STEP_ANIMATING);
+            _advanceStep(slot, now);
+        }
+    }
+
+    function _executeDecayStep(slot: number, config: DecayStepConfig, now: number): void {
+        _setFlag(slot, FLAG_STEP_ANIMATING);
+
+        const animId = Animations.startDecay({
+            from: config.from ?? 0,
+            velocity: config.velocity,
+            deceleration: config.deceleration,
+            precision: config.precision,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
+            onUpdate: config.onUpdate,
+            onComplete: () => {
+                config.onComplete?.();
+                _onChildAnimComplete(slot, animId!);
+            },
+        });
+
+        if (animId !== null) {
+            _activeAnimIds[slot] = [animId];
+        } else {
+            _clearFlag(slot, FLAG_STEP_ANIMATING);
+            _advanceStep(slot, now);
+        }
+    }
+
+    function _startParallelTweenChild(
+        slot: number,
+        child: { type: 'tween' } & TweenStepConfig
+    ): Animations.AnimationID | null {
+        const childAnimId = Animations.start({
+            from: child.from ?? 0,
+            to: child.to ?? 1,
+            duration: child.duration,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
+            easing: child.easing,
+            onUpdate: child.onUpdate,
+            onComplete: () => {
+                child.onComplete?.();
+                _onChildAnimComplete(slot, childAnimId!);
+            },
+        });
+
+        return childAnimId;
+    }
+
+    function _startParallelSpringChild(
+        slot: number,
+        child: { type: 'spring' } & SpringStepConfig
+    ): Animations.AnimationID | null {
+        const childAnimId = Animations.startSpring({
+            from: child.from ?? 0,
+            to: child.to ?? 1,
+            velocity: child.velocity,
+            stiffness: child.stiffness,
+            damping: child.damping,
+            precision: child.precision,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
+            onUpdate: child.onUpdate,
+            onComplete: () => {
+                child.onComplete?.();
+                _onChildAnimComplete(slot, childAnimId!);
+            },
+        });
+
+        return childAnimId;
+    }
+
+    function _startParallelDecayChild(
+        slot: number,
+        child: { type: 'decay' } & DecayStepConfig
+    ): Animations.AnimationID | null {
+        const childAnimId = Animations.startDecay({
+            from: child.from ?? 0,
+            velocity: child.velocity,
+            deceleration: child.deceleration,
+            precision: child.precision,
+            minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
+            onUpdate: child.onUpdate,
+            onComplete: () => {
+                child.onComplete?.();
+                _onChildAnimComplete(slot, childAnimId!);
+            },
+        });
+
+        return childAnimId;
+    }
+
+    function _executeParallelStep(slot: number, children: readonly ParallelChildConfig[], now: number): void {
+        _setFlag(slot, FLAG_STEP_ANIMATING);
+
+        if (children.length === 0) {
+            _clearFlag(slot, FLAG_STEP_ANIMATING);
+            _advanceStep(slot, now);
+            return;
+        }
+
+        const animIds: Animations.AnimationID[] = [];
+        _activeAnimIds[slot] = animIds;
+
+        for (let i = 0; i < children.length; ++i) {
+            const child = children[i];
+
+            const childAnimId =
+                child.type === 'tween'
+                    ? _startParallelTweenChild(slot, child)
+                    : child.type === 'spring'
+                      ? _startParallelSpringChild(slot, child)
+                      : _startParallelDecayChild(slot, child);
+
+            if (childAnimId !== null) {
+                animIds.push(childAnimId);
+            }
+        }
+
+        if (animIds.length !== 0) return;
+
+        _activeAnimIds[slot] = null;
+        _clearFlag(slot, FLAG_STEP_ANIMATING);
+        _advanceStep(slot, now);
+    }
+
+    function _handleTimelineIterationComplete(slot: number, now: number): void {
+        const completed = _completedLoops[slot] + 1;
+        _completedLoops[slot] = completed;
+
+        const onLoopCb = _onLoop[slot];
+
+        if (onLoopCb) {
+            CallbackHandler.invoke(onLoopCb, completed, undefined, undefined, undefined, logging, 'onLoop');
+        }
+
+        if (_isInfinite(_flags[slot]) || completed < _targetLoops[slot]) {
+            _currentStep[slot] = 0;
+            _startCurrentStep(slot, now);
+            return;
+        }
+
+        // Full completion
+        _clearFlag(slot, FLAG_RUNNING);
+        _setFlag(slot, FLAG_COMPLETE);
+
+        const onCompleteCb = _onComplete[slot];
+        _freeSlot(slot);
+
+        if (onCompleteCb) {
+            CallbackHandler.invokeNoArgs(onCompleteCb, logging, 'onComplete');
+        }
+    }
+
     function _startCurrentStep(slot: number, now: number): void {
         const stepList = _steps[slot];
         const stepIdx = _currentStep[slot];
 
         if (stepIdx >= stepList.length) {
-            // Timeline iteration completed: check looping
-            const completed = _completedLoops[slot] + 1;
-            _completedLoops[slot] = completed;
-
-            const onLoopCb = _onLoop[slot];
-
-            if (onLoopCb) {
-                CallbackHandler.invoke(onLoopCb, completed, undefined, undefined, undefined, logging, 'onLoop');
-            }
-
-            if (_isInfinite(_flags[slot]) || completed < _targetLoops[slot]) {
-                _currentStep[slot] = 0;
-                _startCurrentStep(slot, now);
-
-                return;
-            }
-
-            // Full completion
-            _clearFlag(slot, FLAG_RUNNING);
-            _setFlag(slot, FLAG_COMPLETE);
-
-            const onCompleteCb = _onComplete[slot];
-            _freeSlot(slot);
-
-            if (onCompleteCb) {
-                CallbackHandler.invokeNoArgs(onCompleteCb, logging, 'onComplete');
-            }
-
+            _handleTimelineIterationComplete(slot, now);
             return;
         }
 
@@ -426,200 +616,24 @@ export namespace Timelines {
         _stepElapsedMs[slot] = 0;
 
         switch (step.type) {
-            case 'wait': {
-                _setFlag(slot, FLAG_WAITING);
-                _stepWaitMs[slot] = Math.max(0, step.durationMs);
-
-                if (step.durationMs <= 0) {
-                    _clearFlag(slot, FLAG_WAITING);
-                    _advanceStep(slot, now);
-                }
-
+            case 'wait':
+                _executeWaitStep(slot, step.durationMs, now);
                 break;
-            }
-
-            case 'call': {
-                CallbackHandler.invokeNoArgs(step.callback, logging, 'callStep');
-                _advanceStep(slot, now);
+            case 'call':
+                _executeCallStep(slot, step.callback, now);
                 break;
-            }
-
-            case 'tween': {
-                _setFlag(slot, FLAG_STEP_ANIMATING);
-                const from = step.config.from ?? 0;
-                const to = step.config.to ?? 1;
-
-                const animId = Animations.start({
-                    from,
-                    to,
-                    duration: step.config.duration,
-                    minUpdateDeltaMs:
-                        step.config.minUpdateDeltaMs ??
-                        (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                    easing: step.config.easing,
-                    onUpdate: step.config.onUpdate,
-                    onComplete: () => {
-                        step.config.onComplete?.();
-                        _onChildAnimComplete(slot, animId!);
-                    },
-                });
-
-                if (animId !== null) {
-                    _activeAnimIds[slot] = [animId];
-                } else {
-                    _clearFlag(slot, FLAG_STEP_ANIMATING);
-                    _advanceStep(slot, now);
-                }
-
+            case 'tween':
+                _executeTweenStep(slot, step.config, now);
                 break;
-            }
-
-            case 'spring': {
-                _setFlag(slot, FLAG_STEP_ANIMATING);
-                const from = step.config.from ?? 0;
-                const to = step.config.to ?? 1;
-
-                const animId = Animations.startSpring({
-                    from,
-                    to,
-                    velocity: step.config.velocity,
-                    stiffness: step.config.stiffness,
-                    damping: step.config.damping,
-                    precision: step.config.precision,
-                    minUpdateDeltaMs:
-                        step.config.minUpdateDeltaMs ??
-                        (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                    onUpdate: step.config.onUpdate,
-                    onComplete: () => {
-                        step.config.onComplete?.();
-                        _onChildAnimComplete(slot, animId!);
-                    },
-                });
-
-                if (animId !== null) {
-                    _activeAnimIds[slot] = [animId];
-                } else {
-                    _clearFlag(slot, FLAG_STEP_ANIMATING);
-                    _advanceStep(slot, now);
-                }
+            case 'spring':
+                _executeSpringStep(slot, step.config, now);
                 break;
-            }
-
-            case 'decay': {
-                _setFlag(slot, FLAG_STEP_ANIMATING);
-                const from = step.config.from ?? 0;
-
-                const animId = Animations.startDecay({
-                    from,
-                    velocity: step.config.velocity,
-                    deceleration: step.config.deceleration,
-                    precision: step.config.precision,
-                    minUpdateDeltaMs:
-                        step.config.minUpdateDeltaMs ??
-                        (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                    onUpdate: step.config.onUpdate,
-                    onComplete: () => {
-                        step.config.onComplete?.();
-                        _onChildAnimComplete(slot, animId!);
-                    },
-                });
-
-                if (animId !== null) {
-                    _activeAnimIds[slot] = [animId];
-                } else {
-                    _clearFlag(slot, FLAG_STEP_ANIMATING);
-                    _advanceStep(slot, now);
-                }
+            case 'decay':
+                _executeDecayStep(slot, step.config, now);
                 break;
-            }
-
-            case 'parallel': {
-                _setFlag(slot, FLAG_STEP_ANIMATING);
-                const children = step.children;
-
-                if (children.length === 0) {
-                    _clearFlag(slot, FLAG_STEP_ANIMATING);
-                    _advanceStep(slot, now);
-                    return;
-                }
-
-                const animIds: Animations.AnimationID[] = [];
-                _activeAnimIds[slot] = animIds;
-
-                for (let i = 0; i < children.length; ++i) {
-                    const child = children[i];
-                    const from = child.from ?? 0;
-
-                    if (child.type === 'spring') {
-                        const childAnimId = Animations.startSpring({
-                            from,
-                            to: child.to ?? 1,
-                            velocity: child.velocity,
-                            stiffness: child.stiffness,
-                            damping: child.damping,
-                            precision: child.precision,
-                            minUpdateDeltaMs:
-                                child.minUpdateDeltaMs ??
-                                (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                            onUpdate: child.onUpdate,
-                            onComplete: () => {
-                                child.onComplete?.();
-                                _onChildAnimComplete(slot, childAnimId!);
-                            },
-                        });
-
-                        if (childAnimId !== null) {
-                            animIds.push(childAnimId);
-                        }
-                    } else if (child.type === 'decay') {
-                        const childAnimId = Animations.startDecay({
-                            from,
-                            velocity: child.velocity,
-                            deceleration: child.deceleration,
-                            precision: child.precision,
-                            minUpdateDeltaMs:
-                                child.minUpdateDeltaMs ??
-                                (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                            onUpdate: child.onUpdate,
-                            onComplete: () => {
-                                child.onComplete?.();
-                                _onChildAnimComplete(slot, childAnimId!);
-                            },
-                        });
-
-                        if (childAnimId !== null) {
-                            animIds.push(childAnimId);
-                        }
-                    } else if (child.type === 'tween') {
-                        const childAnimId = Animations.start({
-                            from,
-                            to: child.to ?? 1,
-                            duration: child.duration,
-                            minUpdateDeltaMs:
-                                child.minUpdateDeltaMs ??
-                                (_minUpdateDeltaMs[slot] > 0 ? _minUpdateDeltaMs[slot] : undefined),
-                            easing: child.easing,
-                            onUpdate: child.onUpdate,
-                            onComplete: () => {
-                                child.onComplete?.();
-                                _onChildAnimComplete(slot, childAnimId!);
-                            },
-                        });
-
-                        if (childAnimId !== null) {
-                            animIds.push(childAnimId);
-                        }
-                    }
-                }
-
-                if (animIds.length === 0) {
-                    _activeAnimIds[slot] = null;
-                    _clearFlag(slot, FLAG_STEP_ANIMATING);
-                    _advanceStep(slot, now);
-                }
-
+            case 'parallel':
+                _executeParallelStep(slot, step.children, now);
                 break;
-            }
         }
     }
 
