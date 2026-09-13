@@ -318,10 +318,9 @@ export abstract class UIBaseButton extends UI.Element {
 
         const btnSlot = this._allocateButtonSlot();
 
-        if (btnSlot === UIBaseButton._INVALID_INDEX) {
-            this.delete();
-            return;
-        }
+        if (btnSlot !== UIBaseButton._INVALID_INDEX) return;
+
+        this.delete();
     }
 
     /**

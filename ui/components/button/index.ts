@@ -5,8 +5,11 @@ import { UIBaseButton } from '../base-button/index.ts';
 // version: 10.0.0
 export class UIButton extends UIBaseButton {
     private static readonly _baseRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+
     private static readonly _disabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+
     private static readonly _pressedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+
     private static readonly _focusedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
 
     private static _packRgba(color: Colors.Color, alpha: number): number {
@@ -14,6 +17,7 @@ export class UIButton extends UIBaseButton {
         const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
         const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
         const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+
         return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
     }
 
@@ -21,12 +25,14 @@ export class UIButton extends UIBaseButton {
         const r = (rgba >>> 24) / 255;
         const g = ((rgba >>> 16) & 0xff) / 255;
         const b = ((rgba >>> 8) & 0xff) / 255;
+
         if (out) {
             out.r = r;
             out.g = g;
             out.b = b;
             return out;
         }
+
         return { r, g, b };
     }
 
@@ -139,6 +145,7 @@ export class UIButton extends UIBaseButton {
         this._bindNativeWidget(name);
 
         const btnSlot = this._buttonSlot;
+
         if (btnSlot !== UIBaseButton._INVALID_INDEX) {
             UIButton._baseRgba[btnSlot] = UIButton._packRgba(baseColor, baseAlpha);
             UIButton._disabledRgba[btnSlot] = UIButton._packRgba(disabledColor, disabledAlpha);
@@ -168,6 +175,7 @@ export class UIButton extends UIBaseButton {
      */
     public override delete(): void {
         const btnSlot = this._buttonSlot;
+
         if (btnSlot !== UIBaseButton._INVALID_INDEX) {
             UIButton._baseRgba[btnSlot] = 0;
             UIButton._disabledRgba[btnSlot] = 0;

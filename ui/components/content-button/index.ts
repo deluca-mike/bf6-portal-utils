@@ -58,6 +58,7 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
         const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
         const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+
         return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
     }
 
@@ -65,12 +66,14 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         const r = (rgba >>> 24) / 255;
         const g = ((rgba >>> 16) & 0xff) / 255;
         const b = ((rgba >>> 8) & 0xff) / 255;
+
         if (out) {
             out.r = r;
             out.g = g;
             out.b = b;
             return out;
         }
+
         return { r, g, b };
     }
 
