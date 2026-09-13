@@ -473,4 +473,93 @@ describe('Animations Engine Module', () => {
             expect(healthyUpdated).toBe(true);
         });
     });
+
+    describe('Start Delay with delayMs', () => {
+        it('should delay start of tween animation until delayMs has elapsed', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.start({
+                from: 0,
+                to: 100,
+                duration: 200,
+                delayMs: 100,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // Advance by 50ms (still within delayMs)
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(0);
+            expect(completed).toBe(false);
+
+            // Advance by another 50ms (total 100ms -> delay passed, animation starts)
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(1);
+            expect(updates[0]).toBe(0);
+
+            // Advance by 100ms (total 200ms -> half duration)
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(2);
+            expect(updates[1]).toBe(50);
+
+            // Advance to finish (total 300ms)
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(completed).toBe(true);
+            expect(updates[updates.length - 1]).toBe(100);
+        });
+
+        it('should delay start of spring animation until delayMs has elapsed', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.startSpring({
+                from: 0,
+                to: 100,
+                delayMs: 150,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // Ticks during delay window
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(0);
+            expect(completed).toBe(false);
+
+            // Ticks after delay passed
+            vi.advanceTimersByTime(60);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBeGreaterThan(0);
+        });
+
+        it('should delay start of decay animation until delayMs has elapsed', () => {
+            const updates: number[] = [];
+
+            Animations.startDecay({
+                from: 0,
+                velocity: 500,
+                delayMs: 200,
+                onUpdate: (v) => updates.push(v),
+            });
+
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBe(0);
+
+            vi.advanceTimersByTime(110);
+            Events.OngoingGlobal.trigger();
+            expect(updates.length).toBeGreaterThan(0);
+        });
+    });
 });

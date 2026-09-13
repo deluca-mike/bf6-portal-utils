@@ -609,4 +609,156 @@ describe('Timelines Module', () => {
             expect(updatesStep2.length).toBe(2);
         });
     });
+
+    describe('Parallel Track Staggering with delayMs', () => {
+        it('should stagger parallel child tracks using delayMs', () => {
+            const track1: number[] = [];
+            const track2: number[] = [];
+            let completed = false;
+
+            const id = Timelines.create({
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            Timelines.addParallel(id!, [
+                {
+                    type: 'tween',
+                    from: 0,
+                    to: 100,
+                    duration: 100,
+                    delayMs: 0, // Starts immediately
+                    onUpdate: (v) => track1.push(v),
+                },
+                {
+                    type: 'tween',
+                    from: 0,
+                    to: 100,
+                    duration: 100,
+                    delayMs: 50, // Starts after 50ms
+                    onUpdate: (v) => track2.push(v),
+                },
+            ]);
+
+            Timelines.play(id!);
+
+            // At 20ms: track 1 updating, track 2 not yet started
+            vi.advanceTimersByTime(20);
+            Events.OngoingGlobal.trigger();
+            expect(track1.length).toBe(1);
+            expect(track2.length).toBe(0);
+
+            // At 60ms: track 2 starts updating
+            vi.advanceTimersByTime(40);
+            Events.OngoingGlobal.trigger();
+            expect(track1.length).toBe(2);
+            expect(track2.length).toBe(1);
+
+            // At 110ms: track 1 finished (100ms duration), track 2 still running (ends at 150ms)
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(track1[track1.length - 1]).toBe(100);
+            expect(completed).toBe(false);
+
+            // At 160ms: track 2 finishes, timeline completes
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(track2[track2.length - 1]).toBe(100);
+            expect(completed).toBe(true);
+        });
+    });
+
+    describe('Yoyo Looping (yoyo: true)', () => {
+        it('should alternate forward and reverse playback on loop iterations when yoyo is true', () => {
+            const updates: number[] = [];
+            const loopCounts: number[] = [];
+            let completed = false;
+
+            const id = Timelines.create({
+                loop: 2, // 2 iterations: 1 forward, 1 reverse
+                yoyo: true,
+                onLoop: (count) => loopCounts.push(count),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // Step 0: 0 -> 100
+            Timelines.addTween(id!, {
+                from: 0,
+                to: 100,
+                duration: 100,
+                onUpdate: (v) => updates.push(v),
+            });
+
+            // Step 1: 100 -> 200
+            Timelines.addTween(id!, {
+                from: 100,
+                to: 200,
+                duration: 100,
+                onUpdate: (v) => updates.push(v),
+            });
+
+            Timelines.play(id!);
+
+            // 1. Forward iteration: Step 0 (0 -> 100) in 100ms
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates[updates.length - 1]).toBe(100);
+
+            // Forward iteration: Step 1 (100 -> 200) in 100ms (total 200ms)
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates[updates.length - 1]).toBe(200);
+            expect(loopCounts).toEqual([1]);
+            expect(completed).toBe(false);
+
+            // 2. Reverse iteration (Yoyo): Step 1 runs in reverse (200 -> 100) in 100ms (total 300ms)
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates[updates.length - 1]).toBe(100);
+
+            // Reverse iteration: Step 0 runs in reverse (100 -> 0) in 100ms (total 400ms)
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(updates[updates.length - 1]).toBe(0);
+
+            // Completed 2 total iterations (1 forward + 1 reverse)
+            expect(loopCounts).toEqual([1, 2]);
+            expect(completed).toBe(true);
+            expect(Timelines.isActive(id!)).toBe(false);
+        });
+
+        it('should support yoyo with Timeline fluent wrapper', () => {
+            const values: number[] = [];
+            let completed = false;
+
+            const tl = new Timelines.Timeline({
+                loop: 2,
+                yoyo: true,
+                onComplete: () => {
+                    completed = true;
+                },
+            }).addTween({
+                from: 10,
+                to: 50,
+                duration: 100,
+                onUpdate: (v) => values.push(v),
+            });
+
+            tl.play();
+
+            // Forward: 10 -> 50
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(values[values.length - 1]).toBe(50);
+
+            // Reverse: 50 -> 10
+            vi.advanceTimersByTime(100);
+            Events.OngoingGlobal.trigger();
+            expect(values[values.length - 1]).toBe(10);
+            expect(completed).toBe(true);
+        });
+    });
 });

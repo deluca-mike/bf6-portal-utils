@@ -33,6 +33,11 @@ export declare namespace Animations {
          */
         from: number;
         /**
+         * Optional start delay in milliseconds before the animation begins updating.
+         * When omitted or 0, the animation starts immediately on the next tick.
+         */
+        delayMs?: number;
+        /**
          * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
          * When omitted or 0, updates fire on every server tick.
          */

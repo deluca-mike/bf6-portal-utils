@@ -33,6 +33,10 @@ export declare namespace Timelines {
          */
         loop?: boolean | number;
         /**
+         * Optional yoyo flag: when `true` and `loop` is configured, alternates playback direction on each loop iteration.
+         */
+        yoyo?: boolean;
+        /**
          * Optional default minimum elapsed time in milliseconds between onUpdate invocations for child steps.
          */
         minUpdateDeltaMs?: number;
@@ -55,6 +59,8 @@ export declare namespace Timelines {
     interface BaseAnimationStepConfig {
         /** Starting numeric value (default: 0). */
         from?: number;
+        /** Optional start delay in milliseconds before this step begins updating. */
+        delayMs?: number;
         /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
         minUpdateDeltaMs?: number;
         /** Callback fired on every tick with the interpolated/current value. */

@@ -8,6 +8,7 @@ Key features include:
 
 - **Structure of Arrays Engine (`Animations`)** – Pooled state management using single-precision and unsigned TypedArrays (`Float32Array`, `Uint32Array`, `Uint16Array`, `Int16Array`) with dual-duty free-list state machines for zero GC pressure during continuous animation playback.
 - **Three Core Animation Drivers** – Native support for **Tween** (parametric easing), **Spring** (harmonic physics), and **Decay** (friction/inertia momentum).
+- **Start Delay Support (`delayMs`)** – Configurable start delay per animation to hold execution at initial state without allocating timers.
 - **Purely Functional ID-Based Control** – Returns unboxed primitive `AnimationID`s (or `null` when the pool is full) for zero heap allocations when starting or controlling animations.
 - **Update Rate Throttling (`minUpdateDeltaMs`)** – Configurable update frequency per animation to throttle server `onUpdate` execution while preserving accurate continuous physics and guaranteed completion frames.
 - **Server Uptime Delta-Time Scaling** – Measures high-precision frame deltas (`dt`) relative to server start time to ensure smooth and identical playback speed across 30Hz and 60Hz tick rates.
@@ -41,6 +42,7 @@ const animId = Animations.start({
     from: 0,
     to: 200,
     duration: 600, // ms
+    delayMs: 150, // optional start delay
     easing: Transitions.Easing.outExpo,
     onUpdate: (value) => {
         widget.width = value;

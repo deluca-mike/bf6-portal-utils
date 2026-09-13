@@ -46,6 +46,11 @@ export namespace Animations {
          */
         from: number;
         /**
+         * Optional start delay in milliseconds before the animation begins updating.
+         * When omitted or 0, the animation starts immediately on the next tick.
+         */
+        delayMs?: number;
+        /**
          * Optional minimum elapsed time in milliseconds between onUpdate invocations (throttling / update rate limit).
          * When omitted or 0, updates fire on every server tick.
          */
@@ -206,6 +211,7 @@ export namespace Animations {
 
     // Structure of Arrays (Time values in Uint32Array / Uint16Array based on server uptime milliseconds)
     const _durationMs = new Uint32Array(MAX_ANIMATIONS);
+    const _delayMs = new Uint32Array(MAX_ANIMATIONS);
     const _accumulatedMs = new Uint32Array(MAX_ANIMATIONS);
     const _lastResumeTime = new Uint32Array(MAX_ANIMATIONS);
     const _minUpdateDeltaMs = new Uint16Array(MAX_ANIMATIONS);
@@ -300,6 +306,7 @@ export namespace Animations {
     function _freeSlot(slot: number): void {
         _removeFromRunning(slot);
 
+        _delayMs[slot] = 0;
         _minUpdateDeltaMs[slot] = 0;
         _lastUpdateTime[slot] = 0;
         _onUpdate[slot] = null;
@@ -319,6 +326,13 @@ export namespace Animations {
     }
 
     function _tickSpring(slot: number, dtSec: number, now: number): void {
+        const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
+        const delay = _delayMs[slot];
+
+        if (totalElapsed < delay) {
+            return;
+        }
+
         const target = _to[slot];
         const precision = _precision[slot];
 
@@ -363,6 +377,13 @@ export namespace Animations {
     }
 
     function _tickDecay(slot: number, dtSec: number, now: number): void {
+        const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
+        const delay = _delayMs[slot];
+
+        if (totalElapsed < delay) {
+            return;
+        }
+
         Transitions.calculateDecay(
             _currentValue[slot],
             _velocity[slot],
@@ -400,8 +421,15 @@ export namespace Animations {
     }
 
     function _tickTween(slot: number, dtSec: number, now: number): void {
+        const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
+        const delay = _delayMs[slot];
+
+        if (totalElapsed < delay) {
+            return;
+        }
+
+        const elapsed = totalElapsed - delay;
         const duration = _durationMs[slot];
-        const elapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
         const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
 
         const easingFn = _easing[slot];
@@ -477,6 +505,7 @@ export namespace Animations {
         _currentValue[slot] = config.from;
         _velocity[slot] = 0;
         _durationMs[slot] = Math.max(0, config.duration);
+        _delayMs[slot] = Math.max(0, config.delayMs ?? 0);
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
         _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
@@ -510,6 +539,7 @@ export namespace Animations {
         _stiffnessOrDeceleration[slot] = config.stiffness ?? 170;
         _damping[slot] = config.damping ?? 26;
         _precision[slot] = config.precision ?? 0.001;
+        _delayMs[slot] = Math.max(0, config.delayMs ?? 0);
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
         _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);
@@ -543,6 +573,7 @@ export namespace Animations {
         _stiffnessOrDeceleration[slot] = config.deceleration ?? 0.997;
         _damping[slot] = 0;
         _precision[slot] = config.precision ?? 0.01;
+        _delayMs[slot] = Math.max(0, config.delayMs ?? 0);
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
         _minUpdateDeltaMs[slot] = Math.max(0, config.minUpdateDeltaMs ?? 0);

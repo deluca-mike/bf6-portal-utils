@@ -46,6 +46,10 @@ export namespace Timelines {
          */
         loop?: boolean | number;
         /**
+         * Optional yoyo flag: when `true` and `loop` is configured, alternates playback direction on each loop iteration.
+         */
+        yoyo?: boolean;
+        /**
          * Optional default minimum elapsed time in milliseconds between onUpdate invocations for child steps.
          */
         minUpdateDeltaMs?: number;
@@ -69,6 +73,8 @@ export namespace Timelines {
     export interface BaseAnimationStepConfig {
         /** Starting numeric value (default: 0). */
         from?: number;
+        /** Optional start delay in milliseconds before this step begins updating. */
+        delayMs?: number;
         /** Optional minimum elapsed time in milliseconds between onUpdate invocations. */
         minUpdateDeltaMs?: number;
         /** Callback fired on every tick with the interpolated/current value. */
@@ -165,9 +171,11 @@ export namespace Timelines {
     const FLAG_WAITING = 1 << 4;
     const FLAG_LOOP_INFINITE = 1 << 5;
     const FLAG_STEP_ANIMATING = 1 << 6;
+    const FLAG_YOYO = 1 << 7;
+    const FLAG_REVERSED = 1 << 8;
 
     // Slot state and generation tracking
-    const _flags = new Uint8Array(MAX_TIMELINES);
+    const _flags = new Uint16Array(MAX_TIMELINES);
     const _generations = new Uint16Array(MAX_TIMELINES);
 
     /**
@@ -248,6 +256,14 @@ export namespace Timelines {
 
     function _isInfinite(flags: number): boolean {
         return (flags & FLAG_LOOP_INFINITE) !== 0;
+    }
+
+    function _isYoyo(flags: number): boolean {
+        return (flags & FLAG_YOYO) !== 0;
+    }
+
+    function _isReversed(flags: number): boolean {
+        return (flags & FLAG_REVERSED) !== 0;
     }
 
     function _setFlag(slot: number, flag: number): void {
@@ -401,10 +417,15 @@ export namespace Timelines {
     function _executeTweenStep(slot: number, config: TweenStepConfig, now: number): void {
         _setFlag(slot, FLAG_STEP_ANIMATING);
 
+        const isReversed = _isReversed(_flags[slot]);
+        const from = isReversed ? (config.to ?? 1) : (config.from ?? 0);
+        const to = isReversed ? (config.from ?? 0) : (config.to ?? 1);
+
         const animId = Animations.start({
-            from: config.from ?? 0,
-            to: config.to ?? 1,
+            from,
+            to,
             duration: config.duration,
+            delayMs: config.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
             easing: config.easing,
             onUpdate: config.onUpdate,
@@ -425,13 +446,19 @@ export namespace Timelines {
     function _executeSpringStep(slot: number, config: SpringStepConfig, now: number): void {
         _setFlag(slot, FLAG_STEP_ANIMATING);
 
+        const isReversed = _isReversed(_flags[slot]);
+        const from = isReversed ? (config.to ?? 1) : (config.from ?? 0);
+        const to = isReversed ? (config.from ?? 0) : (config.to ?? 1);
+        const velocity = isReversed ? -(config.velocity ?? 0) : config.velocity;
+
         const animId = Animations.startSpring({
-            from: config.from ?? 0,
-            to: config.to ?? 1,
-            velocity: config.velocity,
+            from,
+            to,
+            velocity,
             stiffness: config.stiffness,
             damping: config.damping,
             precision: config.precision,
+            delayMs: config.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
             onUpdate: config.onUpdate,
             onComplete: () => {
@@ -451,11 +478,16 @@ export namespace Timelines {
     function _executeDecayStep(slot: number, config: DecayStepConfig, now: number): void {
         _setFlag(slot, FLAG_STEP_ANIMATING);
 
+        const isReversed = _isReversed(_flags[slot]);
+        const from = config.from ?? 0;
+        const velocity = isReversed ? -config.velocity : config.velocity;
+
         const animId = Animations.startDecay({
-            from: config.from ?? 0,
-            velocity: config.velocity,
+            from,
+            velocity,
             deceleration: config.deceleration,
             precision: config.precision,
+            delayMs: config.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
             onUpdate: config.onUpdate,
             onComplete: () => {
@@ -476,10 +508,15 @@ export namespace Timelines {
         slot: number,
         child: { type: 'tween' } & TweenStepConfig
     ): Animations.AnimationID | null {
+        const isReversed = _isReversed(_flags[slot]);
+        const from = isReversed ? (child.to ?? 1) : (child.from ?? 0);
+        const to = isReversed ? (child.from ?? 0) : (child.to ?? 1);
+
         const childAnimId = Animations.start({
-            from: child.from ?? 0,
-            to: child.to ?? 1,
+            from,
+            to,
             duration: child.duration,
+            delayMs: child.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
             easing: child.easing,
             onUpdate: child.onUpdate,
@@ -496,13 +533,19 @@ export namespace Timelines {
         slot: number,
         child: { type: 'spring' } & SpringStepConfig
     ): Animations.AnimationID | null {
+        const isReversed = _isReversed(_flags[slot]);
+        const from = isReversed ? (child.to ?? 1) : (child.from ?? 0);
+        const to = isReversed ? (child.from ?? 0) : (child.to ?? 1);
+        const velocity = isReversed ? -(child.velocity ?? 0) : child.velocity;
+
         const childAnimId = Animations.startSpring({
-            from: child.from ?? 0,
-            to: child.to ?? 1,
-            velocity: child.velocity,
+            from,
+            to,
+            velocity,
             stiffness: child.stiffness,
             damping: child.damping,
             precision: child.precision,
+            delayMs: child.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
             onUpdate: child.onUpdate,
             onComplete: () => {
@@ -518,11 +561,16 @@ export namespace Timelines {
         slot: number,
         child: { type: 'decay' } & DecayStepConfig
     ): Animations.AnimationID | null {
+        const isReversed = _isReversed(_flags[slot]);
+        const from = child.from ?? 0;
+        const velocity = isReversed ? -child.velocity : child.velocity;
+
         const childAnimId = Animations.startDecay({
-            from: child.from ?? 0,
-            velocity: child.velocity,
+            from,
+            velocity,
             deceleration: child.deceleration,
             precision: child.precision,
+            delayMs: child.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
             onUpdate: child.onUpdate,
             onComplete: () => {
@@ -579,13 +627,24 @@ export namespace Timelines {
         }
 
         if (_isInfinite(_flags[slot]) || completed < _targetLoops[slot]) {
-            _currentStep[slot] = 0;
+            if (_isYoyo(_flags[slot])) {
+                if (_isReversed(_flags[slot])) {
+                    _clearFlag(slot, FLAG_REVERSED);
+                    _currentStep[slot] = 0;
+                } else {
+                    _setFlag(slot, FLAG_REVERSED);
+                    _currentStep[slot] = _steps[slot].length - 1;
+                }
+            } else {
+                _currentStep[slot] = 0;
+            }
             _startCurrentStep(slot, now);
             return;
         }
 
         // Full completion
         _clearFlag(slot, FLAG_RUNNING);
+        _clearFlag(slot, FLAG_REVERSED);
         _setFlag(slot, FLAG_COMPLETE);
 
         const onCompleteCb = _onComplete[slot];
@@ -599,8 +658,9 @@ export namespace Timelines {
     function _startCurrentStep(slot: number, now: number): void {
         const stepList = _steps[slot];
         const stepIdx = _currentStep[slot];
+        const isReversed = _isReversed(_flags[slot]);
 
-        if (stepIdx >= stepList.length) {
+        if (isReversed ? stepIdx < 0 : stepIdx >= stepList.length) {
             _handleTimelineIterationComplete(slot, now);
             return;
         }
@@ -640,7 +700,11 @@ export namespace Timelines {
     function _advanceStep(slot: number, now: number): void {
         if (!_isInUse(_flags[slot]) || !_isRunning(_flags[slot])) return;
 
-        ++_currentStep[slot];
+        if (_isReversed(_flags[slot])) {
+            --_currentStep[slot];
+        } else {
+            ++_currentStep[slot];
+        }
         _startCurrentStep(slot, now);
     }
 
@@ -687,6 +751,10 @@ export namespace Timelines {
             flags |= FLAG_LOOP_INFINITE;
         } else if (typeof config?.loop === 'number' && config.loop > 0) {
             targetLoops = Math.floor(config.loop);
+        }
+
+        if (config?.yoyo === true) {
+            flags |= FLAG_YOYO;
         }
 
         _flags[slot] = flags;
@@ -955,7 +1023,7 @@ export namespace Timelines {
         if (slot === INVALID_INDEX) return false;
 
         _stopActiveChildAnimations(slot);
-        _clearFlag(slot, FLAG_PAUSED | FLAG_WAITING | FLAG_STEP_ANIMATING | FLAG_COMPLETE);
+        _clearFlag(slot, FLAG_PAUSED | FLAG_WAITING | FLAG_STEP_ANIMATING | FLAG_COMPLETE | FLAG_REVERSED);
         _currentStep[slot] = 0;
         _completedLoops[slot] = 0;
         _stepElapsedMs[slot] = 0;
