@@ -68,6 +68,9 @@ export namespace UI {
     const ANCHOR_SHIFT = 9;
     const ANCHOR_MASK = 0xf; // 4 bits (0..8)
 
+    const RECEIVER_GLOBAL = 164;
+    const RECEIVER_TEAM_OFFSET = 100;
+
     /****** SoA Buffers ******/
 
     const _flags = new Uint16Array(MAX_ELEMENTS);
@@ -83,8 +86,20 @@ export namespace UI {
     const _bgRgba = new Uint32Array(MAX_ELEMENTS);
 
     const _nativeWidgets = new Array<mod.UIWidget | null>(MAX_ELEMENTS);
-    const _receivers = new Array<Receiver<mod.Player | mod.Team | undefined> | null>(MAX_ELEMENTS);
     const _instances = new Array<Element | null>(MAX_ELEMENTS);
+
+    /**
+     * Target receiver IDs per UI element slot:
+     * - 0..99: Player receiver (player object ID 0..99)
+     * - 100..163: Team receiver (team object ID 0..63, offset by +100)
+     * - 164: Global receiver (all players and teams)
+     *
+     * NOTE: Currently allocated as a dedicated Uint8Array to save memory over a Uint32Array
+     * _flags. If more element flags are added in the future and _flags is expanded from
+     * Uint16Array to Uint32Array, these 8 bits can be packed directly into 8 unused bits of
+     * _flags to save an additional 2 KB.
+     */
+    const _receiverIds = new Uint8Array(MAX_ELEMENTS);
 
     // Intrusive free-list initialization for elements (array slots 0..MAX_ELEMENTS-1)
     for (let i = 0; i < MAX_ELEMENTS - 1; ++i) {
@@ -95,7 +110,7 @@ export namespace UI {
     _parents.fill(INVALID_INDEX);
     _firstChild.fill(INVALID_INDEX);
     _nativeWidgets.fill(null);
-    _receivers.fill(null);
+    _receiverIds.fill(RECEIVER_GLOBAL);
     _instances.fill(null);
 
     let _firstFree = 0;
@@ -337,7 +352,7 @@ export namespace UI {
         _flags[slot] = 0;
         _bgRgba[slot] = 0;
         _nativeWidgets[slot] = null;
-        _receivers[slot] = null;
+        _receiverIds[slot] = RECEIVER_GLOBAL;
         _instances[slot] = null;
         _parents[slot] = INVALID_INDEX;
         _firstChild[slot] = INVALID_INDEX;
@@ -632,6 +647,15 @@ export namespace UI {
         public static clear(id: number): void {
             TeamReceiver._instances[id] = null;
         }
+
+        /**
+         * Retrieves the cached receiver for a given team ID if it exists.
+         * @param id - The team object ID.
+         * @returns The cached team receiver instance or null.
+         */
+        public static getById(id: number): TeamReceiver | null {
+            return TeamReceiver._instances[id] ?? null;
+        }
     }
 
     /**
@@ -665,6 +689,33 @@ export namespace UI {
         public static clear(id: number): void {
             PlayerReceiver._instances[id] = null;
         }
+
+        /**
+         * Retrieves the cached receiver for a given player ID if it exists.
+         * @param id - The player object ID.
+         * @returns The cached player receiver instance or null.
+         */
+        public static getById(id: number): PlayerReceiver | null {
+            return PlayerReceiver._instances[id] ?? null;
+        }
+    }
+
+    function _getReceiver(slot: number): Receiver<mod.Player | mod.Team | undefined> {
+        const id = _receiverIds[slot];
+
+        if (id === RECEIVER_GLOBAL) return _globalReceiver;
+
+        if (id >= RECEIVER_TEAM_OFFSET) return TeamReceiver.getById(id - RECEIVER_TEAM_OFFSET) ?? _globalReceiver;
+
+        return PlayerReceiver.getById(id) ?? _globalReceiver;
+    }
+
+    function _encodeReceiver(receiver: Receiver<mod.Player | mod.Team | undefined>): number {
+        if (receiver instanceof PlayerReceiver) return mod.GetObjId(receiver.nativeReceiver);
+
+        if (receiver instanceof TeamReceiver) return RECEIVER_TEAM_OFFSET + mod.GetObjId(receiver.nativeReceiver);
+
+        return RECEIVER_GLOBAL;
     }
 
     /**
@@ -743,7 +794,7 @@ export namespace UI {
 
             if (slot === INVALID_INDEX) return undefined;
 
-            return _receivers[slot]?.nativeReceiver ?? null;
+            return _getReceiver(slot).nativeReceiver ?? null;
         }
     }
 
@@ -897,7 +948,7 @@ export namespace UI {
         }
 
         protected get _receiver(): Receiver<mod.Player | mod.Team | undefined> | undefined {
-            return this._slot !== INVALID_INDEX ? (_receivers[this._slot] ?? undefined) : undefined;
+            return this._slot !== INVALID_INDEX ? _getReceiver(this._slot) : undefined;
         }
 
         protected get _firstChild(): number {
@@ -960,7 +1011,7 @@ export namespace UI {
             const bgColor = params.bgColor ?? Colors.WHITE;
             const bgAlpha = params.bgAlpha ?? 0;
 
-            _receivers[slot] = receiver;
+            _receiverIds[slot] = _encodeReceiver(receiver);
             _instances[slot] = this;
 
             _x[slot] = x;
@@ -1074,10 +1125,10 @@ export namespace UI {
             const parentSlot = _resolveNodeSlot(parent);
 
             if (!receiverParam) {
-                return (parentSlot !== INVALID_INDEX ? _receivers[parentSlot] : undefined) ?? _globalReceiver;
+                return (parentSlot !== INVALID_INDEX ? _getReceiver(parentSlot) : undefined) ?? _globalReceiver;
             }
 
-            const parentReceiver = parentSlot !== INVALID_INDEX ? _receivers[parentSlot] : undefined;
+            const parentReceiver = parentSlot !== INVALID_INDEX ? _getReceiver(parentSlot) : undefined;
 
             if (isTeam(receiverParam)) {
                 const receiver = TeamReceiver.getInstance(receiverParam);
@@ -1219,10 +1270,10 @@ export namespace UI {
 
             if (visible && !hasInputMode) {
                 _setFlag(slot, FLAG_HAS_INPUT_MODE);
-                _receivers[slot]?.addInputModeRequester();
+                _getReceiver(slot).addInputModeRequester();
             } else if (!visible && hasInputMode) {
                 _clearFlag(slot, FLAG_HAS_INPUT_MODE);
-                _receivers[slot]?.removeInputModeRequester();
+                _getReceiver(slot).removeInputModeRequester();
             }
 
             return this;
@@ -1279,7 +1330,7 @@ export namespace UI {
 
             // 3. Remove input mode requester if active
             if (_hasInputMode(slot)) {
-                _receivers[slot]?.removeInputModeRequester();
+                _getReceiver(slot).removeInputModeRequester();
             }
 
             // 4. Delete native widget
@@ -1749,10 +1800,10 @@ export namespace UI {
 
             if (newValue && isVisible && !hasInputMode) {
                 _setFlag(slot, FLAG_HAS_INPUT_MODE);
-                _receivers[slot]?.addInputModeRequester();
+                _getReceiver(slot).addInputModeRequester();
             } else if ((!newValue || !isVisible) && hasInputMode) {
                 _clearFlag(slot, FLAG_HAS_INPUT_MODE);
-                _receivers[slot]?.removeInputModeRequester();
+                _getReceiver(slot).removeInputModeRequester();
             }
 
             return this;
