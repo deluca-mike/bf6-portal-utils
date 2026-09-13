@@ -211,7 +211,7 @@ export declare namespace Logger {
         /**
          * The background color of the logger.
          */
-        bgColor?: mod.Vector;
+        bgColor?: UI.Color;
         /**
          * The background alpha of the logger.
          */
@@ -223,7 +223,7 @@ export declare namespace Logger {
         /**
          * The text color of the logger.
          */
-        textColor?: mod.Vector;
+        textColor?: UI.Color;
         /**
          * Whether to show the logger.
          */

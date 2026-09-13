@@ -46,9 +46,9 @@ button.enabled = false;
 | --- | --- | --- |
 | All parameters from `UIBaseButton.Params`, plus: |
 | `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
-| `imageColor` | `mod.Vector = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
+| `imageColor` | `UI.Color = UI.COLORS.WHITE` | Image color tint (used when button is enabled). |
 | `imageAlpha` | `number = 1` | Image opacity (used when button is enabled). |
-| `imageDisabledColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
+| `imageDisabledColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Image color when button is disabled. |
 | `imageDisabledAlpha` | `number = 1` | Image opacity when button is disabled. |
 | `padding` | `number = 0` | Container padding. |
 
@@ -62,9 +62,9 @@ For a complete list of `UIBaseButton.Params`, see the [UIBaseButton documentatio
 
 `UIImageButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill` (delegated from button)
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`
@@ -78,9 +78,9 @@ All button properties are forwarded to the underlying button widget:
 
 - **Button State**: `enabled`
 - **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Colors**: `baseColor`, `getBaseColor(out?)`, `disabledColor`, `getDisabledColor(out?)`, `pressedColor`, `getPressedColor(out?)`, `focusedColor`, `getFocusedColor(out?)`
 - **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill` (delegated from button)
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill` (delegated from button)
 
 ### Delegated from Internal Image
 
@@ -88,9 +88,9 @@ All button properties are forwarded to the underlying button widget:
 
 ### ImageButton-Specific
 
-- **`imageColor: mod.Vector`** (getter/setter) – Image color tint (used when button is enabled).
+- **`imageColor: UI.Color`** (getter/setter) – Image color tint (used when button is enabled). Supports zero-allocation `getImageColor(out?)`.
 - **`imageAlpha: number`** (getter/setter) – Image opacity (used when button is enabled).
-- **`imageDisabledColor: mod.Vector`** (getter/setter) – Image color when button is disabled.
+- **`imageDisabledColor: UI.Color`** (getter/setter) – Image color when button is disabled. Supports zero-allocation `getImageDisabledColor(out?)`.
 - **`imageDisabledAlpha: number`** (getter/setter) – Image opacity when button is disabled.
 - **`padding: number`** (getter/setter) – Container padding.
 
@@ -110,7 +110,7 @@ All button properties are forwarded to the underlying button widget:
 ```ts
 type Params = UIContentButton.Params &
     UIImage.Params & {
-        imageDisabledColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_2
+        imageDisabledColor?: UI.Color; // Default: UI.COLORS.BF_GREY_2
         imageDisabledAlpha?: number; // Default: 1
     };
 ```

@@ -1,6 +1,7 @@
 import './mockMod.ts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import jsQR from 'jsqr';
+import { Colors } from '../../colors/index.ts';
 import { UI } from '../index.ts';
 import { UIQRCode } from '../components/qr-code/index.ts';
 import { mockWidgets, resetMockState } from './mockMod.ts';
@@ -292,10 +293,10 @@ describe('UIQRCode Component', () => {
             });
 
             qr.setDarkColor(UI.COLORS.BLUE);
-            expect(qr.darkColor).toBe(UI.COLORS.BLUE);
+            expect(Colors.equals(qr.darkColor!, UI.COLORS.BLUE, 0.005)).toBe(true);
 
             qr.setLightColor(UI.COLORS.GREY_25);
-            expect(qr.lightColor).toBe(UI.COLORS.GREY_25);
+            expect(Colors.equals(qr.lightColor!, UI.COLORS.GREY_25, 0.005)).toBe(true);
 
             qr.delete();
         });

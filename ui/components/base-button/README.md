@@ -80,13 +80,13 @@ type Handlers = {
 ```ts
 type Styling = {
     enabled?: boolean;
-    baseColor?: mod.Vector;
+    baseColor?: UI.Color;
     baseAlpha?: number;
-    disabledColor?: mod.Vector;
+    disabledColor?: UI.Color;
     disabledAlpha?: number;
-    pressedColor?: mod.Vector;
+    pressedColor?: UI.Color;
     pressedAlpha?: number;
-    focusedColor?: mod.Vector;
+    focusedColor?: UI.Color;
     focusedAlpha?: number;
 };
 ```

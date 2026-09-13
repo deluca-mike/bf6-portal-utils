@@ -49,14 +49,14 @@ image.imageAlpha = 0.8;
 | `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
-| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Background color. |
+| `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
 | `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
 | `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `imageType` | `mod.UIImageType` | **Required.** The type of image to display. |
-| `imageColor` | `mod.Vector = UI.COLORS.WHITE` | Image color tint. |
+| `imageColor` | `UI.Color = UI.COLORS.WHITE` | Image color tint. |
 | `imageAlpha` | `number = 1` | Image opacity. |
 
 ---
@@ -67,9 +67,9 @@ image.imageAlpha = 0.8;
 
 `UIImage` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`
@@ -80,7 +80,7 @@ For complete documentation of these properties, see the [main UI documentation](
 ### Image-Specific
 
 - **`imageType: mod.UIImageType`** (getter/setter) – The type of image to display.
-- **`imageColor: mod.Vector`** (getter/setter) – Image color tint.
+- **`imageColor: UI.Color`** (getter/setter) – Image color tint. Supports zero-allocation `getImageColor(out?)`.
 - **`imageAlpha: number`** (getter/setter) – Image opacity.
 
 ---
@@ -92,7 +92,7 @@ For complete documentation of these properties, see the [main UI documentation](
 ```ts
 type Params = UI.ElementParams & {
     imageType: mod.UIImageType; // Required (no default)
-    imageColor?: mod.Vector; // Default: UI.COLORS.WHITE
+    imageColor?: UI.Color; // Default: UI.COLORS.WHITE
     imageAlpha?: number; // Default: 1
 };
 ```

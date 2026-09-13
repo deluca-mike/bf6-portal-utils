@@ -14,6 +14,8 @@ This repository is organized into focused modules, each addressing specific deve
 
 - **[Clocks Module](./clocks/)** – Provides **CountUpClock** (stopwatch) and **CountDownClock** (timer) classes for match timers, round timers, or bomb fuse countdowns. Both are efficient and drift-resistant, with callbacks for `onSecond`, `onMinute`, and `onComplete`. Time is tracked at whole-second boundaries to minimize drift; callback errors are caught and logged so they cannot break the clock.
 
+- **[Colors Module](./colors/)** – Transparent `{ r, g, b }` color representation with arithmetic, linear interpolation (`lerp`), relative luminance, perceptual distance, format conversions (hex, opaque `mod.Vector`, `Vectors.Vector3`), and a rich set of frozen palette constants for UI design.
+
 - **[Events Module](./events/)** – A centralized event subscription system that allows multiple handlers to subscribe to the same Battlefield Portal event. This module implements all handlers once and exposes a subscription API, enabling modular code organization, clean separation of concerns, and ensures various handlers execute asynchronously without blocking each other.
 
 - **[FFA Drop-Ins Module](./ffa-drop-ins/)** – Enables Free For All (FFA) spawning with a custom UI prompt and developer-curated drop-in spawn points. You define rectangular regions and an altitude; players spawn in the air and skydive or parachute down. Supports "spawn now" or "ask again after a delay," with configurable queue processing. No safe-distance logic—spawns are distributed across the region.

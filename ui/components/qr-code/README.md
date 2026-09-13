@@ -92,9 +92,9 @@ const qrCode = new UIQRCode({
 | `ecc` | `UIQRCode.ECC = UIQRCode.ECC.Medium` | Error correction level when `text` is supplied (`'L'`, `'M'`, `'Q'`, `'H'`). |
 | `scale` | `number = 1` | Scale multiplier. When `1`, the smallest module is 10 units wide/tall. When `2`, it is 20 units. |
 | `margin` | `number = 0` | Quiet zone margin around the QR code in module units. |
-| `darkColor` | `mod.Vector = UI.COLORS.BLACK` | Color vector for dark modules. |
+| `darkColor` | `UI.Color = UI.COLORS.BLACK` | Color for dark modules. |
 | `darkAlpha` | `number = 1` | Opacity for dark modules. |
-| `lightColor` | `mod.Vector = UI.COLORS.WHITE` | Color vector for light modules and background canvas. |
+| `lightColor` | `UI.Color = UI.COLORS.WHITE` | Color for light modules and background canvas. |
 | `lightAlpha` | `number = 1` | Opacity for light modules and background canvas. |
 | `x`, `y` | `number = 0` | Position relative to `anchor`. Mutually exclusive with `position`. |
 | `position` | `UI.Position \| undefined` | Position as `{ x: number; y: number }`. Mutually exclusive with `x`/`y`. |
@@ -115,8 +115,9 @@ const qrCode = new UIQRCode({
 
 `UIQRCode` inherits all properties and methods from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `setX()`, `setY()`, `setWidth()`, `setHeight()`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`, `setX()`, `setY()`, `setWidth()`, `setHeight()`
 - **Visibility**: `visible`, `setVisible()`, `show()`, `hide()`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout & Depth**: `anchor`, `depth`
 - **Parent Management**: `parent`, `setParent()`
 - **Lifecycle**: `delete()`, `isDeleted`
@@ -132,10 +133,10 @@ const qrCode = new UIQRCode({
 - **`setScale(scale: number): this`** – Sets scale and re-renders child rectangles.
 - **`margin: number | undefined`** (getter/setter) – Quiet zone margin count.
 - **`setMargin(margin: number): this`** – Sets margin and re-renders child rectangles.
-- **`darkColor: mod.Vector | undefined`** (getter/setter) – Dark module color.
-- **`setDarkColor(color: mod.Vector): this`** – Sets dark module color and re-renders.
-- **`lightColor: mod.Vector | undefined`** (getter/setter) – Light module / background color.
-- **`setLightColor(color: mod.Vector): this`** – Sets light module color and re-renders.
+- **`darkColor: UI.Color | undefined`** (getter/setter) – Dark module color. Supports zero-allocation `getDarkColor(out?)`.
+- **`setDarkColor(color: UI.Color): this`** – Sets dark module color and re-renders.
+- **`lightColor: UI.Color | undefined`** (getter/setter) – Light module / background color. Supports zero-allocation `getLightColor(out?)`.
+- **`setLightColor(color: UI.Color): this`** – Sets light module color and re-renders.
 - **`setText(text: string, ecc?: UIQRCode.ECC): this`** – Dynamically updates content and re-encodes.
 - **`setMatrix(matrix: UIQRCode.Matrix): this`** – Dynamically updates 2D matrix and re-renders.
 

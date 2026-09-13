@@ -1,9 +1,14 @@
 import { CallbackHandler } from '../callback-handler/index.ts';
+import { Colors } from '../colors/index.ts';
 import { Events } from '../events/index.ts';
 import { Logging } from '../logging/index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export namespace UI {
+    /**
+     * A transparent 3-channel RGB color.
+     */
+    export type Color = Colors.Color;
     /****** Logging ******/
 
     const logging = new Logging('UI');
@@ -51,15 +56,21 @@ export namespace UI {
         return _activeElementCount;
     }
 
-    // Bitflags for _flags
-    const FLAG_IN_USE = 1 << 0; // 0x01
-    const FLAG_VISIBLE = 1 << 1; // 0x02
-    const FLAG_HAS_INPUT_MODE = 1 << 2; // 0x04
-    const FLAG_UI_INPUT_MODE_WHEN_VISIBLE = 1 << 3; // 0x08
+    // Bitflags and bitfield shifts/masks for _flags (Uint16Array)
+    const FLAG_IN_USE = 1 << 0; // 0x0001
+    const FLAG_VISIBLE = 1 << 1; // 0x0002
+    const FLAG_HAS_INPUT_MODE = 1 << 2; // 0x0004
+    const FLAG_UI_INPUT_MODE_WHEN_VISIBLE = 1 << 3; // 0x0008
+    const DEPTH_SHIFT = 4;
+    const DEPTH_MASK = 0x1; // 1 bit (0: AboveGameUI, 1: BelowGameUI)
+    const BG_FILL_SHIFT = 5;
+    const BG_FILL_MASK = 0xf; // 4 bits (0..8)
+    const ANCHOR_SHIFT = 9;
+    const ANCHOR_MASK = 0xf; // 4 bits (0..8)
 
     /****** SoA Buffers ******/
 
-    const _flags = new Uint8Array(MAX_ELEMENTS);
+    const _flags = new Uint16Array(MAX_ELEMENTS);
     const _generations = new Uint16Array(MAX_ELEMENTS);
     const _parents = new Int16Array(MAX_ELEMENTS);
     const _firstChild = new Int16Array(MAX_ELEMENTS);
@@ -69,6 +80,7 @@ export namespace UI {
     const _y = new Float32Array(MAX_ELEMENTS);
     const _width = new Float32Array(MAX_ELEMENTS);
     const _height = new Float32Array(MAX_ELEMENTS);
+    const _bgRgba = new Uint32Array(MAX_ELEMENTS);
 
     const _nativeWidgets = new Array<mod.UIWidget | null>(MAX_ELEMENTS);
     const _receivers = new Array<Receiver<mod.Player | mod.Team | undefined> | null>(MAX_ELEMENTS);
@@ -128,6 +140,183 @@ export namespace UI {
 
     function _isUIInputModeWhenVisible(slot: number): boolean {
         return _hasFlag(slot, FLAG_UI_INPUT_MODE_WHEN_VISIBLE);
+    }
+
+    function _encodeAnchor(anchor: mod.UIAnchor): number {
+        switch (anchor) {
+            case mod.UIAnchor.TopLeft:
+                return 0;
+            case mod.UIAnchor.TopCenter:
+                return 1;
+            case mod.UIAnchor.TopRight:
+                return 2;
+            case mod.UIAnchor.CenterLeft:
+                return 3;
+            case mod.UIAnchor.Center:
+                return 4;
+            case mod.UIAnchor.CenterRight:
+                return 5;
+            case mod.UIAnchor.BottomLeft:
+                return 6;
+            case mod.UIAnchor.BottomCenter:
+                return 7;
+            case mod.UIAnchor.BottomRight:
+                return 8;
+            default:
+                return 4;
+        }
+    }
+
+    function _decodeAnchor(code: number): mod.UIAnchor {
+        switch (code) {
+            case 0:
+                return mod.UIAnchor.TopLeft;
+            case 1:
+                return mod.UIAnchor.TopCenter;
+            case 2:
+                return mod.UIAnchor.TopRight;
+            case 3:
+                return mod.UIAnchor.CenterLeft;
+            case 4:
+                return mod.UIAnchor.Center;
+            case 5:
+                return mod.UIAnchor.CenterRight;
+            case 6:
+                return mod.UIAnchor.BottomLeft;
+            case 7:
+                return mod.UIAnchor.BottomCenter;
+            case 8:
+                return mod.UIAnchor.BottomRight;
+            default:
+                return mod.UIAnchor.Center;
+        }
+    }
+
+    function _encodeBgFill(fill: mod.UIBgFill): number {
+        switch (fill) {
+            case mod.UIBgFill.None:
+                return 0;
+            case mod.UIBgFill.Solid:
+                return 1;
+            case mod.UIBgFill.Blur:
+                return 2;
+            case mod.UIBgFill.GradientBottom:
+                return 3;
+            case mod.UIBgFill.GradientLeft:
+                return 4;
+            case mod.UIBgFill.GradientRight:
+                return 5;
+            case mod.UIBgFill.GradientTop:
+                return 6;
+            case mod.UIBgFill.OutlineThick:
+                return 7;
+            case mod.UIBgFill.OutlineThin:
+                return 8;
+            default:
+                return 0;
+        }
+    }
+
+    function _decodeBgFill(code: number): mod.UIBgFill {
+        switch (code) {
+            case 0:
+                return mod.UIBgFill.None;
+            case 1:
+                return mod.UIBgFill.Solid;
+            case 2:
+                return mod.UIBgFill.Blur;
+            case 3:
+                return mod.UIBgFill.GradientBottom;
+            case 4:
+                return mod.UIBgFill.GradientLeft;
+            case 5:
+                return mod.UIBgFill.GradientRight;
+            case 6:
+                return mod.UIBgFill.GradientTop;
+            case 7:
+                return mod.UIBgFill.OutlineThick;
+            case 8:
+                return mod.UIBgFill.OutlineThin;
+            default:
+                return mod.UIBgFill.None;
+        }
+    }
+
+    function _encodeDepth(depth: mod.UIDepth): number {
+        return depth === mod.UIDepth.BelowGameUI ? 1 : 0;
+    }
+
+    function _decodeDepth(code: number): mod.UIDepth {
+        return code === 1 ? mod.UIDepth.BelowGameUI : mod.UIDepth.AboveGameUI;
+    }
+
+    function _setAnchor(slot: number, anchor: mod.UIAnchor): void {
+        const code = _encodeAnchor(anchor);
+        _flags[slot] = (_flags[slot] & ~(ANCHOR_MASK << ANCHOR_SHIFT)) | ((code & ANCHOR_MASK) << ANCHOR_SHIFT);
+    }
+
+    function _getAnchor(slot: number): mod.UIAnchor {
+        const code = (_flags[slot] >>> ANCHOR_SHIFT) & ANCHOR_MASK;
+        return _decodeAnchor(code);
+    }
+
+    function _setBgFill(slot: number, fill: mod.UIBgFill): void {
+        const code = _encodeBgFill(fill);
+        _flags[slot] = (_flags[slot] & ~(BG_FILL_MASK << BG_FILL_SHIFT)) | ((code & BG_FILL_MASK) << BG_FILL_SHIFT);
+    }
+
+    function _getBgFill(slot: number): mod.UIBgFill {
+        const code = (_flags[slot] >>> BG_FILL_SHIFT) & BG_FILL_MASK;
+        return _decodeBgFill(code);
+    }
+
+    function _setDepth(slot: number, depth: mod.UIDepth): void {
+        const code = _encodeDepth(depth);
+        _flags[slot] = (_flags[slot] & ~(DEPTH_MASK << DEPTH_SHIFT)) | ((code & DEPTH_MASK) << DEPTH_SHIFT);
+    }
+
+    function _getDepth(slot: number): mod.UIDepth {
+        const code = (_flags[slot] >>> DEPTH_SHIFT) & DEPTH_MASK;
+        return _decodeDepth(code);
+    }
+
+    function _setBgRgba(slot: number, color: Colors.Color, alpha: number): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        _bgRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    function _setBgColor(slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = _bgRgba[slot] & 0xff;
+        _bgRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    function _setBgAlpha(slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        _bgRgba[slot] = (_bgRgba[slot] & ~0xff) | aInt;
+    }
+
+    function _getBgColor(slot: number, out?: Colors.Color): Colors.Color {
+        const rgba = _bgRgba[slot];
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+        return { r, g, b };
+    }
+
+    function _getBgAlpha(slot: number): number {
+        return (_bgRgba[slot] & 0xff) / 255;
     }
 
     /**
@@ -229,6 +418,7 @@ export namespace UI {
 
     function _freeSlot(slot: number): void {
         _flags[slot] = 0;
+        _bgRgba[slot] = 0;
         _nativeWidgets[slot] = null;
         _receivers[slot] = null;
         _instances[slot] = null;
@@ -336,7 +526,7 @@ export namespace UI {
         anchor?: mod.UIAnchor;
         parent?: Parent;
         visible?: boolean;
-        bgColor?: mod.Vector;
+        bgColor?: Colors.Color;
         bgAlpha?: number;
         bgFill?: mod.UIBgFill;
         depth?: mod.UIDepth;
@@ -596,6 +786,7 @@ export namespace UI {
 
         /**
          * @inheritdoc
+         * @returns The root UI widget.
          */
         protected override get _uiWidget(): mod.UIWidget {
             return _getRootNativeWidget();
@@ -603,6 +794,7 @@ export namespace UI {
 
         /**
          * @inheritdoc
+         * @returns null.
          */
         public override get receiver(): null {
             return null;
@@ -791,6 +983,11 @@ export namespace UI {
             const { width, height } = Element._getSize(params);
             const visible = params.visible ?? true;
             const uiInputModeWhenVisible = params.uiInputModeWhenVisible ?? false;
+            const anchor = params.anchor ?? mod.UIAnchor.Center;
+            const bgFill = params.bgFill ?? mod.UIBgFill.None;
+            const depth = params.depth ?? mod.UIDepth.AboveGameUI;
+            const bgColor = params.bgColor ?? Colors.WHITE;
+            const bgAlpha = params.bgAlpha ?? 0;
 
             _receivers[slot] = receiver;
             _instances[slot] = this;
@@ -801,6 +998,9 @@ export namespace UI {
             _height[slot] = height;
 
             let flags = FLAG_IN_USE;
+            flags |= (_encodeDepth(depth) & DEPTH_MASK) << DEPTH_SHIFT;
+            flags |= (_encodeBgFill(bgFill) & BG_FILL_MASK) << BG_FILL_SHIFT;
+            flags |= (_encodeAnchor(anchor) & ANCHOR_MASK) << ANCHOR_SHIFT;
 
             if (visible) {
                 flags |= FLAG_VISIBLE;
@@ -816,6 +1016,7 @@ export namespace UI {
             }
 
             _flags[slot] = flags;
+            _setBgRgba(slot, bgColor, bgAlpha);
 
             _attachChild(_resolveNodeSlotAndLogWarning(parent), slot);
         }
@@ -1344,15 +1545,28 @@ export namespace UI {
          * The background color of the element, or undefined if deleted.
          * @returns The background color of the element, or undefined.
          */
-        public get bgColor(): mod.Vector | undefined {
-            return this._isValid ? mod.GetUIWidgetBgColor(this._uiWidget) : undefined;
+        public get bgColor(): Color | undefined {
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getBgColor(slot);
+        }
+
+        /**
+         * Retrieves the background color of the element into an optional target Color object for zero-allocation reuse.
+         * @param out - Optional target Color to write into.
+         * @returns The background color, or undefined if deleted.
+         */
+        public getBgColor(out?: Color): Color | undefined {
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getBgColor(slot, out);
         }
 
         /**
          * Sets the background color of the element.
          * @param color - The background color to set.
          */
-        public set bgColor(color: mod.Vector) {
+        public set bgColor(color: Color) {
             this.setBgColor(color);
         }
 
@@ -1361,10 +1575,13 @@ export namespace UI {
          * @param color - The background color to set.
          * @returns This element for chaining.
          */
-        public setBgColor(color: mod.Vector): this {
-            if (this._getIsInvalidAndLogWarning()) return this;
+        public setBgColor(color: Color): this {
+            const slot = this._getSlotAndLogWarning();
 
-            mod.SetUIWidgetBgColor(this._uiWidget, color);
+            if (slot === INVALID_INDEX) return this;
+
+            _setBgColor(slot, color);
+            mod.SetUIWidgetBgColor(this._uiWidget, Colors.toVector(color));
 
             return this;
         }
@@ -1374,7 +1591,9 @@ export namespace UI {
          * @returns The background alpha of the element, or undefined.
          */
         public get bgAlpha(): number | undefined {
-            return this._isValid ? mod.GetUIWidgetBgAlpha(this._uiWidget) : undefined;
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getBgAlpha(slot);
         }
 
         /**
@@ -1391,8 +1610,11 @@ export namespace UI {
          * @returns This element for chaining.
          */
         public setBgAlpha(alpha: number): this {
-            if (this._getIsInvalidAndLogWarning()) return this;
+            const slot = this._getSlotAndLogWarning();
 
+            if (slot === INVALID_INDEX) return this;
+
+            _setBgAlpha(slot, alpha);
             mod.SetUIWidgetBgAlpha(this._uiWidget, alpha);
 
             return this;
@@ -1403,7 +1625,9 @@ export namespace UI {
          * @returns The background fill of the element, or undefined.
          */
         public get bgFill(): mod.UIBgFill | undefined {
-            return this._isValid ? mod.GetUIWidgetBgFill(this._uiWidget) : undefined;
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getBgFill(slot);
         }
 
         /**
@@ -1420,8 +1644,11 @@ export namespace UI {
          * @returns This element for chaining.
          */
         public setBgFill(fill: mod.UIBgFill): this {
-            if (this._getIsInvalidAndLogWarning()) return this;
+            const slot = this._getSlotAndLogWarning();
 
+            if (slot === INVALID_INDEX) return this;
+
+            _setBgFill(slot, fill);
             mod.SetUIWidgetBgFill(this._uiWidget, fill);
 
             return this;
@@ -1432,7 +1659,9 @@ export namespace UI {
          * @returns The depth of the element, or undefined.
          */
         public get depth(): mod.UIDepth | undefined {
-            return this._isValid ? mod.GetUIWidgetDepth(this._uiWidget) : undefined;
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getDepth(slot);
         }
 
         /**
@@ -1449,8 +1678,11 @@ export namespace UI {
          * @returns This element for chaining.
          */
         public setDepth(depth: mod.UIDepth): this {
-            if (this._getIsInvalidAndLogWarning()) return this;
+            const slot = this._getSlotAndLogWarning();
 
+            if (slot === INVALID_INDEX) return this;
+
+            _setDepth(slot, depth);
             mod.SetUIWidgetDepth(this._uiWidget, depth);
 
             return this;
@@ -1461,7 +1693,9 @@ export namespace UI {
          * @returns The anchor of the element, or undefined.
          */
         public get anchor(): mod.UIAnchor | undefined {
-            return this._isValid ? mod.GetUIWidgetAnchor(this._uiWidget) : undefined;
+            const slot = this._slot;
+
+            return slot === INVALID_INDEX ? undefined : _getAnchor(slot);
         }
 
         /**
@@ -1478,8 +1712,11 @@ export namespace UI {
          * @returns This element for chaining.
          */
         public setAnchor(anchor: mod.UIAnchor): this {
-            if (this._getIsInvalidAndLogWarning()) return this;
+            const slot = this._getSlotAndLogWarning();
 
+            if (slot === INVALID_INDEX) return this;
+
+            _setAnchor(slot, anchor);
             mod.SetUIWidgetAnchor(this._uiWidget, anchor);
 
             return this;
@@ -1537,34 +1774,9 @@ export namespace UI {
     /****** Constants ******/
 
     /**
-     * Some useful colors.
+     * Re-export of standard and Battlefield color presets.
      */
-    export const COLORS = Object.freeze({
-        BLACK: mod.CreateVector(0, 0, 0),
-        GREY_25: mod.CreateVector(0.25, 0.25, 0.25),
-        GREY_50: mod.CreateVector(0.5, 0.5, 0.5),
-        GREY_75: mod.CreateVector(0.75, 0.75, 0.75),
-        WHITE: mod.CreateVector(1, 1, 1),
-        RED: mod.CreateVector(1, 0, 0),
-        GREEN: mod.CreateVector(0, 1, 0),
-        BLUE: mod.CreateVector(0, 0, 1),
-        YELLOW: mod.CreateVector(1, 1, 0),
-        PURPLE: mod.CreateVector(1, 0, 1),
-        CYAN: mod.CreateVector(0, 1, 1),
-        MAGENTA: mod.CreateVector(1, 0, 1),
-        BF_GREY_1: mod.CreateVector(0.8353, 0.9216, 0.9765), // #D5EBF9
-        BF_GREY_2: mod.CreateVector(0.3294, 0.3686, 0.3882), // #545E63
-        BF_GREY_3: mod.CreateVector(0.2118, 0.2235, 0.2353), // #36393C
-        BF_GREY_4: mod.CreateVector(0.0314, 0.0431, 0.0431), // #080B0B,
-        BF_BLUE_BRIGHT: mod.CreateVector(0.4392, 0.9216, 1.0), // #70EBFF
-        BF_BLUE_DARK: mod.CreateVector(0.0745, 0.1843, 0.2471), // #132F3F
-        BF_RED_BRIGHT: mod.CreateVector(1.0, 0.5137, 0.3804), // #FF8361
-        BF_RED_DARK: mod.CreateVector(0.251, 0.0941, 0.0667), // #401811
-        BF_GREEN_BRIGHT: mod.CreateVector(0.6784, 0.9922, 0.5255), // #ADFD86
-        BF_GREEN_DARK: mod.CreateVector(0.2784, 0.4471, 0.2118), // #477236
-        BF_YELLOW_BRIGHT: mod.CreateVector(1.0, 0.9882, 0.6118), // #FFFC9C
-        BF_YELLOW_DARK: mod.CreateVector(0.4431, 0.3765, 0.0), // #716000
-    });
+    export const COLORS = Colors.PRESETS;
 
     Events.OnPlayerLeaveGame.subscribe((playerId: number) => {
         PlayerReceiver.clear(playerId);

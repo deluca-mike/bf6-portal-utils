@@ -122,10 +122,10 @@ Optional configuration object passed to the constructor.
 | `anchor` | `mod.UIAnchor` | `mod.UIAnchor.TopLeft` | Determines how `x`/`y` offsets are interpreted. |
 | `x`, `y` | `number` | `10`, `10` | Window origin (in pixels) relative to the anchor. |
 | `width`, `height` | `number` | `400`, `304` | Determines row count (`maxRows` is `(height - 16) / 24`). |
-| `bgColor` | `mod.Vector` | `UI.COLORS.BF_GREY_4` | Background color for the container. |
+| `bgColor` | `UI.Color` | `UI.COLORS.BF_GREY_4` | Background color for the container. |
 | `bgAlpha` | `number` | `0.5` | Opacity of the window background. |
 | `bgFill` | `mod.UIBgFill` | `mod.UIBgFill.Blur` | Background fill style for the container. |
-| `textColor` | `mod.Vector` | `UI.COLORS.BF_GREEN_BRIGHT` | Applied to every text widget inside the logger. |
+| `textColor` | `UI.Color` | `UI.COLORS.BF_GREEN_BRIGHT` | Applied to every text widget inside the logger. |
 | `visible` | `boolean` | `false` | Set `true` to show the window immediately when constructed. |
 
 ---

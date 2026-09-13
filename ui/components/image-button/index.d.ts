@@ -1,10 +1,10 @@
+import { Colors } from '../../../colors/index.ts';
 import { UIContentButton } from '../content-button/index.ts';
+import { UIBaseButton } from '../base-button/index.ts';
 import { UIImage } from '../image/index.ts';
 export declare class UIImageButton extends UIContentButton<UIImage> {
-    private static readonly _imageColors;
-    private static readonly _imageAlphas;
-    private static readonly _imageDisabledColors;
-    private static readonly _imageDisabledAlphas;
+    private static readonly _imageRgba;
+    private static readonly _imageDisabledRgba;
     /**
      * Creates a new image button.
      * @param params - The parameters for the image button.
@@ -17,6 +17,7 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
     protected _setContentEnabled(enabled: boolean): void;
     /**
      * @inheritdoc
+     * @returns True if enabled, false if disabled, or undefined if deleted.
      */
     get enabled(): boolean | undefined;
     /**
@@ -25,6 +26,7 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
     set enabled(enabled: boolean);
     /**
      * @inheritdoc
+     * @returns This image button for chaining.
      */
     setEnabled(enabled: boolean): this;
     /**
@@ -45,20 +47,26 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
     setImageType(imageType: mod.UIImageType): this;
     /**
      * The color of the image, or undefined if deleted.
-     * @returns The image color vector, or undefined if deleted.
+     * @returns The image color, or undefined if deleted.
      */
-    get imageColor(): mod.Vector | undefined;
+    get imageColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The image color, or undefined if deleted.
+     */
+    getImageColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
-    set imageColor(color: mod.Vector);
+    set imageColor(color: Colors.Color);
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      * @returns This image button for chaining.
      */
-    setImageColor(color: mod.Vector): this;
+    setImageColor(color: Colors.Color): this;
     /**
      * The alpha of the image, or undefined if deleted.
      * @returns The image alpha opacity, or undefined if deleted.
@@ -77,20 +85,26 @@ export declare class UIImageButton extends UIContentButton<UIImage> {
     setImageAlpha(alpha: number): this;
     /**
      * The disabled color of the image, or undefined if deleted.
-     * @returns The disabled image color vector, or undefined if deleted.
+     * @returns The disabled image color, or undefined if deleted.
      */
-    get imageDisabledColor(): mod.Vector | undefined;
+    get imageDisabledColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the disabled image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled image color, or undefined if deleted.
+     */
+    getImageDisabledColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
      */
-    set imageDisabledColor(color: mod.Vector);
+    set imageDisabledColor(color: Colors.Color);
     /**
      * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
      * @returns This image button for chaining.
      */
-    setImageDisabledColor(color: mod.Vector): this;
+    setImageDisabledColor(color: Colors.Color): this;
     /**
      * The disabled alpha of the image, or undefined if deleted.
      * @returns The disabled image alpha opacity, or undefined if deleted.
@@ -112,9 +126,9 @@ export declare namespace UIImageButton {
     /**
      * The parameters for creating a new image button.
      */
-    type Params = UIContentButton.Params &
+    type Params = UIBaseButton.Params &
         UIImage.Params & {
-            imageDisabledColor?: mod.Vector;
+            imageDisabledColor?: Colors.Color;
             imageDisabledAlpha?: number;
         };
 }

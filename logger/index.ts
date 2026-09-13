@@ -2,7 +2,7 @@ import { UI } from '../ui/index.ts';
 import { UIContainer } from '../ui/components/container/index.ts';
 import { UIText } from '../ui/components/text/index.ts';
 
-// version: 4.0.0
+// version: 5.0.0
 export class Logger {
     /**
      * List of characters that cannot appear standalone in the strings file or as mod.Message arguments.
@@ -282,7 +282,7 @@ export class Logger {
 
     private _height: number;
 
-    private _textColor: mod.Vector;
+    private _textColor: UI.Color;
 
     private _maxRows: number;
 
@@ -617,7 +617,7 @@ export namespace Logger {
         /**
          * The background color of the logger.
          */
-        bgColor?: mod.Vector;
+        bgColor?: UI.Color;
         /**
          * The background alpha of the logger.
          */
@@ -629,7 +629,7 @@ export namespace Logger {
         /**
          * The text color of the logger.
          */
-        textColor?: mod.Vector;
+        textColor?: UI.Color;
         /**
          * Whether to show the logger.
          */

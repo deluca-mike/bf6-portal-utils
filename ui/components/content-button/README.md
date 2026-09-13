@@ -61,15 +61,15 @@ protected constructor(
 
 `UIContentButton` inherits all properties from `UIBaseButton` and `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`, `isValid`
 - **Parent Management**: `parent`
 - **Button Handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Colors**: `baseColor`, `getBaseColor(out?)`, `disabledColor`, `getDisabledColor(out?)`, `pressedColor`, `getPressedColor(out?)`, `focusedColor`, `getFocusedColor(out?)`
 - **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 
 For complete documentation of base element properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode) and [UIBaseButton documentation](../base-button/README.md).

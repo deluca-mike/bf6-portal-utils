@@ -1,17 +1,13 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIImage } from '../image/index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export class UIImageButton extends UIContentButton<UIImage> {
-    private static readonly _imageColors = new Array<mod.Vector | null>(UIBaseButton.MAX_BUTTONS);
-
-    private static readonly _imageAlphas = new Float64Array(UIBaseButton.MAX_BUTTONS);
-
-    private static readonly _imageDisabledColors = new Array<mod.Vector | null>(UIBaseButton.MAX_BUTTONS);
-
-    private static readonly _imageDisabledAlphas = new Float64Array(UIBaseButton.MAX_BUTTONS);
+    private static readonly _imageRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+    private static readonly _imageDisabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
 
     /**
      * Creates a new image button.
@@ -37,11 +33,13 @@ export class UIImageButton extends UIContentButton<UIImage> {
         if (!this._isValid) return;
 
         const btnSlot = this._buttonSlot;
+        const imageColor = params.imageColor ?? UI.COLORS.WHITE;
+        const imageAlpha = params.imageAlpha ?? 1;
+        const imageDisabledColor = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
+        const imageDisabledAlpha = params.imageDisabledAlpha ?? 1;
 
-        UIImageButton._imageColors[btnSlot] = params.imageColor ?? UI.COLORS.WHITE;
-        UIImageButton._imageAlphas[btnSlot] = params.imageAlpha ?? 1;
-        UIImageButton._imageDisabledColors[btnSlot] = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
-        UIImageButton._imageDisabledAlphas[btnSlot] = params.imageDisabledAlpha ?? 1;
+        UIImageButton._imageRgba[btnSlot] = UIImageButton._packRgba(imageColor, imageAlpha);
+        UIImageButton._imageDisabledRgba[btnSlot] = UIImageButton._packRgba(imageDisabledColor, imageDisabledAlpha);
 
         if (!this.enabled) {
             this._setContentEnabled(false);
@@ -55,10 +53,8 @@ export class UIImageButton extends UIContentButton<UIImage> {
         const btnSlot = this._buttonSlot;
 
         if (btnSlot !== UIBaseButton._INVALID_INDEX) {
-            UIImageButton._imageColors[btnSlot] = null;
-            UIImageButton._imageDisabledColors[btnSlot] = null;
-            UIImageButton._imageAlphas[btnSlot] = 0;
-            UIImageButton._imageDisabledAlphas[btnSlot] = 0;
+            UIImageButton._imageRgba[btnSlot] = 0;
+            UIImageButton._imageDisabledRgba[btnSlot] = 0;
         }
 
         super.delete();
@@ -72,19 +68,19 @@ export class UIImageButton extends UIContentButton<UIImage> {
         const content = this.content;
         const contentWidget = content ? UI.Element._getNativeWidget(content) : null;
 
-        if (!contentWidget) return;
+        if (!content || !contentWidget) return;
 
-        if (enabled) {
-            mod.SetUIImageColor(contentWidget, UIImageButton._imageColors[btnSlot]!);
-            mod.SetUIImageAlpha(contentWidget, UIImageButton._imageAlphas[btnSlot]);
-        } else {
-            mod.SetUIImageColor(contentWidget, UIImageButton._imageDisabledColors[btnSlot]!);
-            mod.SetUIImageAlpha(contentWidget, UIImageButton._imageDisabledAlphas[btnSlot]);
-        }
+        const rgba = enabled ? UIImageButton._imageRgba[btnSlot] : UIImageButton._imageDisabledRgba[btnSlot];
+        const color = UIImageButton._unpackColor(rgba);
+        const alpha = UIImageButton._unpackAlpha(rgba);
+
+        content.setImageColor(color);
+        content.setImageAlpha(alpha);
     }
 
     /**
      * @inheritdoc
+     * @returns True if enabled, false if disabled, or undefined if deleted.
      */
     public override get enabled(): boolean | undefined {
         return super.enabled;
@@ -99,6 +95,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
     /**
      * @inheritdoc
+     * @returns This image button for chaining.
      */
     public override setEnabled(enabled: boolean): this {
         if (this._getIsInvalidAndLogWarning()) return this;
@@ -140,19 +137,34 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
     /**
      * The color of the image, or undefined if deleted.
-     * @returns The image color vector, or undefined if deleted.
+     * @returns The image color, or undefined if deleted.
      */
-    public get imageColor(): mod.Vector | undefined {
+    public get imageColor(): Colors.Color | undefined {
         const btnSlot = this._buttonSlot;
 
-        return btnSlot === -1 ? undefined : (UIImageButton._imageColors[btnSlot] ?? undefined);
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIImageButton._unpackColor(UIImageButton._imageRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The image color, or undefined if deleted.
+     */
+    public getImageColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIImageButton._unpackColor(UIImageButton._imageRgba[btnSlot], out);
     }
 
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
-    public set imageColor(color: mod.Vector) {
+    public set imageColor(color: Colors.Color) {
         this.setImageColor(color);
     }
 
@@ -161,12 +173,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param color - The new color of the image.
      * @returns This image button for chaining.
      */
-    public setImageColor(color: mod.Vector): this {
+    public setImageColor(color: Colors.Color): this {
         const btnSlot = this._resolveButtonSlotAndLogWarning();
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._imageColors[btnSlot] = color;
+        UIImageButton._setRgb(UIImageButton._imageRgba, btnSlot, color);
 
         if (this.enabled) {
             this.content?.setImageColor(color);
@@ -182,7 +194,9 @@ export class UIImageButton extends UIContentButton<UIImage> {
     public get imageAlpha(): number | undefined {
         const btnSlot = this._buttonSlot;
 
-        return btnSlot === UIBaseButton._INVALID_INDEX ? undefined : UIImageButton._imageAlphas[btnSlot];
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIImageButton._unpackAlpha(UIImageButton._imageRgba[btnSlot]);
     }
 
     /**
@@ -203,7 +217,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._imageAlphas[btnSlot] = alpha;
+        UIImageButton._setAlpha(UIImageButton._imageRgba, btnSlot, alpha);
 
         if (this.enabled) {
             this.content?.setImageAlpha(alpha);
@@ -214,21 +228,34 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
     /**
      * The disabled color of the image, or undefined if deleted.
-     * @returns The disabled image color vector, or undefined if deleted.
+     * @returns The disabled image color, or undefined if deleted.
      */
-    public get imageDisabledColor(): mod.Vector | undefined {
+    public get imageDisabledColor(): Colors.Color | undefined {
         const btnSlot = this._buttonSlot;
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : (UIImageButton._imageDisabledColors[btnSlot] ?? undefined);
+            : UIImageButton._unpackColor(UIImageButton._imageDisabledRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the disabled image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled image color, or undefined if deleted.
+     */
+    public getImageDisabledColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIImageButton._unpackColor(UIImageButton._imageDisabledRgba[btnSlot], out);
     }
 
     /**
      * Sets the disabled color of the image.
      * @param color - The new disabled color of the image.
      */
-    public set imageDisabledColor(color: mod.Vector) {
+    public set imageDisabledColor(color: Colors.Color) {
         this.setImageDisabledColor(color);
     }
 
@@ -237,12 +264,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
      * @param color - The new disabled color of the image.
      * @returns This image button for chaining.
      */
-    public setImageDisabledColor(color: mod.Vector): this {
+    public setImageDisabledColor(color: Colors.Color): this {
         const btnSlot = this._resolveButtonSlotAndLogWarning();
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._imageDisabledColors[btnSlot] = color;
+        UIImageButton._setRgb(UIImageButton._imageDisabledRgba, btnSlot, color);
 
         if (!this.enabled) {
             this.content?.setImageColor(color);
@@ -258,7 +285,9 @@ export class UIImageButton extends UIContentButton<UIImage> {
     public get imageDisabledAlpha(): number | undefined {
         const btnSlot = this._buttonSlot;
 
-        return btnSlot === UIBaseButton._INVALID_INDEX ? undefined : UIImageButton._imageDisabledAlphas[btnSlot];
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIImageButton._unpackAlpha(UIImageButton._imageDisabledRgba[btnSlot]);
     }
 
     /**
@@ -279,7 +308,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._imageDisabledAlphas[btnSlot] = alpha;
+        UIImageButton._setAlpha(UIImageButton._imageDisabledRgba, btnSlot, alpha);
 
         if (!this.enabled) {
             this.content?.setImageAlpha(alpha);
@@ -293,9 +322,9 @@ export namespace UIImageButton {
     /**
      * The parameters for creating a new image button.
      */
-    export type Params = UIContentButton.Params &
+    export type Params = UIBaseButton.Params &
         UIImage.Params & {
-            imageDisabledColor?: mod.Vector;
+            imageDisabledColor?: Colors.Color;
             imageDisabledAlpha?: number;
         };
 }

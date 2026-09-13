@@ -1,6 +1,7 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 1.0.0
+// version: 2.0.0
 export class UIQRCode extends UI.Element {
     private static readonly BASE_MODULE_SIZE = 10;
 
@@ -12,13 +13,9 @@ export class UIQRCode extends UI.Element {
 
     private static readonly _margins = new Int16Array(UI.MAX_ELEMENTS);
 
-    private static readonly _darkColors = new Array<mod.Vector | null>(UI.MAX_ELEMENTS);
+    private static readonly _darkRgba = new Uint32Array(UI.MAX_ELEMENTS);
 
-    private static readonly _darkAlphas = new Float32Array(UI.MAX_ELEMENTS);
-
-    private static readonly _lightColors = new Array<mod.Vector | null>(UI.MAX_ELEMENTS);
-
-    private static readonly _lightAlphas = new Float32Array(UI.MAX_ELEMENTS);
+    private static readonly _lightRgba = new Uint32Array(UI.MAX_ELEMENTS);
 
     private static readonly _eccs = new Array<UIQRCode.ECC | null>(UI.MAX_ELEMENTS);
 
@@ -32,10 +29,46 @@ export class UIQRCode extends UI.Element {
     static {
         UIQRCode._matrices.fill(null);
         UIQRCode._childWidgets.fill(null);
-        UIQRCode._darkColors.fill(null);
-        UIQRCode._lightColors.fill(null);
         UIQRCode._eccs.fill(null);
         UIQRCode._texts.fill(null);
+    }
+
+    private static _packRgba(color: Colors.Color, alpha: number): number {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _unpackColor(rgba: number, out?: Colors.Color): Colors.Color {
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+        return { r, g, b };
+    }
+
+    private static _unpackAlpha(rgba: number): number {
+        return (rgba & 0xff) / 255;
+    }
+
+    private static _setRgb(arr: Uint32Array, slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = arr[slot] & 0xff;
+        arr[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setAlpha(arr: Uint32Array, slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        arr[slot] = (arr[slot] & ~0xff) | aInt;
     }
 
     /**
@@ -117,7 +150,7 @@ export class UIQRCode extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                lightColor,
+                Colors.toVector(lightColor),
                 lightAlpha,
                 mod.UIBgFill.Solid,
                 depth
@@ -131,7 +164,7 @@ export class UIQRCode extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                lightColor,
+                Colors.toVector(lightColor),
                 lightAlpha,
                 mod.UIBgFill.Solid,
                 depth,
@@ -145,10 +178,8 @@ export class UIQRCode extends UI.Element {
         UIQRCode._matrices[slot] = matrix;
         UIQRCode._scales[slot] = scale;
         UIQRCode._margins[slot] = margin;
-        UIQRCode._darkColors[slot] = darkColor;
-        UIQRCode._darkAlphas[slot] = darkAlpha;
-        UIQRCode._lightColors[slot] = lightColor;
-        UIQRCode._lightAlphas[slot] = lightAlpha;
+        UIQRCode._darkRgba[slot] = UIQRCode._packRgba(darkColor, darkAlpha);
+        UIQRCode._lightRgba[slot] = UIQRCode._packRgba(lightColor, lightAlpha);
         UIQRCode._eccs[slot] = params.ecc ?? null;
         UIQRCode._texts[slot] = params.text ?? null;
         UIQRCode._childWidgets[slot] = [];
@@ -207,9 +238,9 @@ export class UIQRCode extends UI.Element {
      * @param totalHeight - Total pixel height.
      * @param scale - Scale multiplier.
      * @param margin - Margin in module units.
-     * @param darkColor - Dark module color vector.
+     * @param darkColor - Dark module color.
      * @param darkAlpha - Dark module opacity.
-     * @param lightColor - Light module color vector.
+     * @param lightColor - Light module color.
      * @param lightAlpha - Light module opacity.
      */
     private _renderQR(
@@ -218,9 +249,9 @@ export class UIQRCode extends UI.Element {
         totalHeight: number,
         scale: number,
         margin: number,
-        darkColor: mod.Vector,
+        darkColor: Colors.Color,
         darkAlpha: number,
-        lightColor: mod.Vector,
+        lightColor: Colors.Color,
         lightAlpha: number
     ): void {
         const slot = this._slot;
@@ -230,6 +261,9 @@ export class UIQRCode extends UI.Element {
         const N = matrix.length;
 
         if (N === 0) return;
+
+        const darkVec = Colors.toVector(darkColor);
+        const lightVec = Colors.toVector(lightColor);
 
         const gridUnits = N + 2 * margin;
         const cellWidth = totalWidth / gridUnits;
@@ -326,11 +360,11 @@ export class UIQRCode extends UI.Element {
             for (let f = 0; f < 3; ++f) {
                 const { r, c } = finders[f];
                 // Layer 1: 7x7 Dark base
-                drawRect(c, r, 7, 7, darkColor, darkAlpha);
+                drawRect(c, r, 7, 7, darkVec, darkAlpha);
                 // Layer 2: 5x5 Light cutout
-                drawRect(c + 1, r + 1, 5, 5, lightColor, lightAlpha);
+                drawRect(c + 1, r + 1, 5, 5, lightVec, lightAlpha);
                 // Layer 3: 3x3 Dark core
-                drawRect(c + 2, r + 2, 3, 3, darkColor, darkAlpha);
+                drawRect(c + 2, r + 2, 3, 3, darkVec, darkAlpha);
 
                 // Mark 7x7 cells as visited
                 for (let i = 0; i < 7; ++i) {
@@ -361,11 +395,11 @@ export class UIQRCode extends UI.Element {
                         const c = cc - 2;
 
                         // Layer 1: 5x5 Dark base
-                        drawRect(c, r, 5, 5, darkColor, darkAlpha);
+                        drawRect(c, r, 5, 5, darkVec, darkAlpha);
                         // Layer 2: 3x3 Light cutout
-                        drawRect(c + 1, r + 1, 3, 3, lightColor, lightAlpha);
+                        drawRect(c + 1, r + 1, 3, 3, lightVec, lightAlpha);
                         // Layer 3: 1x1 Dark core
-                        drawRect(c + 2, r + 2, 1, 1, darkColor, darkAlpha);
+                        drawRect(c + 2, r + 2, 1, 1, darkVec, darkAlpha);
 
                         // Mark 5x5 cells as visited
                         for (let i = 0; i < 5; ++i) {
@@ -411,7 +445,7 @@ export class UIQRCode extends UI.Element {
                 }
 
                 // Step 3c: Draw Merged Dark Rectangle
-                drawRect(c, r, w, h, darkColor, darkAlpha);
+                drawRect(c, r, w, h, darkVec, darkAlpha);
 
                 // Step 3d: Mark w x h region as visited
                 for (let i = 0; i < h; ++i) {
@@ -459,10 +493,8 @@ export class UIQRCode extends UI.Element {
         UIQRCode._matrices[slot] = null;
         UIQRCode._scales[slot] = 0;
         UIQRCode._margins[slot] = 0;
-        UIQRCode._darkColors[slot] = null;
-        UIQRCode._darkAlphas[slot] = 0;
-        UIQRCode._lightColors[slot] = null;
-        UIQRCode._lightAlphas[slot] = 0;
+        UIQRCode._darkRgba[slot] = 0;
+        UIQRCode._lightRgba[slot] = 0;
         UIQRCode._eccs[slot] = null;
         UIQRCode._texts[slot] = null;
         UIQRCode._childWidgets[slot] = null;
@@ -580,63 +612,146 @@ export class UIQRCode extends UI.Element {
 
     /**
      * The dark module color, or undefined if deleted.
-     * @returns The dark module color vector, or undefined.
+     * @returns The dark module color, or undefined if deleted.
      */
-    public get darkColor(): mod.Vector | undefined {
+    public get darkColor(): Colors.Color | undefined {
         const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : (UIQRCode._darkColors[slot] ?? undefined);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._darkRgba[slot]);
+    }
+
+    /**
+     * Retrieves the dark module color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The dark module color, or undefined if deleted.
+     */
+    public getDarkColor(out?: Colors.Color): Colors.Color | undefined {
+        const slot = this._slot;
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._darkRgba[slot], out);
     }
 
     /**
      * Sets the dark module color.
-     * @param color - The new dark module color vector.
+     * @param color - The new dark module color.
      */
-    public set darkColor(color: mod.Vector) {
+    public set darkColor(color: Colors.Color) {
         this.setDarkColor(color);
     }
 
     /**
      * Sets the dark module color.
-     * @param color - The new dark module color vector.
+     * @param color - The new dark module color.
      * @returns This element for chaining.
      */
-    public setDarkColor(color: mod.Vector): this {
+    public setDarkColor(color: Colors.Color): this {
         const slot = this._getSlotAndLogWarning();
         if (slot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._darkColors[slot] = color;
+        UIQRCode._setRgb(UIQRCode._darkRgba, slot, color);
+        this._rebuildQR();
+        return this;
+    }
+
+    /**
+     * The dark module alpha opacity, or undefined if deleted.
+     * @returns The dark module alpha opacity, or undefined if deleted.
+     */
+    public get darkAlpha(): number | undefined {
+        const slot = this._slot;
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackAlpha(UIQRCode._darkRgba[slot]);
+    }
+
+    /**
+     * Sets the dark module alpha opacity.
+     * @param alpha - The new dark module alpha opacity.
+     */
+    public set darkAlpha(alpha: number) {
+        this.setDarkAlpha(alpha);
+    }
+
+    /**
+     * Sets the dark module alpha opacity.
+     * @param alpha - The new dark module alpha opacity.
+     * @returns This element for chaining.
+     */
+    public setDarkAlpha(alpha: number): this {
+        const slot = this._getSlotAndLogWarning();
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIQRCode._setAlpha(UIQRCode._darkRgba, slot, alpha);
         this._rebuildQR();
         return this;
     }
 
     /**
      * The light module (background) color, or undefined if deleted.
-     * @returns The light color vector, or undefined.
+     * @returns The light color, or undefined if deleted.
      */
-    public get lightColor(): mod.Vector | undefined {
+    public get lightColor(): Colors.Color | undefined {
         const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : (UIQRCode._lightColors[slot] ?? undefined);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._lightRgba[slot]);
+    }
+
+    /**
+     * Retrieves the light module color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The light module color, or undefined if deleted.
+     */
+    public getLightColor(out?: Colors.Color): Colors.Color | undefined {
+        const slot = this._slot;
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._lightRgba[slot], out);
     }
 
     /**
      * Sets the light module (background) color.
-     * @param color - The new light color vector.
+     * @param color - The new light color.
      */
-    public set lightColor(color: mod.Vector) {
+    public set lightColor(color: Colors.Color) {
         this.setLightColor(color);
     }
 
     /**
      * Sets the light module (background) color.
-     * @param color - The new light color vector.
+     * @param color - The new light color.
      * @returns This element for chaining.
      */
-    public setLightColor(color: mod.Vector): this {
+    public setLightColor(color: Colors.Color): this {
         const slot = this._getSlotAndLogWarning();
         if (slot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._lightColors[slot] = color;
+        UIQRCode._setRgb(UIQRCode._lightRgba, slot, color);
         this.setBgColor(color);
+        this._rebuildQR();
+        return this;
+    }
+
+    /**
+     * The light module alpha opacity, or undefined if deleted.
+     * @returns The light module alpha opacity, or undefined if deleted.
+     */
+    public get lightAlpha(): number | undefined {
+        const slot = this._slot;
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackAlpha(UIQRCode._lightRgba[slot]);
+    }
+
+    /**
+     * Sets the light module alpha opacity.
+     * @param alpha - The new light module alpha opacity.
+     */
+    public set lightAlpha(alpha: number) {
+        this.setLightAlpha(alpha);
+    }
+
+    /**
+     * Sets the light module alpha opacity.
+     * @param alpha - The new light module alpha opacity.
+     * @returns This element for chaining.
+     */
+    public setLightAlpha(alpha: number): this {
+        const slot = this._getSlotAndLogWarning();
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIQRCode._setAlpha(UIQRCode._lightRgba, slot, alpha);
+        this.setBgAlpha(alpha);
         this._rebuildQR();
         return this;
     }
@@ -690,10 +805,12 @@ export class UIQRCode extends UI.Element {
 
         const scale = UIQRCode._scales[slot];
         const margin = UIQRCode._margins[slot];
-        const darkColor = UIQRCode._darkColors[slot] ?? UI.COLORS.BLACK;
-        const darkAlpha = UIQRCode._darkAlphas[slot] || 1;
-        const lightColor = UIQRCode._lightColors[slot] ?? UI.COLORS.WHITE;
-        const lightAlpha = UIQRCode._lightAlphas[slot] || 1;
+        const darkRgba = UIQRCode._darkRgba[slot];
+        const lightRgba = UIQRCode._lightRgba[slot];
+        const darkColor = UIQRCode._unpackColor(darkRgba);
+        const darkAlpha = UIQRCode._unpackAlpha(darkRgba);
+        const lightColor = UIQRCode._unpackColor(lightRgba);
+        const lightAlpha = UIQRCode._unpackAlpha(lightRgba);
 
         const totalUnits = matrix.length + 2 * margin;
         const currentWidth = this.width ?? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale;
@@ -806,17 +923,17 @@ export namespace UIQRCode {
          */
         margin?: number;
         /**
-         * Color vector for dark modules (defaults to `UI.COLORS.BLACK`).
+         * Color for dark modules (defaults to `UI.COLORS.BLACK`).
          */
-        darkColor?: mod.Vector;
+        darkColor?: Colors.Color;
         /**
          * Opacity for dark modules (defaults to `1`).
          */
         darkAlpha?: number;
         /**
-         * Color vector for light modules and background canvas (defaults to `UI.COLORS.WHITE`).
+         * Color for light modules and background canvas (defaults to `UI.COLORS.WHITE`).
          */
-        lightColor?: mod.Vector;
+        lightColor?: Colors.Color;
         /**
          * Opacity for light modules and background canvas (defaults to `1`).
          */

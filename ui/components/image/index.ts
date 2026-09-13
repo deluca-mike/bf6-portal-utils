@@ -1,7 +1,49 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export class UIImage extends UI.Element {
+    private static readonly _imageRgba = new Uint32Array(UI.MAX_ELEMENTS);
+
+    private static _setImageRgba(slot: number, color: Colors.Color, alpha: number): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        UIImage._imageRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setImageColor(slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = UIImage._imageRgba[slot] & 0xff;
+        UIImage._imageRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setImageAlpha(slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        UIImage._imageRgba[slot] = (UIImage._imageRgba[slot] & ~0xff) | aInt;
+    }
+
+    private static _getImageColor(slot: number, out?: Colors.Color): Colors.Color {
+        const rgba = UIImage._imageRgba[slot];
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+        return { r, g, b };
+    }
+
+    private static _getImageAlpha(slot: number): number {
+        return (UIImage._imageRgba[slot] & 0xff) / 255;
+    }
+
     /**
      * Creates a new image.
      * @param params - The parameters for the image.
@@ -34,11 +76,11 @@ export class UIImage extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 params.imageType,
-                imageColor,
+                Colors.toVector(imageColor),
                 imageAlpha,
                 depth
             );
@@ -51,11 +93,11 @@ export class UIImage extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 params.imageType,
-                imageColor,
+                Colors.toVector(imageColor),
                 imageAlpha,
                 depth,
                 receiver.nativeReceiver
@@ -63,6 +105,21 @@ export class UIImage extends UI.Element {
         }
 
         this._bindNativeWidget(name);
+
+        const slot = this._slot;
+        UIImage._setImageRgba(slot, imageColor, imageAlpha);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public override delete(): void {
+        const slot = this._getSlotAndLogWarning();
+
+        if (slot === UI.Element._INVALID_INDEX) return;
+
+        UIImage._imageRgba[slot] = 0;
+        super.delete();
     }
 
     /**
@@ -99,7 +156,9 @@ export class UIImage extends UI.Element {
      * @returns The image alpha opacity, or undefined if deleted.
      */
     public get imageAlpha(): number | undefined {
-        return this._isValid ? mod.GetUIImageAlpha(this._uiWidget) : undefined;
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageAlpha(slot);
     }
 
     /**
@@ -116,8 +175,11 @@ export class UIImage extends UI.Element {
      * @returns This image for chaining.
      */
     public setImageAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const slot = this._getSlotAndLogWarning();
 
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIImage._setImageAlpha(slot, alpha);
         mod.SetUIImageAlpha(this._uiWidget, alpha);
 
         return this;
@@ -125,17 +187,30 @@ export class UIImage extends UI.Element {
 
     /**
      * The color of the image, or undefined if deleted.
-     * @returns The image color vector, or undefined if deleted.
+     * @returns The image color, or undefined if deleted.
      */
-    public get imageColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUIImageColor(this._uiWidget) : undefined;
+    public get imageColor(): Colors.Color | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageColor(slot);
+    }
+
+    /**
+     * Retrieves the image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The image color, or undefined if deleted.
+     */
+    public getImageColor(out?: Colors.Color): Colors.Color | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageColor(slot, out);
     }
 
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
-    public set imageColor(color: mod.Vector) {
+    public set imageColor(color: Colors.Color) {
         this.setImageColor(color);
     }
 
@@ -144,10 +219,13 @@ export class UIImage extends UI.Element {
      * @param color - The new color of the image.
      * @returns This image for chaining.
      */
-    public setImageColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setImageColor(color: Colors.Color): this {
+        const slot = this._getSlotAndLogWarning();
 
-        mod.SetUIImageColor(this._uiWidget, color);
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIImage._setImageColor(slot, color);
+        mod.SetUIImageColor(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -159,7 +237,7 @@ export namespace UIImage {
      */
     export type Params = UI.ElementParams & {
         imageType: mod.UIImageType;
-        imageColor?: mod.Vector;
+        imageColor?: Colors.Color;
         imageAlpha?: number;
     };
 }

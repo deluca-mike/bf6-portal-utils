@@ -1,7 +1,8 @@
 import { CallbackHandler } from '../../../callback-handler/index.ts';
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export class UIContainer extends UI.Element implements UI.Parent {
     /**
      * Creates a new container.
@@ -33,7 +34,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 depth
@@ -47,7 +48,7 @@ export class UIContainer extends UI.Element implements UI.Parent {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 depth,

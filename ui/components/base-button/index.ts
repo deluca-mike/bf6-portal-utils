@@ -1,8 +1,9 @@
 import { CallbackHandler } from '../../../callback-handler/index.ts';
+import { Colors } from '../../../colors/index.ts';
 import { Events } from '../../../events/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 1.0.0
+// version: 10.0.0
 export abstract class UIBaseButton extends UI.Element {
     /**
      * The maximum number of button widgets that can exist concurrently in memory.
@@ -467,13 +468,13 @@ export namespace UIBaseButton {
 
     export type Styling = {
         enabled?: boolean;
-        baseColor?: mod.Vector;
+        baseColor?: Colors.Color;
         baseAlpha?: number;
-        disabledColor?: mod.Vector;
+        disabledColor?: Colors.Color;
         disabledAlpha?: number;
-        pressedColor?: mod.Vector;
+        pressedColor?: Colors.Color;
         pressedAlpha?: number;
-        focusedColor?: mod.Vector;
+        focusedColor?: Colors.Color;
         focusedAlpha?: number;
     };
 

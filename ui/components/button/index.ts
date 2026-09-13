@@ -1,8 +1,52 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export class UIButton extends UIBaseButton {
+    private static readonly _baseRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+    private static readonly _disabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+    private static readonly _pressedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+    private static readonly _focusedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+
+    private static _packRgba(color: Colors.Color, alpha: number): number {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _unpackColor(rgba: number, out?: Colors.Color): Colors.Color {
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+        return { r, g, b };
+    }
+
+    private static _unpackAlpha(rgba: number): number {
+        return (rgba & 0xff) / 255;
+    }
+
+    private static _setRgb(arr: Uint32Array, slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = arr[slot] & 0xff;
+        arr[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setAlpha(arr: Uint32Array, slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        arr[slot] = (arr[slot] & ~0xff) | aInt;
+    }
+
     /**
      * Creates a new button.
      * @param params - The parameters for the button.
@@ -44,19 +88,19 @@ export class UIButton extends UIBaseButton {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 enabled,
-                baseColor,
+                Colors.toVector(baseColor),
                 baseAlpha,
-                disabledColor,
+                Colors.toVector(disabledColor),
                 disabledAlpha,
-                pressedColor,
+                Colors.toVector(pressedColor),
                 pressedAlpha,
-                focusedColor,
+                Colors.toVector(focusedColor),
                 focusedAlpha,
-                focusedColor,
+                Colors.toVector(focusedColor),
                 focusedAlpha,
                 depth
             );
@@ -69,19 +113,19 @@ export class UIButton extends UIBaseButton {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 0,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 enabled,
-                baseColor,
+                Colors.toVector(baseColor),
                 baseAlpha,
-                disabledColor,
+                Colors.toVector(disabledColor),
                 disabledAlpha,
-                pressedColor,
+                Colors.toVector(pressedColor),
                 pressedAlpha,
-                focusedColor,
+                Colors.toVector(focusedColor),
                 focusedAlpha,
-                focusedColor,
+                Colors.toVector(focusedColor),
                 focusedAlpha,
                 depth,
                 receiver.nativeReceiver
@@ -89,6 +133,14 @@ export class UIButton extends UIBaseButton {
         }
 
         this._bindNativeWidget(name);
+
+        const btnSlot = this._buttonSlot;
+        if (btnSlot !== UIBaseButton._INVALID_INDEX) {
+            UIButton._baseRgba[btnSlot] = UIButton._packRgba(baseColor, baseAlpha);
+            UIButton._disabledRgba[btnSlot] = UIButton._packRgba(disabledColor, disabledAlpha);
+            UIButton._pressedRgba[btnSlot] = UIButton._packRgba(pressedColor, pressedAlpha);
+            UIButton._focusedRgba[btnSlot] = UIButton._packRgba(focusedColor, focusedAlpha);
+        }
 
         if (params.onClickDown) {
             this._setButtonHandler(UIBaseButton.Event.ClickDown, params.onClickDown);
@@ -105,6 +157,21 @@ export class UIButton extends UIBaseButton {
         if (params.onFocusOut) {
             this._setButtonHandler(UIBaseButton.Event.FocusOut, params.onFocusOut);
         }
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public override delete(): void {
+        const btnSlot = this._buttonSlot;
+        if (btnSlot !== UIBaseButton._INVALID_INDEX) {
+            UIButton._baseRgba[btnSlot] = 0;
+            UIButton._disabledRgba[btnSlot] = 0;
+            UIButton._pressedRgba[btnSlot] = 0;
+            UIButton._focusedRgba[btnSlot] = 0;
+        }
+
+        super.delete();
     }
 
     /**
@@ -138,17 +205,32 @@ export class UIButton extends UIBaseButton {
 
     /**
      * The base color of the button, or undefined if deleted.
-     * @returns The base color vector, or undefined if deleted.
+     * @returns The base color, or undefined if deleted.
      */
-    public get baseColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUIButtonColorBase(this._uiWidget) : undefined;
+    public get baseColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX ? undefined : UIButton._unpackColor(UIButton._baseRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the base color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The base color, or undefined if deleted.
+     */
+    public getBaseColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._baseRgba[btnSlot], out);
     }
 
     /**
      * Sets the base color of the button.
      * @param color - The new base color.
      */
-    public set baseColor(color: mod.Vector) {
+    public set baseColor(color: Colors.Color) {
         this.setBaseColor(color);
     }
 
@@ -157,10 +239,13 @@ export class UIButton extends UIBaseButton {
      * @param color - The new base color.
      * @returns This button for chaining.
      */
-    public setBaseColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setBaseColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
-        mod.SetUIButtonColorBase(this._uiWidget, color);
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setRgb(UIButton._baseRgba, btnSlot, color);
+        mod.SetUIButtonColorBase(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -170,7 +255,9 @@ export class UIButton extends UIBaseButton {
      * @returns The base alpha opacity, or undefined if deleted.
      */
     public get baseAlpha(): number | undefined {
-        return this._isValid ? mod.GetUIButtonAlphaBase(this._uiWidget) : undefined;
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX ? undefined : UIButton._unpackAlpha(UIButton._baseRgba[btnSlot]);
     }
 
     /**
@@ -187,8 +274,11 @@ export class UIButton extends UIBaseButton {
      * @returns This button for chaining.
      */
     public setBaseAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setAlpha(UIButton._baseRgba, btnSlot, alpha);
         mod.SetUIButtonAlphaBase(this._uiWidget, alpha);
 
         return this;
@@ -196,17 +286,34 @@ export class UIButton extends UIBaseButton {
 
     /**
      * The disabled color of the button, or undefined if deleted.
-     * @returns The disabled color vector, or undefined if deleted.
+     * @returns The disabled color, or undefined if deleted.
      */
-    public get disabledColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUIButtonColorDisabled(this._uiWidget) : undefined;
+    public get disabledColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._disabledRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the disabled color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled color, or undefined if deleted.
+     */
+    public getDisabledColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._disabledRgba[btnSlot], out);
     }
 
     /**
      * Sets the disabled color of the button.
      * @param color - The new disabled color.
      */
-    public set disabledColor(color: mod.Vector) {
+    public set disabledColor(color: Colors.Color) {
         this.setDisabledColor(color);
     }
 
@@ -215,10 +322,13 @@ export class UIButton extends UIBaseButton {
      * @param color - The new disabled color.
      * @returns This button for chaining.
      */
-    public setDisabledColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setDisabledColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
-        mod.SetUIButtonColorDisabled(this._uiWidget, color);
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setRgb(UIButton._disabledRgba, btnSlot, color);
+        mod.SetUIButtonColorDisabled(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -228,7 +338,11 @@ export class UIButton extends UIBaseButton {
      * @returns The disabled alpha opacity, or undefined if deleted.
      */
     public get disabledAlpha(): number | undefined {
-        return this._isValid ? mod.GetUIButtonAlphaDisabled(this._uiWidget) : undefined;
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackAlpha(UIButton._disabledRgba[btnSlot]);
     }
 
     /**
@@ -245,8 +359,11 @@ export class UIButton extends UIBaseButton {
      * @returns This button for chaining.
      */
     public setDisabledAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setAlpha(UIButton._disabledRgba, btnSlot, alpha);
         mod.SetUIButtonAlphaDisabled(this._uiWidget, alpha);
 
         return this;
@@ -254,17 +371,34 @@ export class UIButton extends UIBaseButton {
 
     /**
      * The pressed color of the button, or undefined if deleted.
-     * @returns The pressed color vector, or undefined if deleted.
+     * @returns The pressed color, or undefined if deleted.
      */
-    public get pressedColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUIButtonColorPressed(this._uiWidget) : undefined;
+    public get pressedColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._pressedRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the pressed color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The pressed color, or undefined if deleted.
+     */
+    public getPressedColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._pressedRgba[btnSlot], out);
     }
 
     /**
      * Sets the pressed color of the button.
      * @param color - The new pressed color.
      */
-    public set pressedColor(color: mod.Vector) {
+    public set pressedColor(color: Colors.Color) {
         this.setPressedColor(color);
     }
 
@@ -273,10 +407,13 @@ export class UIButton extends UIBaseButton {
      * @param color - The new pressed color.
      * @returns This button for chaining.
      */
-    public setPressedColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setPressedColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
-        mod.SetUIButtonColorPressed(this._uiWidget, color);
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setRgb(UIButton._pressedRgba, btnSlot, color);
+        mod.SetUIButtonColorPressed(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -286,7 +423,11 @@ export class UIButton extends UIBaseButton {
      * @returns The pressed alpha opacity, or undefined if deleted.
      */
     public get pressedAlpha(): number | undefined {
-        return this._isValid ? mod.GetUIButtonAlphaPressed(this._uiWidget) : undefined;
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackAlpha(UIButton._pressedRgba[btnSlot]);
     }
 
     /**
@@ -303,8 +444,11 @@ export class UIButton extends UIBaseButton {
      * @returns This button for chaining.
      */
     public setPressedAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setAlpha(UIButton._pressedRgba, btnSlot, alpha);
         mod.SetUIButtonAlphaPressed(this._uiWidget, alpha);
 
         return this;
@@ -312,17 +456,34 @@ export class UIButton extends UIBaseButton {
 
     /**
      * The focused color of the button, or undefined if deleted.
-     * @returns The focused color vector, or undefined if deleted.
+     * @returns The focused color, or undefined if deleted.
      */
-    public get focusedColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUIButtonColorFocused(this._uiWidget) : undefined;
+    public get focusedColor(): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._focusedRgba[btnSlot]);
+    }
+
+    /**
+     * Retrieves the focused color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The focused color, or undefined if deleted.
+     */
+    public getFocusedColor(out?: Colors.Color): Colors.Color | undefined {
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackColor(UIButton._focusedRgba[btnSlot], out);
     }
 
     /**
      * Sets the focused color of the button.
      * @param color - The new focused color.
      */
-    public set focusedColor(color: mod.Vector) {
+    public set focusedColor(color: Colors.Color) {
         this.setFocusedColor(color);
     }
 
@@ -331,10 +492,13 @@ export class UIButton extends UIBaseButton {
      * @param color - The new focused color.
      * @returns This button for chaining.
      */
-    public setFocusedColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setFocusedColor(color: Colors.Color): this {
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
-        mod.SetUIButtonColorFocused(this._uiWidget, color);
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setRgb(UIButton._focusedRgba, btnSlot, color);
+        mod.SetUIButtonColorFocused(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -344,7 +508,11 @@ export class UIButton extends UIBaseButton {
      * @returns The focused alpha opacity, or undefined if deleted.
      */
     public get focusedAlpha(): number | undefined {
-        return this._isValid ? mod.GetUIButtonAlphaFocused(this._uiWidget) : undefined;
+        const btnSlot = this._buttonSlot;
+
+        return btnSlot === UIBaseButton._INVALID_INDEX
+            ? undefined
+            : UIButton._unpackAlpha(UIButton._focusedRgba[btnSlot]);
     }
 
     /**
@@ -361,8 +529,11 @@ export class UIButton extends UIBaseButton {
      * @returns This button for chaining.
      */
     public setFocusedAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const btnSlot = this._resolveButtonSlotAndLogWarning();
 
+        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
+
+        UIButton._setAlpha(UIButton._focusedRgba, btnSlot, alpha);
         mod.SetUIButtonAlphaFocused(this._uiWidget, alpha);
 
         return this;

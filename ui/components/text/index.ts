@@ -1,8 +1,49 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 9.0.0
+// version: 10.0.0
 export class UIText extends UI.Element {
     private static readonly _labels = new Array<mod.Message | null>(UI.MAX_ELEMENTS);
+    private static readonly _textRgba = new Uint32Array(UI.MAX_ELEMENTS);
+
+    private static _setTextRgba(slot: number, color: Colors.Color, alpha: number): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        UIText._textRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setTextColor(slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = UIText._textRgba[slot] & 0xff;
+        UIText._textRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    private static _setTextAlpha(slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        UIText._textRgba[slot] = (UIText._textRgba[slot] & ~0xff) | aInt;
+    }
+
+    private static _getTextColor(slot: number, out?: Colors.Color): Colors.Color {
+        const rgba = UIText._textRgba[slot];
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+        return { r, g, b };
+    }
+
+    private static _getTextAlpha(slot: number): number {
+        return (UIText._textRgba[slot] & 0xff) / 255;
+    }
 
     /**
      * Creates a new text.
@@ -39,12 +80,12 @@ export class UIText extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 params.label,
                 textSize,
-                textColor,
+                Colors.toVector(textColor),
                 textAlpha,
                 textAnchor,
                 depth
@@ -58,12 +99,12 @@ export class UIText extends UI.Element {
                 UI.Element._getNativeWidget(parent)!,
                 visible,
                 padding,
-                bgColor,
+                Colors.toVector(bgColor),
                 bgAlpha,
                 bgFill,
                 params.label,
                 textSize,
-                textColor,
+                Colors.toVector(textColor),
                 textAlpha,
                 textAnchor,
                 depth,
@@ -73,7 +114,9 @@ export class UIText extends UI.Element {
 
         this._bindNativeWidget(name);
 
-        UIText._labels[this._slot] = params.label;
+        const slot = this._slot;
+        UIText._labels[slot] = params.label;
+        UIText._setTextRgba(slot, textColor, textAlpha);
     }
 
     /**
@@ -85,6 +128,7 @@ export class UIText extends UI.Element {
         if (slot === UI.Element._INVALID_INDEX) return;
 
         UIText._labels[slot] = null;
+        UIText._textRgba[slot] = 0;
         super.delete();
     }
 
@@ -128,7 +172,9 @@ export class UIText extends UI.Element {
      * @returns The text alpha opacity, or undefined if deleted.
      */
     public get textAlpha(): number | undefined {
-        return this._isValid ? mod.GetUITextAlpha(this._uiWidget) : undefined;
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIText._getTextAlpha(slot);
     }
 
     /**
@@ -145,8 +191,11 @@ export class UIText extends UI.Element {
      * @returns This text for chaining.
      */
     public setTextAlpha(alpha: number): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+        const slot = this._getSlotAndLogWarning();
 
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIText._setTextAlpha(slot, alpha);
         mod.SetUITextAlpha(this._uiWidget, alpha);
 
         return this;
@@ -183,17 +232,30 @@ export class UIText extends UI.Element {
 
     /**
      * The color of the text, or undefined if deleted.
-     * @returns The text color vector, or undefined if deleted.
+     * @returns The text color, or undefined if deleted.
      */
-    public get textColor(): mod.Vector | undefined {
-        return this._isValid ? mod.GetUITextColor(this._uiWidget) : undefined;
+    public get textColor(): Colors.Color | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIText._getTextColor(slot);
+    }
+
+    /**
+     * Retrieves the text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The text color, or undefined if deleted.
+     */
+    public getTextColor(out?: Colors.Color): Colors.Color | undefined {
+        const slot = this._slot;
+
+        return slot === UI.Element._INVALID_INDEX ? undefined : UIText._getTextColor(slot, out);
     }
 
     /**
      * Sets the color of the text.
      * @param color - The new color.
      */
-    public set textColor(color: mod.Vector) {
+    public set textColor(color: Colors.Color) {
         this.setTextColor(color);
     }
 
@@ -202,10 +264,13 @@ export class UIText extends UI.Element {
      * @param color - The new color.
      * @returns This text for chaining.
      */
-    public setTextColor(color: mod.Vector): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
+    public setTextColor(color: Colors.Color): this {
+        const slot = this._getSlotAndLogWarning();
 
-        mod.SetUITextColor(this._uiWidget, color);
+        if (slot === UI.Element._INVALID_INDEX) return this;
+
+        UIText._setTextColor(slot, color);
+        mod.SetUITextColor(this._uiWidget, Colors.toVector(color));
 
         return this;
     }
@@ -276,7 +341,7 @@ export namespace UIText {
     export type Params = UI.ElementParams & {
         label: mod.Message;
         textSize?: number;
-        textColor?: mod.Vector;
+        textColor?: Colors.Color;
         textAlpha?: number;
         textAnchor?: mod.UIAnchor;
         padding?: number;

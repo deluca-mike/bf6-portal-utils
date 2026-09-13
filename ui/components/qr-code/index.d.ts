@@ -1,3 +1,4 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIQRCode extends UI.Element {
     private static readonly BASE_MODULE_SIZE;
@@ -5,14 +6,17 @@ export declare class UIQRCode extends UI.Element {
     private static readonly _drawCallCounts;
     private static readonly _scales;
     private static readonly _margins;
-    private static readonly _darkColors;
-    private static readonly _darkAlphas;
-    private static readonly _lightColors;
-    private static readonly _lightAlphas;
+    private static readonly _darkRgba;
+    private static readonly _lightRgba;
     private static readonly _eccs;
     private static readonly _texts;
     private static readonly _childWidgets;
     private static readonly _visitedBuffer;
+    private static _packRgba;
+    private static _unpackColor;
+    private static _unpackAlpha;
+    private static _setRgb;
+    private static _setAlpha;
     /**
      * Creates a new optimized QR code element.
      * @param params - The parameters for the QR code.
@@ -37,9 +41,9 @@ export declare class UIQRCode extends UI.Element {
      * @param totalHeight - Total pixel height.
      * @param scale - Scale multiplier.
      * @param margin - Margin in module units.
-     * @param darkColor - Dark module color vector.
+     * @param darkColor - Dark module color.
      * @param darkAlpha - Dark module opacity.
-     * @param lightColor - Light module color vector.
+     * @param lightColor - Light module color.
      * @param lightAlpha - Light module opacity.
      */
     private _renderQR;
@@ -110,36 +114,80 @@ export declare class UIQRCode extends UI.Element {
     setMargin(margin: number): this;
     /**
      * The dark module color, or undefined if deleted.
-     * @returns The dark module color vector, or undefined.
+     * @returns The dark module color, or undefined if deleted.
      */
-    get darkColor(): mod.Vector | undefined;
+    get darkColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the dark module color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The dark module color, or undefined if deleted.
+     */
+    getDarkColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the dark module color.
-     * @param color - The new dark module color vector.
+     * @param color - The new dark module color.
      */
-    set darkColor(color: mod.Vector);
+    set darkColor(color: Colors.Color);
     /**
      * Sets the dark module color.
-     * @param color - The new dark module color vector.
+     * @param color - The new dark module color.
      * @returns This element for chaining.
      */
-    setDarkColor(color: mod.Vector): this;
+    setDarkColor(color: Colors.Color): this;
+    /**
+     * The dark module alpha opacity, or undefined if deleted.
+     * @returns The dark module alpha opacity, or undefined if deleted.
+     */
+    get darkAlpha(): number | undefined;
+    /**
+     * Sets the dark module alpha opacity.
+     * @param alpha - The new dark module alpha opacity.
+     */
+    set darkAlpha(alpha: number);
+    /**
+     * Sets the dark module alpha opacity.
+     * @param alpha - The new dark module alpha opacity.
+     * @returns This element for chaining.
+     */
+    setDarkAlpha(alpha: number): this;
     /**
      * The light module (background) color, or undefined if deleted.
-     * @returns The light color vector, or undefined.
+     * @returns The light color, or undefined if deleted.
      */
-    get lightColor(): mod.Vector | undefined;
+    get lightColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the light module color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The light module color, or undefined if deleted.
+     */
+    getLightColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the light module (background) color.
-     * @param color - The new light color vector.
+     * @param color - The new light color.
      */
-    set lightColor(color: mod.Vector);
+    set lightColor(color: Colors.Color);
     /**
      * Sets the light module (background) color.
-     * @param color - The new light color vector.
+     * @param color - The new light color.
      * @returns This element for chaining.
      */
-    setLightColor(color: mod.Vector): this;
+    setLightColor(color: Colors.Color): this;
+    /**
+     * The light module alpha opacity, or undefined if deleted.
+     * @returns The light module alpha opacity, or undefined if deleted.
+     */
+    get lightAlpha(): number | undefined;
+    /**
+     * Sets the light module alpha opacity.
+     * @param alpha - The new light module alpha opacity.
+     */
+    set lightAlpha(alpha: number);
+    /**
+     * Sets the light module alpha opacity.
+     * @param alpha - The new light module alpha opacity.
+     * @returns This element for chaining.
+     */
+    setLightAlpha(alpha: number): this;
     /**
      * Dynamically updates the QR code with a new text payload and optional ECC level.
      * @param text - The text string to encode.
@@ -205,17 +253,17 @@ export declare namespace UIQRCode {
          */
         margin?: number;
         /**
-         * Color vector for dark modules (defaults to `UI.COLORS.BLACK`).
+         * Color for dark modules (defaults to `UI.COLORS.BLACK`).
          */
-        darkColor?: mod.Vector;
+        darkColor?: Colors.Color;
         /**
          * Opacity for dark modules (defaults to `1`).
          */
         darkAlpha?: number;
         /**
-         * Color vector for light modules and background canvas (defaults to `UI.COLORS.WHITE`).
+         * Color for light modules and background canvas (defaults to `UI.COLORS.WHITE`).
          */
-        lightColor?: mod.Vector;
+        lightColor?: Colors.Color;
         /**
          * Opacity for light modules and background canvas (defaults to `1`).
          */

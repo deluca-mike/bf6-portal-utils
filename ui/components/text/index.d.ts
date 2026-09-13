@@ -1,6 +1,13 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIText extends UI.Element {
     private static readonly _labels;
+    private static readonly _textRgba;
+    private static _setTextRgba;
+    private static _setTextColor;
+    private static _setTextAlpha;
+    private static _getTextColor;
+    private static _getTextAlpha;
     /**
      * Creates a new text.
      * @param params - The parameters for the text.
@@ -60,20 +67,26 @@ export declare class UIText extends UI.Element {
     setTextAnchor(anchor: mod.UIAnchor): this;
     /**
      * The color of the text, or undefined if deleted.
-     * @returns The text color vector, or undefined if deleted.
+     * @returns The text color, or undefined if deleted.
      */
-    get textColor(): mod.Vector | undefined;
+    get textColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The text color, or undefined if deleted.
+     */
+    getTextColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the text.
      * @param color - The new color.
      */
-    set textColor(color: mod.Vector);
+    set textColor(color: Colors.Color);
     /**
      * Sets the color of the text.
      * @param color - The new color.
      * @returns This text for chaining.
      */
-    setTextColor(color: mod.Vector): this;
+    setTextColor(color: Colors.Color): this;
     /**
      * The size of the text, or undefined if deleted.
      * @returns The text size, or undefined if deleted.
@@ -114,7 +127,7 @@ export declare namespace UIText {
     type Params = UI.ElementParams & {
         label: mod.Message;
         textSize?: number;
-        textColor?: mod.Vector;
+        textColor?: Colors.Color;
         textAlpha?: number;
         textAnchor?: mod.UIAnchor;
         padding?: number;

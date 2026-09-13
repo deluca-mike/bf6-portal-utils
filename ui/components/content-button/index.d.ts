@@ -1,10 +1,11 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 /**
  * Base class for buttons that contain content elements (Text, Image, etc.).
  * Handles the pattern of wrapping a button and content element in a UIContainer.
  * @template TContent - The type of the content element (Text, Image, etc.)
- * @version 9.0.0
+ * @version 10.0.0
  */
 export declare abstract class UIContentButton<TContent extends UI.Element> extends UIBaseButton {
     private static readonly _ScratchParent;
@@ -12,6 +13,15 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     protected static readonly _padding: Float32Array<ArrayBuffer>;
     protected static readonly _buttonWidgets: (mod.UIWidget | null)[];
     protected static readonly _contents: (UI.Element | null)[];
+    private static readonly _baseRgba;
+    private static readonly _disabledRgba;
+    private static readonly _pressedRgba;
+    private static readonly _focusedRgba;
+    protected static _packRgba(color: Colors.Color, alpha: number): number;
+    protected static _unpackColor(rgba: number, out?: Colors.Color): Colors.Color;
+    protected static _unpackAlpha(rgba: number): number;
+    protected static _setRgb(arr: Uint32Array, slot: number, color: Colors.Color): void;
+    protected static _setAlpha(arr: Uint32Array, slot: number, alpha: number): void;
     /**
      * Creates a new content button.
      * @param params - The parameters for the content button.
@@ -33,6 +43,7 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     get content(): TContent | undefined;
     /**
      * @inheritdoc
+     * @returns The width in screen units, or undefined if deleted.
      */
     get width(): number | undefined;
     /**
@@ -41,10 +52,12 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     set width(width: number);
     /**
      * @inheritdoc
+     * @returns This content button for chaining.
      */
     setWidth(width: number): this;
     /**
      * @inheritdoc
+     * @returns The height in screen units, or undefined if deleted.
      */
     get height(): number | undefined;
     /**
@@ -53,10 +66,12 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     set height(height: number);
     /**
      * @inheritdoc
+     * @returns This content button for chaining.
      */
     setHeight(height: number): this;
     /**
      * @inheritdoc
+     * @returns The size object, or undefined if deleted.
      */
     get size(): UI.Size | undefined;
     /**
@@ -65,6 +80,7 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     set size(params: UI.Size);
     /**
      * @inheritdoc
+     * @returns This content button for chaining.
      */
     setSize(params: UI.Size): this;
     /**
@@ -106,20 +122,26 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     setPadding(padding: number): this;
     /**
      * The base color of the button, or undefined if deleted.
-     * @returns The base color vector, or undefined if deleted.
+     * @returns The base color, or undefined if deleted.
      */
-    get baseColor(): mod.Vector | undefined;
+    get baseColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the base color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The base color, or undefined if deleted.
+     */
+    getBaseColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the base color of the button.
      * @param color - The new base color.
      */
-    set baseColor(color: mod.Vector);
+    set baseColor(color: Colors.Color);
     /**
      * Sets the base color of the button.
      * @param color - The new base color.
      * @returns This content button for chaining.
      */
-    setBaseColor(color: mod.Vector): this;
+    setBaseColor(color: Colors.Color): this;
     /**
      * The base alpha of the button, or undefined if deleted.
      * @returns The base alpha opacity, or undefined if deleted.
@@ -138,20 +160,26 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     setBaseAlpha(alpha: number): this;
     /**
      * The disabled color of the button, or undefined if deleted.
-     * @returns The disabled color vector, or undefined if deleted.
+     * @returns The disabled color, or undefined if deleted.
      */
-    get disabledColor(): mod.Vector | undefined;
+    get disabledColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the disabled color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled color, or undefined if deleted.
+     */
+    getDisabledColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the disabled color of the button.
      * @param color - The new disabled color.
      */
-    set disabledColor(color: mod.Vector);
+    set disabledColor(color: Colors.Color);
     /**
      * Sets the disabled color of the button.
      * @param color - The new disabled color.
      * @returns This content button for chaining.
      */
-    setDisabledColor(color: mod.Vector): this;
+    setDisabledColor(color: Colors.Color): this;
     /**
      * The disabled alpha of the button, or undefined if deleted.
      * @returns The disabled alpha opacity, or undefined if deleted.
@@ -170,20 +198,26 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     setDisabledAlpha(alpha: number): this;
     /**
      * The pressed color of the button, or undefined if deleted.
-     * @returns The pressed color vector, or undefined if deleted.
+     * @returns The pressed color, or undefined if deleted.
      */
-    get pressedColor(): mod.Vector | undefined;
+    get pressedColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the pressed color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The pressed color, or undefined if deleted.
+     */
+    getPressedColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the pressed color of the button.
      * @param color - The new pressed color.
      */
-    set pressedColor(color: mod.Vector);
+    set pressedColor(color: Colors.Color);
     /**
      * Sets the pressed color of the button.
      * @param color - The new pressed color.
      * @returns This content button for chaining.
      */
-    setPressedColor(color: mod.Vector): this;
+    setPressedColor(color: Colors.Color): this;
     /**
      * The pressed alpha of the button, or undefined if deleted.
      * @returns The pressed alpha opacity, or undefined if deleted.
@@ -202,20 +236,26 @@ export declare abstract class UIContentButton<TContent extends UI.Element> exten
     setPressedAlpha(alpha: number): this;
     /**
      * The focused color of the button, or undefined if deleted.
-     * @returns The focused color vector, or undefined if deleted.
+     * @returns The focused color, or undefined if deleted.
      */
-    get focusedColor(): mod.Vector | undefined;
+    get focusedColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the focused color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The focused color, or undefined if deleted.
+     */
+    getFocusedColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the focused color of the button.
      * @param color - The new focused color.
      */
-    set focusedColor(color: mod.Vector);
+    set focusedColor(color: Colors.Color);
     /**
      * Sets the focused color of the button.
      * @param color - The new focused color.
      * @returns This content button for chaining.
      */
-    setFocusedColor(color: mod.Vector): this;
+    setFocusedColor(color: Colors.Color): this;
     /**
      * The focused alpha of the button, or undefined if deleted.
      * @returns The focused alpha opacity, or undefined if deleted.

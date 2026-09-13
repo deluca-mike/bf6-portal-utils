@@ -49,20 +49,20 @@ button.pressedColor = UI.COLORS.GREEN;
 | `anchor` | `mod.UIAnchor = mod.UIAnchor.Center` | See `mod` namespace for enum values. |
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
-| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
+| `bgColor` | `UI.Color = UI.COLORS.WHITE` | Button background color. Note: All button colors are multiplied onto `bgColor`, so it is best to leave `bgColor` as its default (white). |
 | `bgAlpha` | `number = 1` | Button background opacity. Note: Alphas are multiplied onto `bgAlpha`, however only `bgAlpha` will control the alpha of the `bgFill` effect. |
 | `bgFill` | `mod.UIBgFill = mod.UIBgFill.Solid` | Button fill mode. |
 | `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
 | `receiver` | `mod.Player \| mod.Team \| undefined` | Target audience. When omitted, inherits parent's receiver (or global if parent is `UI.ROOT_NODE`). Console warnings displayed for incompatible receivers. |
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `enabled` | `boolean = true` | Initial enabled state. |
-| `baseColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Base button color. |
+| `baseColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Base button color. |
 | `baseAlpha` | `number = 1` | Base button opacity. |
-| `disabledColor` | `mod.Vector = UI.COLORS.BF_GREY_3` | Disabled state color. |
+| `disabledColor` | `UI.Color = UI.COLORS.BF_GREY_3` | Disabled state color. |
 | `disabledAlpha` | `number = 1` | Disabled state opacity. |
-| `pressedColor` | `mod.Vector = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
+| `pressedColor` | `UI.Color = UI.COLORS.BF_GREEN_BRIGHT` | Pressed state color. |
 | `pressedAlpha` | `number = 1` | Pressed state opacity. |
-| `focusedColor` | `mod.Vector = UI.COLORS.BF_GREY_1` | Focused state color. |
+| `focusedColor` | `UI.Color = UI.COLORS.BF_GREY_1` | Focused state color. |
 | `focusedAlpha` | `number = 1` | Focused state opacity. |
 | `onClickDown` | `UI.ButtonHandler \| undefined` | Invoked on press (`ButtonDown`). When provided, enables that event on the widget. |
 | `onClickUp` | `UI.ButtonHandler \| undefined` | Invoked on release (`ButtonUp`). When provided, enables that event on the widget. Usual place for “activate on click” behavior. |
@@ -77,9 +77,9 @@ button.pressedColor = UI.COLORS.GREEN;
 
 `UIButton` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`
@@ -93,7 +93,7 @@ For complete documentation of these properties, see the [main UI documentation](
 - **`UIButton.getActiveButtonCount(): number`** (static method) – Retrieves the current number of active interactive buttons in the system.
 - **`enabled: boolean`** (getter/setter) – Button enabled state.
 - **`onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut: UI.ButtonHandler | undefined`** (getter/setter) – Per-event handlers. Setting or clearing a handler dynamically enables or disables the corresponding `mod.UIButtonEvent` on the engine widget.
-- **`baseColor`, `disabledColor`, `focusedColor`, `pressedColor: mod.Vector`** (getter/setter) – State-specific colors.
+- **`baseColor`, `disabledColor`, `focusedColor`, `pressedColor: UI.Color`** (getter/setter) – State-specific colors. Supports zero-allocation read overloads (`getBaseColor(out?)`, `getDisabledColor(out?)`, `getFocusedColor(out?)`, `getPressedColor(out?)`).
 - **`baseAlpha`, `disabledAlpha`, `focusedAlpha`, `pressedAlpha: number`** (getter/setter) – State-specific alphas.
 - **`delete(): void`** – Overrides `Element.delete()` to unregister button event routing and free its button slot before deleting the widget.
 
@@ -104,13 +104,13 @@ For complete documentation of these properties, see the [main UI documentation](
 ```ts
 type Params = UI.ElementParams & {
     enabled?: boolean;
-    baseColor?: mod.Vector;
+    baseColor?: UI.Color;
     baseAlpha?: number;
-    disabledColor?: mod.Vector;
+    disabledColor?: UI.Color;
     disabledAlpha?: number;
-    pressedColor?: mod.Vector;
+    pressedColor?: UI.Color;
     pressedAlpha?: number;
-    focusedColor?: mod.Vector;
+    focusedColor?: UI.Color;
     focusedAlpha?: number;
     onClickDown?: UI.ButtonHandler;
     onClickUp?: UI.ButtonHandler;

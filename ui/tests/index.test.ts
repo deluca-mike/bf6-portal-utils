@@ -1,5 +1,6 @@
 import './mockMod.ts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Colors } from '../../colors/index.ts';
 import { UI } from '../index.ts';
 import { UIBaseButton } from '../components/base-button/index.ts';
 import { UIContainer } from '../components/container/index.ts';
@@ -414,8 +415,8 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 padding: 5,
                 label: mod.Message('Click Me'),
                 textSize: 24,
-                textColor: mod.CreateVector(1, 1, 1),
-                textDisabledColor: mod.CreateVector(0.5, 0.5, 0.5),
+                textColor: { r: 1, g: 1, b: 1 },
+                textDisabledColor: { r: 0.5, g: 0.5, b: 0.5 },
                 enabled: true,
                 onClickUp: clickSpy,
             });
@@ -433,21 +434,21 @@ describe('UI Module & Components Lifecycle Tests', () => {
 
             // Verify initial enabled colors
             const content = textButton.content!;
-            expect(textButton.textColor).toEqual(mod.CreateVector(1, 1, 1));
-            expect(content.textColor).toEqual(mod.CreateVector(1, 1, 1));
+            expect(Colors.equals(textButton.textColor!, { r: 1, g: 1, b: 1 }, 0.005)).toBe(true);
+            expect(Colors.equals(content.textColor!, { r: 1, g: 1, b: 1 }, 0.005)).toBe(true);
 
             // Toggle enabled state to disabled
             textButton.setEnabled(false);
             expect(textButton.enabled).toBe(false);
-            expect(content.textColor).toEqual(mod.CreateVector(0.5, 0.5, 0.5));
-            expect(textButton.textColor).toEqual(mod.CreateVector(1, 1, 1));
-            expect(textButton.textDisabledColor).toEqual(mod.CreateVector(0.5, 0.5, 0.5));
+            expect(Colors.equals(content.textColor!, { r: 0.5, g: 0.5, b: 0.5 }, 0.005)).toBe(true);
+            expect(Colors.equals(textButton.textColor!, { r: 1, g: 1, b: 1 }, 0.005)).toBe(true);
+            expect(Colors.equals(textButton.textDisabledColor!, { r: 0.5, g: 0.5, b: 0.5 }, 0.005)).toBe(true);
 
             // Re-enable and verify original color is restored
             textButton.setEnabled(true);
             expect(textButton.enabled).toBe(true);
-            expect(content.textColor).toEqual(mod.CreateVector(1, 1, 1));
-            expect(textButton.textColor).toEqual(mod.CreateVector(1, 1, 1));
+            expect(Colors.equals(content.textColor!, { r: 1, g: 1, b: 1 }, 0.005)).toBe(true);
+            expect(Colors.equals(textButton.textColor!, { r: 1, g: 1, b: 1 }, 0.005)).toBe(true);
 
             // Resizing should cascade to content with padding deduction
             textButton.setWidth(300);
@@ -458,8 +459,8 @@ describe('UI Module & Components Lifecycle Tests', () => {
         });
 
         it('should correctly restore text color and alpha across enable/disable cycles and property updates', () => {
-            const enabledColor = mod.CreateVector(0.1, 0.2, 0.3);
-            const disabledColor = mod.CreateVector(0.8, 0.8, 0.8);
+            const enabledColor = { r: 0.1, g: 0.2, b: 0.3 };
+            const disabledColor = { r: 0.8, g: 0.8, b: 0.8 };
             const textButton = new UITextButton({
                 x: 0,
                 y: 0,
@@ -474,44 +475,44 @@ describe('UI Module & Components Lifecycle Tests', () => {
             });
 
             const content = textButton.content!;
-            expect(textButton.textColor).toEqual(enabledColor);
-            expect(textButton.textAlpha).toBe(0.9);
-            expect(content.textColor).toEqual(enabledColor);
-            expect(content.textAlpha).toBe(0.9);
+            expect(Colors.equals(textButton.textColor!, enabledColor, 0.005)).toBe(true);
+            expect(textButton.textAlpha).toBeCloseTo(0.9, 2);
+            expect(Colors.equals(content.textColor!, enabledColor, 0.005)).toBe(true);
+            expect(content.textAlpha).toBeCloseTo(0.9, 2);
 
             // Disable button
             textButton.enabled = false;
             expect(textButton.enabled).toBe(false);
-            expect(content.textColor).toEqual(disabledColor);
-            expect(content.textAlpha).toBe(0.4);
-            expect(textButton.textColor).toEqual(enabledColor);
-            expect(textButton.textAlpha).toBe(0.9);
-            expect(textButton.textDisabledColor).toEqual(disabledColor);
-            expect(textButton.textDisabledAlpha).toBe(0.4);
+            expect(Colors.equals(content.textColor!, disabledColor, 0.005)).toBe(true);
+            expect(content.textAlpha).toBeCloseTo(0.4, 2);
+            expect(Colors.equals(textButton.textColor!, enabledColor, 0.005)).toBe(true);
+            expect(textButton.textAlpha).toBeCloseTo(0.9, 2);
+            expect(Colors.equals(textButton.textDisabledColor!, disabledColor, 0.005)).toBe(true);
+            expect(textButton.textDisabledAlpha).toBeCloseTo(0.4, 2);
 
             // Mutate enabled text color while disabled
-            const newEnabledColor = mod.CreateVector(0.4, 0.5, 0.6);
+            const newEnabledColor = { r: 0.4, g: 0.5, b: 0.6 };
             textButton.textColor = newEnabledColor;
             textButton.textAlpha = 0.75;
             // Native widget should remain disabled
-            expect(content.textColor).toEqual(disabledColor);
-            expect(content.textAlpha).toBe(0.4);
-            expect(textButton.textColor).toEqual(newEnabledColor);
-            expect(textButton.textAlpha).toBe(0.75);
+            expect(Colors.equals(content.textColor!, disabledColor, 0.005)).toBe(true);
+            expect(content.textAlpha).toBeCloseTo(0.4, 2);
+            expect(Colors.equals(textButton.textColor!, newEnabledColor, 0.005)).toBe(true);
+            expect(textButton.textAlpha).toBeCloseTo(0.75, 2);
 
             // Re-enable button: new enabled colors should apply
             textButton.enabled = true;
             expect(textButton.enabled).toBe(true);
-            expect(content.textColor).toEqual(newEnabledColor);
-            expect(content.textAlpha).toBe(0.75);
-            expect(textButton.textColor).toEqual(newEnabledColor);
+            expect(Colors.equals(content.textColor!, newEnabledColor, 0.005)).toBe(true);
+            expect(content.textAlpha).toBeCloseTo(0.75, 2);
+            expect(Colors.equals(textButton.textColor!, newEnabledColor, 0.005)).toBe(true);
 
             textButton.delete();
         });
 
         it('should handle UITextButton created with enabled: false initially', () => {
-            const enabledColor = mod.CreateVector(0, 1, 0);
-            const disabledColor = mod.CreateVector(0.3, 0.3, 0.3);
+            const enabledColor = { r: 0, g: 1, b: 0 };
+            const disabledColor = { r: 0.3, g: 0.3, b: 0.3 };
             const textButton = new UITextButton({
                 x: 0,
                 y: 0,
@@ -527,13 +528,13 @@ describe('UI Module & Components Lifecycle Tests', () => {
 
             const content = textButton.content!;
             expect(textButton.enabled).toBe(false);
-            expect(content.textColor).toEqual(disabledColor);
-            expect(content.textAlpha).toBe(0.5);
-            expect(textButton.textColor).toEqual(enabledColor);
+            expect(Colors.equals(content.textColor!, disabledColor, 0.005)).toBe(true);
+            expect(content.textAlpha).toBeCloseTo(0.5, 2);
+            expect(Colors.equals(textButton.textColor!, enabledColor, 0.005)).toBe(true);
 
             textButton.setEnabled(true);
             expect(textButton.enabled).toBe(true);
-            expect(content.textColor).toEqual(enabledColor);
+            expect(Colors.equals(content.textColor!, enabledColor, 0.005)).toBe(true);
             expect(content.textAlpha).toBe(1);
 
             textButton.delete();
@@ -564,11 +565,11 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 width: 32,
                 height: 32,
                 imageType,
-                imageColor: mod.CreateVector(1, 1, 1),
+                imageColor: { r: 1, g: 1, b: 1 },
                 imageAlpha: 0.8,
             });
             expect(image.imageType).toBe(imageType);
-            expect(image.imageAlpha).toBe(0.8);
+            expect(image.imageAlpha).toBeCloseTo(0.8, 2);
             image.delete();
 
             const imageButton = new UIImageButton({
@@ -577,39 +578,39 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 width: 64,
                 height: 64,
                 imageType,
-                imageColor: mod.CreateVector(1, 0, 0),
+                imageColor: { r: 1, g: 0, b: 0 },
                 imageAlpha: 0.9,
-                imageDisabledColor: mod.CreateVector(0.2, 0.2, 0.2),
+                imageDisabledColor: { r: 0.2, g: 0.2, b: 0.2 },
                 imageDisabledAlpha: 0.3,
                 enabled: true,
             });
 
             const btnContent = imageButton.content!;
             expect(imageButton.imageType).toBe(imageType);
-            expect(imageButton.imageColor).toEqual(mod.CreateVector(1, 0, 0));
-            expect(imageButton.imageAlpha).toBe(0.9);
-            expect(btnContent.imageColor).toEqual(mod.CreateVector(1, 0, 0));
-            expect(btnContent.imageAlpha).toBe(0.9);
+            expect(Colors.equals(imageButton.imageColor!, { r: 1, g: 0, b: 0 }, 0.005)).toBe(true);
+            expect(imageButton.imageAlpha).toBeCloseTo(0.9, 2);
+            expect(Colors.equals(btnContent.imageColor!, { r: 1, g: 0, b: 0 }, 0.005)).toBe(true);
+            expect(btnContent.imageAlpha).toBeCloseTo(0.9, 2);
 
             // Toggle to disabled
             imageButton.setEnabled(false);
             expect(imageButton.enabled).toBe(false);
-            expect(btnContent.imageColor).toEqual(mod.CreateVector(0.2, 0.2, 0.2));
-            expect(btnContent.imageAlpha).toBe(0.3);
-            expect(imageButton.imageColor).toEqual(mod.CreateVector(1, 0, 0));
-            expect(imageButton.imageAlpha).toBe(0.9);
-            expect(imageButton.imageDisabledColor).toEqual(mod.CreateVector(0.2, 0.2, 0.2));
-            expect(imageButton.imageDisabledAlpha).toBe(0.3);
+            expect(Colors.equals(btnContent.imageColor!, { r: 0.2, g: 0.2, b: 0.2 }, 0.005)).toBe(true);
+            expect(btnContent.imageAlpha).toBeCloseTo(0.3, 2);
+            expect(Colors.equals(imageButton.imageColor!, { r: 1, g: 0, b: 0 }, 0.005)).toBe(true);
+            expect(imageButton.imageAlpha).toBeCloseTo(0.9, 2);
+            expect(Colors.equals(imageButton.imageDisabledColor!, { r: 0.2, g: 0.2, b: 0.2 }, 0.005)).toBe(true);
+            expect(imageButton.imageDisabledAlpha).toBeCloseTo(0.3, 2);
 
             // Re-enable and verify restored color
             imageButton.setEnabled(true);
             expect(imageButton.enabled).toBe(true);
-            expect(btnContent.imageColor).toEqual(mod.CreateVector(1, 0, 0));
-            expect(btnContent.imageAlpha).toBe(0.9);
+            expect(Colors.equals(btnContent.imageColor!, { r: 1, g: 0, b: 0 }, 0.005)).toBe(true);
+            expect(btnContent.imageAlpha).toBeCloseTo(0.9, 2);
 
-            imageButton.setImageColor(mod.CreateVector(0, 1, 0));
-            expect(imageButton.imageColor).toEqual(mod.CreateVector(0, 1, 0));
-            expect(btnContent.imageColor).toEqual(mod.CreateVector(0, 1, 0));
+            imageButton.setImageColor({ r: 0, g: 1, b: 0 });
+            expect(Colors.equals(imageButton.imageColor!, { r: 0, g: 1, b: 0 }, 0.005)).toBe(true);
+            expect(Colors.equals(btnContent.imageColor!, { r: 0, g: 1, b: 0 }, 0.005)).toBe(true);
 
             imageButton.delete();
             expect(imageButton.isDeleted).toBe(true);

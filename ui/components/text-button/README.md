@@ -45,10 +45,10 @@ button.enabled = false;
 | --- | --- | --- |
 | `label` | `mod.Message` | **Required.** Text label content. Note: `mod.Message` is opaque and cannot be unpacked into a string. |
 | `textSize` | `number = 36` | Font size. |
-| `textColor` | `mod.Vector = UI.COLORS.BLACK` | Text color (used when button is enabled). |
+| `textColor` | `UI.Color = UI.COLORS.BLACK` | Text color (used when button is enabled). |
 | `textAlpha` | `number = 1` | Text opacity (used when button is enabled). |
 | `textAnchor` | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget. |
-| `textDisabledColor` | `mod.Vector = UI.COLORS.BF_GREY_2` | Text color when button is disabled. |
+| `textDisabledColor` | `UI.Color = UI.COLORS.BF_GREY_2` | Text color when button is disabled. |
 | `textDisabledAlpha` | `number = 1` | Text opacity when button is disabled. |
 | `padding` | `number = 0` | Container padding. |
 
@@ -62,16 +62,16 @@ For a complete list of `UIBaseButton.Params`, see the [UIBaseButton documentatio
 
 `UITextButton` inherits all properties from `UIBaseButton` and `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`, `isValid`
 - **Parent Management**: `parent`
 - **Button State**: `enabled`
 - **Button handlers**: `onClickDown`, `onClickUp`, `onFocusIn`, `onFocusOut`
-- **Button Colors**: `baseColor`, `disabledColor`, `pressedColor`, `focusedColor`
+- **Button Colors**: `baseColor`, `getBaseColor(out?)`, `disabledColor`, `getDisabledColor(out?)`, `pressedColor`, `getPressedColor(out?)`, `focusedColor`, `getFocusedColor(out?)`
 - **Button Alphas**: `baseAlpha`, `disabledAlpha`, `pressedAlpha`, `focusedAlpha`
 
 For complete documentation of base properties, see the [main UI documentation](../../README.md#abstract-class-uielement-extends-uinode) and [UIBaseButton documentation](../base-button/README.md).
@@ -84,9 +84,9 @@ For complete documentation of base properties, see the [main UI documentation](.
 
 ### TextButton-Specific
 
-- **`textColor: mod.Vector`** (getter/setter) – Text color (used when button is enabled).
+- **`textColor: UI.Color`** (getter/setter) – Text color (used when button is enabled). Supports zero-allocation `getTextColor(out?)`.
 - **`textAlpha: number`** (getter/setter) – Text opacity (used when button is enabled).
-- **`textDisabledColor: mod.Vector`** (getter/setter) – Text color when button is disabled.
+- **`textDisabledColor: UI.Color`** (getter/setter) – Text color when button is disabled. Supports zero-allocation `getTextDisabledColor(out?)`.
 - **`textDisabledAlpha: number`** (getter/setter) – Text opacity when button is disabled.
 - **`padding: number`** (getter/setter) – Container padding.
 
@@ -106,7 +106,7 @@ For complete documentation of base properties, see the [main UI documentation](.
 ```ts
 type Params = UIBaseButton.Params &
     UIText.Params & {
-        textDisabledColor?: mod.Vector; // Default: UI.COLORS.BF_GREY_2
+        textDisabledColor?: UI.Color; // Default: UI.COLORS.BF_GREY_2
         textDisabledAlpha?: number; // Default: 1
     };
 ```

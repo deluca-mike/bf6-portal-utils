@@ -1,3 +1,4 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare abstract class UIBaseButton extends UI.Element {
     /**
@@ -157,13 +158,13 @@ export declare namespace UIBaseButton {
     };
     type Styling = {
         enabled?: boolean;
-        baseColor?: mod.Vector;
+        baseColor?: Colors.Color;
         baseAlpha?: number;
-        disabledColor?: mod.Vector;
+        disabledColor?: Colors.Color;
         disabledAlpha?: number;
-        pressedColor?: mod.Vector;
+        pressedColor?: Colors.Color;
         pressedAlpha?: number;
-        focusedColor?: mod.Vector;
+        focusedColor?: Colors.Color;
         focusedAlpha?: number;
     };
     type Params = UI.ElementParams & Styling & Handlers;

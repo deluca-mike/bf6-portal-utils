@@ -197,10 +197,12 @@ console.log(container2.children?.length); // 0 (automatically removed)
 
 ## Core Concepts & Architecture
 
-- **Structure-of-Arrays (SoA) Core** – Pre-allocated flat buffers (`Uint8Array`, `Int16Array`, `Uint16Array`, `Float32Array`) manage tree relationships, bitflags, generational slot tracking, and coordinates up to 2,048 elements with zero per-element array allocations. Elements use positive generational IDs (`slot + 1 + 10000 * generation`).
+- **Structure-of-Arrays (SoA) Core & Bit-Packing** – Pre-allocated flat buffers (`Uint16Array`, `Uint32Array`, `Float32Array`) manage tree relationships, bitflags, generational slot tracking, coordinates, and bit-packed styling (RGBA in `Uint32Array`, anchor/depth/bgFill/flags in `Uint16Array`) up to 2,048 elements with zero host getter queries and minimal memory footprint in QuickJS. Elements use positive generational IDs (`slot + 1 + 10000 * generation`).
 - **Generational Slot Recycling** – Each slot tracks a 16-bit generation counter incremented on every free. This guarantees that widget names (`ui_${id}`) and raw IDs are globally unique for the duration of a match, preventing stale handle collisions.
 - **Thin OOP Handles (~24B)** – All classes (`UIButton`, `UIContainer`, `UIText`, etc.) are lightweight facade handles referencing a single integer `_id` in the SoA buffers.
 - **`UI` namespace** – Central container for UI limits (`MAX_ELEMENTS`), types, receivers, active element queries (`getActiveElementCount()`), and singleton logging.
+- **`UI.Color` & `UI.COLORS`** – Transparent `{ r, g, b }` color type and frozen color presets re-exported from the `Colors` module. All color getters/setters across the UI module use transparent `UI.Color` objects without opaque `mod.Vector` wrappers.
+- **Zero-Allocation Property Accessors** – All color and vector getters support optional `out` targets (e.g. `getBgColor(out?)`, `getPosition(out?)`, `getSize(out?)`) to avoid creating garbage-collected objects during per-frame animation and state reads.
 - **`UI.Node` base class** – Root of the UI hierarchy exposing `id`, `isValid`, `isDeleted`, and `receiver`. The native widget handle (`_uiWidget`) is protected internally to prevent unsafe external mutations.
 - **`UI.Parent` interface** – Implemented by parent nodes (`Root` and `UIContainer`). Exposes `children: readonly Element[] | undefined` (safe snapshot array), `getChild(index)`, `childCount: number | undefined` (getter), and `forEachChild()` (zero-allocation iteration with `CallbackHandler` protection).
 - **`UI.ROOT_NODE` singleton** – Singleton `Root` instance (ID `0`) wrapping `mod.GetUIRoot()` that does not occupy a slot in the SoA arrays. All top-level elements default to this parent.
@@ -218,7 +220,6 @@ console.log(container2.children?.length); // 0 (automatically removed)
 - **Button Mechanics** – Button elements (`UIButton`, `UIContentButton`) route native engine events (`ButtonDown`, `ButtonUp`, `FocusIn`, `FocusOut`) via dedicated SoA button slots in `UIBaseButton` (`MAX_BUTTONS = 512`) with $\mathcal{O}(1)$ direct array indexing.
 - **Generational Widget Naming Scheme (`ui_${id}`)**:
     - All elements created by the `UI` module are assigned names in the format `'ui_1'`, `'ui_10001'`, etc., based on their unique generational element ID.
-- **Default colors** – `UI.COLORS` provides prebuilt `mod.Vector` constants for standard colors and BF6 palette colors.
 - **Position & Size parameters** – Constructor params support either `x`/`y` or `position` (mutually exclusive), and either `width`/`height` or `size` (mutually exclusive).
 
 ---
@@ -336,7 +337,7 @@ Retrieves the current number of active UI elements in the system.
 
 ### `UI.COLORS`
 
-Prebuilt `mod.Vector` colors for basic and Battlefield UI palettes (frozen with `Object.freeze`).
+Prebuilt `UI.Color` constants for basic and Battlefield UI palettes (frozen with `Object.freeze`).
 
 ### `UI.ROOT_NODE`
 
@@ -374,7 +375,7 @@ Base class for all created widgets.
 | `width` | `setWidth(width)` | `number \| undefined` | Individual width. |
 | `height` | `setHeight(height)` | `number \| undefined` | Individual height. |
 | `size` / `getSize(out?)` | `setSize(size)` | `UI.Size \| undefined` | Dimensions as `{ width, height }`. Supports zero-allocation `out`. |
-| `bgColor` | `setBgColor(color)` | `mod.Vector \| undefined` | Background color. |
+| `bgColor` / `getBgColor(out?)` | `setBgColor(color)` | `UI.Color \| undefined` | Background color. Supports zero-allocation `out`. |
 | `bgAlpha` | `setBgAlpha(alpha)` | `number \| undefined` | Background opacity (`0-1`). |
 | `bgFill` | `setBgFill(fill)` | `mod.UIBgFill \| undefined` | Background fill style. |
 | `anchor` | `setAnchor(anchor)` | `mod.UIAnchor \| undefined` | Anchor alignment point. |

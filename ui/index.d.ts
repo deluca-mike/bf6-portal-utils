@@ -1,5 +1,10 @@
+import { Colors } from '../colors/index.ts';
 import { Logging } from '../logging/index.ts';
 export declare namespace UI {
+    /**
+     * A transparent 3-channel RGB color.
+     */
+    export type Color = Colors.Color;
     /**
      * Log levels for controlling logging verbosity.
      */
@@ -48,7 +53,7 @@ export declare namespace UI {
         anchor?: mod.UIAnchor;
         parent?: Parent;
         visible?: boolean;
-        bgColor?: mod.Vector;
+        bgColor?: Colors.Color;
         bgAlpha?: number;
         bgFill?: mod.UIBgFill;
         depth?: mod.UIDepth;
@@ -175,10 +180,12 @@ export declare namespace UI {
         constructor();
         /**
          * @inheritdoc
+         * @returns The root UI widget.
          */
         protected get _uiWidget(): mod.UIWidget;
         /**
          * @inheritdoc
+         * @returns null.
          */
         get receiver(): null;
         /**
@@ -426,18 +433,24 @@ export declare namespace UI {
          * The background color of the element, or undefined if deleted.
          * @returns The background color of the element, or undefined.
          */
-        get bgColor(): mod.Vector | undefined;
+        get bgColor(): Color | undefined;
+        /**
+         * Retrieves the background color of the element into an optional target Color object for zero-allocation reuse.
+         * @param out - Optional target Color to write into.
+         * @returns The background color, or undefined if deleted.
+         */
+        getBgColor(out?: Color): Color | undefined;
         /**
          * Sets the background color of the element.
          * @param color - The background color to set.
          */
-        set bgColor(color: mod.Vector);
+        set bgColor(color: Color);
         /**
          * Sets the background color of the element.
          * @param color - The background color to set.
          * @returns This element for chaining.
          */
-        setBgColor(color: mod.Vector): this;
+        setBgColor(color: Color): this;
         /**
          * The background alpha of the element, or undefined if deleted.
          * @returns The background alpha of the element, or undefined.
@@ -521,33 +534,33 @@ export declare namespace UI {
     }
     /****** Constants ******/
     /**
-     * Some useful colors.
+     * Re-export of standard and Battlefield color presets.
      */
     export const COLORS: Readonly<{
-        BLACK: mod.Vector;
-        GREY_25: mod.Vector;
-        GREY_50: mod.Vector;
-        GREY_75: mod.Vector;
-        WHITE: mod.Vector;
-        RED: mod.Vector;
-        GREEN: mod.Vector;
-        BLUE: mod.Vector;
-        YELLOW: mod.Vector;
-        PURPLE: mod.Vector;
-        CYAN: mod.Vector;
-        MAGENTA: mod.Vector;
-        BF_GREY_1: mod.Vector;
-        BF_GREY_2: mod.Vector;
-        BF_GREY_3: mod.Vector;
-        BF_GREY_4: mod.Vector;
-        BF_BLUE_BRIGHT: mod.Vector;
-        BF_BLUE_DARK: mod.Vector;
-        BF_RED_BRIGHT: mod.Vector;
-        BF_RED_DARK: mod.Vector;
-        BF_GREEN_BRIGHT: mod.Vector;
-        BF_GREEN_DARK: mod.Vector;
-        BF_YELLOW_BRIGHT: mod.Vector;
-        BF_YELLOW_DARK: mod.Vector;
+        BLACK: Readonly<Colors.Color>;
+        GREY_25: Readonly<Colors.Color>;
+        GREY_50: Readonly<Colors.Color>;
+        GREY_75: Readonly<Colors.Color>;
+        WHITE: Readonly<Colors.Color>;
+        RED: Readonly<Colors.Color>;
+        GREEN: Readonly<Colors.Color>;
+        BLUE: Readonly<Colors.Color>;
+        YELLOW: Readonly<Colors.Color>;
+        PURPLE: Readonly<Colors.Color>;
+        CYAN: Readonly<Colors.Color>;
+        MAGENTA: Readonly<Colors.Color>;
+        BF_GREY_1: Readonly<Colors.Color>;
+        BF_GREY_2: Readonly<Colors.Color>;
+        BF_GREY_3: Readonly<Colors.Color>;
+        BF_GREY_4: Readonly<Colors.Color>;
+        BF_BLUE_BRIGHT: Readonly<Colors.Color>;
+        BF_BLUE_DARK: Readonly<Colors.Color>;
+        BF_RED_BRIGHT: Readonly<Colors.Color>;
+        BF_RED_DARK: Readonly<Colors.Color>;
+        BF_GREEN_BRIGHT: Readonly<Colors.Color>;
+        BF_GREEN_DARK: Readonly<Colors.Color>;
+        BF_YELLOW_BRIGHT: Readonly<Colors.Color>;
+        BF_YELLOW_DARK: Readonly<Colors.Color>;
     }>;
     export {};
 }

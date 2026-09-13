@@ -1,11 +1,10 @@
+import { Colors } from '../../../colors/index.ts';
 import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
 export declare class UITextButton extends UIContentButton<UIText> {
-    private static readonly _textColors;
-    private static readonly _textAlphas;
-    private static readonly _textDisabledColors;
-    private static readonly _textDisabledAlphas;
+    private static readonly _textRgba;
+    private static readonly _textDisabledRgba;
     /**
      * Creates a new text button.
      * @param params - The parameters for the text button.
@@ -18,6 +17,7 @@ export declare class UITextButton extends UIContentButton<UIText> {
     protected _setContentEnabled(enabled: boolean): void;
     /**
      * @inheritdoc
+     * @returns True if enabled, false if disabled, or undefined if deleted.
      */
     get enabled(): boolean | undefined;
     /**
@@ -26,6 +26,7 @@ export declare class UITextButton extends UIContentButton<UIText> {
     set enabled(enabled: boolean);
     /**
      * @inheritdoc
+     * @returns This text button for chaining.
      */
     setEnabled(enabled: boolean): this;
     /**
@@ -78,20 +79,26 @@ export declare class UITextButton extends UIContentButton<UIText> {
     setTextAnchor(anchor: mod.UIAnchor): this;
     /**
      * The color of the text when the button is enabled, or undefined if deleted.
-     * @returns The text color vector, or undefined if deleted.
+     * @returns The text color, or undefined if deleted.
      */
-    get textColor(): mod.Vector | undefined;
+    get textColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The text color, or undefined if deleted.
+     */
+    getTextColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the text when the button is enabled.
      * @param color - The new color.
      */
-    set textColor(color: mod.Vector);
+    set textColor(color: Colors.Color);
     /**
      * Sets the color of the text when the button is enabled.
      * @param color - The new color.
      * @returns This text button for chaining.
      */
-    setTextColor(color: mod.Vector): this;
+    setTextColor(color: Colors.Color): this;
     /**
      * The alpha of the text when the button is enabled, or undefined if deleted.
      * @returns The text alpha opacity, or undefined if deleted.
@@ -110,20 +117,26 @@ export declare class UITextButton extends UIContentButton<UIText> {
     setTextAlpha(alpha: number): this;
     /**
      * The color of the text when the button is disabled, or undefined if deleted.
-     * @returns The disabled text color vector, or undefined if deleted.
+     * @returns The disabled text color, or undefined if deleted.
      */
-    get textDisabledColor(): mod.Vector | undefined;
+    get textDisabledColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the disabled text color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The disabled text color, or undefined if deleted.
+     */
+    getTextDisabledColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the text when the button is disabled.
      * @param color - The new color.
      */
-    set textDisabledColor(color: mod.Vector);
+    set textDisabledColor(color: Colors.Color);
     /**
      * Sets the color of the text when the button is disabled.
      * @param color - The new disabled color.
      * @returns This text button for chaining.
      */
-    setTextDisabledColor(color: mod.Vector): this;
+    setTextDisabledColor(color: Colors.Color): this;
     /**
      * The alpha of the text when the button is disabled, or undefined if deleted.
      * @returns The disabled text alpha opacity, or undefined if deleted.
@@ -147,7 +160,7 @@ export declare namespace UITextButton {
      */
     type Params = UIBaseButton.Params &
         UIText.Params & {
-            textDisabledColor?: mod.Vector;
+            textDisabledColor?: Colors.Color;
             textDisabledAlpha?: number;
         };
 }

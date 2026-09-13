@@ -49,7 +49,7 @@ text.textSize = 36;
 | `parent` | `UI.Parent \| undefined` | Parent node. Defaults to `UI.ROOT_NODE` when omitted. Parent-child relationships are automatically managed. |
 | `visible` | `boolean = true` | Initial visibility. |
 | `padding` | `number = 0` | Container padding. |
-| `bgColor` | `mod.Vector = UI.COLORS.WHITE` | Background color. |
+| `bgColor` | `UI.Color = UI.COLORS.WHITE` | Background color. |
 | `bgAlpha` | `number = 0` | Background opacity. |
 | `bgFill` | `mod.UIBgFill = mod.UIBgFill.None` | Fill mode. |
 | `depth` | `mod.UIDepth = mod.UIDepth.AboveGameUI` | Z-order. |
@@ -57,7 +57,7 @@ text.textSize = 36;
 | `uiInputModeWhenVisible` | `boolean = false` | Automatically manage UI input mode based on visibility (see [UI Input Mode Management](../../README.md#ui-input-mode-management) section). |
 | `label` | `mod.Message` | **Required.** Text label content (see `mod` namespace for `mod.Message` helpers). Note: `mod.Message` is opaque and cannot be unpacked into a string. |
 | `textSize` | `number = 36` | Font size. |
-| `textColor` | `mod.Vector = UI.COLORS.BLACK` | Text color. |
+| `textColor` | `UI.Color = UI.COLORS.BLACK` | Text color. |
 | `textAlpha` | `number = 1` | Text opacity. |
 | `textAnchor` | `mod.UIAnchor = mod.UIAnchor.Center` | Alignment inside the text widget. |
 
@@ -69,9 +69,9 @@ text.textSize = 36;
 
 `UIText` inherits all properties from `UI.Element`, including:
 
-- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`
+- **Position & Size**: `x`, `y`, `width`, `height`, `position`, `size`, `getPosition(out?)`, `getSize(out?)`
 - **Visibility**: `visible`
-- **Background**: `bgColor`, `bgAlpha`, `bgFill`
+- **Background**: `bgColor`, `getBgColor(out?)`, `bgAlpha`, `bgFill`
 - **Layout**: `anchor`, `depth`
 - **UI Input Mode**: `uiInputModeWhenVisible`
 - **Lifecycle**: `delete()`, `isDeleted`
@@ -83,7 +83,7 @@ For complete documentation of these properties, see the [main UI documentation](
 
 - **`label: mod.Message`** (getter/setter) – The text label content. Use the setter to update the label. Note: `mod.Message` is opaque and cannot be unpacked into a string.
 - **`textSize: number`** (getter/setter) – Font size.
-- **`textColor: mod.Vector`** (getter/setter) – Text color.
+- **`textColor: UI.Color`** (getter/setter) – Text color. Supports zero-allocation `getTextColor(out?)`.
 - **`textAlpha: number`** (getter/setter) – Text opacity.
 - **`textAnchor: mod.UIAnchor`** (getter/setter) – Alignment inside the text widget.
 - **`padding: number`** (getter/setter) – Container padding.
@@ -98,7 +98,7 @@ For complete documentation of these properties, see the [main UI documentation](
 type Params = UI.ElementParams & {
     label: mod.Message; // Required (no default)
     textSize?: number; // Default: 36
-    textColor?: mod.Vector; // Default: UI.COLORS.BLACK
+    textColor?: UI.Color; // Default: UI.COLORS.BLACK
     textAlpha?: number; // Default: 1
     textAnchor?: mod.UIAnchor; // Default: mod.UIAnchor.Center
     padding?: number; // Default: 0

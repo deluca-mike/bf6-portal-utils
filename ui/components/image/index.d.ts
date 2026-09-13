@@ -1,10 +1,21 @@
+import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIImage extends UI.Element {
+    private static readonly _imageRgba;
+    private static _setImageRgba;
+    private static _setImageColor;
+    private static _setImageAlpha;
+    private static _getImageColor;
+    private static _getImageAlpha;
     /**
      * Creates a new image.
      * @param params - The parameters for the image.
      */
     constructor(params: UIImage.Params);
+    /**
+     * @inheritdoc
+     */
+    delete(): void;
     /**
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.
@@ -39,20 +50,26 @@ export declare class UIImage extends UI.Element {
     setImageAlpha(alpha: number): this;
     /**
      * The color of the image, or undefined if deleted.
-     * @returns The image color vector, or undefined if deleted.
+     * @returns The image color, or undefined if deleted.
      */
-    get imageColor(): mod.Vector | undefined;
+    get imageColor(): Colors.Color | undefined;
+    /**
+     * Retrieves the image color into an optional target Color object for zero-allocation reuse.
+     * @param out - Optional target Color to write into.
+     * @returns The image color, or undefined if deleted.
+     */
+    getImageColor(out?: Colors.Color): Colors.Color | undefined;
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      */
-    set imageColor(color: mod.Vector);
+    set imageColor(color: Colors.Color);
     /**
      * Sets the color of the image.
      * @param color - The new color of the image.
      * @returns This image for chaining.
      */
-    setImageColor(color: mod.Vector): this;
+    setImageColor(color: Colors.Color): this;
 }
 export declare namespace UIImage {
     /**
@@ -60,7 +77,7 @@ export declare namespace UIImage {
      */
     type Params = UI.ElementParams & {
         imageType: mod.UIImageType;
-        imageColor?: mod.Vector;
+        imageColor?: Colors.Color;
         imageAlpha?: number;
     };
 }

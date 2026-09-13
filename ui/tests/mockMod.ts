@@ -437,8 +437,10 @@ const mockMod: Record<string, unknown> = {
     SetUIImageColor: (widget: MockWidget, color: MockVector) => {
         widget.imageColor = color;
     },
-    GetUIImageColor: (widget: MockWidget) => widget.imageColor ?? { x: 1, y: 1, z: 1 },
     CreateVector: (x: number, y: number, z: number): MockVector => ({ x, y, z }),
+    XComponentOf: (v: MockVector): number => v.x,
+    YComponentOf: (v: MockVector): number => v.y,
+    ZComponentOf: (v: MockVector): number => v.z,
     CreateNewWeaponPackage: () => ({}),
     EnableUIInputMode: (enabled: boolean, receiver?: unknown) => {
         mockInputModeCalls.push({ enabled, receiver });
