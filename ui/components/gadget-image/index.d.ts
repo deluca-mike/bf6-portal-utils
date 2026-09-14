@@ -3,7 +3,7 @@ export declare class UIGadgetImage extends UI.Element {
     /**
      * The maximum number of gadget image widgets that can exist concurrently in memory.
      */
-    static readonly MAX_GADGET_IMAGES = 64;
+    static readonly MAX_GADGET_IMAGES = 128;
     private static readonly _MAX_GENERATIONS;
     private static _activeGadgetImageCount;
     private static _firstFreeGadgetImage;

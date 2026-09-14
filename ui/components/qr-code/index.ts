@@ -22,8 +22,6 @@ export class UIQRCode extends UI.Element {
 
     private static readonly _elementToQrCodeSlot = new Int16Array(UI.MAX_ELEMENTS);
 
-    private static readonly _drawCallCounts = new Int32Array(UIQRCode.MAX_QR_CODES);
-
     private static readonly _scales = new Float32Array(UIQRCode.MAX_QR_CODES);
 
     private static readonly _margins = new Int16Array(UIQRCode.MAX_QR_CODES);
@@ -141,7 +139,6 @@ export class UIQRCode extends UI.Element {
         UIQRCode._scales[slot] = 0;
         UIQRCode._margins[slot] = 0;
         UIQRCode._matrixSizes[slot] = 0;
-        UIQRCode._drawCallCounts[slot] = 0;
         UIQRCode._childWidgets[slot] = null;
         UIQRCode._elementToQrCodeSlot[elementSlot] = UI.Element._INVALID_INDEX;
 
@@ -174,6 +171,7 @@ export class UIQRCode extends UI.Element {
             params.width ??
             params.size?.width ??
             (totalUnits > 0 ? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale : 100);
+
         const baseHeight =
             params.height ??
             params.size?.height ??
@@ -379,7 +377,6 @@ export class UIQRCode extends UI.Element {
         const cellHeight = totalHeight / gridUnits;
 
         const childModules: UIQRCode.ChildModule[] = [];
-        let drawCalls = 1; // 1 for the root background canvas
 
         const nativeDepth = UI.Element._getNativeDepth(depth);
         const nativeTopLeft = UI.Element._getNativeAnchor(UI.Anchor.TopLeft);
@@ -422,7 +419,7 @@ export class UIQRCode extends UI.Element {
             const w = Math.max(1, x1 - x0);
             const h = Math.max(1, y1 - y0);
 
-            const childName = `ui_qr_${this._id}_${drawCalls}`;
+            const childName = `ui_qr_${this._id}_${childModules.length + 1}`;
 
             if (!receiver.nativeReceiver) {
                 mod.AddUIContainer(
@@ -457,7 +454,6 @@ export class UIQRCode extends UI.Element {
 
             const widget = mod.FindUIWidgetWithName(childName) as mod.UIWidget;
             childModules.push({ widget, col, row, spanW, spanH, isLight });
-            drawCalls++;
         };
 
         // Phase 2: Structural Elements (Z-Index Stacking)
@@ -576,7 +572,6 @@ export class UIQRCode extends UI.Element {
         }
 
         UIQRCode._childWidgets[qrSlot] = childModules;
-        UIQRCode._drawCallCounts[qrSlot] = drawCalls;
     }
 
     /**
@@ -603,7 +598,12 @@ export class UIQRCode extends UI.Element {
      */
     public get drawCallCount(): number | undefined {
         const slot = this._qrCodeSlot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._drawCallCounts[slot];
+
+        if (slot === UI.Element._INVALID_INDEX) return undefined;
+
+        const modules = UIQRCode._childWidgets[slot];
+
+        return modules ? modules.length + 1 : 1;
     }
 
     /**

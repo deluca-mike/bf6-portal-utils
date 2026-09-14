@@ -702,7 +702,6 @@ const UI = {
 class UIQRCode extends UI.Element {
     static BASE_MODULE_SIZE = 10;
     static _matrices = new Array(UI.MAX_ELEMENTS).fill(null);
-    static _drawCallCounts = new Int32Array(UI.MAX_ELEMENTS);
     static _scales = new Float32Array(UI.MAX_ELEMENTS);
     static _margins = new Int16Array(UI.MAX_ELEMENTS);
     static _darkColors = new Array(UI.MAX_ELEMENTS).fill(null);
@@ -985,7 +984,6 @@ class UIQRCode extends UI.Element {
         }
 
         UIQRCode._childWidgets[slot] = childWidgets;
-        UIQRCode._drawCallCounts[slot] = drawCalls;
     }
 
     _clearChildWidgets() {
@@ -997,7 +995,6 @@ class UIQRCode extends UI.Element {
             }
             widgets.length = 0;
         }
-        UIQRCode._drawCallCounts[slot] = 0;
     }
 
     delete() {
@@ -1006,7 +1003,8 @@ class UIQRCode extends UI.Element {
     }
 
     get drawCallCount() {
-        return UIQRCode._drawCallCounts[this._slot];
+        const widgets = UIQRCode._childWidgets[this._slot];
+        return widgets ? widgets.length + 1 : 1;
     }
 
     get matrix() {

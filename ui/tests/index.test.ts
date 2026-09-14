@@ -699,7 +699,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 );
             }
 
-            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(UIWeaponImage.MAX_WEAPON_IMAGES);
 
             // Pool full -> next weapon image should fail and delete itself
             const overflow = new UIWeaponImage({
@@ -710,11 +710,11 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 weapon: ak24,
             });
             expect(overflow.isDeleted).toBe(true);
-            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(UIWeaponImage.MAX_WEAPON_IMAGES);
 
             // Free a slot
             weapons[0].delete();
-            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(63);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(UIWeaponImage.MAX_WEAPON_IMAGES - 1);
 
             // Reuse freed slot
             const replacement = new UIWeaponImage({
@@ -725,7 +725,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 weapon: ak24,
             });
             expect(replacement.isDeleted).toBe(false);
-            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(UIWeaponImage.MAX_WEAPON_IMAGES);
 
             // Cleanup
             replacement.delete();
@@ -753,7 +753,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 );
             }
 
-            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(UIGadgetImage.MAX_GADGET_IMAGES);
 
             // Pool full -> next gadget image should fail and delete itself
             const overflow = new UIGadgetImage({
@@ -764,11 +764,11 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 gadget: medkit,
             });
             expect(overflow.isDeleted).toBe(true);
-            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(UIGadgetImage.MAX_GADGET_IMAGES);
 
             // Free a slot
             gadgets[0].delete();
-            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(63);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(UIGadgetImage.MAX_GADGET_IMAGES - 1);
 
             // Reuse freed slot
             const replacement = new UIGadgetImage({
@@ -779,7 +779,7 @@ describe('UI Module & Components Lifecycle Tests', () => {
                 gadget: medkit,
             });
             expect(replacement.isDeleted).toBe(false);
-            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(UIGadgetImage.MAX_GADGET_IMAGES);
 
             // Cleanup
             replacement.delete();

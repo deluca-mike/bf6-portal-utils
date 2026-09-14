@@ -12,7 +12,6 @@ export declare class UIQRCode extends UI.Element {
     private static readonly _generations;
     private static readonly _nextFreeQrCode;
     private static readonly _elementToQrCodeSlot;
-    private static readonly _drawCallCounts;
     private static readonly _scales;
     private static readonly _margins;
     private static readonly _matrixSizes;

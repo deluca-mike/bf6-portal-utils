@@ -3,7 +3,7 @@ export declare class UIWeaponImage extends UI.Element {
     /**
      * The maximum number of weapon image widgets that can exist concurrently in memory.
      */
-    static readonly MAX_WEAPON_IMAGES = 64;
+    static readonly MAX_WEAPON_IMAGES = 128;
     private static readonly _MAX_GENERATIONS;
     private static _activeWeaponImageCount;
     private static _firstFreeWeaponImage;
