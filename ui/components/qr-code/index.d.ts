@@ -95,6 +95,17 @@ export declare class UIQRCode extends UI.Element {
      */
     private _renderAlignments;
     /**
+     * Calculates the maximum vertical span of contiguous unvisited dark modules matching width w.
+     * @param matrix - The 2D boolean matrix.
+     * @param visited - The flat visited tracking buffer.
+     * @param r - Starting module row.
+     * @param c - Starting module column.
+     * @param w - Span width.
+     * @param N - Matrix dimension size.
+     * @returns The vertical span height.
+     */
+    private static _computeVerticalSpan;
+    /**
      * Renders data modules using greedy rectilinear rectangle merging.
      * @param childModules - The child module array tracking native widgets.
      * @param matrix - The 2D boolean matrix.
@@ -113,7 +124,6 @@ export declare class UIQRCode extends UI.Element {
      * @param matrix - The QR code boolean matrix.
      * @param totalWidth - Total pixel width.
      * @param totalHeight - Total pixel height.
-     * @param scale - Scale multiplier.
      * @param margin - Margin in module units.
      * @param darkColor - Dark module color.
      * @param darkAlpha - Dark module opacity.

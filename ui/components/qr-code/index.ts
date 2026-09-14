@@ -24,7 +24,7 @@ export class UIQRCode extends UI.Element {
 
     private static readonly _scales = new Float32Array(UIQRCode.MAX_QR_CODES);
 
-    private static readonly _margins = new Int16Array(UIQRCode.MAX_QR_CODES);
+    private static readonly _margins = new Uint8Array(UIQRCode.MAX_QR_CODES);
 
     private static readonly _matrixSizes = new Uint8Array(UIQRCode.MAX_QR_CODES);
 
@@ -176,7 +176,7 @@ export class UIQRCode extends UI.Element {
         const matrix = UIQRCode.Encoder.encode(params.text, ecc);
         const matrixSize = matrix.length;
         const scale = params.scale ?? 1;
-        const margin = params.margin ?? 0;
+        const margin = Math.max(0, params.margin ?? 0);
         const totalUnits = matrixSize + 2 * margin;
 
         const baseWidth =
@@ -250,18 +250,7 @@ export class UIQRCode extends UI.Element {
         UI.Element._setForegroundAlpha(this._slot, darkAlpha);
         UI.Element._setForegroundColor(this._slot, darkColor);
 
-        this._renderQR(
-            qrSlot,
-            matrix,
-            baseWidth,
-            baseHeight,
-            scale,
-            margin,
-            darkColor,
-            darkAlpha,
-            lightColor,
-            lightAlpha
-        );
+        this._renderQR(qrSlot, matrix, baseWidth, baseHeight, margin, darkColor, darkAlpha, lightColor, lightAlpha);
     }
 
     /**
@@ -520,6 +509,40 @@ export class UIQRCode extends UI.Element {
     }
 
     /**
+     * Calculates the maximum vertical span of contiguous unvisited dark modules matching width w.
+     * @param matrix - The 2D boolean matrix.
+     * @param visited - The flat visited tracking buffer.
+     * @param r - Starting module row.
+     * @param c - Starting module column.
+     * @param w - Span width.
+     * @param N - Matrix dimension size.
+     * @returns The vertical span height.
+     */
+    private static _computeVerticalSpan(
+        matrix: UIQRCode.BooleanMatrix,
+        visited: Uint8Array,
+        r: number,
+        c: number,
+        w: number,
+        N: number
+    ): number {
+        let h = 1;
+
+        while (r + h < N) {
+            const nextRow = matrix[r + h];
+            const nextRowOffset = (r + h) * N;
+
+            for (let k = 0; k < w; ++k) {
+                if (!nextRow[c + k] || visited[nextRowOffset + (c + k)] === 1) return h;
+            }
+
+            h++;
+        }
+
+        return h;
+    }
+
+    /**
      * Renders data modules using greedy rectilinear rectangle merging.
      * @param childModules - The child module array tracking native widgets.
      * @param matrix - The 2D boolean matrix.
@@ -556,19 +579,7 @@ export class UIQRCode extends UI.Element {
                 }
 
                 // Step 3b: Expand Vertically
-                let h = 1;
-                verticalCheck: while (r + h < N) {
-                    const nextRow = matrix[r + h];
-                    const nextRowOffset = (r + h) * N;
-
-                    for (let k = 0; k < w; ++k) {
-                        if (!nextRow[c + k] || visited[nextRowOffset + (c + k)] === 1) {
-                            break verticalCheck;
-                        }
-                    }
-
-                    h++;
-                }
+                const h = UIQRCode._computeVerticalSpan(matrix, visited, r, c, w, N);
 
                 // Step 3c: Draw Merged Dark Rectangle
                 this._drawModuleRect(
@@ -606,7 +617,6 @@ export class UIQRCode extends UI.Element {
      * @param matrix - The QR code boolean matrix.
      * @param totalWidth - Total pixel width.
      * @param totalHeight - Total pixel height.
-     * @param scale - Scale multiplier.
      * @param margin - Margin in module units.
      * @param darkColor - Dark module color.
      * @param darkAlpha - Dark module opacity.
@@ -618,7 +628,6 @@ export class UIQRCode extends UI.Element {
         matrix: UIQRCode.BooleanMatrix,
         totalWidth: number,
         totalHeight: number,
-        scale: number,
         margin: number,
         darkColor: Colors.Color,
         darkAlpha: number,
@@ -627,8 +636,9 @@ export class UIQRCode extends UI.Element {
     ): void {
         const N = matrix.length;
 
-        if (N === 0) return;
+        if (N < 21 || N > 177 || (N - 17) % 4 !== 0) return;
 
+        const version = (N - 17) / 4;
         const darkVec = Colors.toVector(darkColor);
         const lightVec = Colors.toVector(lightColor);
 
@@ -648,37 +658,33 @@ export class UIQRCode extends UI.Element {
         }
 
         const visited = UIQRCode._visitedBuffer;
-        const isStandardSize = N >= 21 && (N - 17) % 4 === 0;
-        const version = isStandardSize ? (N - 17) / 4 : 0;
 
-        if (version >= 1 && version <= 40) {
-            this._renderFinders(
-                childModules,
-                visited,
-                N,
-                cellWidth,
-                cellHeight,
-                margin,
-                darkVec,
-                darkAlpha,
-                lightVec,
-                lightAlpha
-            );
+        this._renderFinders(
+            childModules,
+            visited,
+            N,
+            cellWidth,
+            cellHeight,
+            margin,
+            darkVec,
+            darkAlpha,
+            lightVec,
+            lightAlpha
+        );
 
-            this._renderAlignments(
-                childModules,
-                visited,
-                version,
-                N,
-                cellWidth,
-                cellHeight,
-                margin,
-                darkVec,
-                darkAlpha,
-                lightVec,
-                lightAlpha
-            );
-        }
+        this._renderAlignments(
+            childModules,
+            visited,
+            version,
+            N,
+            cellWidth,
+            cellHeight,
+            margin,
+            darkVec,
+            darkAlpha,
+            lightVec,
+            lightAlpha
+        );
 
         this._renderDataModules(childModules, matrix, visited, N, cellWidth, cellHeight, margin, darkVec, darkAlpha);
 
@@ -781,7 +787,7 @@ export class UIQRCode extends UI.Element {
 
         if (slot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._margins[slot] = margin;
+        UIQRCode._margins[slot] = Math.max(0, margin);
         this._updateModuleLayout(slot);
 
         return this;
