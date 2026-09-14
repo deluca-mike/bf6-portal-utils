@@ -938,44 +938,56 @@ class UIQRCode extends UI.Element {
             }
         }
 
-        // Phase 3: Data Modules (Greedy Rectilinear Merging)
+        // Phase 3: Data Modules (Greedy Rectilinear Merging with Bounded Overlap)
         for (let r = 0; r < N; ++r) {
             const row = matrix[r];
             const rowOffset = r * N;
 
             for (let c = 0; c < N; ++c) {
-                if (!row[c] || visited[rowOffset + c] === 1) {
+                if (!row[c] || visited[rowOffset + c] !== 0) {
                     continue;
                 }
 
-                // Expand Horizontally
+                // Expand Horizontally across unvisited (0) and previously drawn dark data (2)
                 let w = 1;
-                while (c + w < N && row[c + w] && visited[rowOffset + (c + w)] === 0) {
+                let lastUnvisitedW = 1;
+                while (c + w < N && row[c + w] && visited[rowOffset + (c + w)] !== 1) {
+                    if (visited[rowOffset + (c + w)] === 0) {
+                        lastUnvisitedW = w + 1;
+                    }
                     w++;
                 }
+                w = lastUnvisitedW;
 
                 // Expand Vertically
                 let h = 1;
-                verticalCheck: while (r + h < N) {
+                while (r + h < N) {
                     const nextRow = matrix[r + h];
                     const nextRowOffset = (r + h) * N;
+                    let match = true;
+                    let hasUnvisited = false;
 
                     for (let k = 0; k < w; ++k) {
-                        if (!nextRow[c + k] || visited[nextRowOffset + (c + k)] === 1) {
-                            break verticalCheck;
+                        const v = visited[nextRowOffset + (c + k)];
+                        if (!nextRow[c + k] || v === 1) {
+                            match = false;
+                            break;
                         }
+                        if (v === 0) hasUnvisited = true;
                     }
+
+                    if (!match || !hasUnvisited) break;
                     h++;
                 }
 
                 // Draw Merged Dark Rectangle
                 drawRect(c, r, w, h, darkColor, darkAlpha, 'data_merged');
 
-                // Mark w x h region as visited
+                // Mark w x h region as visited (state 2)
                 for (let i = 0; i < h; ++i) {
                     const markRowOffset = (r + i) * N;
                     for (let j = 0; j < w; ++j) {
-                        visited[markRowOffset + (c + j)] = 1;
+                        visited[markRowOffset + (c + j)] = 2;
                     }
                 }
 
@@ -1619,7 +1631,7 @@ function hexToRgb(hex) {
 }
 
 function renderUI() {
-    const text = document.getElementById('qrText').value || ' ';
+    const text = document.getElementById('qrText').value;
     const ecc = document.getElementById('eccSelect').value;
     const scale = parseFloat(document.getElementById('scaleRange').value);
     const margin = parseInt(document.getElementById('marginRange').value, 10);

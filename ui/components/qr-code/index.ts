@@ -509,9 +509,11 @@ export class UIQRCode extends UI.Element {
     }
 
     /**
-     * Calculates the maximum vertical span of contiguous unvisited dark modules matching width w.
+     * Calculates the maximum vertical span of contiguous dark modules matching width w.
+     * Overlapping dark data modules are permitted as long as they contain at least one unvisited module.
+     * Structural modules (finders, alignments) and light modules are never crossed.
      * @param matrix - The 2D boolean matrix.
-     * @param visited - The flat visited tracking buffer.
+     * @param visited - The flat visited tracking buffer (0=unvisited, 1=structural, 2=data).
      * @param r - Starting module row.
      * @param c - Starting module column.
      * @param w - Span width.
@@ -531,10 +533,16 @@ export class UIQRCode extends UI.Element {
         while (r + h < N) {
             const nextRow = matrix[r + h];
             const nextRowOffset = (r + h) * N;
+            let hasUnvisited = false;
 
             for (let k = 0; k < w; ++k) {
-                if (!nextRow[c + k] || visited[nextRowOffset + (c + k)] === 1) return h;
+                const v = visited[nextRowOffset + (c + k)];
+
+                if (!nextRow[c + k] || v === 1) return h;
+                if (v === 0) hasUnvisited = true;
             }
+
+            if (!hasUnvisited) return h;
 
             h++;
         }
@@ -543,10 +551,13 @@ export class UIQRCode extends UI.Element {
     }
 
     /**
-     * Renders data modules using greedy rectilinear rectangle merging.
+     * Renders data modules using greedy rectilinear rectangle merging with bounded overlap.
+     * Dark rectangles may overlap previously drawn dark data modules (state 2) if it bridges
+     * to absorb unvisited dark modules (state 0), minimizing total draw calls.
+     * Structural modules (state 1) and light modules are strictly never overdrawn.
      * @param childModules - The child module array tracking native widgets.
      * @param matrix - The 2D boolean matrix.
-     * @param visited - The flat visited tracking buffer.
+     * @param visited - The flat visited tracking buffer (0=unvisited, 1=structural, 2=data).
      * @param N - Matrix dimension size.
      * @param cellWidth - Scaled width of a single module cell.
      * @param cellHeight - Scaled height of a single module cell.
@@ -570,13 +581,21 @@ export class UIQRCode extends UI.Element {
             const rowOffset = r * N;
 
             for (let c = 0; c < N; ++c) {
-                if (!row[c] || visited[rowOffset + c] === 1) continue;
+                if (!row[c] || visited[rowOffset + c] !== 0) continue;
 
-                // Step 3a: Expand Horizontally
+                // Step 3a: Expand Horizontally across unvisited (0) and previously drawn dark data (2)
                 let w = 1;
-                while (c + w < N && row[c + w] && visited[rowOffset + (c + w)] === 0) {
+                let lastUnvisitedW = 1;
+
+                while (c + w < N && row[c + w] && visited[rowOffset + (c + w)] !== 1) {
+                    if (visited[rowOffset + (c + w)] === 0) {
+                        lastUnvisitedW = w + 1;
+                    }
                     w++;
                 }
+
+                // Trim trailing overlap that does not absorb any new unvisited cells
+                w = lastUnvisitedW;
 
                 // Step 3b: Expand Vertically
                 const h = UIQRCode._computeVerticalSpan(matrix, visited, r, c, w, N);
@@ -596,12 +615,12 @@ export class UIQRCode extends UI.Element {
                     cellHeight
                 );
 
-                // Step 3d: Mark w x h region as visited
+                // Step 3d: Mark w x h region as visited data modules (state 2)
                 for (let i = 0; i < h; ++i) {
                     const markRowOffset = (r + i) * N;
 
                     for (let j = 0; j < w; ++j) {
-                        visited[markRowOffset + (c + j)] = 1;
+                        visited[markRowOffset + (c + j)] = 2;
                     }
                 }
 
