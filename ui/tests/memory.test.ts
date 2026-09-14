@@ -456,10 +456,10 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
         benchmarkResults.push(result);
     });
 
-    it('Scenario 10: UIQRCode Instantiation, Dynamic Mutations & Disposal', () => {
+    it('Scenario 10: UIQRCode Instantiation, In-Place Visual Mutations & Disposal', () => {
         const count = 50;
         const result = server.benchmarkScenario({
-            scenario: '10. UIQRCode Dynamic Lifecycle (50 QR Codes)',
+            scenario: '10. UIQRCode In-Place Lifecycle (50 QR Codes)',
             entities: `${count} QR codes`,
             numericCount: count,
             unit: 'qrcode',
@@ -473,8 +473,9 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
                             x: i * 10,
                             y: i * 10,
                         });
-                        qr.setText('https://battlefield.portal/match/' + (i + 100));
                         qr.scale = 2;
+                        qr.setDarkColor({ r: 0, g: 0, b: 1 });
+                        qr.margin = 2;
                         qrs.push(qr);
                     }
                     globalThis.__s10 = qrs;
@@ -493,4 +494,62 @@ describe('UI Module QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simul
         benchmarkResults.push(result);
         expect(result['Live Objs Delta']).toBeGreaterThan(0);
     });
+
+    it('Scenario 11: UIQRCode High-Frequency Churn & Visual Mutation Stress Test (100 cycles + 1k writes)', () => {
+        const cycles = 100;
+        const mutations = 1_000;
+        const activeBatch = 16;
+
+        const result = server.benchmarkScenario({
+            scenario: '11. QR Stress Test (100 cycles + 1k mutations)',
+            entities: `${cycles} cycles, ${mutations} writes`,
+            numericCount: cycles,
+            unit: 'cycle',
+            run: `
+                    (() => {
+                        // Phase 1: Rapid 100 allocation/free cycles testing sub-pool intrusive free-list
+                        for (let c = 0; c < ${cycles}; ++c) {
+                            const qr = new UIQRCode({
+                                text: 'BF6-PORTAL-TEST-' + (c % 100),
+                                scale: 1,
+                                margin: 1,
+                            });
+                            qr.delete();
+                        }
+
+                        // Phase 2: Active batch under sustained 1,000 visual property mutations
+                        const qrs = [];
+                        for (let i = 0; i < ${activeBatch}; ++i) {
+                            qrs.push(new UIQRCode({
+                                text: 'STRESS-QR-' + i,
+                                scale: 1,
+                                margin: 0,
+                                darkColor: { r: 0, g: 0, b: 0 },
+                                lightColor: { r: 1, g: 1, b: 1 },
+                            }));
+                        }
+
+                        const darkColor = { r: 0.1, g: 0.2, b: 0.3 };
+                        const lightColor = { r: 0.9, g: 0.9, b: 0.9 };
+
+                        for (let m = 0; m < ${mutations}; ++m) {
+                            const qr = qrs[m % ${activeBatch}];
+                            qr.scale = (m % 3) + 1;
+                            qr.margin = m % 4;
+                            qr.setDarkColor(darkColor);
+                            qr.darkAlpha = (m % 10) / 10;
+                            qr.setLightColor(lightColor);
+                            qr.lightAlpha = (m % 10) / 10;
+                        }
+
+                        for (let i = 0; i < qrs.length; ++i) {
+                            qrs[i].delete();
+                        }
+                    })();
+                `,
+        });
+
+        benchmarkResults.push(result);
+        expect(result['Per-Item']).toBeDefined();
+    }, 20_000);
 });

@@ -1,74 +1,162 @@
 import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 
-// version: 2.0.0
+// version: 3.0.0
 export class UIQRCode extends UI.Element {
+    /**
+     * The maximum number of QR code widgets that can exist concurrently in memory.
+     */
+    public static readonly MAX_QR_CODES = 128;
+
     private static readonly BASE_MODULE_SIZE = 10;
 
-    private static readonly _matrices = new Array<UIQRCode.BooleanMatrix | null>(UI.MAX_ELEMENTS);
+    private static readonly _MAX_GENERATIONS = 65_535;
 
-    private static readonly _drawCallCounts = new Int32Array(UI.MAX_ELEMENTS);
+    private static _activeQrCodeCount: number = 0;
 
-    private static readonly _scales = new Float32Array(UI.MAX_ELEMENTS);
+    private static _firstFreeQrCode: number = 0;
 
-    private static readonly _margins = new Int16Array(UI.MAX_ELEMENTS);
+    private static readonly _generations = new Uint16Array(UIQRCode.MAX_QR_CODES);
 
-    private static readonly _darkRgba = new Uint32Array(UI.MAX_ELEMENTS);
+    private static readonly _nextFreeQrCode = new Int16Array(UIQRCode.MAX_QR_CODES);
 
-    private static readonly _lightRgba = new Uint32Array(UI.MAX_ELEMENTS);
+    private static readonly _elementToQrCodeSlot = new Int16Array(UI.MAX_ELEMENTS);
 
-    private static readonly _eccs = new Array<UIQRCode.ECC | null>(UI.MAX_ELEMENTS);
+    private static readonly _drawCallCounts = new Int32Array(UIQRCode.MAX_QR_CODES);
 
-    private static readonly _texts = new Array<string | null>(UI.MAX_ELEMENTS);
+    private static readonly _scales = new Float32Array(UIQRCode.MAX_QR_CODES);
 
-    private static readonly _childWidgets = new Array<mod.UIWidget[] | null>(UI.MAX_ELEMENTS);
+    private static readonly _margins = new Int16Array(UIQRCode.MAX_QR_CODES);
+
+    private static readonly _matrixSizes = new Uint8Array(UIQRCode.MAX_QR_CODES);
+
+    private static readonly _childWidgets = new Array<UIQRCode.ChildModule[] | null>(UIQRCode.MAX_QR_CODES);
 
     // Reusable flat visited buffer to avoid garbage collection allocations during rendering
     private static readonly _visitedBuffer = new Uint8Array(177 * 177);
 
     static {
-        UIQRCode._matrices.fill(null);
-        UIQRCode._childWidgets.fill(null);
-        UIQRCode._eccs.fill(null);
-        UIQRCode._texts.fill(null);
-    }
-
-    private static _packRgba(color: Colors.Color, alpha: number): number {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
-    private static _unpackColor(rgba: number, out?: Colors.Color): Colors.Color {
-        const r = (rgba >>> 24) / 255;
-        const g = ((rgba >>> 16) & 0xff) / 255;
-        const b = ((rgba >>> 8) & 0xff) / 255;
-        if (out) {
-            out.r = r;
-            out.g = g;
-            out.b = b;
-            return out;
+        for (let i = 0; i < UIQRCode.MAX_QR_CODES - 1; ++i) {
+            UIQRCode._nextFreeQrCode[i] = i + 1;
         }
-        return { r, g, b };
+
+        UIQRCode._nextFreeQrCode[UIQRCode.MAX_QR_CODES - 1] = UI.Element._INVALID_INDEX;
+        UIQRCode._generations.fill(0);
+        UIQRCode._childWidgets.fill(null);
+        UIQRCode._elementToQrCodeSlot.fill(UI.Element._INVALID_INDEX);
     }
 
-    private static _unpackAlpha(rgba: number): number {
-        return (rgba & 0xff) / 255;
+    /**
+     * Returns the number of active QR code elements.
+     * @returns The active QR code count.
+     */
+    public static getActiveQRCodeCount(): number {
+        return UIQRCode._activeQrCodeCount;
     }
 
-    private static _setRgb(arr: Uint32Array, slot: number, color: Colors.Color): void {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = arr[slot] & 0xff;
-        arr[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    /**
+     * Resolves the 0-based QR code slot for an element ID.
+     * @param elementId - The element ID.
+     * @returns The 0-based QR slot index (0 to MAX_QR_CODES - 1), or -1 if invalid or unallocated.
+     */
+    protected static _resolveQrCodeSlot(elementId: number): number {
+        const elementSlot = UI.Element._resolveSlot(elementId);
+
+        if (elementSlot === UI.Element._INVALID_INDEX) return UI.Element._INVALID_INDEX;
+
+        return UIQRCode._elementToQrCodeSlot[elementSlot];
     }
 
-    private static _setAlpha(arr: Uint32Array, slot: number, alpha: number): void {
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        arr[slot] = (arr[slot] & ~0xff) | aInt;
+    protected get _qrCodeSlot(): number {
+        const slot = this._slot;
+
+        return slot !== UI.Element._INVALID_INDEX ? UIQRCode._elementToQrCodeSlot[slot] : UI.Element._INVALID_INDEX;
+    }
+
+    protected override get _isValid(): boolean {
+        return this._qrCodeSlot !== UI.Element._INVALID_INDEX;
+    }
+
+    /**
+     * Resolves the 0-based QR code slot for this QR instance and logs a warning if invalid.
+     * @returns The 0-based QR slot index (0 to MAX_QR_CODES - 1), or -1 if invalid or unallocated.
+     */
+    protected _resolveQrCodeSlotAndLogWarning(): number {
+        const elementSlot = this._getSlotAndLogWarning();
+
+        if (elementSlot === UI.Element._INVALID_INDEX) return UI.Element._INVALID_INDEX;
+
+        const qrSlot = UIQRCode._elementToQrCodeSlot[elementSlot];
+
+        if (qrSlot === UI.Element._INVALID_INDEX) {
+            UIQRCode._logging.log(`QR code is deleted`, UI.LogLevel.Warning);
+            return UI.Element._INVALID_INDEX;
+        }
+
+        return qrSlot;
+    }
+
+    protected override _getIsInvalidAndLogWarning(): boolean {
+        return this._resolveQrCodeSlotAndLogWarning() === UI.Element._INVALID_INDEX;
+    }
+
+    /**
+     * Allocates a QR code slot for this QR instance.
+     * @returns The allocated QR slot index (0 to MAX_QR_CODES - 1), or INVALID_INDEX (-1) if full or invalid.
+     */
+    private _allocateQrCodeSlot(): number {
+        const elementSlot = this._slot;
+
+        if (elementSlot < 0 || elementSlot >= UI.MAX_ELEMENTS) return UI.Element._INVALID_INDEX;
+
+        if (UIQRCode._firstFreeQrCode === UI.Element._INVALID_INDEX) {
+            UIQRCode._logging.log('QR code pool is full', UI.LogLevel.Error);
+            return UI.Element._INVALID_INDEX;
+        }
+
+        const slot = UIQRCode._firstFreeQrCode;
+
+        UIQRCode._firstFreeQrCode = UIQRCode._nextFreeQrCode[slot];
+        UIQRCode._nextFreeQrCode[slot] = UI.Element._INVALID_INDEX;
+        UIQRCode._childWidgets[slot] = null;
+        UIQRCode._elementToQrCodeSlot[elementSlot] = slot;
+
+        UIQRCode._activeQrCodeCount++;
+
+        return slot;
+    }
+
+    /**
+     * Frees the QR code slot associated with this QR instance.
+     */
+    private _freeQrCodeSlot(): void {
+        const elementSlot = this._slot;
+
+        if (elementSlot < 0 || elementSlot >= UI.MAX_ELEMENTS) return;
+
+        const slot = UIQRCode._elementToQrCodeSlot[elementSlot];
+
+        if (slot === UI.Element._INVALID_INDEX || slot < 0 || slot >= UIQRCode.MAX_QR_CODES) return;
+
+        UIQRCode._scales[slot] = 0;
+        UIQRCode._margins[slot] = 0;
+        UIQRCode._matrixSizes[slot] = 0;
+        UIQRCode._drawCallCounts[slot] = 0;
+        UIQRCode._childWidgets[slot] = null;
+        UIQRCode._elementToQrCodeSlot[elementSlot] = UI.Element._INVALID_INDEX;
+
+        UIQRCode._activeQrCodeCount--;
+
+        if (UIQRCode._generations[slot] < UIQRCode._MAX_GENERATIONS) {
+            UIQRCode._generations[slot]++;
+            UIQRCode._nextFreeQrCode[slot] = UIQRCode._firstFreeQrCode;
+            UIQRCode._firstFreeQrCode = slot;
+        } else if (UIQRCode._logging.willLog(UI.LogLevel.Warning)) {
+            UIQRCode._logging.log(
+                `QR code slot ${slot} exhausted max generations and was retired`,
+                UI.LogLevel.Warning
+            );
+        }
     }
 
     /**
@@ -132,7 +220,14 @@ export class UIQRCode extends UI.Element {
                   }
         );
 
-        if (!this._isValid) return;
+        if (!params || this._slot === UI.Element._INVALID_INDEX) return;
+
+        const qrSlot = this._allocateQrCodeSlot();
+
+        if (qrSlot === UI.Element._INVALID_INDEX) {
+            super.delete();
+            return;
+        }
 
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = this._receiver!;
@@ -178,18 +273,27 @@ export class UIQRCode extends UI.Element {
 
         this._bindNativeWidget(name);
 
-        const slot = this._slot;
-        UIQRCode._matrices[slot] = matrix;
-        UIQRCode._scales[slot] = scale;
-        UIQRCode._margins[slot] = margin;
-        UIQRCode._darkRgba[slot] = UIQRCode._packRgba(darkColor, darkAlpha);
-        UIQRCode._lightRgba[slot] = UIQRCode._packRgba(lightColor, lightAlpha);
-        UIQRCode._eccs[slot] = params.ecc ?? null;
-        UIQRCode._texts[slot] = params.text ?? null;
-        UIQRCode._childWidgets[slot] = [];
+        UIQRCode._scales[qrSlot] = scale;
+        UIQRCode._margins[qrSlot] = margin;
+        UIQRCode._matrixSizes[qrSlot] = matrixSize;
+        UIQRCode._childWidgets[qrSlot] = [];
+
+        UI.Element._setForegroundAlpha(this._slot, darkAlpha);
+        UI.Element._setForegroundColor(this._slot, darkColor);
 
         if (matrix) {
-            this._renderQR(matrix, baseWidth, baseHeight, scale, margin, darkColor, darkAlpha, lightColor, lightAlpha);
+            this._renderQR(
+                qrSlot,
+                matrix,
+                baseWidth,
+                baseHeight,
+                scale,
+                margin,
+                darkColor,
+                darkAlpha,
+                lightColor,
+                lightAlpha
+            );
         }
     }
 
@@ -237,6 +341,7 @@ export class UIQRCode extends UI.Element {
 
     /**
      * Renders the QR code sub-rectangles using the hybrid Painter's Algorithm + rectilinear merging.
+     * @param qrSlot - The allocated QR code sub-pool slot.
      * @param matrix - The QR code boolean matrix.
      * @param totalWidth - Total pixel width.
      * @param totalHeight - Total pixel height.
@@ -248,6 +353,7 @@ export class UIQRCode extends UI.Element {
      * @param lightAlpha - Light module opacity.
      */
     private _renderQR(
+        qrSlot: number,
         matrix: UIQRCode.BooleanMatrix,
         totalWidth: number,
         totalHeight: number,
@@ -258,7 +364,6 @@ export class UIQRCode extends UI.Element {
         lightColor: Colors.Color,
         lightAlpha: number
     ): void {
-        const slot = this._slot;
         const parentWidget = this._uiWidget;
         const receiver = this._receiver!;
         const depth = this.depth ?? UI.Depth.AboveGameUI;
@@ -273,7 +378,7 @@ export class UIQRCode extends UI.Element {
         const cellWidth = totalWidth / gridUnits;
         const cellHeight = totalHeight / gridUnits;
 
-        const childWidgets: mod.UIWidget[] = [];
+        const childModules: UIQRCode.ChildModule[] = [];
         let drawCalls = 1; // 1 for the root background canvas
 
         const nativeDepth = UI.Element._getNativeDepth(depth);
@@ -299,6 +404,7 @@ export class UIQRCode extends UI.Element {
          * @param spanH - Module height span.
          * @param color - Fill color vector.
          * @param alpha - Fill alpha opacity.
+         * @param isLight - Whether this rectangle represents a light cutout.
          */
         const drawRect = (
             col: number,
@@ -306,7 +412,8 @@ export class UIQRCode extends UI.Element {
             spanW: number,
             spanH: number,
             color: mod.Vector,
-            alpha: number
+            alpha: number,
+            isLight: boolean
         ): void => {
             const x0 = Math.round((col + margin) * cellWidth);
             const y0 = Math.round((row + margin) * cellHeight);
@@ -349,7 +456,7 @@ export class UIQRCode extends UI.Element {
             }
 
             const widget = mod.FindUIWidgetWithName(childName) as mod.UIWidget;
-            childWidgets.push(widget);
+            childModules.push({ widget, col, row, spanW, spanH, isLight });
             drawCalls++;
         };
 
@@ -368,11 +475,11 @@ export class UIQRCode extends UI.Element {
             for (let f = 0; f < 3; ++f) {
                 const { r, c } = finders[f];
                 // Layer 1: 7x7 Dark base
-                drawRect(c, r, 7, 7, darkVec, darkAlpha);
+                drawRect(c, r, 7, 7, darkVec, darkAlpha, false);
                 // Layer 2: 5x5 Light cutout
-                drawRect(c + 1, r + 1, 5, 5, lightVec, lightAlpha);
+                drawRect(c + 1, r + 1, 5, 5, lightVec, lightAlpha, true);
                 // Layer 3: 3x3 Dark core
-                drawRect(c + 2, r + 2, 3, 3, darkVec, darkAlpha);
+                drawRect(c + 2, r + 2, 3, 3, darkVec, darkAlpha, false);
 
                 // Mark 7x7 cells as visited
                 for (let i = 0; i < 7; ++i) {
@@ -403,11 +510,11 @@ export class UIQRCode extends UI.Element {
                         const c = cc - 2;
 
                         // Layer 1: 5x5 Dark base
-                        drawRect(c, r, 5, 5, darkVec, darkAlpha);
+                        drawRect(c, r, 5, 5, darkVec, darkAlpha, false);
                         // Layer 2: 3x3 Light cutout
-                        drawRect(c + 1, r + 1, 3, 3, lightVec, lightAlpha);
+                        drawRect(c + 1, r + 1, 3, 3, lightVec, lightAlpha, true);
                         // Layer 3: 1x1 Dark core
-                        drawRect(c + 2, r + 2, 1, 1, darkVec, darkAlpha);
+                        drawRect(c + 2, r + 2, 1, 1, darkVec, darkAlpha, false);
 
                         // Mark 5x5 cells as visited
                         for (let i = 0; i < 5; ++i) {
@@ -453,7 +560,7 @@ export class UIQRCode extends UI.Element {
                 }
 
                 // Step 3c: Draw Merged Dark Rectangle
-                drawRect(c, r, w, h, darkVec, darkAlpha);
+                drawRect(c, r, w, h, darkVec, darkAlpha, false);
 
                 // Step 3d: Mark w x h region as visited
                 for (let i = 0; i < h; ++i) {
@@ -468,45 +575,25 @@ export class UIQRCode extends UI.Element {
             }
         }
 
-        UIQRCode._childWidgets[slot] = childWidgets;
-        UIQRCode._drawCallCounts[slot] = drawCalls;
-    }
-
-    /**
-     * Clears and deletes all native child sub-rectangles.
-     */
-    private _clearChildWidgets(): void {
-        const slot = this._slot;
-        if (slot === UI.Element._INVALID_INDEX) return;
-
-        const widgets = UIQRCode._childWidgets[slot];
-        if (widgets) {
-            for (let i = 0; i < widgets.length; ++i) {
-                mod.DeleteUIWidget(widgets[i]);
-            }
-            widgets.length = 0;
-        }
-        UIQRCode._drawCallCounts[slot] = 0;
+        UIQRCode._childWidgets[qrSlot] = childModules;
+        UIQRCode._drawCallCounts[qrSlot] = drawCalls;
     }
 
     /**
      * @inheritdoc
      */
     public override delete(): void {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return;
+        const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+        if (qrSlot === UI.Element._INVALID_INDEX) return;
 
-        this._clearChildWidgets();
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (modules) {
+            for (let i = 0; i < modules.length; ++i) {
+                mod.DeleteUIWidget(modules[i].widget);
+            }
+        }
 
-        UIQRCode._matrices[slot] = null;
-        UIQRCode._scales[slot] = 0;
-        UIQRCode._margins[slot] = 0;
-        UIQRCode._darkRgba[slot] = 0;
-        UIQRCode._lightRgba[slot] = 0;
-        UIQRCode._eccs[slot] = null;
-        UIQRCode._texts[slot] = null;
-        UIQRCode._childWidgets[slot] = null;
-
+        this._freeQrCodeSlot();
         super.delete();
     }
 
@@ -515,45 +602,8 @@ export class UIQRCode extends UI.Element {
      * @returns The total draw call count, or undefined if deleted.
      */
     public get drawCallCount(): number | undefined {
-        const slot = this._slot;
+        const slot = this._qrCodeSlot;
         return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._drawCallCounts[slot];
-    }
-
-    /**
-     * The boolean QR matrix currently rendered, or undefined if deleted.
-     * @returns The 2D boolean matrix, or undefined if deleted.
-     */
-    public get matrix(): UIQRCode.BooleanMatrix | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : (UIQRCode._matrices[slot] ?? undefined);
-    }
-
-    /**
-     * The QR code version (1–40), or undefined if deleted or non-standard.
-     * @returns The QR version number, or undefined.
-     */
-    public get version(): number | undefined {
-        const mat = this.matrix;
-        if (!mat || mat.length < 21 || (mat.length - 17) % 4 !== 0) return undefined;
-        return (mat.length - 17) / 4;
-    }
-
-    /**
-     * The text payload encoded by this QR code, or undefined if initialized via raw matrix.
-     * @returns The text string, or undefined.
-     */
-    public get text(): string | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : (UIQRCode._texts[slot] ?? undefined);
-    }
-
-    /**
-     * The error correction level, or undefined if deleted or not specified.
-     * @returns The ECC level, or undefined.
-     */
-    public get ecc(): UIQRCode.ECC | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : (UIQRCode._eccs[slot] ?? undefined);
     }
 
     /**
@@ -561,7 +611,7 @@ export class UIQRCode extends UI.Element {
      * @returns The scale multiplier, or undefined if deleted.
      */
     public get scale(): number | undefined {
-        const slot = this._slot;
+        const slot = this._qrCodeSlot;
         return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._scales[slot];
     }
 
@@ -579,11 +629,11 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setScale(scale: number): this {
-        const slot = this._getSlotAndLogWarning();
+        const slot = this._resolveQrCodeSlotAndLogWarning();
         if (slot === UI.Element._INVALID_INDEX) return this;
 
         UIQRCode._scales[slot] = scale;
-        this._rebuildQR();
+        this._updateModuleLayout(slot);
         return this;
     }
 
@@ -592,7 +642,7 @@ export class UIQRCode extends UI.Element {
      * @returns The margin count, or undefined if deleted.
      */
     public get margin(): number | undefined {
-        const slot = this._slot;
+        const slot = this._qrCodeSlot;
         return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._margins[slot];
     }
 
@@ -610,11 +660,11 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setMargin(margin: number): this {
-        const slot = this._getSlotAndLogWarning();
+        const slot = this._resolveQrCodeSlotAndLogWarning();
         if (slot === UI.Element._INVALID_INDEX) return this;
 
         UIQRCode._margins[slot] = margin;
-        this._rebuildQR();
+        this._updateModuleLayout(slot);
         return this;
     }
 
@@ -624,7 +674,7 @@ export class UIQRCode extends UI.Element {
      */
     public get darkColor(): Colors.Color | undefined {
         const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._darkRgba[slot]);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot);
     }
 
     /**
@@ -634,7 +684,7 @@ export class UIQRCode extends UI.Element {
      */
     public getDarkColor(out?: Colors.Color): Colors.Color | undefined {
         const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._darkRgba[slot], out);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot, out);
     }
 
     /**
@@ -651,11 +701,23 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setDarkColor(color: Colors.Color): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
+        const elementSlot = this._getSlotAndLogWarning();
+        if (elementSlot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._setRgb(UIQRCode._darkRgba, slot, color);
-        this._rebuildQR();
+        const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+        if (qrSlot === UI.Element._INVALID_INDEX) return this;
+
+        UI.Element._setForegroundColor(elementSlot, color);
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (modules) {
+            const darkVec = Colors.toVector(color);
+            for (let i = 0; i < modules.length; ++i) {
+                const modInfo = modules[i];
+                if (!modInfo.isLight) {
+                    mod.SetUIWidgetBgColor(modInfo.widget, darkVec);
+                }
+            }
+        }
         return this;
     }
 
@@ -665,7 +727,7 @@ export class UIQRCode extends UI.Element {
      */
     public get darkAlpha(): number | undefined {
         const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackAlpha(UIQRCode._darkRgba[slot]);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundAlpha(slot);
     }
 
     /**
@@ -682,11 +744,22 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setDarkAlpha(alpha: number): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
+        const elementSlot = this._getSlotAndLogWarning();
+        if (elementSlot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._setAlpha(UIQRCode._darkRgba, slot, alpha);
-        this._rebuildQR();
+        const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+        if (qrSlot === UI.Element._INVALID_INDEX) return this;
+
+        UI.Element._setForegroundAlpha(elementSlot, alpha);
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (modules) {
+            for (let i = 0; i < modules.length; ++i) {
+                const modInfo = modules[i];
+                if (!modInfo.isLight) {
+                    mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
+                }
+            }
+        }
         return this;
     }
 
@@ -695,8 +768,7 @@ export class UIQRCode extends UI.Element {
      * @returns The light color, or undefined if deleted.
      */
     public get lightColor(): Colors.Color | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._lightRgba[slot]);
+        return this.bgColor;
     }
 
     /**
@@ -705,8 +777,7 @@ export class UIQRCode extends UI.Element {
      * @returns The light module color, or undefined if deleted.
      */
     public getLightColor(out?: Colors.Color): Colors.Color | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackColor(UIQRCode._lightRgba[slot], out);
+        return this.getBgColor(out);
     }
 
     /**
@@ -723,13 +794,29 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setLightColor(color: Colors.Color): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
+        const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+        if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._setRgb(UIQRCode._lightRgba, slot, color);
-        this.setBgColor(color);
-        this._rebuildQR();
+        super.setBgColor(color);
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (modules) {
+            const lightVec = Colors.toVector(color);
+            for (let i = 0; i < modules.length; ++i) {
+                const modInfo = modules[i];
+                if (modInfo.isLight) {
+                    mod.SetUIWidgetBgColor(modInfo.widget, lightVec);
+                }
+            }
+        }
         return this;
+    }
+
+    /**
+     * @inheritdoc
+     * @returns This element for chaining.
+     */
+    public override setBgColor(color: Colors.Color): this {
+        return this.setLightColor(color);
     }
 
     /**
@@ -737,8 +824,7 @@ export class UIQRCode extends UI.Element {
      * @returns The light module alpha opacity, or undefined if deleted.
      */
     public get lightAlpha(): number | undefined {
-        const slot = this._slot;
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._unpackAlpha(UIQRCode._lightRgba[slot]);
+        return this.bgAlpha;
     }
 
     /**
@@ -755,91 +841,82 @@ export class UIQRCode extends UI.Element {
      * @returns This element for chaining.
      */
     public setLightAlpha(alpha: number): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
+        const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+        if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
-        UIQRCode._setAlpha(UIQRCode._lightRgba, slot, alpha);
-        this.setBgAlpha(alpha);
-        this._rebuildQR();
+        super.setBgAlpha(alpha);
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (modules) {
+            for (let i = 0; i < modules.length; ++i) {
+                const modInfo = modules[i];
+                if (modInfo.isLight) {
+                    mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
+                }
+            }
+        }
         return this;
     }
 
     /**
-     * Dynamically updates the QR code with a new text payload and optional ECC level.
-     * @param text - The text string to encode.
-     * @param ecc - Optional error correction level (defaults to current or Medium).
+     * @inheritdoc
      * @returns This element for chaining.
      */
-    public setText(text: string, ecc?: UIQRCode.ECC): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
-
-        const effectiveEcc = ecc ?? UIQRCode._eccs[slot] ?? UIQRCode.ECC.Medium;
-        const matrix = UIQRCode.Encoder.encode(text, effectiveEcc);
-
-        UIQRCode._texts[slot] = text;
-        UIQRCode._eccs[slot] = effectiveEcc;
-        UIQRCode._matrices[slot] = matrix;
-
-        this._rebuildQR();
-        return this;
+    public override setBgAlpha(alpha: number): this {
+        return this.setLightAlpha(alpha);
     }
 
     /**
-     * Dynamically updates the QR code with a new 2D boolean/number matrix.
-     * @param matrix - The 2D matrix of numbers (1/0) or booleans.
-     * @returns This element for chaining.
+     * Updates the position and size of all child modules in place upon scale or margin change.
+     * @param qrSlot - The QR code sub-pool slot index.
      */
-    public setMatrix(matrix: UIQRCode.Matrix): this {
-        const slot = this._getSlotAndLogWarning();
-        if (slot === UI.Element._INVALID_INDEX) return this;
+    private _updateModuleLayout(qrSlot: number): void {
+        const N = UIQRCode._matrixSizes[qrSlot];
+        if (N === 0) return;
 
-        UIQRCode._matrices[slot] = UIQRCode._normalizeMatrix(matrix);
-        UIQRCode._texts[slot] = null;
+        const scale = UIQRCode._scales[qrSlot];
+        const margin = UIQRCode._margins[qrSlot];
+        const gridUnits = N + 2 * margin;
 
-        this._rebuildQR();
-        return this;
-    }
+        const totalWidth = gridUnits * UIQRCode.BASE_MODULE_SIZE * scale;
+        const totalHeight = gridUnits * UIQRCode.BASE_MODULE_SIZE * scale;
 
-    /**
-     * Rebuilds all child widgets based on current matrix, size, colors, and margins.
-     */
-    private _rebuildQR(): void {
-        const slot = this._slot;
-        if (slot === UI.Element._INVALID_INDEX) return;
+        this.setWidth(totalWidth);
+        this.setHeight(totalHeight);
 
-        const matrix = UIQRCode._matrices[slot];
-        if (!matrix) return;
+        const cellWidth = totalWidth / gridUnits;
+        const cellHeight = totalHeight / gridUnits;
 
-        const scale = UIQRCode._scales[slot];
-        const margin = UIQRCode._margins[slot];
-        const darkRgba = UIQRCode._darkRgba[slot];
-        const lightRgba = UIQRCode._lightRgba[slot];
-        const darkColor = UIQRCode._unpackColor(darkRgba);
-        const darkAlpha = UIQRCode._unpackAlpha(darkRgba);
-        const lightColor = UIQRCode._unpackColor(lightRgba);
-        const lightAlpha = UIQRCode._unpackAlpha(lightRgba);
+        const modules = UIQRCode._childWidgets[qrSlot];
+        if (!modules) return;
 
-        const totalUnits = matrix.length + 2 * margin;
-        const currentWidth = this.width ?? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale;
-        const currentHeight = this.height ?? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale;
+        for (let i = 0; i < modules.length; ++i) {
+            const m = modules[i];
+            const x0 = Math.round((m.col + margin) * cellWidth);
+            const y0 = Math.round((m.row + margin) * cellHeight);
+            const x1 = Math.round((m.col + m.spanW + margin) * cellWidth);
+            const y1 = Math.round((m.row + m.spanH + margin) * cellHeight);
+            const w = Math.max(1, x1 - x0);
+            const h = Math.max(1, y1 - y0);
 
-        this._clearChildWidgets();
-        this._renderQR(
-            matrix,
-            currentWidth,
-            currentHeight,
-            scale,
-            margin,
-            darkColor,
-            darkAlpha,
-            lightColor,
-            lightAlpha
-        );
+            mod.SetUIWidgetPosition(m.widget, mod.CreateVector(x0, y0, 0));
+            mod.SetUIWidgetSize(m.widget, mod.CreateVector(w, h, 0));
+        }
     }
 }
 
 export namespace UIQRCode {
+    /**
+     * Represents a single child module container widget with its relative grid bounds.
+     */
+    export interface ChildModule {
+        widget: mod.UIWidget;
+        col: number;
+        row: number;
+        spanW: number;
+        spanH: number;
+        isLight: boolean;
+    }
+
     /**
      * Standard ISO/IEC 18004 alignment pattern center locations for versions 1 through 40.
      */

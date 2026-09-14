@@ -85,47 +85,36 @@ describe('UIQRCode Component', () => {
                 y: 100,
             });
 
-            expect(qr.matrix).toBeDefined();
-            expect(qr.matrix!.length).toBe(21);
-            expect(qr.version).toBe(1);
             expect(qr.drawCallCount).toBeGreaterThan(0);
             expect(qr.scale).toBe(1);
             expect(qr.width).toBe(210); // 21 * 10
             expect(qr.height).toBe(210);
 
-            // Slot conservation: Only 1 slot in UI.MAX_ELEMENTS consumed
+            // Slot conservation: Only 1 slot in UI.MAX_ELEMENTS and 1 in UIQRCode consumed
             expect(UI.getActiveElementCount()).toBe(1);
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(1);
 
             qr.delete();
             expect(UI.getActiveElementCount()).toBe(0);
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(0);
         });
 
         it('renders a QR code from a text payload using the standalone encoder', () => {
             const text = 'https://portal.battlefield.com';
+            const matrix = UIQRCode.Encoder.encode(text, UIQRCode.ECC.Medium);
             const qr = new UIQRCode({
                 text,
                 ecc: UIQRCode.ECC.Medium,
                 scale: 1,
             });
 
-            expect(qr.text).toBe(text);
-            expect(qr.ecc).toBe(UIQRCode.ECC.Medium);
-            expect(qr.matrix).toBeDefined();
-            expect(qr.version).toBeGreaterThanOrEqual(1);
-
-            const N = qr.matrix!.length;
+            const N = matrix.length;
             expect(qr.width).toBe(N * 10);
             expect(qr.height).toBe(N * 10);
-
-            // Verify finder patterns are present
-            expect(qr.matrix![0][0]).toBe(true);
-            expect(qr.matrix![0][1]).toBe(true);
-            expect(qr.matrix![0][6]).toBe(true);
-            expect(qr.matrix![1][1]).toBe(false); // Cutout
-            expect(qr.matrix![2][2]).toBe(true); // Core
+            expect(qr.drawCallCount).toBeGreaterThan(0);
 
             // Verify decoding matches payload
-            expect(decodeMatrix(qr.matrix!)).toBe(text);
+            expect(decodeMatrix(matrix)).toBe(text);
 
             qr.delete();
         });
@@ -142,11 +131,8 @@ describe('UIQRCode Component', () => {
                 scale: 1,
             });
 
-            expect(qr.matrix![0][0]).toBe(true);
-            expect(qr.matrix![0][1]).toBe(false);
-            expect(qr.matrix![0][2]).toBe(true);
-            expect(qr.matrix![1][1]).toBe(true);
-            expect(qr.matrix![2][0]).toBe(true);
+            expect(qr.width).toBe(30);
+            expect(qr.height).toBe(30);
 
             qr.delete();
         });
@@ -155,8 +141,10 @@ describe('UIQRCode Component', () => {
     describe('Scale & Margin Options', () => {
         it('scales module size proportionally with scale parameter', () => {
             const text = 'HELLO';
+            const matrix = UIQRCode.Encoder.encode(text, UIQRCode.ECC.Medium);
+            const N = matrix.length;
+
             const qr1 = new UIQRCode({ text, scale: 1 });
-            const N = qr1.matrix!.length;
             expect(qr1.width).toBe(N * 10);
             expect(qr1.height).toBe(N * 10);
             qr1.delete();
@@ -175,6 +163,8 @@ describe('UIQRCode Component', () => {
 
         it('supports quiet zone margins in module units', () => {
             const text = 'TEST';
+            const matrix = UIQRCode.Encoder.encode(text, UIQRCode.ECC.Medium);
+            const N = matrix.length;
             const margin = 4;
             const qr = new UIQRCode({
                 text,
@@ -182,7 +172,6 @@ describe('UIQRCode Component', () => {
                 margin,
             });
 
-            const N = qr.matrix!.length;
             const expectedTotalUnits = N + 2 * margin;
             expect(qr.width).toBe(expectedTotalUnits * 10);
             expect(qr.height).toBe(expectedTotalUnits * 10);
@@ -207,12 +196,12 @@ describe('UIQRCode Component', () => {
     describe('Draw Call Optimization & Hybrid Rendering', () => {
         it('drastically reduces draw calls compared to naive cell-by-cell rendering (>60% savings)', () => {
             const text = 'https://example.com/join?code=BF6-PORTAL-MATCH-12345';
+            const matrix = UIQRCode.Encoder.encode(text, UIQRCode.ECC.Medium);
             const qr = new UIQRCode({
                 text,
                 ecc: UIQRCode.ECC.Medium,
             });
 
-            const matrix = qr.matrix!;
             const N = matrix.length;
 
             // Calculate naive black cell count
@@ -240,79 +229,60 @@ describe('UIQRCode Component', () => {
                 ecc: UIQRCode.ECC.High,
             });
 
-            expect(qr.version).toBeGreaterThanOrEqual(2);
             expect(qr.drawCallCount).toBeGreaterThan(0);
 
             qr.delete();
         });
     });
 
-    describe('Dynamic Mutations & Lifecycle', () => {
-        it('supports dynamic text mutation via setText()', () => {
-            const qr = new UIQRCode({
-                text: 'INITIAL',
-                scale: 1,
-            });
-
-            expect(qr.text).toBe('INITIAL');
-            expect(decodeMatrix(qr.matrix!)).toBe('INITIAL');
-            const initialVersion = qr.version;
-
-            const updatedText = 'UPDATED_WITH_A_MUCH_LONGER_TEXT_PAYLOAD_THAT_REQUIRES_A_LARGER_VERSION_1234567890';
-            qr.setText(updatedText);
-            expect(qr.text).toBe(updatedText);
-            expect(qr.version).toBeGreaterThanOrEqual(initialVersion!);
-            expect(decodeMatrix(qr.matrix!)).toBe(updatedText);
-
-            qr.delete();
-        });
-
-        it('supports dynamic matrix mutation via setMatrix()', () => {
-            const qr = new UIQRCode({
-                text: 'INITIAL',
-            });
-
-            const customMatrix = [
-                [1, 1, 1],
-                [1, 0, 1],
-                [1, 1, 1],
-            ];
-
-            qr.setMatrix(customMatrix);
-            expect(qr.text).toBeUndefined();
-            expect(qr.matrix!.length).toBe(3);
-
-            qr.delete();
-        });
-
-        it('supports dynamic color mutations', () => {
+    describe('Dynamic In-Place Visual Mutations & Sub-Pool Lifecycle', () => {
+        it('supports dynamic in-place color and alpha mutations', () => {
             const qr = new UIQRCode({
                 text: 'COLORS',
                 darkColor: UI.COLORS.BLACK,
+                darkAlpha: 1,
                 lightColor: UI.COLORS.WHITE,
+                lightAlpha: 1,
             });
 
             qr.setDarkColor(UI.COLORS.BLUE);
             expect(Colors.equals(qr.darkColor!, UI.COLORS.BLUE, 0.005)).toBe(true);
 
+            qr.setDarkAlpha(0.75);
+            expect(qr.darkAlpha).toBeCloseTo(0.75, 2);
+
             qr.setLightColor(UI.COLORS.GREY_25);
             expect(Colors.equals(qr.lightColor!, UI.COLORS.GREY_25, 0.005)).toBe(true);
+
+            qr.setLightAlpha(0.5);
+            expect(qr.lightAlpha).toBeCloseTo(0.5, 2);
 
             qr.delete();
         });
 
-        it('supports scale and margin setters', () => {
+        it('supports dynamic in-place scale and margin setters', () => {
+            const text = 'SCALE_TEST';
+            const matrix = UIQRCode.Encoder.encode(text, UIQRCode.ECC.Medium);
+            const N = matrix.length;
+
             const qr = new UIQRCode({
-                text: 'SCALE_TEST',
+                text,
                 scale: 1,
                 margin: 0,
             });
 
+            expect(qr.width).toBe(N * 10);
+            expect(qr.height).toBe(N * 10);
+
             qr.scale = 2;
             expect(qr.scale).toBe(2);
+            expect(qr.width).toBe(N * 20);
+            expect(qr.height).toBe(N * 20);
 
-            qr.margin = 3;
-            expect(qr.margin).toBe(3);
+            qr.margin = 2;
+            expect(qr.margin).toBe(2);
+            expect(qr.width).toBe((N + 4) * 20);
+            expect(qr.height).toBe((N + 4) * 20);
 
             qr.delete();
         });
@@ -325,10 +295,41 @@ describe('UIQRCode Component', () => {
             });
 
             expect(mockWidgets.size).toBeGreaterThan(initialWidgetCount);
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(1);
 
             qr.delete();
-            expect(qr.matrix).toBeUndefined();
             expect(qr.drawCallCount).toBeUndefined();
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(0);
+        });
+
+        it('enforces MAX_QR_CODES = 128 sub-pool limit and slot reuse', () => {
+            const qrs: UIQRCode[] = [];
+            for (let i = 0; i < UIQRCode.MAX_QR_CODES; ++i) {
+                qrs.push(new UIQRCode({ text: `QR_${i}` }));
+            }
+
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(128);
+
+            // Pool full -> next QR should fail and delete itself cleanly
+            const overflowQr = new UIQRCode({ text: 'OVERFLOW' });
+            expect(overflowQr.isDeleted).toBe(true);
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(128);
+
+            // Free one slot
+            qrs[0].delete();
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(127);
+
+            // Re-allocate
+            const replacement = new UIQRCode({ text: 'REPLACEMENT' });
+            expect(replacement.isDeleted).toBe(false);
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(128);
+
+            // Clean up all
+            replacement.delete();
+            for (let i = 1; i < qrs.length; ++i) {
+                qrs[i].delete();
+            }
+            expect(UIQRCode.getActiveQRCodeCount()).toBe(0);
         });
     });
 

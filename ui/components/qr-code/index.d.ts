@@ -1,22 +1,51 @@
 import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIQRCode extends UI.Element {
+    /**
+     * The maximum number of QR code widgets that can exist concurrently in memory.
+     */
+    static readonly MAX_QR_CODES = 128;
     private static readonly BASE_MODULE_SIZE;
-    private static readonly _matrices;
+    private static readonly _MAX_GENERATIONS;
+    private static _activeQrCodeCount;
+    private static _firstFreeQrCode;
+    private static readonly _generations;
+    private static readonly _nextFreeQrCode;
+    private static readonly _elementToQrCodeSlot;
     private static readonly _drawCallCounts;
     private static readonly _scales;
     private static readonly _margins;
-    private static readonly _darkRgba;
-    private static readonly _lightRgba;
-    private static readonly _eccs;
-    private static readonly _texts;
+    private static readonly _matrixSizes;
     private static readonly _childWidgets;
     private static readonly _visitedBuffer;
-    private static _packRgba;
-    private static _unpackColor;
-    private static _unpackAlpha;
-    private static _setRgb;
-    private static _setAlpha;
+    /**
+     * Returns the number of active QR code elements.
+     * @returns The active QR code count.
+     */
+    static getActiveQRCodeCount(): number;
+    /**
+     * Resolves the 0-based QR code slot for an element ID.
+     * @param elementId - The element ID.
+     * @returns The 0-based QR slot index (0 to MAX_QR_CODES - 1), or -1 if invalid or unallocated.
+     */
+    protected static _resolveQrCodeSlot(elementId: number): number;
+    protected get _qrCodeSlot(): number;
+    protected get _isValid(): boolean;
+    /**
+     * Resolves the 0-based QR code slot for this QR instance and logs a warning if invalid.
+     * @returns The 0-based QR slot index (0 to MAX_QR_CODES - 1), or -1 if invalid or unallocated.
+     */
+    protected _resolveQrCodeSlotAndLogWarning(): number;
+    protected _getIsInvalidAndLogWarning(): boolean;
+    /**
+     * Allocates a QR code slot for this QR instance.
+     * @returns The allocated QR slot index (0 to MAX_QR_CODES - 1), or INVALID_INDEX (-1) if full or invalid.
+     */
+    private _allocateQrCodeSlot;
+    /**
+     * Frees the QR code slot associated with this QR instance.
+     */
+    private _freeQrCodeSlot;
     /**
      * Creates a new optimized QR code element.
      * @param params - The parameters for the QR code.
@@ -36,6 +65,7 @@ export declare class UIQRCode extends UI.Element {
     private static _normalizeMatrix;
     /**
      * Renders the QR code sub-rectangles using the hybrid Painter's Algorithm + rectilinear merging.
+     * @param qrSlot - The allocated QR code sub-pool slot.
      * @param matrix - The QR code boolean matrix.
      * @param totalWidth - Total pixel width.
      * @param totalHeight - Total pixel height.
@@ -48,10 +78,6 @@ export declare class UIQRCode extends UI.Element {
      */
     private _renderQR;
     /**
-     * Clears and deletes all native child sub-rectangles.
-     */
-    private _clearChildWidgets;
-    /**
      * @inheritdoc
      */
     delete(): void;
@@ -60,26 +86,6 @@ export declare class UIQRCode extends UI.Element {
      * @returns The total draw call count, or undefined if deleted.
      */
     get drawCallCount(): number | undefined;
-    /**
-     * The boolean QR matrix currently rendered, or undefined if deleted.
-     * @returns The 2D boolean matrix, or undefined if deleted.
-     */
-    get matrix(): UIQRCode.BooleanMatrix | undefined;
-    /**
-     * The QR code version (1–40), or undefined if deleted or non-standard.
-     * @returns The QR version number, or undefined.
-     */
-    get version(): number | undefined;
-    /**
-     * The text payload encoded by this QR code, or undefined if initialized via raw matrix.
-     * @returns The text string, or undefined.
-     */
-    get text(): string | undefined;
-    /**
-     * The error correction level, or undefined if deleted or not specified.
-     * @returns The ECC level, or undefined.
-     */
-    get ecc(): UIQRCode.ECC | undefined;
     /**
      * The scale multiplier applied to module sizing.
      * @returns The scale multiplier, or undefined if deleted.
@@ -173,6 +179,11 @@ export declare class UIQRCode extends UI.Element {
      */
     setLightColor(color: Colors.Color): this;
     /**
+     * @inheritdoc
+     * @returns This element for chaining.
+     */
+    setBgColor(color: Colors.Color): this;
+    /**
      * The light module alpha opacity, or undefined if deleted.
      * @returns The light module alpha opacity, or undefined if deleted.
      */
@@ -189,24 +200,28 @@ export declare class UIQRCode extends UI.Element {
      */
     setLightAlpha(alpha: number): this;
     /**
-     * Dynamically updates the QR code with a new text payload and optional ECC level.
-     * @param text - The text string to encode.
-     * @param ecc - Optional error correction level (defaults to current or Medium).
+     * @inheritdoc
      * @returns This element for chaining.
      */
-    setText(text: string, ecc?: UIQRCode.ECC): this;
+    setBgAlpha(alpha: number): this;
     /**
-     * Dynamically updates the QR code with a new 2D boolean/number matrix.
-     * @param matrix - The 2D matrix of numbers (1/0) or booleans.
-     * @returns This element for chaining.
+     * Updates the position and size of all child modules in place upon scale or margin change.
+     * @param qrSlot - The QR code sub-pool slot index.
      */
-    setMatrix(matrix: UIQRCode.Matrix): this;
-    /**
-     * Rebuilds all child widgets based on current matrix, size, colors, and margins.
-     */
-    private _rebuildQR;
+    private _updateModuleLayout;
 }
 export declare namespace UIQRCode {
+    /**
+     * Represents a single child module container widget with its relative grid bounds.
+     */
+    interface ChildModule {
+        widget: mod.UIWidget;
+        col: number;
+        row: number;
+        spanW: number;
+        spanH: number;
+        isLight: boolean;
+    }
     /**
      * Standard ISO/IEC 18004 alignment pattern center locations for versions 1 through 40.
      */

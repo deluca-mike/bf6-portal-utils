@@ -680,6 +680,114 @@ describe('UI Module & Components Lifecycle Tests', () => {
             expect(containerBtn.isDeleted).toBe(true);
             expect(innerChild.isDeleted).toBe(true);
         });
+
+        it('should enforce UIWeaponImage sub-pool limit and slot reuse', () => {
+            const ak24 = (mod.Weapons as unknown as { AK24: mod.Weapons }).AK24;
+            const weapons: UIWeaponImage[] = [];
+
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(0);
+
+            for (let i = 0; i < UIWeaponImage.MAX_WEAPON_IMAGES; ++i) {
+                weapons.push(
+                    new UIWeaponImage({
+                        x: 0,
+                        y: 0,
+                        width: 100,
+                        height: 50,
+                        weapon: ak24,
+                    })
+                );
+            }
+
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+
+            // Pool full -> next weapon image should fail and delete itself
+            const overflow = new UIWeaponImage({
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 50,
+                weapon: ak24,
+            });
+            expect(overflow.isDeleted).toBe(true);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+
+            // Free a slot
+            weapons[0].delete();
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(63);
+
+            // Reuse freed slot
+            const replacement = new UIWeaponImage({
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 50,
+                weapon: ak24,
+            });
+            expect(replacement.isDeleted).toBe(false);
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(64);
+
+            // Cleanup
+            replacement.delete();
+            for (let i = 1; i < weapons.length; ++i) {
+                weapons[i].delete();
+            }
+            expect(UIWeaponImage.getActiveWeaponImageCount()).toBe(0);
+        });
+
+        it('should enforce UIGadgetImage sub-pool limit and slot reuse', () => {
+            const medkit = (mod.Gadgets as unknown as { Medkit: mod.Gadgets }).Medkit;
+            const gadgets: UIGadgetImage[] = [];
+
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(0);
+
+            for (let i = 0; i < UIGadgetImage.MAX_GADGET_IMAGES; ++i) {
+                gadgets.push(
+                    new UIGadgetImage({
+                        x: 0,
+                        y: 0,
+                        width: 50,
+                        height: 50,
+                        gadget: medkit,
+                    })
+                );
+            }
+
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+
+            // Pool full -> next gadget image should fail and delete itself
+            const overflow = new UIGadgetImage({
+                x: 0,
+                y: 0,
+                width: 50,
+                height: 50,
+                gadget: medkit,
+            });
+            expect(overflow.isDeleted).toBe(true);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+
+            // Free a slot
+            gadgets[0].delete();
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(63);
+
+            // Reuse freed slot
+            const replacement = new UIGadgetImage({
+                x: 0,
+                y: 0,
+                width: 50,
+                height: 50,
+                gadget: medkit,
+            });
+            expect(replacement.isDeleted).toBe(false);
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(64);
+
+            // Cleanup
+            replacement.delete();
+            for (let i = 1; i < gadgets.length; ++i) {
+                gadgets[i].delete();
+            }
+            expect(UIGadgetImage.getActiveGadgetImageCount()).toBe(0);
+        });
     });
 
     describe('UI Input Mode Automatic Reference Counting', () => {
