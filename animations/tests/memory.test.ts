@@ -28,7 +28,7 @@ describe('Animations QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simu
 
         // Warm up QuickJS compiler/runtime
         server.evalCode(
-            '(() => { const id = Animations.start({ from: 0, to: 10, duration: 100, onUpdate: () => {} }); Animations.stop(id); })()'
+            '(() => { const id = Animations.startTween({ from: 0, to: 10, duration: 100, onUpdate: () => {} }); Animations.stop(id); })()'
         );
         server.flushJobs();
     });
@@ -56,7 +56,7 @@ describe('Animations QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simu
                 (() => {
                     const ids = [];
                     for (let i = 0; i < ${count}; ++i) {
-                        const id = Animations.start({
+                        const id = Animations.startTween({
                             from: 0,
                             to: 100,
                             duration: 5000,
@@ -95,7 +95,7 @@ describe('Animations QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simu
                     let sink = 0;
 
                     for (let i = 0; i < ${animCount}; ++i) {
-                        const id = Animations.start({
+                        const id = Animations.startTween({
                             from: 0,
                             to: 1000,
                             duration: 1000000,
@@ -129,7 +129,7 @@ describe('Animations QuickJS Runtime Memory & ARC Profiling (BF6 Portal C++ Simu
             run: `
                 (() => {
                     for (let i = 0; i < ${churnCount}; ++i) {
-                        const id = Animations.start({
+                        const id = Animations.startTween({
                             from: 0,
                             to: 50,
                             duration: 50,

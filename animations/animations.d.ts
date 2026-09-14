@@ -121,7 +121,7 @@ export declare namespace Animations {
      * @param config - Animation parameters and callbacks.
      * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
      */
-    function start(config: TweenAnimationConfig): AnimationID | null;
+    function startTween(config: TweenAnimationConfig): AnimationID | null;
     /**
      * Starts a new spring physics animation from config.
      * @param config - Spring animation parameters and callbacks.

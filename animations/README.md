@@ -38,7 +38,7 @@ import { Animations } from 'bf6-portal-utils/animations/animations.ts';
 import { Transitions } from 'bf6-portal-utils/transitions/transitions.ts';
 
 // Start a tween animation (returns unboxed AnimationID or null if pool full)
-const animId = Animations.start({
+const animId = Animations.startTween({
     from: 0,
     to: 200,
     duration: 600, // ms

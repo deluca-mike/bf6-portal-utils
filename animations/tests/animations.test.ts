@@ -24,7 +24,7 @@ describe('Animations Engine Module', () => {
             // Ticking with 0 active animations does nothing
             expect(() => Events.OngoingGlobal.trigger()).not.toThrow();
 
-            const id1 = Animations.start({
+            const id1 = Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 500,
@@ -34,7 +34,7 @@ describe('Animations Engine Module', () => {
             expect(id1).not.toBeNull();
             expect(Animations.getRunningCount()).toBe(1);
 
-            const id2 = Animations.start({
+            const id2 = Animations.startTween({
                 from: 0,
                 to: 50,
                 duration: 500,
@@ -53,7 +53,7 @@ describe('Animations Engine Module', () => {
 
         it('should decrease running count when animations naturally complete', () => {
             let completed = false;
-            Animations.start({
+            Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 100,
@@ -77,7 +77,7 @@ describe('Animations Engine Module', () => {
             const allocatedIds: Animations.AnimationID[] = [];
 
             for (let i = 0; i < Animations.MAX_ANIMATIONS; ++i) {
-                const id = Animations.start({
+                const id = Animations.startTween({
                     from: 0,
                     to: 10,
                     duration: 1000,
@@ -90,7 +90,7 @@ describe('Animations Engine Module', () => {
             expect(Animations.getActiveCount()).toBe(Animations.MAX_ANIMATIONS);
 
             // 1025th allocation fails and returns null
-            const overflowId = Animations.start({
+            const overflowId = Animations.startTween({
                 from: 0,
                 to: 10,
                 duration: 1000,
@@ -119,7 +119,7 @@ describe('Animations Engine Module', () => {
             expect(Animations.getActiveCount()).toBe(Animations.MAX_ANIMATIONS - 1);
 
             // Now allocation succeeds
-            const reclaimedId = Animations.start({
+            const reclaimedId = Animations.startTween({
                 from: 0,
                 to: 10,
                 duration: 1000,
@@ -134,7 +134,7 @@ describe('Animations Engine Module', () => {
             const updates: number[] = [];
             let completed = false;
 
-            const id = Animations.start({
+            const id = Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 1000,
@@ -174,7 +174,7 @@ describe('Animations Engine Module', () => {
         it('should support stop() and return undefined for isRunning / isPaused on stopped IDs', () => {
             let completed = false;
 
-            const id = Animations.start({
+            const id = Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 1000,
@@ -205,7 +205,7 @@ describe('Animations Engine Module', () => {
             const updates: number[] = [];
             let completed = false;
 
-            const id = Animations.start({
+            const id = Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 1000,
@@ -355,7 +355,7 @@ describe('Animations Engine Module', () => {
             const updates: number[] = [];
             let completed = false;
 
-            Animations.start({
+            Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 200,
@@ -447,7 +447,7 @@ describe('Animations Engine Module', () => {
         it('should catch errors in onUpdate without breaking other animations', () => {
             let healthyUpdated = false;
 
-            Animations.start({
+            Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 500,
@@ -456,7 +456,7 @@ describe('Animations Engine Module', () => {
                 },
             });
 
-            Animations.start({
+            Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 500,
@@ -479,7 +479,7 @@ describe('Animations Engine Module', () => {
             const updates: number[] = [];
             let completed = false;
 
-            Animations.start({
+            Animations.startTween({
                 from: 0,
                 to: 100,
                 duration: 200,

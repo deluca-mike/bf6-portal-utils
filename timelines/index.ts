@@ -421,7 +421,7 @@ export namespace Timelines {
         const from = isReversed ? (config.to ?? 1) : (config.from ?? 0);
         const to = isReversed ? (config.from ?? 0) : (config.to ?? 1);
 
-        const animId = Animations.start({
+        const animId = Animations.startTween({
             from,
             to,
             duration: config.duration,
@@ -512,7 +512,7 @@ export namespace Timelines {
         const from = isReversed ? (child.to ?? 1) : (child.from ?? 0);
         const to = isReversed ? (child.from ?? 0) : (child.to ?? 1);
 
-        const childAnimId = Animations.start({
+        const childAnimId = Animations.startTween({
             from,
             to,
             duration: child.duration,

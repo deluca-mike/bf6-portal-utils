@@ -4,6 +4,7 @@ import { Events } from '../../events/index.ts';
 import { Solid } from '../index.ts';
 import { SolidTweenAdapter } from '../adapters/createTween.ts';
 import { SolidSpringAdapter } from '../adapters/createSpring.ts';
+import { SolidDecayAdapter } from '../adapters/createDecay.ts';
 
 describe('Solid Animation Adapters', () => {
     beforeEach(() => {
@@ -176,6 +177,76 @@ describe('Solid Animation Adapters', () => {
             });
 
             Solid.write(targetSig, 100);
+            await Promise.resolve();
+
+            expect(Animations.getRunningCount()).toBe(1);
+
+            disposeRoot();
+
+            expect(Animations.getRunningCount()).toBe(0);
+        });
+    });
+
+    describe('SolidDecayAdapter.createDecay', () => {
+        it('should initialize with initial position from options without animating', () => {
+            const velSig = Solid.createSignal(0);
+            const decaySig = SolidDecayAdapter.createDecay(velSig, { from: 250 });
+
+            expect(Solid.read(decaySig)).toBe(250);
+            expect(Animations.getRunningCount()).toBe(0);
+        });
+
+        it('should glide position when velocity impulse is written', async () => {
+            const velSig = Solid.createSignal(0);
+            let decayVal = -1;
+            let completed = false;
+
+            Solid.createRoot(() => {
+                const decaySig = SolidDecayAdapter.createDecay(velSig, {
+                    from: 50,
+                    deceleration: 0.99,
+                    precision: 0.5,
+                    onComplete: () => {
+                        completed = true;
+                    },
+                });
+                Solid.createEffect(() => {
+                    decayVal = Solid.read(decaySig);
+                });
+            });
+
+            expect(decayVal).toBe(50);
+            expect(Animations.getRunningCount()).toBe(0);
+
+            // Trigger velocity impulse
+            Solid.write(velSig, 400);
+            await Promise.resolve();
+
+            expect(Animations.getRunningCount()).toBe(1);
+
+            // Step through decay ticks
+            for (let i = 0; i < 80; ++i) {
+                vi.advanceTimersByTime(16.67);
+                Events.OngoingGlobal.trigger();
+                await Promise.resolve();
+                if (Animations.getRunningCount() === 0) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(decayVal).toBeGreaterThan(50);
+            expect(Animations.getRunningCount()).toBe(0);
+        });
+
+        it('should cancel active decay animation when component scope unmounts via onCleanup', async () => {
+            const velSig = Solid.createSignal(0);
+            let disposeRoot!: () => void;
+
+            Solid.createRoot((dispose) => {
+                disposeRoot = dispose;
+                SolidDecayAdapter.createDecay(velSig, { from: 0 });
+            });
+
+            Solid.write(velSig, 500);
             await Promise.resolve();
 
             expect(Animations.getRunningCount()).toBe(1);

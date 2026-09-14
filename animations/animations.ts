@@ -246,7 +246,7 @@ export namespace Animations {
 
     function _allocateSlot(): number {
         if (_firstFree === INVALID_INDEX) {
-            logging.log('Animation pool is full', LogLevel.Error);
+            logging.log('Pool is full', LogLevel.Error);
             return INVALID_INDEX;
         }
 
@@ -325,13 +325,47 @@ export namespace Animations {
         }
     }
 
+    function _tickTween(slot: number, dtSec: number, now: number): void {
+        const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
+        const delay = _delayMs[slot];
+
+        if (totalElapsed < delay) return;
+
+        const elapsed = totalElapsed - delay;
+        const duration = _durationMs[slot];
+        const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
+
+        const easingFn = _easing[slot];
+        const easedProgress = easingFn ? easingFn(progress) : progress;
+        const value = Transitions.lerp(_from[slot], _to[slot], easedProgress);
+
+        _currentValue[slot] = value;
+
+        const minDelta = _minUpdateDeltaMs[slot];
+        const lastUpdate = _lastUpdateTime[slot];
+        const isComplete = progress >= 1;
+
+        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isComplete) {
+            _lastUpdateTime[slot] = now;
+            const updateCb = _onUpdate[slot];
+            CallbackHandler.invoke(updateCb, value, undefined, undefined, undefined, logging, 'onUpdate');
+        }
+
+        if (!isComplete) return;
+
+        _clearFlag(slot, FLAG_RUNNING);
+        _setFlag(slot, FLAG_COMPLETE);
+        const completeCb = _onComplete[slot];
+        _freeSlot(slot);
+
+        CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
+    }
+
     function _tickSpring(slot: number, dtSec: number, now: number): void {
         const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
         const delay = _delayMs[slot];
 
-        if (totalElapsed < delay) {
-            return;
-        }
+        if (totalElapsed < delay) return;
 
         const target = _to[slot];
         const precision = _precision[slot];
@@ -380,9 +414,7 @@ export namespace Animations {
         const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
         const delay = _delayMs[slot];
 
-        if (totalElapsed < delay) {
-            return;
-        }
+        if (totalElapsed < delay) return;
 
         Transitions.calculateDecay(
             _currentValue[slot],
@@ -411,44 +443,6 @@ export namespace Animations {
         }
 
         if (!isSettled) return;
-
-        _clearFlag(slot, FLAG_RUNNING);
-        _setFlag(slot, FLAG_COMPLETE);
-        const completeCb = _onComplete[slot];
-        _freeSlot(slot);
-
-        CallbackHandler.invokeNoArgs(completeCb, logging, 'onComplete');
-    }
-
-    function _tickTween(slot: number, dtSec: number, now: number): void {
-        const totalElapsed = _accumulatedMs[slot] + (now - _lastResumeTime[slot]);
-        const delay = _delayMs[slot];
-
-        if (totalElapsed < delay) {
-            return;
-        }
-
-        const elapsed = totalElapsed - delay;
-        const duration = _durationMs[slot];
-        const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
-
-        const easingFn = _easing[slot];
-        const easedProgress = easingFn ? easingFn(progress) : progress;
-        const value = Transitions.lerp(_from[slot], _to[slot], easedProgress);
-
-        _currentValue[slot] = value;
-
-        const minDelta = _minUpdateDeltaMs[slot];
-        const lastUpdate = _lastUpdateTime[slot];
-        const isComplete = progress >= 1;
-
-        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isComplete) {
-            _lastUpdateTime[slot] = now;
-            const updateCb = _onUpdate[slot];
-            CallbackHandler.invoke(updateCb, value, undefined, undefined, undefined, logging, 'onUpdate');
-        }
-
-        if (!isComplete) return;
 
         _clearFlag(slot, FLAG_RUNNING);
         _setFlag(slot, FLAG_COMPLETE);
@@ -494,7 +488,7 @@ export namespace Animations {
      * @param config - Animation parameters and callbacks.
      * @returns The unboxed {@link AnimationID} for lifecycle control, or null if the pool is full.
      */
-    export function start(config: TweenAnimationConfig): AnimationID | null {
+    export function startTween(config: TweenAnimationConfig): AnimationID | null {
         const slot = _allocateSlot();
 
         if (slot === INVALID_INDEX) return null;
@@ -504,6 +498,8 @@ export namespace Animations {
         _to[slot] = config.to;
         _currentValue[slot] = config.from;
         _velocity[slot] = 0;
+        _stiffnessOrDeceleration[slot] = 0;
+        _damping[slot] = 0;
         _durationMs[slot] = Math.max(0, config.duration);
         _delayMs[slot] = Math.max(0, config.delayMs ?? 0);
         _accumulatedMs[slot] = 0;

@@ -45,7 +45,7 @@ export namespace SolidTweenAdapter {
 
             if (current === nextTarget) return;
 
-            activeId = Animations.start({
+            activeId = Animations.startTween({
                 from: current,
                 to: nextTarget,
                 duration: options?.duration ?? 300,
