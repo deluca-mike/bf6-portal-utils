@@ -4,32 +4,12 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
 export declare class UITextButton extends UIContentButton<UIText> {
-    private static readonly _textRgba;
-    private static readonly _textDisabledRgba;
     /**
      * Creates a new text button.
      * @param params - The parameters for the text button.
      */
     constructor(params: UITextButton.Params);
-    /**
-     * @inheritdoc
-     */
-    delete(): void;
     protected _setContentEnabled(enabled: boolean): void;
-    /**
-     * @inheritdoc
-     * @returns True if enabled, false if disabled, or undefined if deleted.
-     */
-    get enabled(): boolean | undefined;
-    /**
-     * @inheritdoc
-     */
-    set enabled(enabled: boolean);
-    /**
-     * @inheritdoc
-     * @returns This text button for chaining.
-     */
-    setEnabled(enabled: boolean): this;
     /**
      * The label message of the text, or undefined if deleted.
      * @returns The label message, or undefined if deleted.

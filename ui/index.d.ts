@@ -300,6 +300,10 @@ export declare namespace UI {
         protected static _getNativeDepth(depth: Depth): mod.UIDepth;
         protected static _getNativeImageType(imageType: ImageType): mod.UIImageType;
         protected static _resolveSlot(id: number): number;
+        protected static _setForegroundColor(slot: number, color: Colors.Color): void;
+        protected static _setForegroundAlpha(slot: number, alpha: number): void;
+        protected static _getForegroundColor(slot: number, out?: Colors.Color): Colors.Color;
+        protected static _getForegroundAlpha(slot: number): number;
         protected static _getNextSibling(slot: number): number;
         protected static _getInstance(slot: number): Element | undefined;
         protected static _getNativeWidget(target: Parent | Node | number): mod.UIWidget | undefined;

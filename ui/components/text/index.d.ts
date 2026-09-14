@@ -2,13 +2,7 @@ import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIText extends UI.Element {
     private static readonly _labels;
-    private static readonly _textRgba;
     private static readonly _textAnchor;
-    private static _setTextRgba;
-    private static _setTextColor;
-    private static _setTextAlpha;
-    private static _getTextColor;
-    private static _getTextAlpha;
     /**
      * Creates a new text.
      * @param params - The parameters for the text.

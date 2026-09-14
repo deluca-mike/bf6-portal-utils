@@ -4,11 +4,7 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIText } from '../text/index.ts';
 
-// version: 10.0.0
 export class UITextButton extends UIContentButton<UIText> {
-    private static readonly _textRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-    private static readonly _textDisabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-
     /**
      * Creates a new text button.
      * @param params - The parameters for the text button.
@@ -40,26 +36,14 @@ export class UITextButton extends UIContentButton<UIText> {
         const textDisabledColor = params.textDisabledColor ?? UI.COLORS.BF_GREY_2;
         const textDisabledAlpha = params.textDisabledAlpha ?? 1;
 
-        UITextButton._textRgba[btnSlot] = UITextButton._packRgba(textColor, textAlpha);
-        UITextButton._textDisabledRgba[btnSlot] = UITextButton._packRgba(textDisabledColor, textDisabledAlpha);
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, textAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, textColor);
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, textDisabledAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, textDisabledColor);
 
         if (!this.enabled) {
             this._setContentEnabled(false);
         }
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override delete(): void {
-        const btnSlot = this._buttonSlot;
-
-        if (btnSlot !== UIBaseButton._INVALID_INDEX) {
-            UITextButton._textRgba[btnSlot] = 0;
-            UITextButton._textDisabledRgba[btnSlot] = 0;
-        }
-
-        super.delete();
     }
 
     protected override _setContentEnabled(enabled: boolean): void {
@@ -72,40 +56,12 @@ export class UITextButton extends UIContentButton<UIText> {
 
         if (!content || !contentWidget) return;
 
-        const rgba = enabled ? UITextButton._textRgba[btnSlot] : UITextButton._textDisabledRgba[btnSlot];
-        const color = UITextButton._unpackColor(rgba);
-        const alpha = UITextButton._unpackAlpha(rgba);
+        const rgba = enabled ? UIContentButton._contentRgba[btnSlot] : UIContentButton._contentDisabledRgba[btnSlot];
+        const color = UIBaseButton._unpackColor(rgba);
+        const alpha = UIBaseButton._unpackAlpha(rgba);
 
         content.setTextColor(color);
         content.setTextAlpha(alpha);
-    }
-
-    /**
-     * @inheritdoc
-     * @returns True if enabled, false if disabled, or undefined if deleted.
-     */
-    public override get enabled(): boolean | undefined {
-        return super.enabled;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override set enabled(enabled: boolean) {
-        this.setEnabled(enabled);
-    }
-
-    /**
-     * @inheritdoc
-     * @returns This text button for chaining.
-     */
-    public override setEnabled(enabled: boolean): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
-
-        super.setEnabled(enabled);
-        this._setContentEnabled(enabled);
-
-        return this;
     }
 
     /**
@@ -204,7 +160,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackColor(UITextButton._textRgba[btnSlot]);
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot]);
     }
 
     /**
@@ -217,7 +173,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackColor(UITextButton._textRgba[btnSlot], out);
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot], out);
     }
 
     /**
@@ -238,7 +194,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UITextButton._setRgb(UITextButton._textRgba, btnSlot, color);
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, color);
 
         if (this.enabled) {
             this.content?.setTextColor(color);
@@ -256,7 +212,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackAlpha(UITextButton._textRgba[btnSlot]);
+            : UIBaseButton._unpackAlpha(UIContentButton._contentRgba[btnSlot]);
     }
 
     /**
@@ -277,7 +233,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UITextButton._setAlpha(UITextButton._textRgba, btnSlot, alpha);
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, alpha);
 
         if (this.enabled) {
             this.content?.setTextAlpha(alpha);
@@ -295,7 +251,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackColor(UITextButton._textDisabledRgba[btnSlot]);
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot]);
     }
 
     /**
@@ -308,7 +264,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackColor(UITextButton._textDisabledRgba[btnSlot], out);
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot], out);
     }
 
     /**
@@ -329,7 +285,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UITextButton._setRgb(UITextButton._textDisabledRgba, btnSlot, color);
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, color);
 
         if (!this.enabled) {
             this.content?.setTextColor(color);
@@ -347,7 +303,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UITextButton._unpackAlpha(UITextButton._textDisabledRgba[btnSlot]);
+            : UIBaseButton._unpackAlpha(UIContentButton._contentDisabledRgba[btnSlot]);
     }
 
     /**
@@ -368,7 +324,7 @@ export class UITextButton extends UIContentButton<UIText> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UITextButton._setAlpha(UITextButton._textDisabledRgba, btnSlot, alpha);
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, alpha);
 
         if (!this.enabled) {
             this.content?.setTextAlpha(alpha);

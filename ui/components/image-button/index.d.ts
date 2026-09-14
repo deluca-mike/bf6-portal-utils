@@ -4,32 +4,12 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIBaseButton } from '../base-button/index.ts';
 import { UIImage } from '../image/index.ts';
 export declare class UIImageButton extends UIContentButton<UIImage> {
-    private static readonly _imageRgba;
-    private static readonly _imageDisabledRgba;
     /**
      * Creates a new image button.
      * @param params - The parameters for the image button.
      */
     constructor(params: UIImageButton.Params);
-    /**
-     * @inheritdoc
-     */
-    delete(): void;
     protected _setContentEnabled(enabled: boolean): void;
-    /**
-     * @inheritdoc
-     * @returns True if enabled, false if disabled, or undefined if deleted.
-     */
-    get enabled(): boolean | undefined;
-    /**
-     * @inheritdoc
-     */
-    set enabled(enabled: boolean);
-    /**
-     * @inheritdoc
-     * @returns This image button for chaining.
-     */
-    setEnabled(enabled: boolean): this;
     /**
      * The type of the image, or undefined if deleted.
      * @returns The image type, or undefined if deleted.

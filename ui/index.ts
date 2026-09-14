@@ -84,6 +84,7 @@ export namespace UI {
     const _width = new Float32Array(MAX_ELEMENTS);
     const _height = new Float32Array(MAX_ELEMENTS);
     const _bgRgba = new Uint32Array(MAX_ELEMENTS);
+    const _foregroundRgba = new Uint32Array(MAX_ELEMENTS);
 
     const _nativeWidgets = new Array<mod.UIWidget | null>(MAX_ELEMENTS);
     const _instances = new Array<Element | null>(MAX_ELEMENTS);
@@ -251,6 +252,39 @@ export namespace UI {
         return (_bgRgba[slot] & 0xff) / 255;
     }
 
+    function _setForegroundColor(slot: number, color: Colors.Color): void {
+        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
+        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
+        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
+        const aInt = _foregroundRgba[slot] & 0xff;
+        _foregroundRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
+    }
+
+    function _setForegroundAlpha(slot: number, alpha: number): void {
+        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
+        _foregroundRgba[slot] = (_foregroundRgba[slot] & ~0xff) | aInt;
+    }
+
+    function _getForegroundColor(slot: number, out?: Colors.Color): Colors.Color {
+        const rgba = _foregroundRgba[slot];
+        const r = (rgba >>> 24) / 255;
+        const g = ((rgba >>> 16) & 0xff) / 255;
+        const b = ((rgba >>> 8) & 0xff) / 255;
+
+        if (out) {
+            out.r = r;
+            out.g = g;
+            out.b = b;
+            return out;
+        }
+
+        return { r, g, b };
+    }
+
+    function _getForegroundAlpha(slot: number): number {
+        return (_foregroundRgba[slot] & 0xff) / 255;
+    }
+
     /**
      * Encodes an internal array index and its current generation into a public node ID.
      * 1-based offset ensures slot 0 with generation 0 starts at ID 1, preserving ROOT_NODE_ID = 0.
@@ -351,6 +385,7 @@ export namespace UI {
     function _freeSlot(slot: number): void {
         _flags[slot] = 0;
         _bgRgba[slot] = 0;
+        _foregroundRgba[slot] = 0;
         _nativeWidgets[slot] = null;
         _receiverIds[slot] = RECEIVER_GLOBAL;
         _instances[slot] = null;
@@ -1064,6 +1099,22 @@ export namespace UI {
 
         protected static _resolveSlot(id: number): number {
             return _resolveSlot(id);
+        }
+
+        protected static _setForegroundColor(slot: number, color: Colors.Color): void {
+            _setForegroundColor(slot, color);
+        }
+
+        protected static _setForegroundAlpha(slot: number, alpha: number): void {
+            _setForegroundAlpha(slot, alpha);
+        }
+
+        protected static _getForegroundColor(slot: number, out?: Colors.Color): Colors.Color {
+            return _getForegroundColor(slot, out);
+        }
+
+        protected static _getForegroundAlpha(slot: number): number {
+            return _getForegroundAlpha(slot);
         }
 
         protected static _getNextSibling(slot: number): number {

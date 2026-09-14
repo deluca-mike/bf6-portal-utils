@@ -6,9 +6,6 @@ import { UIImage } from '../image/index.ts';
 
 // version: 10.0.0
 export class UIImageButton extends UIContentButton<UIImage> {
-    private static readonly _imageRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-    private static readonly _imageDisabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-
     /**
      * Creates a new image button.
      * @param params - The parameters for the image button.
@@ -38,26 +35,14 @@ export class UIImageButton extends UIContentButton<UIImage> {
         const imageDisabledColor = params.imageDisabledColor ?? UI.COLORS.BF_GREY_2;
         const imageDisabledAlpha = params.imageDisabledAlpha ?? 1;
 
-        UIImageButton._imageRgba[btnSlot] = UIImageButton._packRgba(imageColor, imageAlpha);
-        UIImageButton._imageDisabledRgba[btnSlot] = UIImageButton._packRgba(imageDisabledColor, imageDisabledAlpha);
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, imageAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, imageColor);
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, imageDisabledAlpha);
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, imageDisabledColor);
 
         if (!this.enabled) {
             this._setContentEnabled(false);
         }
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override delete(): void {
-        const btnSlot = this._buttonSlot;
-
-        if (btnSlot !== UIBaseButton._INVALID_INDEX) {
-            UIImageButton._imageRgba[btnSlot] = 0;
-            UIImageButton._imageDisabledRgba[btnSlot] = 0;
-        }
-
-        super.delete();
     }
 
     protected override _setContentEnabled(enabled: boolean): void {
@@ -70,40 +55,12 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (!content || !contentWidget) return;
 
-        const rgba = enabled ? UIImageButton._imageRgba[btnSlot] : UIImageButton._imageDisabledRgba[btnSlot];
-        const color = UIImageButton._unpackColor(rgba);
-        const alpha = UIImageButton._unpackAlpha(rgba);
+        const rgba = enabled ? UIContentButton._contentRgba[btnSlot] : UIContentButton._contentDisabledRgba[btnSlot];
+        const color = UIBaseButton._unpackColor(rgba);
+        const alpha = UIBaseButton._unpackAlpha(rgba);
 
         content.setImageColor(color);
         content.setImageAlpha(alpha);
-    }
-
-    /**
-     * @inheritdoc
-     * @returns True if enabled, false if disabled, or undefined if deleted.
-     */
-    public override get enabled(): boolean | undefined {
-        return super.enabled;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public override set enabled(enabled: boolean) {
-        this.setEnabled(enabled);
-    }
-
-    /**
-     * @inheritdoc
-     * @returns This image button for chaining.
-     */
-    public override setEnabled(enabled: boolean): this {
-        if (this._getIsInvalidAndLogWarning()) return this;
-
-        super.setEnabled(enabled);
-        this._setContentEnabled(enabled);
-
-        return this;
     }
 
     /**
@@ -144,7 +101,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackColor(UIImageButton._imageRgba[btnSlot]);
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot]);
     }
 
     /**
@@ -157,7 +114,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackColor(UIImageButton._imageRgba[btnSlot], out);
+            : UIBaseButton._unpackColor(UIContentButton._contentRgba[btnSlot], out);
     }
 
     /**
@@ -178,7 +135,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._setRgb(UIImageButton._imageRgba, btnSlot, color);
+        UIBaseButton._setRgb(UIContentButton._contentRgba, btnSlot, color);
 
         if (this.enabled) {
             this.content?.setImageColor(color);
@@ -196,7 +153,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackAlpha(UIImageButton._imageRgba[btnSlot]);
+            : UIBaseButton._unpackAlpha(UIContentButton._contentRgba[btnSlot]);
     }
 
     /**
@@ -217,7 +174,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._setAlpha(UIImageButton._imageRgba, btnSlot, alpha);
+        UIBaseButton._setAlpha(UIContentButton._contentRgba, btnSlot, alpha);
 
         if (this.enabled) {
             this.content?.setImageAlpha(alpha);
@@ -235,7 +192,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackColor(UIImageButton._imageDisabledRgba[btnSlot]);
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot]);
     }
 
     /**
@@ -248,7 +205,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackColor(UIImageButton._imageDisabledRgba[btnSlot], out);
+            : UIBaseButton._unpackColor(UIContentButton._contentDisabledRgba[btnSlot], out);
     }
 
     /**
@@ -269,7 +226,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._setRgb(UIImageButton._imageDisabledRgba, btnSlot, color);
+        UIBaseButton._setRgb(UIContentButton._contentDisabledRgba, btnSlot, color);
 
         if (!this.enabled) {
             this.content?.setImageColor(color);
@@ -287,7 +244,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         return btnSlot === UIBaseButton._INVALID_INDEX
             ? undefined
-            : UIImageButton._unpackAlpha(UIImageButton._imageDisabledRgba[btnSlot]);
+            : UIBaseButton._unpackAlpha(UIContentButton._contentDisabledRgba[btnSlot]);
     }
 
     /**
@@ -308,7 +265,7 @@ export class UIImageButton extends UIContentButton<UIImage> {
 
         if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
 
-        UIImageButton._setAlpha(UIImageButton._imageDisabledRgba, btnSlot, alpha);
+        UIBaseButton._setAlpha(UIContentButton._contentDisabledRgba, btnSlot, alpha);
 
         if (!this.enabled) {
             this.content?.setImageAlpha(alpha);

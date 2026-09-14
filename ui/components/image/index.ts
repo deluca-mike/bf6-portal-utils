@@ -3,47 +3,7 @@ import { UI } from '../../index.ts';
 
 // version: 10.0.0
 export class UIImage extends UI.Element {
-    private static readonly _imageRgba = new Uint32Array(UI.MAX_ELEMENTS);
     private static readonly _imageType = new Uint8Array(UI.MAX_ELEMENTS);
-
-    private static _setImageRgba(slot: number, color: Colors.Color, alpha: number): void {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        UIImage._imageRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
-    private static _setImageColor(slot: number, color: Colors.Color): void {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = UIImage._imageRgba[slot] & 0xff;
-        UIImage._imageRgba[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
-    private static _setImageAlpha(slot: number, alpha: number): void {
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        UIImage._imageRgba[slot] = (UIImage._imageRgba[slot] & ~0xff) | aInt;
-    }
-
-    private static _getImageColor(slot: number, out?: Colors.Color): Colors.Color {
-        const rgba = UIImage._imageRgba[slot];
-        const r = (rgba >>> 24) / 255;
-        const g = ((rgba >>> 16) & 0xff) / 255;
-        const b = ((rgba >>> 8) & 0xff) / 255;
-        if (out) {
-            out.r = r;
-            out.g = g;
-            out.b = b;
-            return out;
-        }
-        return { r, g, b };
-    }
-
-    private static _getImageAlpha(slot: number): number {
-        return (UIImage._imageRgba[slot] & 0xff) / 255;
-    }
 
     /**
      * Creates a new image.
@@ -114,7 +74,8 @@ export class UIImage extends UI.Element {
 
         const slot = this._slot;
         UIImage._imageType[slot] = params.imageType;
-        UIImage._setImageRgba(slot, imageColor, imageAlpha);
+        UI.Element._setForegroundAlpha(slot, imageAlpha);
+        UI.Element._setForegroundColor(slot, imageColor);
     }
 
     /**
@@ -126,7 +87,6 @@ export class UIImage extends UI.Element {
         if (slot === UI.Element._INVALID_INDEX) return;
 
         UIImage._imageType[slot] = 0;
-        UIImage._imageRgba[slot] = 0;
         super.delete();
     }
 
@@ -171,7 +131,7 @@ export class UIImage extends UI.Element {
     public get imageAlpha(): number | undefined {
         const slot = this._slot;
 
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageAlpha(slot);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundAlpha(slot);
     }
 
     /**
@@ -192,7 +152,7 @@ export class UIImage extends UI.Element {
 
         if (slot === UI.Element._INVALID_INDEX) return this;
 
-        UIImage._setImageAlpha(slot, alpha);
+        UI.Element._setForegroundAlpha(slot, alpha);
         mod.SetUIImageAlpha(this._uiWidget, alpha);
 
         return this;
@@ -205,7 +165,7 @@ export class UIImage extends UI.Element {
     public get imageColor(): Colors.Color | undefined {
         const slot = this._slot;
 
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageColor(slot);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot);
     }
 
     /**
@@ -216,7 +176,7 @@ export class UIImage extends UI.Element {
     public getImageColor(out?: Colors.Color): Colors.Color | undefined {
         const slot = this._slot;
 
-        return slot === UI.Element._INVALID_INDEX ? undefined : UIImage._getImageColor(slot, out);
+        return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot, out);
     }
 
     /**
@@ -237,7 +197,7 @@ export class UIImage extends UI.Element {
 
         if (slot === UI.Element._INVALID_INDEX) return this;
 
-        UIImage._setImageColor(slot, color);
+        UI.Element._setForegroundColor(slot, color);
         mod.SetUIImageColor(this._uiWidget, Colors.toVector(color));
 
         return this;

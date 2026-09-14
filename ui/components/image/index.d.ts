@@ -1,13 +1,7 @@
 import { Colors } from '../../../colors/index.ts';
 import { UI } from '../../index.ts';
 export declare class UIImage extends UI.Element {
-    private static readonly _imageRgba;
     private static readonly _imageType;
-    private static _setImageRgba;
-    private static _setImageColor;
-    private static _setImageAlpha;
-    private static _getImageColor;
-    private static _getImageAlpha;
     /**
      * Creates a new image.
      * @param params - The parameters for the image.

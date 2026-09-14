@@ -3,6 +3,7 @@ import { UI } from '../../index.ts';
 // version: 9.0.0
 export class UIWeaponImage extends UI.Element {
     private static readonly _weapons = new Array<mod.Weapons | null>(UI.MAX_ELEMENTS);
+
     private static readonly _weaponPackages = new Array<mod.WeaponPackage | null>(UI.MAX_ELEMENTS);
 
     /**

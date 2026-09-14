@@ -45,54 +45,9 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
 
     protected static readonly _contents = new Array<UI.Element | null>(UIBaseButton.MAX_BUTTONS);
 
-    private static readonly _baseRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
+    protected static readonly _contentRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
 
-    private static readonly _disabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-
-    private static readonly _pressedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-
-    private static readonly _focusedRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
-
-    protected static _packRgba(color: Colors.Color, alpha: number): number {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-
-        return (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
-    protected static _unpackColor(rgba: number, out?: Colors.Color): Colors.Color {
-        const r = (rgba >>> 24) / 255;
-        const g = ((rgba >>> 16) & 0xff) / 255;
-        const b = ((rgba >>> 8) & 0xff) / 255;
-
-        if (out) {
-            out.r = r;
-            out.g = g;
-            out.b = b;
-            return out;
-        }
-
-        return { r, g, b };
-    }
-
-    protected static _unpackAlpha(rgba: number): number {
-        return (rgba & 0xff) / 255;
-    }
-
-    protected static _setRgb(arr: Uint32Array, slot: number, color: Colors.Color): void {
-        const rInt = Math.min(Math.max(Math.round(color.r * 255), 0), 255);
-        const gInt = Math.min(Math.max(Math.round(color.g * 255), 0), 255);
-        const bInt = Math.min(Math.max(Math.round(color.b * 255), 0), 255);
-        const aInt = arr[slot] & 0xff;
-        arr[slot] = (rInt << 24) | (gInt << 16) | (bInt << 8) | aInt;
-    }
-
-    protected static _setAlpha(arr: Uint32Array, slot: number, alpha: number): void {
-        const aInt = Math.min(Math.max(Math.round(alpha * 255), 0), 255);
-        arr[slot] = (arr[slot] & ~0xff) | aInt;
-    }
+    protected static readonly _contentDisabledRgba = new Uint32Array(UIBaseButton.MAX_BUTTONS);
 
     /**
      * Creates a new content button.
@@ -225,14 +180,22 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
         }
 
         const buttonWidget = mod.FindUIWidgetWithName(buttonName) as mod.UIWidget;
+        const slot = this._slot;
         const btnSlot = this._buttonSlot;
 
         UIContentButton._padding[btnSlot] = padding;
         UIContentButton._buttonWidgets[btnSlot] = buttonWidget;
-        UIContentButton._baseRgba[btnSlot] = UIContentButton._packRgba(baseColor, baseAlpha);
-        UIContentButton._disabledRgba[btnSlot] = UIContentButton._packRgba(disabledColor, disabledAlpha);
-        UIContentButton._pressedRgba[btnSlot] = UIContentButton._packRgba(pressedColor, pressedAlpha);
-        UIContentButton._focusedRgba[btnSlot] = UIContentButton._packRgba(focusedColor, focusedAlpha);
+
+        if (slot !== UI.Element._INVALID_INDEX && btnSlot !== UIBaseButton._INVALID_INDEX) {
+            UI.Element._setForegroundAlpha(slot, baseAlpha);
+            UI.Element._setForegroundColor(slot, baseColor);
+            UIBaseButton._setAlpha(UIBaseButton._disabledRgba, btnSlot, disabledAlpha);
+            UIBaseButton._setRgb(UIBaseButton._disabledRgba, btnSlot, disabledColor);
+            UIBaseButton._setAlpha(UIBaseButton._pressedRgba, btnSlot, pressedAlpha);
+            UIBaseButton._setRgb(UIBaseButton._pressedRgba, btnSlot, pressedColor);
+            UIBaseButton._setAlpha(UIBaseButton._focusedRgba, btnSlot, focusedAlpha);
+            UIBaseButton._setRgb(UIBaseButton._focusedRgba, btnSlot, focusedColor);
+        }
 
         if (params.onClickDown) {
             this._setButtonHandler(UIBaseButton.Event.ClickDown, params.onClickDown);
@@ -287,10 +250,8 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
             UIContentButton._contents[btnSlot] = null;
             UIContentButton._buttonWidgets[btnSlot] = null;
             UIContentButton._padding[btnSlot] = 0;
-            UIContentButton._baseRgba[btnSlot] = 0;
-            UIContentButton._disabledRgba[btnSlot] = 0;
-            UIContentButton._pressedRgba[btnSlot] = 0;
-            UIContentButton._focusedRgba[btnSlot] = 0;
+            UIContentButton._contentRgba[btnSlot] = 0;
+            UIContentButton._contentDisabledRgba[btnSlot] = 0;
         }
 
         super.delete();
@@ -421,48 +382,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
     }
 
     /**
-     * Whether the button is enabled, or undefined if deleted.
-     * @returns True if enabled, false if disabled, or undefined if deleted.
-     */
-    public get enabled(): boolean | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : mod.GetUIButtonEnabled(UIContentButton._buttonWidgets[btnSlot]!);
-    }
-
-    /**
-     * Sets whether the button is enabled.
-     * @param enabled - The new enabled state.
-     */
-    public set enabled(enabled: boolean) {
-        this.setEnabled(enabled);
-    }
-
-    /**
-     * Hook invoked when the enabled state of the content button changes.
-     * @param _enabled - Whether the button is enabled.
-     */
-    protected _setContentEnabled(_enabled: boolean): void {}
-
-    /**
-     * Sets whether the button is enabled.
-     * @param enabled - The new enabled state.
-     * @returns This content button for chaining.
-     */
-    public setEnabled(enabled: boolean): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        mod.SetUIButtonEnabled(UIContentButton._buttonWidgets[btnSlot]!, enabled);
-        this._setContentEnabled(enabled);
-
-        return this;
-    }
-
-    /**
      * The padding of the content button, or undefined if deleted.
      * @returns The padding in pixels, or undefined if deleted.
      */
@@ -492,346 +411,6 @@ export abstract class UIContentButton<TContent extends UI.Element> extends UIBas
 
         UIContentButton._padding[btnSlot] = padding;
         mod.SetUIWidgetPadding(this._uiWidget, padding);
-
-        return this;
-    }
-
-    /**
-     * The base color of the button, or undefined if deleted.
-     * @returns The base color, or undefined if deleted.
-     */
-    public get baseColor(): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._baseRgba[btnSlot]);
-    }
-
-    /**
-     * Retrieves the base color into an optional target Color object for zero-allocation reuse.
-     * @param out - Optional target Color to write into.
-     * @returns The base color, or undefined if deleted.
-     */
-    public getBaseColor(out?: Colors.Color): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._baseRgba[btnSlot], out);
-    }
-
-    /**
-     * Sets the base color of the button.
-     * @param color - The new base color.
-     */
-    public set baseColor(color: Colors.Color) {
-        this.setBaseColor(color);
-    }
-
-    /**
-     * Sets the base color of the button.
-     * @param color - The new base color.
-     * @returns This content button for chaining.
-     */
-    public setBaseColor(color: Colors.Color): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setRgb(UIContentButton._baseRgba, btnSlot, color);
-        mod.SetUIButtonColorBase(UIContentButton._buttonWidgets[btnSlot]!, Colors.toVector(color));
-
-        return this;
-    }
-
-    /**
-     * The base alpha of the button, or undefined if deleted.
-     * @returns The base alpha opacity, or undefined if deleted.
-     */
-    public get baseAlpha(): number | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackAlpha(UIContentButton._baseRgba[btnSlot]);
-    }
-
-    /**
-     * Sets the base alpha of the button.
-     * @param alpha - The new base alpha.
-     */
-    public set baseAlpha(alpha: number) {
-        this.setBaseAlpha(alpha);
-    }
-
-    /**
-     * Sets the base alpha of the button.
-     * @param alpha - The new base alpha.
-     * @returns This content button for chaining.
-     */
-    public setBaseAlpha(alpha: number): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setAlpha(UIContentButton._baseRgba, btnSlot, alpha);
-        mod.SetUIButtonAlphaBase(UIContentButton._buttonWidgets[btnSlot]!, alpha);
-
-        return this;
-    }
-
-    /**
-     * The disabled color of the button, or undefined if deleted.
-     * @returns The disabled color, or undefined if deleted.
-     */
-    public get disabledColor(): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._disabledRgba[btnSlot]);
-    }
-
-    /**
-     * Retrieves the disabled color into an optional target Color object for zero-allocation reuse.
-     * @param out - Optional target Color to write into.
-     * @returns The disabled color, or undefined if deleted.
-     */
-    public getDisabledColor(out?: Colors.Color): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._disabledRgba[btnSlot], out);
-    }
-
-    /**
-     * Sets the disabled color of the button.
-     * @param color - The new disabled color.
-     */
-    public set disabledColor(color: Colors.Color) {
-        this.setDisabledColor(color);
-    }
-
-    /**
-     * Sets the disabled color of the button.
-     * @param color - The new disabled color.
-     * @returns This content button for chaining.
-     */
-    public setDisabledColor(color: Colors.Color): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setRgb(UIContentButton._disabledRgba, btnSlot, color);
-        mod.SetUIButtonColorDisabled(UIContentButton._buttonWidgets[btnSlot]!, Colors.toVector(color));
-
-        return this;
-    }
-
-    /**
-     * The disabled alpha of the button, or undefined if deleted.
-     * @returns The disabled alpha opacity, or undefined if deleted.
-     */
-    public get disabledAlpha(): number | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackAlpha(UIContentButton._disabledRgba[btnSlot]);
-    }
-
-    /**
-     * Sets the disabled alpha of the button.
-     * @param alpha - The new disabled alpha.
-     */
-    public set disabledAlpha(alpha: number) {
-        this.setDisabledAlpha(alpha);
-    }
-
-    /**
-     * Sets the disabled alpha of the button.
-     * @param alpha - The new disabled alpha.
-     * @returns This content button for chaining.
-     */
-    public setDisabledAlpha(alpha: number): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setAlpha(UIContentButton._disabledRgba, btnSlot, alpha);
-        mod.SetUIButtonAlphaDisabled(UIContentButton._buttonWidgets[btnSlot]!, alpha);
-
-        return this;
-    }
-
-    /**
-     * The pressed color of the button, or undefined if deleted.
-     * @returns The pressed color, or undefined if deleted.
-     */
-    public get pressedColor(): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._pressedRgba[btnSlot]);
-    }
-
-    /**
-     * Retrieves the pressed color into an optional target Color object for zero-allocation reuse.
-     * @param out - Optional target Color to write into.
-     * @returns The pressed color, or undefined if deleted.
-     */
-    public getPressedColor(out?: Colors.Color): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._pressedRgba[btnSlot], out);
-    }
-
-    /**
-     * Sets the pressed color of the button.
-     * @param color - The new pressed color.
-     */
-    public set pressedColor(color: Colors.Color) {
-        this.setPressedColor(color);
-    }
-
-    /**
-     * Sets the pressed color of the button.
-     * @param color - The new pressed color.
-     * @returns This content button for chaining.
-     */
-    public setPressedColor(color: Colors.Color): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setRgb(UIContentButton._pressedRgba, btnSlot, color);
-        mod.SetUIButtonColorPressed(UIContentButton._buttonWidgets[btnSlot]!, Colors.toVector(color));
-
-        return this;
-    }
-
-    /**
-     * The pressed alpha of the button, or undefined if deleted.
-     * @returns The pressed alpha opacity, or undefined if deleted.
-     */
-    public get pressedAlpha(): number | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackAlpha(UIContentButton._pressedRgba[btnSlot]);
-    }
-
-    /**
-     * Sets the pressed alpha of the button.
-     * @param alpha - The new pressed alpha.
-     */
-    public set pressedAlpha(alpha: number) {
-        this.setPressedAlpha(alpha);
-    }
-
-    /**
-     * Sets the pressed alpha of the button.
-     * @param alpha - The new pressed alpha.
-     * @returns This content button for chaining.
-     */
-    public setPressedAlpha(alpha: number): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setAlpha(UIContentButton._pressedRgba, btnSlot, alpha);
-        mod.SetUIButtonAlphaPressed(UIContentButton._buttonWidgets[btnSlot]!, alpha);
-
-        return this;
-    }
-
-    /**
-     * The focused color of the button, or undefined if deleted.
-     * @returns The focused color, or undefined if deleted.
-     */
-    public get focusedColor(): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._focusedRgba[btnSlot]);
-    }
-
-    /**
-     * Retrieves the focused color into an optional target Color object for zero-allocation reuse.
-     * @param out - Optional target Color to write into.
-     * @returns The focused color, or undefined if deleted.
-     */
-    public getFocusedColor(out?: Colors.Color): Colors.Color | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackColor(UIContentButton._focusedRgba[btnSlot], out);
-    }
-
-    /**
-     * Sets the focused color of the button.
-     * @param color - The new focused color.
-     */
-    public set focusedColor(color: Colors.Color) {
-        this.setFocusedColor(color);
-    }
-
-    /**
-     * Sets the focused color of the button.
-     * @param color - The new focused color.
-     * @returns This content button for chaining.
-     */
-    public setFocusedColor(color: Colors.Color): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setRgb(UIContentButton._focusedRgba, btnSlot, color);
-        mod.SetUIButtonColorFocused(UIContentButton._buttonWidgets[btnSlot]!, Colors.toVector(color));
-
-        return this;
-    }
-
-    /**
-     * The focused alpha of the button, or undefined if deleted.
-     * @returns The focused alpha opacity, or undefined if deleted.
-     */
-    public get focusedAlpha(): number | undefined {
-        const btnSlot = this._buttonSlot;
-
-        return btnSlot === UIBaseButton._INVALID_INDEX
-            ? undefined
-            : UIContentButton._unpackAlpha(UIContentButton._focusedRgba[btnSlot]);
-    }
-
-    /**
-     * Sets the focused alpha of the button.
-     * @param alpha - The new focused alpha.
-     */
-    public set focusedAlpha(alpha: number) {
-        this.setFocusedAlpha(alpha);
-    }
-
-    /**
-     * Sets the focused alpha of the button.
-     * @param alpha - The new focused alpha.
-     * @returns This content button for chaining.
-     */
-    public setFocusedAlpha(alpha: number): this {
-        const btnSlot = this._resolveButtonSlotAndLogWarning();
-
-        if (btnSlot === UIBaseButton._INVALID_INDEX) return this;
-
-        UIContentButton._setAlpha(UIContentButton._focusedRgba, btnSlot, alpha);
-        mod.SetUIButtonAlphaFocused(UIContentButton._buttonWidgets[btnSlot]!, alpha);
 
         return this;
     }
