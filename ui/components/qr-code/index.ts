@@ -301,13 +301,9 @@ export class UIQRCode extends UI.Element {
      * @returns The resolved 2D boolean matrix, or null if neither was provided.
      */
     private static _resolveMatrix(params: UIQRCode.Params): UIQRCode.BooleanMatrix | null {
-        if (params.matrix) {
-            return UIQRCode._normalizeMatrix(params.matrix);
-        }
+        if (params.matrix) return UIQRCode._normalizeMatrix(params.matrix);
 
-        if (params.text !== undefined) {
-            return UIQRCode.Encoder.encode(params.text, params.ecc ?? UIQRCode.ECC.Medium);
-        }
+        if (params.text !== undefined) return UIQRCode.Encoder.encode(params.text, params.ecc ?? UIQRCode.ECC.Medium);
 
         return null;
     }
@@ -515,6 +511,7 @@ export class UIQRCode extends UI.Element {
                         // Mark 5x5 cells as visited
                         for (let i = 0; i < 5; ++i) {
                             const rowOffset = (r + i) * N;
+
                             for (let j = 0; j < 5; ++j) {
                                 visited[rowOffset + (c + j)] = 1;
                             }
@@ -530,9 +527,7 @@ export class UIQRCode extends UI.Element {
             const rowOffset = r * N;
 
             for (let c = 0; c < N; ++c) {
-                if (!row[c] || visited[rowOffset + c] === 1) {
-                    continue;
-                }
+                if (!row[c] || visited[rowOffset + c] === 1) continue;
 
                 // Step 3a: Expand Horizontally
                 let w = 1;
@@ -561,6 +556,7 @@ export class UIQRCode extends UI.Element {
                 // Step 3d: Mark w x h region as visited
                 for (let i = 0; i < h; ++i) {
                     const markRowOffset = (r + i) * N;
+
                     for (let j = 0; j < w; ++j) {
                         visited[markRowOffset + (c + j)] = 1;
                     }
@@ -579,9 +575,11 @@ export class UIQRCode extends UI.Element {
      */
     public override delete(): void {
         const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+
         if (qrSlot === UI.Element._INVALID_INDEX) return;
 
         const modules = UIQRCode._childWidgets[qrSlot];
+
         if (modules) {
             for (let i = 0; i < modules.length; ++i) {
                 mod.DeleteUIWidget(modules[i].widget);
@@ -612,6 +610,7 @@ export class UIQRCode extends UI.Element {
      */
     public get scale(): number | undefined {
         const slot = this._qrCodeSlot;
+
         return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._scales[slot];
     }
 
@@ -630,10 +629,12 @@ export class UIQRCode extends UI.Element {
      */
     public setScale(scale: number): this {
         const slot = this._resolveQrCodeSlotAndLogWarning();
+
         if (slot === UI.Element._INVALID_INDEX) return this;
 
         UIQRCode._scales[slot] = scale;
         this._updateModuleLayout(slot);
+
         return this;
     }
 
@@ -643,6 +644,7 @@ export class UIQRCode extends UI.Element {
      */
     public get margin(): number | undefined {
         const slot = this._qrCodeSlot;
+
         return slot === UI.Element._INVALID_INDEX ? undefined : UIQRCode._margins[slot];
     }
 
@@ -661,10 +663,12 @@ export class UIQRCode extends UI.Element {
      */
     public setMargin(margin: number): this {
         const slot = this._resolveQrCodeSlotAndLogWarning();
+
         if (slot === UI.Element._INVALID_INDEX) return this;
 
         UIQRCode._margins[slot] = margin;
         this._updateModuleLayout(slot);
+
         return this;
     }
 
@@ -674,6 +678,7 @@ export class UIQRCode extends UI.Element {
      */
     public get darkColor(): Colors.Color | undefined {
         const slot = this._slot;
+
         return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot);
     }
 
@@ -684,6 +689,7 @@ export class UIQRCode extends UI.Element {
      */
     public getDarkColor(out?: Colors.Color): Colors.Color | undefined {
         const slot = this._slot;
+
         return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundColor(slot, out);
     }
 
@@ -702,22 +708,28 @@ export class UIQRCode extends UI.Element {
      */
     public setDarkColor(color: Colors.Color): this {
         const elementSlot = this._getSlotAndLogWarning();
+
         if (elementSlot === UI.Element._INVALID_INDEX) return this;
 
         const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+
         if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
         UI.Element._setForegroundColor(elementSlot, color);
         const modules = UIQRCode._childWidgets[qrSlot];
-        if (modules) {
-            const darkVec = Colors.toVector(color);
-            for (let i = 0; i < modules.length; ++i) {
-                const modInfo = modules[i];
-                if (!modInfo.isLight) {
-                    mod.SetUIWidgetBgColor(modInfo.widget, darkVec);
-                }
-            }
+
+        if (!modules) return this;
+
+        const darkVec = Colors.toVector(color);
+
+        for (let i = 0; i < modules.length; ++i) {
+            const modInfo = modules[i];
+
+            if (modInfo.isLight) continue;
+
+            mod.SetUIWidgetBgColor(modInfo.widget, darkVec);
         }
+
         return this;
     }
 
@@ -727,6 +739,7 @@ export class UIQRCode extends UI.Element {
      */
     public get darkAlpha(): number | undefined {
         const slot = this._slot;
+
         return slot === UI.Element._INVALID_INDEX ? undefined : UI.Element._getForegroundAlpha(slot);
     }
 
@@ -745,21 +758,26 @@ export class UIQRCode extends UI.Element {
      */
     public setDarkAlpha(alpha: number): this {
         const elementSlot = this._getSlotAndLogWarning();
+
         if (elementSlot === UI.Element._INVALID_INDEX) return this;
 
         const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+
         if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
         UI.Element._setForegroundAlpha(elementSlot, alpha);
         const modules = UIQRCode._childWidgets[qrSlot];
-        if (modules) {
-            for (let i = 0; i < modules.length; ++i) {
-                const modInfo = modules[i];
-                if (!modInfo.isLight) {
-                    mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
-                }
-            }
+
+        if (!modules) return this;
+
+        for (let i = 0; i < modules.length; ++i) {
+            const modInfo = modules[i];
+
+            if (modInfo.isLight) continue;
+
+            mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
         }
+
         return this;
     }
 
@@ -795,19 +813,24 @@ export class UIQRCode extends UI.Element {
      */
     public setLightColor(color: Colors.Color): this {
         const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+
         if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
         super.setBgColor(color);
         const modules = UIQRCode._childWidgets[qrSlot];
-        if (modules) {
-            const lightVec = Colors.toVector(color);
-            for (let i = 0; i < modules.length; ++i) {
-                const modInfo = modules[i];
-                if (modInfo.isLight) {
-                    mod.SetUIWidgetBgColor(modInfo.widget, lightVec);
-                }
-            }
+
+        if (!modules) return this;
+
+        const lightVec = Colors.toVector(color);
+
+        for (let i = 0; i < modules.length; ++i) {
+            const modInfo = modules[i];
+
+            if (!modInfo.isLight) continue;
+
+            mod.SetUIWidgetBgColor(modInfo.widget, lightVec);
         }
+
         return this;
     }
 
@@ -842,18 +865,22 @@ export class UIQRCode extends UI.Element {
      */
     public setLightAlpha(alpha: number): this {
         const qrSlot = this._resolveQrCodeSlotAndLogWarning();
+
         if (qrSlot === UI.Element._INVALID_INDEX) return this;
 
         super.setBgAlpha(alpha);
         const modules = UIQRCode._childWidgets[qrSlot];
-        if (modules) {
-            for (let i = 0; i < modules.length; ++i) {
-                const modInfo = modules[i];
-                if (modInfo.isLight) {
-                    mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
-                }
-            }
+
+        if (!modules) return this;
+
+        for (let i = 0; i < modules.length; ++i) {
+            const modInfo = modules[i];
+
+            if (!modInfo.isLight) continue;
+
+            mod.SetUIWidgetBgAlpha(modInfo.widget, alpha);
         }
+
         return this;
     }
 
@@ -871,6 +898,7 @@ export class UIQRCode extends UI.Element {
      */
     private _updateModuleLayout(qrSlot: number): void {
         const N = UIQRCode._matrixSizes[qrSlot];
+
         if (N === 0) return;
 
         const scale = UIQRCode._scales[qrSlot];
@@ -887,6 +915,7 @@ export class UIQRCode extends UI.Element {
         const cellHeight = totalHeight / gridUnits;
 
         const modules = UIQRCode._childWidgets[qrSlot];
+
         if (!modules) return;
 
         for (let i = 0; i < modules.length; ++i) {
@@ -1039,31 +1068,35 @@ export namespace UIQRCode {
             GF_EXP[i + 255] = x;
             GF_LOG[x] = i;
             x <<= 1;
+
             if (x & 0x100) {
                 x ^= 0x11d;
             }
         }
 
         function gfMul(a: number, b: number): number {
-            if (a === 0 || b === 0) return 0;
-            return GF_EXP[GF_LOG[a] + GF_LOG[b]];
+            return a === 0 || b === 0 ? 0 : GF_EXP[GF_LOG[a] + GF_LOG[b]];
         }
 
         function polyMul(p1: Uint8Array, p2: Uint8Array): Uint8Array {
             const result = new Uint8Array(p1.length + p2.length - 1);
+
             for (let i = 0; i < p1.length; ++i) {
                 for (let j = 0; j < p2.length; ++j) {
                     result[i + j] ^= gfMul(p1[i], p2[j]);
                 }
             }
+
             return result;
         }
 
         function getGeneratorPoly(degree: number): Uint8Array {
             let poly: Uint8Array = new Uint8Array([1]);
+
             for (let i = 0; i < degree; ++i) {
                 poly = polyMul(poly, new Uint8Array([1, GF_EXP[i]]));
             }
+
             return poly;
         }
 
@@ -1074,22 +1107,26 @@ export namespace UIQRCode {
 
             for (let i = 0; i < data.length; ++i) {
                 const coef = msg[i];
-                if (coef !== 0) {
-                    for (let j = 0; j < gen.length; ++j) {
-                        msg[i + j] ^= gfMul(gen[j], coef);
-                    }
+
+                if (coef === 0) continue;
+
+                for (let j = 0; j < gen.length; ++j) {
+                    msg[i + j] ^= gfMul(gen[j], coef);
                 }
             }
 
             const out = new Uint8Array(eccLen);
             out.set(msg.subarray(data.length));
+
             return out;
         }
 
         function encodeUtf8(str: string): Uint8Array {
             const bytes: number[] = [];
+
             for (let i = 0; i < str.length; ++i) {
                 const code = str.charCodeAt(i);
+
                 if (code < 0x80) {
                     bytes.push(code);
                 } else if (code < 0x800) {
@@ -1097,6 +1134,7 @@ export namespace UIQRCode {
                 } else if (code >= 0xd800 && code <= 0xdbff && i + 1 < str.length) {
                     const next = str.charCodeAt(++i);
                     const codePoint = 0x10000 + ((code & 0x3ff) << 10) + (next & 0x3ff);
+
                     bytes.push(
                         0xf0 | (codePoint >> 18),
                         0x80 | ((codePoint >> 12) & 0x3f),
@@ -1107,6 +1145,7 @@ export namespace UIQRCode {
                     bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
                 }
             }
+
             return new Uint8Array(bytes);
         }
 
@@ -1412,11 +1451,15 @@ export namespace UIQRCode {
 
         function getVersionInfoBits(version: number): number {
             let d = version << 12;
+
             while (d >= 1 << 12) {
                 const shift = 31 - Math.clz32(d) - 12;
+
                 if (shift < 0) break;
+
                 d ^= 0x1f25 << shift;
             }
+
             return (version << 12) | d;
         }
 
@@ -1424,11 +1467,15 @@ export namespace UIQRCode {
             const eccBits = [1, 0, 3, 2][getEccIndex(ecc)];
             const data = (eccBits << 3) | mask;
             let d = data << 10;
+
             while (d >= 1 << 10) {
                 const shift = 31 - Math.clz32(d) - 10;
+
                 if (shift < 0) break;
+
                 d ^= 0x537 << shift;
             }
+
             return ((data << 10) | d) ^ 0x5412;
         }
 
@@ -1478,6 +1525,7 @@ export namespace UIQRCode {
             // Mode indicator (0100 for 8-bit byte mode)
             pushBits(0b0100, 4);
             pushBits(utf8.length, charCountBits);
+
             for (let i = 0; i < utf8.length; ++i) {
                 pushBits(utf8[i], 8);
             }
@@ -1502,11 +1550,14 @@ export namespace UIQRCode {
 
             // Convert bitStream to data codewords
             const dataBytes = new Uint8Array(totalDataCodewords);
+
             for (let i = 0; i < totalDataCodewords; ++i) {
                 let byte = 0;
+
                 for (let b = 0; b < 8; ++b) {
                     byte = (byte << 1) | bitStream[i * 8 + b];
                 }
+
                 dataBytes[i] = byte;
             }
 
@@ -1519,6 +1570,7 @@ export namespace UIQRCode {
             const eccBlocks: Uint8Array[] = [];
 
             let offset = 0;
+
             for (let b = 0; b < eccConfig[1]; ++b) {
                 const len = eccConfig[2];
                 const blockData = dataBytes.subarray(offset, offset + len);
@@ -1526,6 +1578,7 @@ export namespace UIQRCode {
                 dataBlocks.push(blockData);
                 eccBlocks.push(computeReedSolomon(blockData, eccPerBlock));
             }
+
             for (let b = 0; b < eccConfig[3]; ++b) {
                 const len = eccConfig[4];
                 const blockData = dataBytes.subarray(offset, offset + len);
@@ -1559,7 +1612,10 @@ export namespace UIQRCode {
 
             function setModule(r: number, c: number, val: boolean, isFunc = true): void {
                 matrix[r][c] = val;
-                if (isFunc) isFunction[r][c] = true;
+
+                if (isFunc) {
+                    isFunction[r][c] = true;
+                }
             }
 
             // Finder patterns
@@ -1568,14 +1624,16 @@ export namespace UIQRCode {
                     for (let j = -1; j <= 7; ++j) {
                         const nr = r + i;
                         const nc = c + j;
-                        if (nr >= 0 && nr < size && nc >= 0 && nc < size) {
-                            if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
-                                const isBlack =
-                                    i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
-                                setModule(nr, nc, isBlack);
-                            } else {
-                                setModule(nr, nc, false); // Separator
-                            }
+
+                        if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+
+                        if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
+                            const isBlack =
+                                i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+
+                            setModule(nr, nc, isBlack);
+                        } else {
+                            setModule(nr, nc, false); // Separator
                         }
                     }
                 }
@@ -1588,13 +1646,14 @@ export namespace UIQRCode {
             // Alignment patterns
             if (version >= 2) {
                 const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
+
                 for (let p1 = 0; p1 < positions.length; ++p1) {
                     const r = positions[p1];
+
                     for (let p2 = 0; p2 < positions.length; ++p2) {
                         const c = positions[p2];
-                        if ((r <= 8 && c <= 8) || (r <= 8 && c >= size - 9) || (r >= size - 9 && c <= 8)) {
-                            continue;
-                        }
+
+                        if ((r <= 8 && c <= 8) || (r <= 8 && c >= size - 9) || (r >= size - 9 && c <= 8)) continue;
 
                         for (let i = -2; i <= 2; ++i) {
                             for (let j = -2; j <= 2; ++j) {
@@ -1620,9 +1679,11 @@ export namespace UIQRCode {
                 if (!isFunction[8][i]) setModule(8, i, false);
                 if (!isFunction[i][8]) setModule(i, 8, false);
             }
+
             for (let i = 0; i < 8; ++i) {
                 setModule(8, size - 1 - i, false);
             }
+
             for (let i = 0; i < 7; ++i) {
                 setModule(size - 1 - i, 8, false);
             }
@@ -1651,18 +1712,22 @@ export namespace UIQRCode {
 
                     for (let colOffset = 0; colOffset < 2; ++colOffset) {
                         const c = right - colOffset;
-                        if (!isFunction[r][c]) {
-                            let bit = false;
-                            if (bitIdx < totalDataBits) {
-                                const byte = finalCodewords[bitIdx >> 3];
-                                const bitPos = 7 - (bitIdx & 7);
-                                bit = ((byte >> bitPos) & 1) === 1;
-                            }
-                            bitIdx++;
-                            matrix[r][c] = bit;
+
+                        if (isFunction[r][c]) continue;
+
+                        let bit = false;
+
+                        if (bitIdx < totalDataBits) {
+                            const byte = finalCodewords[bitIdx >> 3];
+                            const bitPos = 7 - (bitIdx & 7);
+                            bit = ((byte >> bitPos) & 1) === 1;
                         }
+
+                        bitIdx++;
+                        matrix[r][c] = bit;
                     }
                 }
+
                 upward = !upward;
                 right -= 2;
             }
@@ -1699,8 +1764,10 @@ export namespace UIQRCode {
 
                 // Copy matrix with mask applied
                 const testMat: boolean[][] = new Array(size);
+
                 for (let r = 0; r < size; ++r) {
                     testMat[r] = new Array(size);
+
                     for (let c = 0; c < size; ++c) {
                         testMat[r][c] = isFunction[r][c]
                             ? matrix[r][c]
@@ -1712,6 +1779,7 @@ export namespace UIQRCode {
 
                 // Apply format info for mask evaluation
                 const formatBits = getFormatInfoBits(ecc, m);
+
                 const formatCoords = [
                     [0, 8],
                     [1, 8],
@@ -1729,6 +1797,7 @@ export namespace UIQRCode {
                     [8, 1],
                     [8, 0],
                 ];
+
                 const formatCoords2 = [
                     [size - 1, 8],
                     [size - 2, 8],
@@ -1766,8 +1835,12 @@ export namespace UIQRCode {
                             rowCount = 1;
                         } else {
                             rowCount++;
-                            if (rowCount === 5) penalty += 3;
-                            else if (rowCount > 5) penalty++;
+
+                            if (rowCount === 5) {
+                                penalty += 3;
+                            } else if (rowCount > 5) {
+                                penalty++;
+                            }
                         }
 
                         if (c === 0 || testMat[c][r] !== colColor) {
@@ -1775,8 +1848,12 @@ export namespace UIQRCode {
                             colCount = 1;
                         } else {
                             colCount++;
-                            if (colCount === 5) penalty += 3;
-                            else if (colCount > 5) penalty++;
+
+                            if (colCount === 5) {
+                                penalty += 3;
+                            } else if (colCount > 5) {
+                                penalty++;
+                            }
                         }
                     }
                 }
@@ -1785,6 +1862,7 @@ export namespace UIQRCode {
                 for (let r = 0; r < size - 1; ++r) {
                     for (let c = 0; c < size - 1; ++c) {
                         const val = testMat[r][c];
+
                         if (val === testMat[r][c + 1] && val === testMat[r + 1][c] && val === testMat[r + 1][c + 1]) {
                             penalty += 3;
                         }
@@ -1793,11 +1871,15 @@ export namespace UIQRCode {
 
                 // Penalty 4: Dark module ratio
                 let darkCount = 0;
+
                 for (let r = 0; r < size; ++r) {
                     for (let c = 0; c < size; ++c) {
-                        if (testMat[r][c]) darkCount++;
+                        if (testMat[r][c]) {
+                            darkCount++;
+                        }
                     }
                 }
+
                 const ratio = (darkCount * 100) / (size * size);
                 const step = Math.floor(Math.abs(ratio - 50) / 5);
                 penalty += step * 10;
@@ -1819,6 +1901,7 @@ export namespace UIQRCode {
 
             // Write Format information (15 bits)
             const formatBits = getFormatInfoBits(ecc, bestMask);
+
             const formatCoords = [
                 [0, 8],
                 [1, 8],
@@ -1836,6 +1919,7 @@ export namespace UIQRCode {
                 [8, 1],
                 [8, 0],
             ];
+
             const formatCoords2 = [
                 [size - 1, 8],
                 [size - 2, 8],
@@ -1863,6 +1947,7 @@ export namespace UIQRCode {
             // Write Version information (18 bits, v >= 7)
             if (version >= 7) {
                 const verBits = getVersionInfoBits(version);
+
                 for (let i = 0; i < 18; ++i) {
                     const bit = ((verBits >> i) & 1) === 1;
                     const a = Math.floor(i / 3);
