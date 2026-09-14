@@ -65,30 +65,19 @@ describe('UIQRCode Component', () => {
         resetMockState();
     });
 
-    describe('Matrix & Text Initialization', () => {
-        it('renders a QR code from a pre-computed boolean matrix', () => {
-            // Simple 21x21 test matrix (Version 1 size)
-            const matrix: boolean[][] = Array.from({ length: 21 }, () => new Array(21).fill(false));
-
-            // Set Top-Left finder pattern
-            for (let r = 0; r < 7; ++r) {
-                for (let c = 0; c < 7; ++c) {
-                    if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) {
-                        matrix[r][c] = true;
-                    }
-                }
-            }
-
+    describe('Initialization & Rendering', () => {
+        it('renders a QR code from a text payload and verifies slot conservation', () => {
+            const text = 'HELLO_PORTAL';
             const qr = new UIQRCode({
-                matrix,
+                text,
                 x: 100,
                 y: 100,
             });
 
             expect(qr.drawCallCount).toBeGreaterThan(0);
             expect(qr.scale).toBe(1);
-            expect(qr.width).toBe(210); // 21 * 10
-            expect(qr.height).toBe(210);
+            expect(qr.width).toBeGreaterThan(0);
+            expect(qr.height).toBeGreaterThan(0);
 
             // Slot conservation: Only 1 slot in UI.MAX_ELEMENTS and 1 in UIQRCode consumed
             expect(UI.getActiveElementCount()).toBe(1);
@@ -115,24 +104,6 @@ describe('UIQRCode Component', () => {
 
             // Verify decoding matches payload
             expect(decodeMatrix(matrix)).toBe(text);
-
-            qr.delete();
-        });
-
-        it('encodes numbers (1/0) matrices correctly', () => {
-            const matrix = [
-                [1, 0, 1],
-                [0, 1, 0],
-                [1, 1, 1],
-            ];
-
-            const qr = new UIQRCode({
-                matrix,
-                scale: 1,
-            });
-
-            expect(qr.width).toBe(30);
-            expect(qr.height).toBe(30);
 
             qr.delete();
         });

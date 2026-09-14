@@ -161,8 +161,20 @@ export class UIQRCode extends UI.Element {
      * @param params - The parameters for the QR code.
      */
     public constructor(params: UIQRCode.Params) {
-        const matrix = UIQRCode._resolveMatrix(params);
-        const matrixSize = matrix ? matrix.length : 0;
+        super(params);
+
+        if (!params || this._slot === UI.Element._INVALID_INDEX) return;
+
+        const qrSlot = this._allocateQrCodeSlot();
+
+        if (qrSlot === UI.Element._INVALID_INDEX) {
+            super.delete();
+            return;
+        }
+
+        const ecc = params.ecc ?? UIQRCode.ECC.Medium;
+        const matrix = UIQRCode.Encoder.encode(params.text, ecc);
+        const matrixSize = matrix.length;
         const scale = params.scale ?? 1;
         const margin = params.margin ?? 0;
         const totalUnits = matrixSize + 2 * margin;
@@ -177,56 +189,12 @@ export class UIQRCode extends UI.Element {
             params.size?.height ??
             (totalUnits > 0 ? totalUnits * UIQRCode.BASE_MODULE_SIZE * scale : 100);
 
-        const lightColor = params.lightColor ?? UI.COLORS.WHITE;
-        const lightAlpha = params.lightAlpha ?? 1;
+        const lightColor = params.lightColor ?? params.bgColor ?? UI.COLORS.WHITE;
+        const lightAlpha = params.lightAlpha ?? params.bgAlpha ?? 1;
         const darkColor = params.darkColor ?? UI.COLORS.BLACK;
         const darkAlpha = params.darkAlpha ?? 1;
 
         const { x, y } = UI.Element._getPosition(params);
-
-        // The root element is created as a container that acts as the Phase 1 solid background canvas
-        super(
-            params.position !== undefined
-                ? {
-                      position: params.position,
-                      width: baseWidth,
-                      height: baseHeight,
-                      parent: params.parent,
-                      anchor: params.anchor,
-                      visible: params.visible,
-                      bgColor: lightColor,
-                      bgAlpha: lightAlpha,
-                      bgFill: UI.BgFill.Solid,
-                      depth: params.depth,
-                      receiver: params.receiver,
-                      uiInputModeWhenVisible: params.uiInputModeWhenVisible,
-                  }
-                : {
-                      x,
-                      y,
-                      width: baseWidth,
-                      height: baseHeight,
-                      parent: params.parent,
-                      anchor: params.anchor,
-                      visible: params.visible,
-                      bgColor: lightColor,
-                      bgAlpha: lightAlpha,
-                      bgFill: UI.BgFill.Solid,
-                      depth: params.depth,
-                      receiver: params.receiver,
-                      uiInputModeWhenVisible: params.uiInputModeWhenVisible,
-                  }
-        );
-
-        if (!params || this._slot === UI.Element._INVALID_INDEX) return;
-
-        const qrSlot = this._allocateQrCodeSlot();
-
-        if (qrSlot === UI.Element._INVALID_INDEX) {
-            super.delete();
-            return;
-        }
-
         const parent = params.parent ?? UI.ROOT_NODE;
         const receiver = this._receiver!;
         const name = this._name;
@@ -270,6 +238,9 @@ export class UIQRCode extends UI.Element {
         }
 
         this._bindNativeWidget(name);
+        this.setSize({ width: baseWidth, height: baseHeight });
+        super.setBgColor(lightColor);
+        super.setBgAlpha(lightAlpha);
 
         UIQRCode._scales[qrSlot] = scale;
         UIQRCode._margins[qrSlot] = margin;
@@ -279,249 +250,298 @@ export class UIQRCode extends UI.Element {
         UI.Element._setForegroundAlpha(this._slot, darkAlpha);
         UI.Element._setForegroundColor(this._slot, darkColor);
 
-        if (matrix) {
-            this._renderQR(
-                qrSlot,
-                matrix,
-                baseWidth,
-                baseHeight,
-                scale,
-                margin,
-                darkColor,
-                darkAlpha,
-                lightColor,
-                lightAlpha
-            );
-        }
+        this._renderQR(
+            qrSlot,
+            matrix,
+            baseWidth,
+            baseHeight,
+            scale,
+            margin,
+            darkColor,
+            darkAlpha,
+            lightColor,
+            lightAlpha
+        );
     }
 
     /**
-     * Resolves the boolean matrix from parameters (either provided directly or encoded from text).
-     * @param params - The initialization parameters.
-     * @returns The resolved 2D boolean matrix, or null if neither was provided.
+     * Draws a single native rectangular container attached to this QR container.
+     * @param childModules - The child module array tracking native widgets.
+     * @param col - Module grid column.
+     * @param row - Module grid row.
+     * @param spanW - Module grid column width span.
+     * @param spanH - Module grid row height span.
+     * @param color - Native color vector.
+     * @param alpha - Opacity value.
+     * @param isLight - True if this represents a light cutout, false if dark.
+     * @param margin - Quiet zone margin in module units.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
      */
-    private static _resolveMatrix(params: UIQRCode.Params): UIQRCode.BooleanMatrix | null {
-        if (params.matrix) return UIQRCode._normalizeMatrix(params.matrix);
-
-        if (params.text !== undefined) return UIQRCode.Encoder.encode(params.text, params.ecc ?? UIQRCode.ECC.Medium);
-
-        return null;
-    }
-
-    /**
-     * Normalizes a user-supplied matrix (with numbers or booleans) into a boolean matrix.
-     * @param matrix - The input 2D matrix.
-     * @returns A 2D boolean array.
-     */
-    private static _normalizeMatrix(matrix: UIQRCode.Matrix): UIQRCode.BooleanMatrix {
-        const height = matrix.length;
-        const result: boolean[][] = new Array(height);
-
-        for (let r = 0; r < height; ++r) {
-            const row = matrix[r];
-            const width = row.length;
-            const boolRow: boolean[] = new Array(width);
-
-            for (let c = 0; c < width; ++c) {
-                const val = row[c];
-                boolRow[c] = val === true || val === 1;
-            }
-
-            result[r] = boolRow;
-        }
-
-        return result;
-    }
-
-    /**
-     * Renders the QR code sub-rectangles using the hybrid Painter's Algorithm + rectilinear merging.
-     * @param qrSlot - The allocated QR code sub-pool slot.
-     * @param matrix - The QR code boolean matrix.
-     * @param totalWidth - Total pixel width.
-     * @param totalHeight - Total pixel height.
-     * @param scale - Scale multiplier.
-     * @param margin - Margin in module units.
-     * @param darkColor - Dark module color.
-     * @param darkAlpha - Dark module opacity.
-     * @param lightColor - Light module color.
-     * @param lightAlpha - Light module opacity.
-     */
-    private _renderQR(
-        qrSlot: number,
-        matrix: UIQRCode.BooleanMatrix,
-        totalWidth: number,
-        totalHeight: number,
-        scale: number,
+    private _drawModuleRect(
+        childModules: UIQRCode.ChildModule[],
+        col: number,
+        row: number,
+        spanW: number,
+        spanH: number,
+        color: mod.Vector,
+        alpha: number,
+        isLight: boolean,
         margin: number,
-        darkColor: Colors.Color,
-        darkAlpha: number,
-        lightColor: Colors.Color,
-        lightAlpha: number
+        cellWidth: number,
+        cellHeight: number
     ): void {
-        const parentWidget = this._uiWidget;
+        const x0 = Math.round((col + margin) * cellWidth);
+        const y0 = Math.round((row + margin) * cellHeight);
+        const x1 = Math.round((col + spanW + margin) * cellWidth);
+        const y1 = Math.round((row + spanH + margin) * cellHeight);
+        const w = Math.max(1, x1 - x0);
+        const h = Math.max(1, y1 - y0);
+
+        const childName = `ui_qr_${this._id}_${childModules.length + 1}`;
         const receiver = this._receiver!;
-        const depth = this.depth ?? UI.Depth.AboveGameUI;
-        const N = matrix.length;
-
-        if (N === 0) return;
-
-        const darkVec = Colors.toVector(darkColor);
-        const lightVec = Colors.toVector(lightColor);
-
-        const gridUnits = N + 2 * margin;
-        const cellWidth = totalWidth / gridUnits;
-        const cellHeight = totalHeight / gridUnits;
-
-        const childModules: UIQRCode.ChildModule[] = [];
-
-        const nativeDepth = UI.Element._getNativeDepth(depth);
+        const parentWidget = this._uiWidget;
         const nativeTopLeft = UI.Element._getNativeAnchor(UI.Anchor.TopLeft);
         const nativeBgFillSolid = UI.Element._getNativeBgFill(UI.BgFill.Solid);
+        const depth = this.depth ?? UI.Depth.AboveGameUI;
+        const nativeDepth = UI.Element._getNativeDepth(depth);
 
-        // Reset visited tracking buffer
-        const totalCells = N * N;
-        if (UIQRCode._visitedBuffer.length < totalCells) {
-            // Unlikely to exceed 177x177, but guard against large custom matrices
-            UIQRCode._visitedBuffer.fill(0);
+        if (!receiver.nativeReceiver) {
+            mod.AddUIContainer(
+                childName,
+                mod.CreateVector(x0, y0, 0),
+                mod.CreateVector(w, h, 0),
+                nativeTopLeft,
+                parentWidget,
+                true,
+                0,
+                color,
+                alpha,
+                nativeBgFillSolid,
+                nativeDepth
+            );
         } else {
-            UIQRCode._visitedBuffer.fill(0, 0, totalCells);
+            mod.AddUIContainer(
+                childName,
+                mod.CreateVector(x0, y0, 0),
+                mod.CreateVector(w, h, 0),
+                nativeTopLeft,
+                parentWidget,
+                true,
+                0,
+                color,
+                alpha,
+                nativeBgFillSolid,
+                nativeDepth,
+                receiver.nativeReceiver
+            );
         }
 
-        const visited = UIQRCode._visitedBuffer;
+        const widget = mod.FindUIWidgetWithName(childName) as mod.UIWidget;
+        childModules.push({ widget, col, row, spanW, spanH, isLight });
+    }
 
-        /**
-         * Helper to add a native solid rectangular container attached to this QR container.
-         * @param col - Starting module column.
-         * @param row - Starting module row.
-         * @param spanW - Module width span.
-         * @param spanH - Module height span.
-         * @param color - Fill color vector.
-         * @param alpha - Fill alpha opacity.
-         * @param isLight - Whether this rectangle represents a light cutout.
-         */
-        const drawRect = (
-            col: number,
-            row: number,
-            spanW: number,
-            spanH: number,
-            color: mod.Vector,
-            alpha: number,
-            isLight: boolean
-        ): void => {
-            const x0 = Math.round((col + margin) * cellWidth);
-            const y0 = Math.round((row + margin) * cellHeight);
-            const x1 = Math.round((col + spanW + margin) * cellWidth);
-            const y1 = Math.round((row + spanH + margin) * cellHeight);
-            const w = Math.max(1, x1 - x0);
-            const h = Math.max(1, y1 - y0);
+    /**
+     * Renders the 3 standard finder patterns (eyes) at the corners.
+     * @param childModules - The child module array tracking native widgets.
+     * @param visited - The flat visited tracking buffer.
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     * @param lightVec - Native light module color vector.
+     * @param lightAlpha - Light module opacity value.
+     */
+    private _renderFinders(
+        childModules: UIQRCode.ChildModule[],
+        visited: Uint8Array,
+        N: number,
+        cellWidth: number,
+        cellHeight: number,
+        margin: number,
+        darkVec: mod.Vector,
+        darkAlpha: number,
+        lightVec: mod.Vector,
+        lightAlpha: number
+    ): void {
+        const finders = [
+            { r: 0, c: 0 },
+            { r: 0, c: N - 7 },
+            { r: N - 7, c: 0 },
+        ];
 
-            const childName = `ui_qr_${this._id}_${childModules.length + 1}`;
+        for (let f = 0; f < 3; ++f) {
+            const { r, c } = finders[f];
+            // Layer 1: 7x7 Dark base
+            this._drawModuleRect(childModules, c, r, 7, 7, darkVec, darkAlpha, false, margin, cellWidth, cellHeight);
 
-            if (!receiver.nativeReceiver) {
-                mod.AddUIContainer(
-                    childName,
-                    mod.CreateVector(x0, y0, 0),
-                    mod.CreateVector(w, h, 0),
-                    nativeTopLeft,
-                    parentWidget,
-                    true,
-                    0,
-                    color,
-                    alpha,
-                    nativeBgFillSolid,
-                    nativeDepth
-                );
-            } else {
-                mod.AddUIContainer(
-                    childName,
-                    mod.CreateVector(x0, y0, 0),
-                    mod.CreateVector(w, h, 0),
-                    nativeTopLeft,
-                    parentWidget,
-                    true,
-                    0,
-                    color,
-                    alpha,
-                    nativeBgFillSolid,
-                    nativeDepth,
-                    receiver.nativeReceiver
-                );
+            // Layer 2: 5x5 Light cutout
+            this._drawModuleRect(
+                childModules,
+                c + 1,
+                r + 1,
+                5,
+                5,
+                lightVec,
+                lightAlpha,
+                true,
+                margin,
+                cellWidth,
+                cellHeight
+            );
+
+            // Layer 3: 3x3 Dark core
+            this._drawModuleRect(
+                childModules,
+                c + 2,
+                r + 2,
+                3,
+                3,
+                darkVec,
+                darkAlpha,
+                false,
+                margin,
+                cellWidth,
+                cellHeight
+            );
+
+            // Mark 7x7 cells as visited
+            for (let i = 0; i < 7; ++i) {
+                const rowOffset = (r + i) * N;
+
+                for (let j = 0; j < 7; ++j) {
+                    visited[rowOffset + (c + j)] = 1;
+                }
             }
+        }
+    }
 
-            const widget = mod.FindUIWidgetWithName(childName) as mod.UIWidget;
-            childModules.push({ widget, col, row, spanW, spanH, isLight });
-        };
+    /**
+     * Renders the alignment patterns across the matrix for versions >= 2.
+     * @param childModules - The child module array tracking native widgets.
+     * @param visited - The flat visited tracking buffer.
+     * @param version - QR code version number (1..40).
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     * @param lightVec - Native light module color vector.
+     * @param lightAlpha - Light module opacity value.
+     */
+    private _renderAlignments(
+        childModules: UIQRCode.ChildModule[],
+        visited: Uint8Array,
+        version: number,
+        N: number,
+        cellWidth: number,
+        cellHeight: number,
+        margin: number,
+        darkVec: mod.Vector,
+        darkAlpha: number,
+        lightVec: mod.Vector,
+        lightAlpha: number
+    ): void {
+        if (version < 2) return;
 
-        // Phase 2: Structural Elements (Z-Index Stacking)
-        const isStandardSize = N >= 21 && (N - 17) % 4 === 0;
-        const version = isStandardSize ? (N - 17) / 4 : 0;
+        const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
+        const posLen = positions.length;
 
-        if (version >= 1 && version <= 40) {
-            // Finder Patterns (3 Corner Eyes)
-            const finders = [
-                { r: 0, c: 0 },
-                { r: 0, c: N - 7 },
-                { r: N - 7, c: 0 },
-            ];
+        for (let p1 = 0; p1 < posLen; ++p1) {
+            const rc = positions[p1];
 
-            for (let f = 0; f < 3; ++f) {
-                const { r, c } = finders[f];
-                // Layer 1: 7x7 Dark base
-                drawRect(c, r, 7, 7, darkVec, darkAlpha, false);
-                // Layer 2: 5x5 Light cutout
-                drawRect(c + 1, r + 1, 5, 5, lightVec, lightAlpha, true);
-                // Layer 3: 3x3 Dark core
-                drawRect(c + 2, r + 2, 3, 3, darkVec, darkAlpha, false);
+            for (let p2 = 0; p2 < posLen; ++p2) {
+                const cc = positions[p2];
 
-                // Mark 7x7 cells as visited
-                for (let i = 0; i < 7; ++i) {
+                // Skip positions that collide with Finder Pattern corners
+                if ((rc <= 8 && cc <= 8) || (rc <= 8 && cc >= N - 9) || (rc >= N - 9 && cc <= 8)) continue;
+
+                const r = rc - 2;
+                const c = cc - 2;
+
+                // Layer 1: 5x5 Dark base
+                this._drawModuleRect(
+                    childModules,
+                    c,
+                    r,
+                    5,
+                    5,
+                    darkVec,
+                    darkAlpha,
+                    false,
+                    margin,
+                    cellWidth,
+                    cellHeight
+                );
+
+                // Layer 2: 3x3 Light cutout
+                this._drawModuleRect(
+                    childModules,
+                    c + 1,
+                    r + 1,
+                    3,
+                    3,
+                    lightVec,
+                    lightAlpha,
+                    true,
+                    margin,
+                    cellWidth,
+                    cellHeight
+                );
+
+                // Layer 3: 1x1 Dark core
+                this._drawModuleRect(
+                    childModules,
+                    c + 2,
+                    r + 2,
+                    1,
+                    1,
+                    darkVec,
+                    darkAlpha,
+                    false,
+                    margin,
+                    cellWidth,
+                    cellHeight
+                );
+
+                // Mark 5x5 cells as visited
+                for (let i = 0; i < 5; ++i) {
                     const rowOffset = (r + i) * N;
-                    for (let j = 0; j < 7; ++j) {
+
+                    for (let j = 0; j < 5; ++j) {
                         visited[rowOffset + (c + j)] = 1;
                     }
                 }
             }
-
-            // Alignment Patterns (Version >= 2)
-            if (version >= 2) {
-                const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
-                const posLen = positions.length;
-
-                for (let p1 = 0; p1 < posLen; ++p1) {
-                    const rc = positions[p1];
-
-                    for (let p2 = 0; p2 < posLen; ++p2) {
-                        const cc = positions[p2];
-
-                        // Skip positions that collide with Finder Pattern corners
-                        if ((rc <= 8 && cc <= 8) || (rc <= 8 && cc >= N - 9) || (rc >= N - 9 && cc <= 8)) {
-                            continue;
-                        }
-
-                        const r = rc - 2;
-                        const c = cc - 2;
-
-                        // Layer 1: 5x5 Dark base
-                        drawRect(c, r, 5, 5, darkVec, darkAlpha, false);
-                        // Layer 2: 3x3 Light cutout
-                        drawRect(c + 1, r + 1, 3, 3, lightVec, lightAlpha, true);
-                        // Layer 3: 1x1 Dark core
-                        drawRect(c + 2, r + 2, 1, 1, darkVec, darkAlpha, false);
-
-                        // Mark 5x5 cells as visited
-                        for (let i = 0; i < 5; ++i) {
-                            const rowOffset = (r + i) * N;
-
-                            for (let j = 0; j < 5; ++j) {
-                                visited[rowOffset + (c + j)] = 1;
-                            }
-                        }
-                    }
-                }
-            }
         }
+    }
 
-        // Phase 3: Data Modules (Greedy Rectilinear Merging)
+    /**
+     * Renders data modules using greedy rectilinear rectangle merging.
+     * @param childModules - The child module array tracking native widgets.
+     * @param matrix - The 2D boolean matrix.
+     * @param visited - The flat visited tracking buffer.
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     */
+    private _renderDataModules(
+        childModules: UIQRCode.ChildModule[],
+        matrix: UIQRCode.BooleanMatrix,
+        visited: Uint8Array,
+        N: number,
+        cellWidth: number,
+        cellHeight: number,
+        margin: number,
+        darkVec: mod.Vector,
+        darkAlpha: number
+    ): void {
         for (let r = 0; r < N; ++r) {
             const row = matrix[r];
             const rowOffset = r * N;
@@ -551,7 +571,19 @@ export class UIQRCode extends UI.Element {
                 }
 
                 // Step 3c: Draw Merged Dark Rectangle
-                drawRect(c, r, w, h, darkVec, darkAlpha, false);
+                this._drawModuleRect(
+                    childModules,
+                    c,
+                    r,
+                    w,
+                    h,
+                    darkVec,
+                    darkAlpha,
+                    false,
+                    margin,
+                    cellWidth,
+                    cellHeight
+                );
 
                 // Step 3d: Mark w x h region as visited
                 for (let i = 0; i < h; ++i) {
@@ -566,6 +598,89 @@ export class UIQRCode extends UI.Element {
                 c += w - 1;
             }
         }
+    }
+
+    /**
+     * Renders the QR code sub-rectangles using the hybrid Painter's Algorithm + rectilinear merging.
+     * @param qrSlot - The allocated QR code sub-pool slot.
+     * @param matrix - The QR code boolean matrix.
+     * @param totalWidth - Total pixel width.
+     * @param totalHeight - Total pixel height.
+     * @param scale - Scale multiplier.
+     * @param margin - Margin in module units.
+     * @param darkColor - Dark module color.
+     * @param darkAlpha - Dark module opacity.
+     * @param lightColor - Light module color.
+     * @param lightAlpha - Light module opacity.
+     */
+    private _renderQR(
+        qrSlot: number,
+        matrix: UIQRCode.BooleanMatrix,
+        totalWidth: number,
+        totalHeight: number,
+        scale: number,
+        margin: number,
+        darkColor: Colors.Color,
+        darkAlpha: number,
+        lightColor: Colors.Color,
+        lightAlpha: number
+    ): void {
+        const N = matrix.length;
+
+        if (N === 0) return;
+
+        const darkVec = Colors.toVector(darkColor);
+        const lightVec = Colors.toVector(lightColor);
+
+        const gridUnits = N + 2 * margin;
+        const cellWidth = totalWidth / gridUnits;
+        const cellHeight = totalHeight / gridUnits;
+
+        const childModules: UIQRCode.ChildModule[] = [];
+
+        // Reset visited tracking buffer
+        const totalCells = N * N;
+
+        if (UIQRCode._visitedBuffer.length < totalCells) {
+            UIQRCode._visitedBuffer.fill(0);
+        } else {
+            UIQRCode._visitedBuffer.fill(0, 0, totalCells);
+        }
+
+        const visited = UIQRCode._visitedBuffer;
+        const isStandardSize = N >= 21 && (N - 17) % 4 === 0;
+        const version = isStandardSize ? (N - 17) / 4 : 0;
+
+        if (version >= 1 && version <= 40) {
+            this._renderFinders(
+                childModules,
+                visited,
+                N,
+                cellWidth,
+                cellHeight,
+                margin,
+                darkVec,
+                darkAlpha,
+                lightVec,
+                lightAlpha
+            );
+
+            this._renderAlignments(
+                childModules,
+                visited,
+                version,
+                N,
+                cellWidth,
+                cellHeight,
+                margin,
+                darkVec,
+                darkAlpha,
+                lightVec,
+                lightAlpha
+            );
+        }
+
+        this._renderDataModules(childModules, matrix, visited, N, cellWidth, cellHeight, margin, darkVec, darkAlpha);
 
         UIQRCode._childWidgets[qrSlot] = childModules;
     }
@@ -993,11 +1108,6 @@ export namespace UIQRCode {
     ]);
 
     /**
-     * 2D Matrix of numbers (1/0) or booleans representing QR module cells.
-     */
-    export type Matrix = ReadonlyArray<ReadonlyArray<boolean | number>>;
-
-    /**
      * 2D Matrix of booleans representing QR module cells.
      */
     export type BooleanMatrix = ReadonlyArray<ReadonlyArray<boolean>>;
@@ -1017,15 +1127,11 @@ export namespace UIQRCode {
      */
     export type Params = UI.ElementParams & {
         /**
-         * Text string to encode into a QR code. Mutually exclusive with `matrix`.
+         * Text string to encode into a QR code.
          */
-        text?: string;
+        text: string;
         /**
-         * Optional pre-generated 2D matrix (array of rows containing 1/0 or true/false).
-         */
-        matrix?: UIQRCode.Matrix;
-        /**
-         * Error correction level when `text` is provided (defaults to `ECC.Medium`).
+         * Error correction level (defaults to `ECC.Medium`).
          */
         ecc?: UIQRCode.ECC;
         /**
@@ -1479,40 +1585,44 @@ export namespace UIQRCode {
             return ((data << 10) | d) ^ 0x5412;
         }
 
-        /**
-         * Encodes a text payload into a 2D boolean QR code matrix.
-         * @param text - The text to encode.
-         * @param ecc - Error correction level.
-         * @returns 2D square boolean matrix.
-         */
-        export function encode(text: string, ecc: UIQRCode.ECC = UIQRCode.ECC.Medium): boolean[][] {
-            const utf8 = encodeUtf8(text);
-            const eccIdx = getEccIndex(ecc);
+        const FORMAT_COORDS_TOP_LEFT: ReadonlyArray<readonly [number, number]> = Object.freeze([
+            [0, 8],
+            [1, 8],
+            [2, 8],
+            [3, 8],
+            [4, 8],
+            [5, 8],
+            [7, 8],
+            [8, 8],
+            [8, 7],
+            [8, 5],
+            [8, 4],
+            [8, 3],
+            [8, 2],
+            [8, 1],
+            [8, 0],
+        ]);
 
-            // Find minimum version that fits data
-            let version = 0;
-            let totalDataCodewords = 0;
+        function getSecondFormatCoord(index: number, size: number): [number, number] {
+            return index < 7 ? [size - 1 - index, 8] : [8, size - 15 + index];
+        }
 
+        function selectVersion(dataByteLen: number, eccIdx: number): { version: number; totalDataCodewords: number } {
             for (let v = 1; v <= 40; ++v) {
                 const eccConfig = ECC_TABLE[v - 1][eccIdx];
                 const dataCapacity = eccConfig[1] * eccConfig[2] + eccConfig[3] * eccConfig[4];
 
                 const charCountBits = v < 10 ? 8 : 16;
-                const totalBits = 4 + charCountBits + utf8.length * 8;
+                const totalBits = 4 + charCountBits + dataByteLen * 8;
                 const totalBytes = Math.ceil(totalBits / 8);
 
-                if (totalBytes <= dataCapacity) {
-                    version = v;
-                    totalDataCodewords = dataCapacity;
-                    break;
-                }
+                if (totalBytes <= dataCapacity) return { version: v, totalDataCodewords: dataCapacity };
             }
 
-            if (version === 0) {
-                throw new Error(`Data payload too large for QR code (ECC: ${ecc}, bytes: ${utf8.length})`);
-            }
+            throw new Error(`Data payload too large for QR code (bytes: ${dataByteLen})`);
+        }
 
-            // Construct bitstream
+        function buildDataBytes(utf8: Uint8Array, version: number, totalDataCodewords: number): Uint8Array {
             const charCountBits = version < 10 ? 8 : 16;
             const bitStream: number[] = [];
 
@@ -1543,6 +1653,7 @@ export namespace UIQRCode {
             // Pad bytes (0xEC, 0x11)
             const padBytes = [0xec, 0x11];
             let padIdx = 0;
+
             while (bitStream.length < capacityBits) {
                 pushBits(padBytes[padIdx], 8);
                 padIdx ^= 1;
@@ -1561,7 +1672,10 @@ export namespace UIQRCode {
                 dataBytes[i] = byte;
             }
 
-            // Break into blocks and compute Reed-Solomon ECC
+            return dataBytes;
+        }
+
+        function interleaveBlocks(dataBytes: Uint8Array, version: number, eccIdx: number): number[] {
             const eccConfig = ECC_TABLE[version - 1][eccIdx];
             const eccPerBlock = eccConfig[0];
             const numBlocks = eccConfig[1] + eccConfig[3];
@@ -1605,100 +1719,119 @@ export namespace UIQRCode {
                 }
             }
 
-            // Matrix generation
-            const size = 17 + 4 * version;
-            const matrix: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
-            const isFunction: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
+            return finalCodewords;
+        }
 
-            function setModule(r: number, c: number, val: boolean, isFunc = true): void {
-                matrix[r][c] = val;
+        function drawFinder(matrix: boolean[][], isFunction: boolean[][], size: number, r: number, c: number): void {
+            for (let i = -1; i <= 7; ++i) {
+                for (let j = -1; j <= 7; ++j) {
+                    const nr = r + i;
+                    const nc = c + j;
 
-                if (isFunc) {
-                    isFunction[r][c] = true;
+                    if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+
+                    if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
+                        const isBlack =
+                            i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+                        matrix[nr][nc] = isBlack;
+                    } else {
+                        matrix[nr][nc] = false; // Separator
+                    }
+
+                    isFunction[nr][nc] = true;
                 }
             }
+        }
 
-            // Finder patterns
-            function drawFinder(r: number, c: number): void {
-                for (let i = -1; i <= 7; ++i) {
-                    for (let j = -1; j <= 7; ++j) {
-                        const nr = r + i;
-                        const nc = c + j;
+        function drawFinders(matrix: boolean[][], isFunction: boolean[][], size: number): void {
+            drawFinder(matrix, isFunction, size, 0, 0);
+            drawFinder(matrix, isFunction, size, 0, size - 7);
+            drawFinder(matrix, isFunction, size, size - 7, 0);
+        }
 
-                        if (nr < 0 || nr >= size || nc < 0 || nc >= size) continue;
+        function drawAlignments(matrix: boolean[][], isFunction: boolean[][], size: number, version: number): void {
+            if (version < 2) return;
 
-                        if (i >= 0 && i <= 6 && j >= 0 && j <= 6) {
-                            const isBlack =
-                                i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+            const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
 
-                            setModule(nr, nc, isBlack);
-                        } else {
-                            setModule(nr, nc, false); // Separator
+            for (let p1 = 0; p1 < positions.length; ++p1) {
+                const r = positions[p1];
+
+                for (let p2 = 0; p2 < positions.length; ++p2) {
+                    const c = positions[p2];
+
+                    if ((r <= 8 && c <= 8) || (r <= 8 && c >= size - 9) || (r >= size - 9 && c <= 8)) continue;
+
+                    for (let i = -2; i <= 2; ++i) {
+                        for (let j = -2; j <= 2; ++j) {
+                            const isBlack = Math.max(Math.abs(i), Math.abs(j)) === 2 || (i === 0 && j === 0);
+                            matrix[r + i][c + j] = isBlack;
+                            isFunction[r + i][c + j] = true;
                         }
                     }
                 }
             }
+        }
 
-            drawFinder(0, 0);
-            drawFinder(0, size - 7);
-            drawFinder(size - 7, 0);
-
-            // Alignment patterns
-            if (version >= 2) {
-                const positions = UIQRCode.ALIGNMENT_POSITIONS[version - 1];
-
-                for (let p1 = 0; p1 < positions.length; ++p1) {
-                    const r = positions[p1];
-
-                    for (let p2 = 0; p2 < positions.length; ++p2) {
-                        const c = positions[p2];
-
-                        if ((r <= 8 && c <= 8) || (r <= 8 && c >= size - 9) || (r >= size - 9 && c <= 8)) continue;
-
-                        for (let i = -2; i <= 2; ++i) {
-                            for (let j = -2; j <= 2; ++j) {
-                                const isBlack = Math.max(Math.abs(i), Math.abs(j)) === 2 || (i === 0 && j === 0);
-                                setModule(r + i, c + j, isBlack);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Timing patterns
+        function drawTimingPatterns(matrix: boolean[][], isFunction: boolean[][], size: number): void {
             for (let i = 8; i < size - 8; ++i) {
-                setModule(6, i, i % 2 === 0);
-                setModule(i, 6, i % 2 === 0);
+                matrix[6][i] = i % 2 === 0;
+                isFunction[6][i] = true;
+                matrix[i][6] = i % 2 === 0;
+                isFunction[i][6] = true;
             }
 
             // Dark module
-            setModule(size - 8, 8, true);
+            matrix[size - 8][8] = true;
+            isFunction[size - 8][8] = true;
+        }
 
-            // Reserve format info
+        function reserveFormatAndVersionInfo(
+            matrix: boolean[][],
+            isFunction: boolean[][],
+            size: number,
+            version: number
+        ): void {
             for (let i = 0; i <= 8; ++i) {
-                if (!isFunction[8][i]) setModule(8, i, false);
-                if (!isFunction[i][8]) setModule(i, 8, false);
-            }
+                if (!isFunction[8][i]) {
+                    matrix[8][i] = false;
+                    isFunction[8][i] = true;
+                }
 
-            for (let i = 0; i < 8; ++i) {
-                setModule(8, size - 1 - i, false);
-            }
-
-            for (let i = 0; i < 7; ++i) {
-                setModule(size - 1 - i, 8, false);
-            }
-
-            // Reserve version info (v >= 7)
-            if (version >= 7) {
-                for (let i = 0; i < 6; ++i) {
-                    for (let j = 0; j < 3; ++j) {
-                        setModule(i, size - 11 + j, false);
-                        setModule(size - 11 + j, i, false);
-                    }
+                if (!isFunction[i][8]) {
+                    matrix[i][8] = false;
+                    isFunction[i][8] = true;
                 }
             }
 
-            // Place data bits in zigzag path
+            for (let i = 0; i < 8; ++i) {
+                matrix[8][size - 1 - i] = false;
+                isFunction[8][size - 1 - i] = true;
+            }
+
+            for (let i = 0; i < 7; ++i) {
+                matrix[size - 1 - i][8] = false;
+                isFunction[size - 1 - i][8] = true;
+            }
+
+            if (version < 7) return;
+
+            for (let i = 0; i < 6; ++i) {
+                for (let j = 0; j < 3; ++j) {
+                    matrix[i][size - 11 + j] = false;
+                    isFunction[i][size - 11 + j] = true;
+                    matrix[size - 11 + j][i] = false;
+                    isFunction[size - 11 + j][i] = true;
+                }
+            }
+        }
+
+        function placeDataCodewords(
+            matrix: boolean[][],
+            isFunction: boolean[][],
+            size: number,
+            finalCodewords: number[]
+        ): void {
             const totalDataBits = finalCodewords.length * 8;
             let bitIdx = 0;
             let right = size - 1;
@@ -1731,38 +1864,109 @@ export namespace UIQRCode {
                 upward = !upward;
                 right -= 2;
             }
+        }
 
-            // Evaluate best mask pattern (0..7)
-            function isMaskCondition(m: number, r: number, c: number): boolean {
-                switch (m) {
-                    case 0:
-                        return (r + c) % 2 === 0;
-                    case 1:
-                        return r % 2 === 0;
-                    case 2:
-                        return c % 3 === 0;
-                    case 3:
-                        return (r + c) % 3 === 0;
-                    case 4:
-                        return ((r >> 1) + Math.floor(c / 3)) % 2 === 0;
-                    case 5:
-                        return ((r * c) % 2) + ((r * c) % 3) === 0;
-                    case 6:
-                        return (((r * c) % 2) + ((r * c) % 3)) % 2 === 0;
-                    case 7:
-                        return (((r + c) % 2) + ((r * c) % 3)) % 2 === 0;
-                    default:
-                        return false;
+        function isMaskCondition(m: number, r: number, c: number): boolean {
+            switch (m) {
+                case 0:
+                    return (r + c) % 2 === 0;
+                case 1:
+                    return r % 2 === 0;
+                case 2:
+                    return c % 3 === 0;
+                case 3:
+                    return (r + c) % 3 === 0;
+                case 4:
+                    return ((r >> 1) + Math.floor(c / 3)) % 2 === 0;
+                case 5:
+                    return ((r * c) % 2) + ((r * c) % 3) === 0;
+                case 6:
+                    return (((r * c) % 2) + ((r * c) % 3)) % 2 === 0;
+                case 7:
+                    return (((r + c) % 2) + ((r * c) % 3)) % 2 === 0;
+                default:
+                    return false;
+            }
+        }
+
+        function calculatePenalty(testMat: boolean[][], size: number): number {
+            let penalty = 0;
+
+            // Penalty 1: Runs of 5+ same color in rows/columns
+            for (let r = 0; r < size; ++r) {
+                let rowCount = 0;
+                let rowColor = false;
+                let colCount = 0;
+                let colColor = false;
+
+                for (let c = 0; c < size; ++c) {
+                    if (c === 0 || testMat[r][c] !== rowColor) {
+                        rowColor = testMat[r][c];
+                        rowCount = 1;
+                    } else {
+                        rowCount++;
+
+                        if (rowCount === 5) {
+                            penalty += 3;
+                        } else if (rowCount > 5) {
+                            penalty++;
+                        }
+                    }
+
+                    if (c === 0 || testMat[c][r] !== colColor) {
+                        colColor = testMat[c][r];
+                        colCount = 1;
+                    } else {
+                        colCount++;
+
+                        if (colCount === 5) {
+                            penalty += 3;
+                        } else if (colCount > 5) {
+                            penalty++;
+                        }
+                    }
                 }
             }
 
+            // Penalty 2: 2x2 blocks
+            for (let r = 0; r < size - 1; ++r) {
+                for (let c = 0; c < size - 1; ++c) {
+                    const val = testMat[r][c];
+
+                    if (val === testMat[r][c + 1] && val === testMat[r + 1][c] && val === testMat[r + 1][c + 1]) {
+                        penalty += 3;
+                    }
+                }
+            }
+
+            // Penalty 4: Dark module ratio
+            let darkCount = 0;
+
+            for (let r = 0; r < size; ++r) {
+                for (let c = 0; c < size; ++c) {
+                    if (testMat[r][c]) {
+                        darkCount++;
+                    }
+                }
+            }
+
+            const ratio = (darkCount * 100) / (size * size);
+            const step = Math.floor(Math.abs(ratio - 50) / 5);
+            penalty += step * 10;
+
+            return penalty;
+        }
+
+        function evaluateBestMask(
+            matrix: boolean[][],
+            isFunction: boolean[][],
+            size: number,
+            ecc: UIQRCode.ECC
+        ): number {
             let bestMask = 0;
             let lowestPenalty = Infinity;
 
             for (let m = 0; m < 8; ++m) {
-                let penalty = 0;
-
-                // Copy matrix with mask applied
                 const testMat: boolean[][] = new Array(size);
 
                 for (let r = 0; r < size; ++r) {
@@ -1780,109 +1984,15 @@ export namespace UIQRCode {
                 // Apply format info for mask evaluation
                 const formatBits = getFormatInfoBits(ecc, m);
 
-                const formatCoords = [
-                    [0, 8],
-                    [1, 8],
-                    [2, 8],
-                    [3, 8],
-                    [4, 8],
-                    [5, 8],
-                    [7, 8],
-                    [8, 8],
-                    [8, 7],
-                    [8, 5],
-                    [8, 4],
-                    [8, 3],
-                    [8, 2],
-                    [8, 1],
-                    [8, 0],
-                ];
-
-                const formatCoords2 = [
-                    [size - 1, 8],
-                    [size - 2, 8],
-                    [size - 3, 8],
-                    [size - 4, 8],
-                    [size - 5, 8],
-                    [size - 6, 8],
-                    [size - 7, 8],
-                    [8, size - 8],
-                    [8, size - 7],
-                    [8, size - 6],
-                    [8, size - 5],
-                    [8, size - 4],
-                    [8, size - 3],
-                    [8, size - 2],
-                    [8, size - 1],
-                ];
-
                 for (let i = 0; i < 15; ++i) {
                     const bit = ((formatBits >> i) & 1) === 1;
-                    testMat[formatCoords[i][0]][formatCoords[i][1]] = bit;
-                    testMat[formatCoords2[i][0]][formatCoords2[i][1]] = bit;
+                    const [r1, c1] = FORMAT_COORDS_TOP_LEFT[i];
+                    const [r2, c2] = getSecondFormatCoord(i, size);
+                    testMat[r1][c1] = bit;
+                    testMat[r2][c2] = bit;
                 }
 
-                // Penalty 1: Runs of 5+ same color in rows/columns
-                for (let r = 0; r < size; ++r) {
-                    let rowCount = 0;
-                    let rowColor = false;
-                    let colCount = 0;
-                    let colColor = false;
-
-                    for (let c = 0; c < size; ++c) {
-                        if (c === 0 || testMat[r][c] !== rowColor) {
-                            rowColor = testMat[r][c];
-                            rowCount = 1;
-                        } else {
-                            rowCount++;
-
-                            if (rowCount === 5) {
-                                penalty += 3;
-                            } else if (rowCount > 5) {
-                                penalty++;
-                            }
-                        }
-
-                        if (c === 0 || testMat[c][r] !== colColor) {
-                            colColor = testMat[c][r];
-                            colCount = 1;
-                        } else {
-                            colCount++;
-
-                            if (colCount === 5) {
-                                penalty += 3;
-                            } else if (colCount > 5) {
-                                penalty++;
-                            }
-                        }
-                    }
-                }
-
-                // Penalty 2: 2x2 blocks
-                for (let r = 0; r < size - 1; ++r) {
-                    for (let c = 0; c < size - 1; ++c) {
-                        const val = testMat[r][c];
-
-                        if (val === testMat[r][c + 1] && val === testMat[r + 1][c] && val === testMat[r + 1][c + 1]) {
-                            penalty += 3;
-                        }
-                    }
-                }
-
-                // Penalty 4: Dark module ratio
-                let darkCount = 0;
-
-                for (let r = 0; r < size; ++r) {
-                    for (let c = 0; c < size; ++c) {
-                        if (testMat[r][c]) {
-                            darkCount++;
-                        }
-                    }
-                }
-
-                const ratio = (darkCount * 100) / (size * size);
-                const step = Math.floor(Math.abs(ratio - 50) / 5);
-                penalty += step * 10;
+                const penalty = calculatePenalty(testMat, size);
 
                 if (penalty < lowestPenalty) {
                     lowestPenalty = penalty;
@@ -1890,72 +2000,75 @@ export namespace UIQRCode {
                 }
             }
 
-            // Apply best mask to non-function modules
+            return bestMask;
+        }
+
+        function applyMask(matrix: boolean[][], isFunction: boolean[][], size: number, mask: number): void {
             for (let r = 0; r < size; ++r) {
                 for (let c = 0; c < size; ++c) {
-                    if (!isFunction[r][c] && isMaskCondition(bestMask, r, c)) {
+                    if (!isFunction[r][c] && isMaskCondition(mask, r, c)) {
                         matrix[r][c] = !matrix[r][c];
                     }
                 }
             }
+        }
 
-            // Write Format information (15 bits)
-            const formatBits = getFormatInfoBits(ecc, bestMask);
-
-            const formatCoords = [
-                [0, 8],
-                [1, 8],
-                [2, 8],
-                [3, 8],
-                [4, 8],
-                [5, 8],
-                [7, 8],
-                [8, 8],
-                [8, 7],
-                [8, 5],
-                [8, 4],
-                [8, 3],
-                [8, 2],
-                [8, 1],
-                [8, 0],
-            ];
-
-            const formatCoords2 = [
-                [size - 1, 8],
-                [size - 2, 8],
-                [size - 3, 8],
-                [size - 4, 8],
-                [size - 5, 8],
-                [size - 6, 8],
-                [size - 7, 8],
-                [8, size - 8],
-                [8, size - 7],
-                [8, size - 6],
-                [8, size - 5],
-                [8, size - 4],
-                [8, size - 3],
-                [8, size - 2],
-                [8, size - 1],
-            ];
+        function writeFormatAndVersionInfo(
+            matrix: boolean[][],
+            size: number,
+            ecc: UIQRCode.ECC,
+            mask: number,
+            version: number
+        ): void {
+            const formatBits = getFormatInfoBits(ecc, mask);
 
             for (let i = 0; i < 15; ++i) {
                 const bit = ((formatBits >> i) & 1) === 1;
-                setModule(formatCoords[i][0], formatCoords[i][1], bit);
-                setModule(formatCoords2[i][0], formatCoords2[i][1], bit);
+                const [r1, c1] = FORMAT_COORDS_TOP_LEFT[i];
+                const [r2, c2] = getSecondFormatCoord(i, size);
+                matrix[r1][c1] = bit;
+                matrix[r2][c2] = bit;
             }
 
-            // Write Version information (18 bits, v >= 7)
-            if (version >= 7) {
-                const verBits = getVersionInfoBits(version);
+            if (version < 7) return;
 
-                for (let i = 0; i < 18; ++i) {
-                    const bit = ((verBits >> i) & 1) === 1;
-                    const a = Math.floor(i / 3);
-                    const b = (i % 3) + size - 11;
-                    setModule(a, b, bit);
-                    setModule(b, a, bit);
-                }
+            const verBits = getVersionInfoBits(version);
+
+            for (let i = 0; i < 18; ++i) {
+                const bit = ((verBits >> i) & 1) === 1;
+                const a = Math.floor(i / 3);
+                const b = (i % 3) + size - 11;
+                matrix[a][b] = bit;
+                matrix[b][a] = bit;
             }
+        }
+
+        /**
+         * Encodes a text payload into a 2D boolean QR code matrix.
+         * @param text - The text to encode.
+         * @param ecc - Error correction level.
+         * @returns 2D square boolean matrix.
+         */
+        export function encode(text: string, ecc: UIQRCode.ECC = UIQRCode.ECC.Medium): boolean[][] {
+            const utf8 = encodeUtf8(text);
+            const eccIdx = getEccIndex(ecc);
+            const { version, totalDataCodewords } = selectVersion(utf8.length, eccIdx);
+            const dataBytes = buildDataBytes(utf8, version, totalDataCodewords);
+            const finalCodewords = interleaveBlocks(dataBytes, version, eccIdx);
+
+            const size = 17 + 4 * version;
+            const matrix: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
+            const isFunction: boolean[][] = Array.from({ length: size }, () => new Array(size).fill(false));
+
+            drawFinders(matrix, isFunction, size);
+            drawAlignments(matrix, isFunction, size, version);
+            drawTimingPatterns(matrix, isFunction, size);
+            reserveFormatAndVersionInfo(matrix, isFunction, size, version);
+            placeDataCodewords(matrix, isFunction, size, finalCodewords);
+
+            const bestMask = evaluateBestMask(matrix, isFunction, size, ecc);
+            applyMask(matrix, isFunction, size, bestMask);
+            writeFormatAndVersionInfo(matrix, size, ecc, bestMask, version);
 
             return matrix;
         }

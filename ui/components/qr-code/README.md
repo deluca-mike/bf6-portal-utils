@@ -4,7 +4,7 @@
 
 The `UIQRCode` component renders optimized QR codes using a hybrid rendering algorithm that combines **Z-index layering (Painter's Algorithm)** with **greedy rectilinear partitioning**. It drastically minimizes native engine draw calls (reducing widget counts by 60%–85% compared to naive pixel-by-pixel rendering) while consuming only **1 slot** in the global `UI.MAX_ELEMENTS` pool.
 
-The component supports both pre-computed 2D matrices (from packages like `qr-image` or custom generators) and direct text payloads using a built-in, zero-dependency QR matrix encoder supporting standard QR Versions 1–40 and error correction levels L, M, Q, and H.
+The component encodes text payloads into QR codes using a built-in, zero-dependency QR matrix encoder supporting standard QR Versions 1–40 and error correction levels L, M, Q, and H.
 
 </ai>
 
@@ -16,7 +16,7 @@ The component supports both pre-computed 2D matrices (from packages like `qr-ima
 
 <ai>
 
-### Rendering from a Text Payload
+### Rendering a QR Code
 
 ```ts
 import { UIQRCode } from 'bf6-portal-utils/ui/components/qr-code';
@@ -35,32 +35,10 @@ const qrCode = new UIQRCode({
 });
 
 // Access properties
-console.log(`Version: ${qrCode.version}, Draw calls: ${qrCode.drawCallCount}`);
-
-// Mutate payload dynamically
-qrCode.setText('https://battlefield.com/new-room-id');
+console.log(`Draw calls: ${qrCode.drawCallCount}`);
 
 // Delete when done (frees all native widgets and slot)
 qrCode.delete();
-```
-
-### Rendering from a Pre-Computed 2D Matrix
-
-```ts
-import { UIQRCode } from 'bf6-portal-utils/ui/components/qr-code';
-
-// Pre-computed 2D matrix (1/0 or true/false)
-const matrix = [
-    [1, 0, 1],
-    [0, 1, 0],
-    [1, 1, 1],
-];
-
-const qrCode = new UIQRCode({
-    matrix,
-    scale: 2, // 20 pixels per module
-    position: { x: 100, y: 100 },
-});
 ```
 
 </ai>
@@ -87,9 +65,8 @@ const qrCode = new UIQRCode({
 
 | Param | Type / Default | Notes |
 | --- | --- | --- |
-| `text` | `string \| undefined` | Text string to encode into a QR code. Mutually exclusive with `matrix`. |
-| `matrix` | `UIQRCode.Matrix \| undefined` | Pre-generated 2D matrix (array of rows containing `1`/`0` or `true`/`false`). |
-| `ecc` | `UIQRCode.ECC = UIQRCode.ECC.Medium` | Error correction level when `text` is supplied (`'L'`, `'M'`, `'Q'`, `'H'`). |
+| `text` | `string` | Text string to encode into a QR code. |
+| `ecc` | `UIQRCode.ECC = UIQRCode.ECC.Medium` | Error correction level (`'L'`, `'M'`, `'Q'`, `'H'`). |
 | `scale` | `number = 1` | Scale multiplier. When `1`, the smallest module is 10 units wide/tall. When `2`, it is 20 units. |
 | `margin` | `number = 0` | Quiet zone margin around the QR code in module units. |
 | `darkColor` | `UI.Color = UI.COLORS.BLACK` | Color for dark modules. |
@@ -125,10 +102,6 @@ const qrCode = new UIQRCode({
 ### Component-Specific
 
 - **`drawCallCount: number | undefined`** (getter) – Total native draw calls (widgets) used to render the QR code.
-- **`matrix: UIQRCode.BooleanMatrix | undefined`** (getter) – The current 2D boolean module matrix.
-- **`version: number | undefined`** (getter) – The QR version number (1–40).
-- **`text: string | undefined`** (getter) – The text payload string (if initialized with `text`).
-- **`ecc: UIQRCode.ECC | undefined`** (getter) – The error correction level.
 - **`scale: number | undefined`** (getter/setter) – Scale multiplier.
 - **`setScale(scale: number): this`** – Sets scale and re-renders child rectangles.
 - **`margin: number | undefined`** (getter/setter) – Quiet zone margin count.
@@ -137,20 +110,12 @@ const qrCode = new UIQRCode({
 - **`setDarkColor(color: UI.Color): this`** – Sets dark module color and re-renders.
 - **`lightColor: UI.Color | undefined`** (getter/setter) – Light module / background color. Supports zero-allocation `getLightColor(out?)`.
 - **`setLightColor(color: UI.Color): this`** – Sets light module color and re-renders.
-- **`setText(text: string, ecc?: UIQRCode.ECC): this`** – Dynamically updates content and re-encodes.
-- **`setMatrix(matrix: UIQRCode.Matrix): this`** – Dynamically updates 2D matrix and re-renders.
 
 ---
 
 ## Type Definitions
 
 <ai>
-
-### `UIQRCode.Matrix`
-
-```ts
-type Matrix = ReadonlyArray<ReadonlyArray<boolean | number>>;
-```
 
 ### `UIQRCode.BooleanMatrix`
 

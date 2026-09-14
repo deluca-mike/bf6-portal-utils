@@ -51,17 +51,62 @@ export declare class UIQRCode extends UI.Element {
      */
     constructor(params: UIQRCode.Params);
     /**
-     * Resolves the boolean matrix from parameters (either provided directly or encoded from text).
-     * @param params - The initialization parameters.
-     * @returns The resolved 2D boolean matrix, or null if neither was provided.
+     * Draws a single native rectangular container attached to this QR container.
+     * @param childModules - The child module array tracking native widgets.
+     * @param col - Module grid column.
+     * @param row - Module grid row.
+     * @param spanW - Module grid column width span.
+     * @param spanH - Module grid row height span.
+     * @param color - Native color vector.
+     * @param alpha - Opacity value.
+     * @param isLight - True if this represents a light cutout, false if dark.
+     * @param margin - Quiet zone margin in module units.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
      */
-    private static _resolveMatrix;
+    private _drawModuleRect;
     /**
-     * Normalizes a user-supplied matrix (with numbers or booleans) into a boolean matrix.
-     * @param matrix - The input 2D matrix.
-     * @returns A 2D boolean array.
+     * Renders the 3 standard finder patterns (eyes) at the corners.
+     * @param childModules - The child module array tracking native widgets.
+     * @param visited - The flat visited tracking buffer.
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     * @param lightVec - Native light module color vector.
+     * @param lightAlpha - Light module opacity value.
      */
-    private static _normalizeMatrix;
+    private _renderFinders;
+    /**
+     * Renders the alignment patterns across the matrix for versions >= 2.
+     * @param childModules - The child module array tracking native widgets.
+     * @param visited - The flat visited tracking buffer.
+     * @param version - QR code version number (1..40).
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     * @param lightVec - Native light module color vector.
+     * @param lightAlpha - Light module opacity value.
+     */
+    private _renderAlignments;
+    /**
+     * Renders data modules using greedy rectilinear rectangle merging.
+     * @param childModules - The child module array tracking native widgets.
+     * @param matrix - The 2D boolean matrix.
+     * @param visited - The flat visited tracking buffer.
+     * @param N - Matrix dimension size.
+     * @param cellWidth - Scaled width of a single module cell.
+     * @param cellHeight - Scaled height of a single module cell.
+     * @param margin - Quiet zone margin in module units.
+     * @param darkVec - Native dark module color vector.
+     * @param darkAlpha - Dark module opacity value.
+     */
+    private _renderDataModules;
     /**
      * Renders the QR code sub-rectangles using the hybrid Painter's Algorithm + rectilinear merging.
      * @param qrSlot - The allocated QR code sub-pool slot.
@@ -226,10 +271,6 @@ export declare namespace UIQRCode {
      */
     const ALIGNMENT_POSITIONS: ReadonlyArray<ReadonlyArray<number>>;
     /**
-     * 2D Matrix of numbers (1/0) or booleans representing QR module cells.
-     */
-    type Matrix = ReadonlyArray<ReadonlyArray<boolean | number>>;
-    /**
      * 2D Matrix of booleans representing QR module cells.
      */
     type BooleanMatrix = ReadonlyArray<ReadonlyArray<boolean>>;
@@ -247,15 +288,11 @@ export declare namespace UIQRCode {
      */
     type Params = UI.ElementParams & {
         /**
-         * Text string to encode into a QR code. Mutually exclusive with `matrix`.
+         * Text string to encode into a QR code.
          */
-        text?: string;
+        text: string;
         /**
-         * Optional pre-generated 2D matrix (array of rows containing 1/0 or true/false).
-         */
-        matrix?: UIQRCode.Matrix;
-        /**
-         * Error correction level when `text` is provided (defaults to `ECC.Medium`).
+         * Error correction level (defaults to `ECC.Medium`).
          */
         ecc?: UIQRCode.ECC;
         /**
