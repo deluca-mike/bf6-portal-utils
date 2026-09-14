@@ -78,6 +78,8 @@ export declare namespace Timelines {
         duration: number;
         /** Optional easing function mapping normalized progress (0..1) to eased progress. */
         easing?: (t: number) => number;
+        /** Optional precision threshold for quantization and deadbanding. */
+        precision?: number;
     }
     /**
      * Configuration for a single spring physics animation step.

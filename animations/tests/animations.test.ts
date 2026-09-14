@@ -243,6 +243,74 @@ describe('Animations Engine Module', () => {
             expect(completed).toBe(true);
             expect(updates[updates.length - 1]).toBe(100);
         });
+
+        it('should quantize updates to multiples of precision and suppress duplicate updates', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.startTween({
+                from: 0,
+                to: 100,
+                duration: 1000,
+                precision: 25,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            // 1st tick at 50ms: progress = 0.05, lerp = 5, quantized = 0 -> value 0 matches initial from (0), suppressed!
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(updates).toEqual([]);
+
+            // 2nd tick at 100ms: progress = 0.1, lerp = 10, quantized = 0 -> unchanged, suppressed!
+            vi.advanceTimersByTime(50);
+            Events.OngoingGlobal.trigger();
+            expect(updates).toEqual([]);
+
+            // 3rd tick at 250ms (elapsed 250ms): progress = 0.25, lerp = 25, quantized = 25 -> value changed from 0 to 25 -> fires!
+            vi.advanceTimersByTime(150);
+            Events.OngoingGlobal.trigger();
+            expect(updates).toEqual([25]);
+
+            // Advance through rest of duration
+            vi.advanceTimersByTime(750);
+            Events.OngoingGlobal.trigger();
+
+            expect(completed).toBe(true);
+            expect(updates[updates.length - 1]).toBe(100);
+            for (const val of updates) {
+                expect(val % 25).toBe(0);
+            }
+        });
+
+        it('should quantize float values to integers when precision is 1', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            Animations.startTween({
+                from: 0,
+                to: 5,
+                duration: 500,
+                precision: 1,
+                onUpdate: (v) => updates.push(v),
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            for (let i = 0; i < 10; ++i) {
+                vi.advanceTimersByTime(50);
+                Events.OngoingGlobal.trigger();
+            }
+
+            expect(completed).toBe(true);
+            for (const val of updates) {
+                expect(Number.isInteger(val)).toBe(true);
+            }
+            expect(updates[updates.length - 1]).toBe(5);
+        });
     });
 
     describe('Spring Physics Animations', () => {

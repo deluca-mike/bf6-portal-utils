@@ -145,6 +145,39 @@ describe('Timelines Module', () => {
             expect(updates.length).toBeGreaterThan(1);
             expect(updates[updates.length - 1]).toBeGreaterThan(0);
         });
+
+        it('should support precision quantization in tween timeline steps', () => {
+            const updates: number[] = [];
+            let completed = false;
+
+            const id = Timelines.create({
+                onComplete: () => {
+                    completed = true;
+                },
+            });
+
+            Timelines.addTween(id!, {
+                from: 0,
+                to: 100,
+                duration: 500,
+                precision: 20,
+                onUpdate: (v) => updates.push(v),
+            });
+
+            Timelines.play(id!);
+
+            for (let i = 0; i < 20; ++i) {
+                vi.advanceTimersByTime(30);
+                Events.OngoingGlobal.trigger();
+                if (completed) break;
+            }
+
+            expect(completed).toBe(true);
+            expect(updates[updates.length - 1]).toBe(100);
+            for (const val of updates) {
+                expect(val % 20).toBe(0);
+            }
+        });
     });
 
     describe('Parallel Step Execution', () => {

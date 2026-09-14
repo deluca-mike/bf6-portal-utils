@@ -67,6 +67,11 @@ export declare namespace Animations {
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
+        /**
+         * Optional precision threshold. When specified (> 0), quantizes the interpolated value to multiples of
+         * precision and deadbands/suppresses onUpdate invocations if the quantized value has not changed.
+         */
+        precision?: number;
     }
     /**
      * Configuration options for starting a physics-driven spring animation.

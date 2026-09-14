@@ -93,6 +93,8 @@ export namespace Timelines {
         duration: number;
         /** Optional easing function mapping normalized progress (0..1) to eased progress. */
         easing?: (t: number) => number;
+        /** Optional precision threshold for quantization and deadbanding. */
+        precision?: number;
     }
 
     /**
@@ -428,6 +430,7 @@ export namespace Timelines {
             delayMs: config.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, config.minUpdateDeltaMs),
             easing: config.easing,
+            precision: config.precision,
             onUpdate: config.onUpdate,
             onComplete: () => {
                 config.onComplete?.();
@@ -519,6 +522,7 @@ export namespace Timelines {
             delayMs: child.delayMs,
             minUpdateDeltaMs: _resolveStepThrottle(slot, child.minUpdateDeltaMs),
             easing: child.easing,
+            precision: child.precision,
             onUpdate: child.onUpdate,
             onComplete: () => {
                 child.onComplete?.();

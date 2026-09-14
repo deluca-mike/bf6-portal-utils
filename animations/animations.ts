@@ -81,6 +81,11 @@ export namespace Animations {
          * Optional easing function mapping normalized progress t (0.0 to 1.0) to eased progress.
          */
         easing?: (t: number) => number;
+        /**
+         * Optional precision threshold. When specified (> 0), quantizes the interpolated value to multiples of
+         * precision and deadbands/suppresses onUpdate invocations if the quantized value has not changed.
+         */
+        precision?: number;
     }
 
     /**
@@ -203,14 +208,13 @@ export namespace Animations {
     const _from = new Float32Array(MAX_ANIMATIONS);
     const _to = new Float32Array(MAX_ANIMATIONS);
     const _currentValue = new Float32Array(MAX_ANIMATIONS);
-    const _velocity = new Float32Array(MAX_ANIMATIONS);
+    const _velocityOrDurationMs = new Float32Array(MAX_ANIMATIONS);
 
     const _stiffnessOrDeceleration = new Float32Array(MAX_ANIMATIONS);
     const _damping = new Float32Array(MAX_ANIMATIONS);
     const _precision = new Float32Array(MAX_ANIMATIONS);
 
     // Structure of Arrays (Time values in Uint32Array / Uint16Array based on server uptime milliseconds)
-    const _durationMs = new Uint32Array(MAX_ANIMATIONS);
     const _delayMs = new Uint32Array(MAX_ANIMATIONS);
     const _accumulatedMs = new Uint32Array(MAX_ANIMATIONS);
     const _lastResumeTime = new Uint32Array(MAX_ANIMATIONS);
@@ -332,21 +336,33 @@ export namespace Animations {
         if (totalElapsed < delay) return;
 
         const elapsed = totalElapsed - delay;
-        const duration = _durationMs[slot];
+        const duration = _velocityOrDurationMs[slot];
         const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
 
         const easingFn = _easing[slot];
         const easedProgress = easingFn ? easingFn(progress) : progress;
-        const value = Transitions.lerp(_from[slot], _to[slot], easedProgress);
+        let value = Transitions.lerp(_from[slot], _to[slot], easedProgress);
 
-        _currentValue[slot] = value;
+        const precision = _precision[slot];
+
+        if (precision > 0) {
+            value = Math.round(value / precision) * precision;
+        }
+
+        const isComplete = progress >= 1;
+
+        if (isComplete) {
+            value = _to[slot];
+        }
 
         const minDelta = _minUpdateDeltaMs[slot];
         const lastUpdate = _lastUpdateTime[slot];
-        const isComplete = progress >= 1;
+        const hasValueChanged = precision === 0 || value !== _currentValue[slot];
+        const timeElapsed = minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta;
 
-        if (minDelta === 0 || lastUpdate === 0 || now - lastUpdate >= minDelta || isComplete) {
+        if ((timeElapsed && hasValueChanged) || isComplete) {
             _lastUpdateTime[slot] = now;
+            _currentValue[slot] = value;
             const updateCb = _onUpdate[slot];
             CallbackHandler.invoke(updateCb, value, undefined, undefined, undefined, logging, 'onUpdate');
         }
@@ -373,7 +389,7 @@ export namespace Animations {
         Transitions.calculateSpring(
             _currentValue[slot],
             target,
-            _velocity[slot],
+            _velocityOrDurationMs[slot],
             dtSec,
             _stiffnessOrDeceleration[slot],
             _damping[slot],
@@ -381,14 +397,14 @@ export namespace Animations {
         );
 
         _currentValue[slot] = _springScratch.value;
-        _velocity[slot] = _springScratch.velocity;
+        _velocityOrDurationMs[slot] = _springScratch.velocity;
 
         const isSettled =
             Math.abs(_springScratch.value - target) <= precision && Math.abs(_springScratch.velocity) <= precision;
 
         if (isSettled) {
             _currentValue[slot] = target;
-            _velocity[slot] = 0;
+            _velocityOrDurationMs[slot] = 0;
         }
 
         const minDelta = _minUpdateDeltaMs[slot];
@@ -418,19 +434,19 @@ export namespace Animations {
 
         Transitions.calculateDecay(
             _currentValue[slot],
-            _velocity[slot],
+            _velocityOrDurationMs[slot],
             dtSec,
             _stiffnessOrDeceleration[slot],
             _decayScratch
         );
 
         _currentValue[slot] = _decayScratch.value;
-        _velocity[slot] = _decayScratch.velocity;
+        _velocityOrDurationMs[slot] = _decayScratch.velocity;
 
         const isSettled = Math.abs(_decayScratch.velocity) <= _precision[slot];
 
         if (isSettled) {
-            _velocity[slot] = 0;
+            _velocityOrDurationMs[slot] = 0;
         }
 
         const minDelta = _minUpdateDeltaMs[slot];
@@ -497,10 +513,10 @@ export namespace Animations {
         _from[slot] = config.from;
         _to[slot] = config.to;
         _currentValue[slot] = config.from;
-        _velocity[slot] = 0;
+        _velocityOrDurationMs[slot] = Math.max(0, config.duration);
         _stiffnessOrDeceleration[slot] = 0;
         _damping[slot] = 0;
-        _durationMs[slot] = Math.max(0, config.duration);
+        _precision[slot] = Math.max(0, config.precision ?? 0);
         _delayMs[slot] = Math.max(0, config.delayMs ?? 0);
         _accumulatedMs[slot] = 0;
         _lastResumeTime[slot] = getUptime();
@@ -531,7 +547,7 @@ export namespace Animations {
         _from[slot] = config.from;
         _to[slot] = config.to;
         _currentValue[slot] = config.from;
-        _velocity[slot] = config.velocity ?? 0;
+        _velocityOrDurationMs[slot] = config.velocity ?? 0;
         _stiffnessOrDeceleration[slot] = config.stiffness ?? 170;
         _damping[slot] = config.damping ?? 26;
         _precision[slot] = config.precision ?? 0.001;
@@ -565,7 +581,7 @@ export namespace Animations {
         _from[slot] = config.from;
         _to[slot] = 0;
         _currentValue[slot] = config.from;
-        _velocity[slot] = config.velocity;
+        _velocityOrDurationMs[slot] = config.velocity;
         _stiffnessOrDeceleration[slot] = config.deceleration ?? 0.997;
         _damping[slot] = 0;
         _precision[slot] = config.precision ?? 0.01;
