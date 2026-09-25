@@ -4,72 +4,112 @@ export declare namespace Raycast {
     /**
      * A re-export of the `Logging.LogLevel` enum.
      */
-    export const LogLevel: typeof Logging.LogLevel;
+    const LogLevel: typeof Logging.LogLevel;
     /**
-     * Attaches a logger and defines a minimum log level and whether to include the runtime error in the log.
-     * @param log - The logger function to use. Pass undefined to disable logging.
+     * Attaches a logger and defines a minimum log level and whether to attempt to append a string form of the error to
+     * the text of the log message.
+     * @param log - The logger function: `(formattedText, error?) => void | Promise<void>`. `error` is the same value
+     *              passed to `log()` (if any), for inspection (e.g. `instanceof Error`, `stack`). `formattedText` may
+     *              also include ` - Error: …` when `includeRawError` is true.
      * @param logLevel - The minimum log level to use.
-     * @param includeRawError - Whether to include the runtime error in the log.
+     * @param includeRawError - When true and `log()` receives an error, attempts to append a string form of the error
+     *                          to the text of the log message.
      */
-    export function setLogging(
-        log?: (text: string) => Promise<void> | void,
+    function setLogging(
+        log?: (text: string, error?: unknown) => Promise<void> | void,
         logLevel?: Logging.LogLevel,
         includeRawError?: boolean
     ): void;
     /**
      * A re-export of the `Vectors.Vector3` type.
      */
-    export type Vector3 = Vectors.Vector3;
+    type Vector3 = Vectors.Vector3;
     /**
-     * A callback function type for ray hits.
+     * A callback function type for ray hits or misses.
+     * @param hit - True if the ray struck geometry, false if missed or timed out.
+     * @param hitPoint - The intersection point (defined when hit is true).
+     * @param hitNormal - The surface normal at the intersection (defined when hit is true).
      */
-    export type HitCallback<T extends mod.Vector | Vector3> = (hitPoint: T, hitNormal: T) => Promise<void> | void;
+    type RaycastCallback = (hit: boolean, hitPoint?: Vector3, hitNormal?: Vector3) => Promise<void> | void;
     /**
-     * A callback function type for ray misses.
+     * Options for raycast dispatch and lifecycle management.
      */
-    export type MissCallback = () => Promise<void> | void;
+    interface CastOptions {
+        /** Request priority level (default: Priority.Standard). */
+        priority?: Priority;
+        /** Maximum age in server ticks before this request is automatically dropped if not yet dispatched. */
+        maxAgeTicks?: number;
+        /** Maximum age in milliseconds before this request is automatically dropped if not yet dispatched. */
+        timeoutMs?: number;
+    }
     /**
-     * A callback object type for the `cast()` method. Must have Hit (Miss optional) or Miss (Hit optional).
+     * Unique generation-encoded identifier for an enqueued or in-flight raycast request.
      */
-    export type Callbacks<T extends mod.Vector | Vector3> =
-        | {
-              onHit: HitCallback<T>;
-              onMiss?: MissCallback;
-          }
-        | {
-              onHit?: HitCallback<T>;
-              onMiss: MissCallback;
-          };
-    type PendingRay = {
-        start: Vector3;
-        end: Vector3;
-        totalDistance: number;
-        timestamp: number;
-        nativeVectorReturn: boolean;
-        onHit?: HitCallback<mod.Vector | Vector3>;
-        onMiss?: MissCallback;
+    type RaycastID = number & {
+        readonly __brand: 'RaycastID';
     };
-    type PlayerState = {
-        pendingMisses: number;
-        rays: Map<number, PendingRay>;
-    };
-    export function cast(player: mod.Player, start: Vector3, end: Vector3, callbacks: Callbacks<Vector3>): void;
-    export function cast(
-        player: mod.Player,
-        start: mod.Vector,
-        end: mod.Vector,
-        callbacks: Callbacks<mod.Vector>
-    ): void;
     /**
-     * Used when a player leaves to clean up memory leaks by pruning all player states, like a Garbage Collector.
-     * You can hook this into the global `OnPlayerLeaveGame` event, but it will already be called automatically every
-     * `PRUNE_INTERVAL_MS`.
+     * Constant representing an invalid/unallocated RaycastID.
      */
-    export function pruneAllStates(): void;
+    const INVALID_RAYCAST_ID: RaycastID;
     /**
-     * Prunes a single player's state. Used during 'cast' to keep the active player's logic clean.
-     * @param state - The player state to prune.
+     * Priority levels for raycast requests.
      */
-    export function prunePlayerState(state: PlayerState): void;
-    export {};
+    const enum Priority {
+        /** Immediate player actions: weapon hitscans, grapple hooks, instant melee (front of queue). */
+        Critical = 0,
+        /** Time-sensitive simulation: dynamic physics collision sweeps, terrain probes, anti-tunneling. */
+        Physics = 1,
+        /** Default: general gameplay scripts, placement previews, custom trigger logic, line-of-sight. */
+        Standard = 2,
+        /** Low-urgency background tasks: distant AI perception, audio occlusion probes, cosmetic FX. */
+        Ambient = 3,
+    }
+    /**
+     * Casts a ray with a unified callback `(hit, hitPoint?, hitNormal?) => void`.
+     * Requests are queued and dispatched across available worker slots strictly in priority order
+     * (`Critical` -> `Physics` -> `Standard` -> `Ambient`).
+     * @param start - The start position of the ray.
+     * @param end - The end position of the ray.
+     * @param callback - The callback invoked upon hit, miss, or timeout.
+     * @param options - Optional priority level, maxAgeTicks, or timeoutMs.
+     * @returns The unique RaycastID handle, or null if rejected.
+     */
+    function cast(start: Vector3, end: Vector3, callback: RaycastCallback, options?: CastOptions): RaycastID | null;
+    /**
+     * Updates the start and end coordinates (and optional deadline options) of an enqueued raycast in-place.
+     * Preserves the ray's priority position in the queue.
+     * @param id - The RaycastID to update.
+     * @param start - The new start coordinate vector.
+     * @param end - The new end coordinate vector.
+     * @param options - Optional updated timeout/expiry options (calculated relative to current tick/time).
+     * @returns True if successfully updated in the queue, false if invalid, completed, or already in flight.
+     */
+    function update(id: RaycastID, start: Vector3, end: Vector3, options?: CastOptions): boolean;
+    /**
+     * Cancels an enqueued or in-flight raycast request.
+     * If the ray is still in the queue, it is dropped so native `mod.RayCast` is skipped.
+     * If the ray is already in-flight in the native engine, its callback is suppressed upon resolution.
+     * @param id - The RaycastID to cancel.
+     * @returns True if the raycast was successfully marked canceled, false if invalid or already completed.
+     */
+    function cancel(id: RaycastID): boolean;
+    /**
+     * Checks whether a RaycastID is currently active (either waiting in queue or in-flight on a worker slot).
+     * Returns false if the request has completed, was canceled, expired, or was never allocated.
+     * @param id - The RaycastID to query.
+     * @returns True if active, false otherwise.
+     */
+    function isActive(id: RaycastID): boolean;
+    /**
+     * Gets the number of currently queued raycast requests (globally or for a specific priority).
+     * @param priority - Optional priority level to query. If omitted, returns total across all priority levels.
+     * @returns The number of queued raycasts awaiting dispatch.
+     */
+    function getPendingRayCount(priority?: Priority): number;
+    /**
+     * Gets the number of currently in-flight raycast requests.
+     * @returns The number of dispatched raycasts awaiting physics engine resolution.
+     */
+    function getInFlightRayCount(): number;
 }

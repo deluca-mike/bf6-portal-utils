@@ -2,7 +2,9 @@
 
 <ai>
 
-The `PerformanceStats` namespace tracks server tick rate and script timeout lag and exposes getters suitable for real-time compute scaling or displaying smoothed metrics in a UI. When the game mode starts, it subscribes to `Events.OngoingGlobal` to measure inter-tick timing and starts a 1-second sampling window to compute smoothed tick rate (Hz) and lag (ms). When the server is under stress—e.g. timeout lag spikes over 100ms or tick rate drops below 25Hz—it logs warnings via the configured logger so you can see spikes in the UI or logs without polling raw values yourself.
+The `PerformanceStats` namespace tracks server tick rate and script timeout lag and exposes getters suitable for real-time compute scaling or displaying smoothed metrics in a UI. When the game mode starts, it subscribes to `Events.OnTickStart` to record timestamps at the very beginning of each frame for accurate inter-tick delta calculations and starts a 1-second sampling window to compute smoothed tick rate (Hz) and lag (ms). When the server is under stress—e.g. timeout lag spikes over 100ms or tick rate drops below 25Hz—it logs warnings via the configured logger so you can see spikes in the UI or logs without polling raw values yourself.
+
+> **Note:** Since this module imports and relies on `Events`, **you must use the `Events` module as your only mechanism to subscribe to game events**—do not implement or export any Battlefield Portal event handler functions in your own code. See the [Events module](../events/README.md#known-limitations--caveats).
 
 </ai>
 
@@ -58,11 +60,11 @@ Events.OngoingPlayer.subscribe((player: mod.Player) => {
 
 ## Core Concepts
 
-- **Automatic start** – When the game mode starts, the module subscribes to `Events.OngoingGlobal` and starts a 1-second measurement loop. No explicit “start” call is required.
+- **Automatic start** – When the game mode starts, the module subscribes to `Events.OnTickStart` and starts a 1-second measurement loop. No explicit “start” call is required.
 - **Two layers of metrics** – **Spot** values (last-tick delta, updated every tick) are for real-time compute scaling. **Smoothed** values (EMA over 1s windows) are for stable UI display.
 - **Target cadence** – The module assumes a 30Hz server tick; smoothed Hz and health factor are interpreted relative to that target.
 - **Spike warnings** – When script lag over a 1s window exceeds 100ms, or when tick rate drops below 25Hz, the module logs a warning at the configured log level so you can surface spikes in the UI or logs.
-- **Events dependency** – The module uses the Events module for `OngoingGlobal` and the Timers module for the measurement loop. Use the Events module for all game event subscription; do not implement or export Portal event handlers yourself.
+- **Events dependency** – The module uses the Events module for `OnTickStart` and the Timers module for the measurement loop. Use the Events module for all game event subscription; do not implement or export Portal event handlers yourself.
 
 ---
 
@@ -89,7 +91,7 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 | Method | Description |
 | --- | --- |
-| `setLogging(log?: (text: string) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging module documentation](../logging/README.md). |
+| `setLogging(log?: (text: string, error?: unknown) => Promise<void> \| void, logLevel?: LogLevel, includeRawError?: boolean): void` | Attaches a logger and sets the minimum log level and whether to include the runtime error in logs. Used for spike warnings and the “Monitoring started.” message. Pass `undefined` for `log` to disable logging. Default log level is `Warning`, default `includeRawError` is `false`. See the [Logging module documentation](../logging/README.md). |
 | `getSmoothedTickRate(): number` | Returns the smoothed server tick rate (Hz). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSmoothedTimeoutLagMs(): number` | Returns the smoothed script lag (ms) over the 1s sampling window (how late the window callback ran vs the expected 1s). Updated every second using an exponential moving average. Suitable for displaying in a UI. |
 | `getSpotDeltaMs(): number` | Returns the raw delta time (ms) between the last two `OngoingGlobal` ticks (somewhat analogous to SFT when above ~33ms). Use for real-time compute scaling (e.g. scaling work per tick). |
@@ -108,9 +110,9 @@ For more details, see the [Logging module documentation](../logging/README.md).
 
 ## How It Works
 
-1. **Tick tracking** – The module subscribes to `Events.OnGameModeStarted` at load time; when the game mode starts, it subscribes to `Events.OngoingGlobal`. In that handler it records the current time and computes `currentTickDeltaMs` (time since the previous tick) and increments a tick counter. Subscribing early ensures the handler runs near the engine’s tick cadence.
+1. **Tick tracking** – The module subscribes to `Events.OnGameModeStarted` at load time; when the game mode starts, it subscribes to `Events.OnTickStart`. In that handler it records the current time and computes `currentTickDeltaMs` (time since the previous tick) and increments a tick counter. Subscribing early ensures the handler runs near the engine’s tick cadence.
 
-2. **Window loop** – A recurring 1-second timeout (`Timers.setTimeout(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
+2. **Window loop** – A recurring 1-second interval (`Timers.setInterval(measureTimeoutLag, SAMPLE_RATE_MS)`) runs `measureTimeoutLag`. In each run it:
     - Computes raw server tick rate and raw timeout lag.
     - Updates smoothed values with an exponential moving average (smoothing factor 0.3).
     - Logs a warning if raw timeout lag &gt; 100ms or raw server tick rate &lt; 25.

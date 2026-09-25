@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>BF6 Portal - Pixel Art Studio & Inspector</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+    
+    </head>
+    <body>
+        <header>
+            <div class="header-left">
+                <a href="../" class="back-link">← Tools</a>
+                <div class="brand">
+                    <span class="brand-badge">BF6 PORTAL</span>
+                    <span class="brand-title">Pixel Art Studio & Inspector</span>
+                </div>
+            </div>
+            <div class="header-subtitle">
+                Painter's Algorithm 2D Rectilinear Optimization
+            </div>
+        </header>
+
+        <div class="app-container">
+            <!-- Sidebar Controls -->
+            <aside class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Source Image</span>
+                </div>
+
+                <!-- Drag and drop zone -->
+                <div class="dropzone" id="dropzone">
+                    <div class="dropzone-icon">🖼️</div>
+                    <div class="dropzone-text">Drag & drop PNG image here</div>
+                    <div class="dropzone-subtext">or click to browse files</div>
+                    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" style="display: none" />
+                </div>
+
+                <div class="panel-header">
+                    <span class="panel-title">Fidelity Tuning</span>
+                </div>
+
+                <!-- Target Scale / Grid Resolution -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Target Grid Resolution</span>
+                        <span class="control-value" id="grid-size-label">32 x 32</span>
+                    </div>
+                    <input type="range" id="scale-slider" min="8" max="256" step="8" value="32" />
+                </div>
+
+                <!-- Palette Quantization Algorithm -->
+                <div class="control-group" id="algo-control-group">
+                    <div class="control-label">
+                        <span>Palette Quantization</span>
+                    </div>
+                    <div class="algo-btn-group" id="algo-btn-group">
+                        <button
+                            class="btn active"
+                            id="algo-median-cut-btn"
+                            data-algo="median-cut"
+                            title="Median Cut Box Clustering"
+                        >
+                            Median Cut
+                        </button>
+                        <button
+                            class="btn"
+                            id="algo-most-frequent-btn"
+                            data-algo="most-frequent"
+                            title="Top N Most Frequent Colors"
+                        >
+                            Most Frequent
+                        </button>
+                        <button
+                            class="btn"
+                            id="algo-user-defined-btn"
+                            data-algo="user-defined"
+                            title="Custom User Palette & Eyedropper"
+                        >
+                            User Defined
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Max Colors / Max Alphas -->
+                <div class="control-group" id="max-colors-group">
+                    <div class="control-label">
+                        <span id="max-colors-title">Max Colors</span>
+                        <span class="control-value" id="max-colors-label">32</span>
+                    </div>
+                    <input type="range" id="colors-slider" min="1" max="64" step="1" value="32" />
+                </div>
+
+                <!-- Monochrome Toggle -->
+                <div class="toggle-group">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500"
+                        >Monochrome Mode</span
+                    >
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="monochrome-toggle" />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Opacity Toggle -->
+                <div class="toggle-group">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500"
+                        >Support Opacity (Alpha)</span
+                    >
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="opacity-toggle" checked />
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Alpha Threshold Slider -->
+                <div class="control-group" id="alpha-threshold-group">
+                    <div class="control-label">
+                        <span>Alpha Cutout Threshold</span>
+                        <span class="control-value" id="alpha-threshold-label">1</span>
+                    </div>
+                    <input type="range" id="alpha-threshold-slider" min="1" max="255" step="1" value="1" />
+                </div>
+
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center">
+                    <span class="panel-title">Encoded Payload</span>
+                    <div style="display: flex; gap: 4px">
+                        <button class="btn active" id="format-b64-btn" style="padding: 2px 8px; font-size: 0.72rem">
+                            Base64
+                        </button>
+                        <button class="btn" id="format-b122-btn" style="padding: 2px 8px; font-size: 0.72rem">
+                            Base122
+                        </button>
+                    </div>
+                </div>
+
+                <textarea id="payload-input" placeholder="Paste Base122 or Base64 encoded payload here..."></textarea>
+
+                <div class="btn-row">
+                    <button class="btn btn-primary" id="copy-payload-btn">📋 Copy Payload</button>
+                    <button class="btn" id="copy-ts-btn">📦 Copy TS Code</button>
+                </div>
+
+                <!-- Palette Preview & Editor -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Quantized Palette</span>
+                        <span class="control-value" id="palette-count-label">0 colors</span>
+                    </div>
+
+                    <!-- User Defined Palette Toolbar -->
+                    <div class="palette-toolbar" id="user-palette-toolbar" style="display: none">
+                        <button
+                            class="palette-tool-btn active"
+                            id="eyedropper-btn"
+                            title="Click on the Original Source image to sample/assign colors"
+                        >
+                            🎯 Eyedropper: On
+                        </button>
+                        <div style="display: flex; gap: 4px">
+                            <button class="palette-tool-btn" id="add-color-btn" title="Add a new color to palette">
+                                ➕ Add
+                            </button>
+                            <button
+                                class="palette-tool-btn"
+                                id="sort-palette-btn"
+                                title="Sort palette colors by Oklab ΔE (Perceptual 3D Hilbert Curve)"
+                            >
+                                🎨 Sort
+                            </button>
+                        </div>
+                        <input
+                            type="color"
+                            id="hidden-color-picker"
+                            style="
+                                position: fixed;
+                                opacity: 0;
+                                width: 0;
+                                height: 0;
+                                pointer-events: none;
+                                border: none;
+                                padding: 0;
+                            "
+                        />
+                    </div>
+
+                    <div class="palette-container" id="palette-container"></div>
+                </div>
+            </aside>
+
+            <!-- Main Workspace -->
+            <main class="workspace">
+                <!-- Stats Dashboard -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Grid Dimensions</span>
+                        <span class="stat-value" id="stat-dims">0 x 0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">UI Draw Calls</span>
+                        <span class="stat-value" id="stat-drawcalls">0</span>
+                        <span class="stat-reduction" id="stat-reduction">0% reduction</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Payload Size</span>
+                        <span class="stat-value" id="stat-bytes">0 B</span>
+                        <span class="stat-reduction" id="stat-chars">0 chars</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Coordinate Precision</span>
+                        <span class="stat-value" id="stat-precision">8-bit</span>
+                    </div>
+                </div>
+
+                <!-- Side-by-side Canvases -->
+                <div class="comparison-container">
+                    <div class="canvas-card">
+                        <div class="canvas-header">
+                            <span class="canvas-title">Original Source</span>
+                            <span class="canvas-badge" id="original-dim-badge">0 x 0</span>
+                        </div>
+                        <div class="canvas-viewport">
+                            <canvas id="canvas-original"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="canvas-card">
+                        <div class="canvas-header">
+                            <div style="display: flex; align-items: center; gap: 0.6rem">
+                                <span class="canvas-title">Decoded Pixel Art</span>
+                                <button
+                                    class="zoom-toggle-btn active"
+                                    id="zoom-toggle-btn"
+                                    title="Toggle between matched original size and 1:1 pixel art grid"
+                                >
+                                    🔍 Match Original Size
+                                </button>
+                            </div>
+                            <span class="canvas-badge" id="reconstructed-dim-badge">0 x 0</span>
+                        </div>
+                        <div class="canvas-viewport">
+                            <canvas id="canvas-reconstructed"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playback / Painter Step Scrubber -->
+                <div class="playback-bar">
+                    <button class="playback-play-btn" id="play-btn">▶</button>
+                    <div class="playback-slider-container">
+                        <div class="control-label">
+                            <span>Painter's Algorithm Draw Step</span>
+                            <span class="control-value" id="step-label">0 / 0</span>
+                        </div>
+                        <input type="range" id="step-slider" min="0" max="0" value="0" />
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div class="toast" id="toast">Copied to clipboard!</div>
+        <div class="swatch-tooltip" id="swatch-tooltip"></div>
+
+        <!-- Single Source of Truth: Core Encoder Library -->
+        <script src="pixel-art-encoder.js"></script>
+
+        <script src="app.js"></script>
+    
+    </body>
+</html>

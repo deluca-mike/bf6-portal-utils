@@ -31,16 +31,23 @@ export default [
             'no-prototype-builtins': 'warn', // Access Object.prototype method 'hasOwnProperty'
             'no-empty': 'warn', // Empty block statement
             'no-debugger': 'warn', // Unexpected 'debugger' statement
-            'jsdoc/require-jsdoc': ['warn', { publicOnly: true }],
+            'jsdoc/require-jsdoc': [
+                'warn',
+                {
+                    publicOnly: true,
+                    exemptOverloadedImplementations: true,
+                },
+            ],
             'jsdoc/require-returns': [
                 'warn',
                 {
-                    checkTypesWhenNoReturn: false,
+                    forceRequireReturn: false,
+                    exemptedBy: ['void'],
                 },
             ],
         },
     },
     {
-        ignores: ['node_modules/**', '**/*.d.ts'],
+        ignores: ['node_modules/**', '**/*.d.ts', 'pages/**/*.js'],
     },
 ];

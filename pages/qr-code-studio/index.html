@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>BF6 Portal - UIQRCode Studio & Inspector</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <!-- Standalone jsQR decoder for instantaneous in-browser scan verification -->
+        <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    </head>
+    <body>
+        <header>
+            <div class="header-left">
+                <a href="../" class="back-link">← Tools</a>
+                <div class="brand">
+                    <span class="brand-badge">BF6 PORTAL</span>
+                    <span class="brand-title">UIQRCode Studio & Inspector</span>
+                </div>
+            </div>
+            <div class="header-subtitle">
+                Greedy Rectilinear Optimization
+            </div>
+        </header>
+
+        <div class="container">
+            <!-- Sidebar Controls -->
+            <aside class="sidebar">
+                <!-- Payload Settings -->
+                <div class="card">
+                    <div class="card-title">📝 Payload & Error Correction</div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="qrText">Text / URL Payload</label>
+                        <textarea id="qrText">https://portal.battlefield.com/join?matchId=BF6-987654</textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Presets</label>
+                        <div class="presets">
+                            <button
+                                class="preset-btn"
+                                data-preset="https://portal.battlefield.com/play?matchId=987654321&mode=conquest"
+                            >
+                                BF6 Match URL
+                            </button>
+                            <button class="preset-btn" data-preset="https://discord.gg/battlefield-portal">
+                                Discord Invite
+                            </button>
+                            <button class="preset-btn" data-preset="HELLO WORLD">Short String</button>
+                            <button class="preset-btn" data-preset="1234567890123456789012345678901234567890">
+                                Numeric 40-digit
+                            </button>
+                            <button class="preset-btn" data-preset-repeat="A:180">High Density (V10)</button>
+                            <button
+                                class="preset-btn"
+                                data-preset="ABC xyz 123 !@#$%^&*()_+-=[]{}|;:,.<>?/~`'&#34;\\"
+                            >
+                                Special Characters
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="eccSelect">Error Correction (ECC)</label>
+                        <select id="eccSelect">
+                            <option value="L">Low (L - 7% Recovery)</option>
+                            <option value="M" selected>Medium (M - 15% Recovery)</option>
+                            <option value="Q">Quartile (Q - 25% Recovery)</option>
+                            <option value="H">High (H - 30% Recovery)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Sizing & Canvas Layout -->
+                <div class="card">
+                    <div class="card-title">📐 Scale & Margins</div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="scaleRange">
+                            Scale Multiplier
+                            <span class="value-pill" id="scaleVal">1.0x (10px/mod)</span>
+                        </label>
+                        <input type="range" id="scaleRange" min="0.3" max="3.0" step="0.1" value="1.0" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="marginRange">
+                            Quiet Zone Margin
+                            <span class="value-pill" id="marginVal">4 modules</span>
+                        </label>
+                        <input type="range" id="marginRange" min="4" max="10" step="1" value="4" />
+                    </div>
+                </div>
+
+                <!-- Color Styling -->
+                <div class="card">
+                    <div class="card-title">🎨 Colors & Opacity</div>
+
+                    <div class="row-2">
+                        <div class="form-group">
+                            <label class="form-label" for="darkColor">Dark Modules</label>
+                            <div class="color-picker-row">
+                                <input type="color" id="darkColor" value="#000000" />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="lightColor">Light Canvas</label>
+                            <div class="color-picker-row">
+                                <input type="color" id="lightColor" value="#ffffff" />
+                                <input
+                                    type="range"
+                                    id="lightAlpha"
+                                    min="0.1"
+                                    max="1"
+                                    step="0.05"
+                                    value="1.0"
+                                    title="Light Alpha"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Snippet Box -->
+                <div class="code-card">
+                    <div class="code-header">
+                        <span class="code-title">💻 Generated Mod Code</span>
+                        <button class="copy-btn" id="copyCodeBtn">📋 Copy</button>
+                    </div>
+                    <pre class="code-block" id="codeSnippet"></pre>
+                </div>
+            </aside>
+
+            <!-- Main Viewport -->
+            <main class="main-viewport">
+                <!-- Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-card version">
+                        <div class="metric-label">QR Version & Size</div>
+                        <div class="metric-value" id="metricVersion">V1 (21×21)</div>
+                        <div class="metric-sub" id="metricPixels">210 × 210 px</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Native Draw Calls</div>
+                        <div class="metric-value" id="metricDrawCalls">--</div>
+                        <div class="metric-sub" id="metricNaiveDiff">vs -- naive calls</div>
+                    </div>
+
+                    <div class="metric-card savings">
+                        <div class="metric-label">Draw Call Reduction</div>
+                        <div class="metric-value" id="metricSavings" style="color: var(--accent-green-bright)">--%</div>
+                        <div class="metric-sub">Greedy Rectilinear Merging</div>
+                    </div>
+
+                    <div class="metric-card payload">
+                        <div class="metric-label">Payload Size</div>
+                        <div class="metric-value" id="metricPayloadBytes" style="color: var(--accent-purple)">--</div>
+                        <div class="metric-sub" id="metricPayloadChars">-- characters</div>
+                    </div>
+                </div>
+
+                <!-- Canvas Stage -->
+                <div class="stage-card">
+                    <div class="stage-toolbar">
+                        <div class="toggle-group">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="inspectCheckbox" />
+                                <span>Highlight Draw Call Rectangles</span>
+                            </label>
+                            <label class="toggle-label">
+                                <input type="checkbox" id="stepByStepCheckbox" />
+                                <span>Step-by-Step Playback</span>
+                            </label>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-dim)">
+                            Z-Index Stack:
+                            <span style="color: var(--accent-cyan); font-family: var(--font-mono)">
+                                Base Container → QR Container → Child Rectangles
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Playback Slider Bar -->
+                    <div class="playback-bar hidden" id="playbackBar">
+                        <label class="form-label" style="margin: 0; min-width: 140px">
+                            Render Step: <span class="value-pill" id="currentStepPill">1 / 1</span>
+                        </label>
+                        <input type="range" id="playbackSlider" min="1" max="1" value="1" style="flex: 1" />
+                    </div>
+
+                    <!-- Live Canvas -->
+                    <div class="canvas-wrapper">
+                        <canvas id="qrCanvas"></canvas>
+                    </div>
+
+                    <!-- Decoder Status Bar -->
+                    <div class="decode-status-box" id="decodeStatusBox">
+                        <div>
+                            <strong>🔍 Scannable Verification:</strong>
+                            <span id="decodeStatusText">Validating matrix decode...</span>
+                        </div>
+                        <code id="decodePayloadCode">--</code>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <div class="toast" id="toast">Copied to clipboard!</div>
+
+        <!-- Single Source of Truth: Core QR Encoder & Merging Library -->
+        <script src="qr-code-encoder.js"></script>
+
+        <!-- Application UI Controller -->
+        <script src="app.js"></script>
+    </body>
+</html>

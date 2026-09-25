@@ -3,13 +3,11 @@ import { UIContentButton } from '../content-button/index.ts';
 import { UIButton } from '../button/index.ts';
 import { UIGadgetImage } from '../gadget-image/index.ts';
 
-// version: 1.0.2
+// version: 10.0.0
 export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
-    // UIGadgetImage properties (delegated via delegateProperties)
-    declare public gadget: mod.Gadgets;
-
-    // UIGadgetImage setter methods (delegated via delegateProperties)
-    declare public setGadget: (gadget: mod.Gadgets) => this;
+    private static readonly _scratchGadgetParams: UIGadgetImage.Params = {
+        gadget: null as unknown as mod.Gadgets,
+    };
 
     /**
      * Creates a new gadget image button.
@@ -17,18 +15,30 @@ export class UIGadgetImageButton extends UIContentButton<UIGadgetImage> {
      */
     public constructor(params: UIGadgetImageButton.Params) {
         const createContent = (parent: UI.Parent, width: number, height: number): UIGadgetImage => {
-            const gadgetImageParams: UIGadgetImage.Params = {
-                parent,
-                width,
-                height,
-                gadget: params.gadget,
-                depth: params.depth,
-            };
+            const scratch = UIGadgetImageButton._scratchGadgetParams;
+            scratch.parent = parent;
+            scratch.width = width;
+            scratch.height = height;
+            scratch.gadget = params.gadget;
+            scratch.depth = params.depth;
 
-            return new UIGadgetImage(gadgetImageParams);
+            const gadgetImage = new UIGadgetImage(scratch);
+
+            scratch.parent = undefined;
+            scratch.gadget = null as unknown as mod.Gadgets;
+
+            return gadgetImage;
         };
 
-        super(params, createContent, ['gadget'] as readonly string[]);
+        super(params, createContent);
+    }
+
+    /**
+     * The gadget of the gadget image button, or undefined if deleted.
+     * @returns The gadget, or undefined if deleted.
+     */
+    public get gadget(): mod.Gadgets | undefined {
+        return this._isValid ? this.content?.gadget : undefined;
     }
 }
 

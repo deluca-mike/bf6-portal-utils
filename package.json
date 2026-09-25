@@ -1,18 +1,61 @@
 {
     "name": "bf6-portal-utils",
-    "version": "9.4.0",
+    "version": "10.0.0",
     "type": "module",
     "description": "Battlefield 6 Portal Utils",
     "engines": {
         "node": ">=24.0.0"
     },
     "scripts": {
-        "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}'",
+        "test": "vitest run --exclude '**/*memory.test.ts' --exclude '**/*matrix.test.ts'",
+        "test:matrix": "vitest run tests/encode-pixel-art-matrix.test.ts",
+        "test:memory": "vitest run memory.test.ts",
+        "prettier": "prettier --no-error-on-unmatched-pattern --write '**/*.{js,json,md,mjs,ts}' --log-level warn",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
+        "build:strings": "node scripts/build-logger-strings.ts && npm run prettier",
+        "build:viewer": "node scripts/bundle-viewer-encoder.ts && npm run prettier",
+        "serve:viewer": "npm run build:viewer && node scripts/serve-viewer.ts",
         "build:types": "tsc --project tsconfig.build.json && npm run prettier",
-        "publish:npm": "npm run build:types && npm publish --access public"
+        "publish:npm": "npm run build:strings && npm run build:viewer && npm run build:types && npm publish --access public"
     },
+    "files": [
+        "README.md",
+        "animations/",
+        "benchmarker/",
+        "callback-handler/",
+        "clocks/",
+        "colors/",
+        "events/",
+        "ffa-drop-ins/",
+        "ffa-spawn-points/",
+        "interleaved-quaternions/",
+        "interleaved-vectors/",
+        "logger/",
+        "logging/",
+        "map-detector/",
+        "mod-extensions/",
+        "multi-click-detector/",
+        "performance-stats/",
+        "player-locations/",
+        "player-undeploy-fixer/",
+        "portal-gadget/",
+        "quaternions/",
+        "raycast/",
+        "scavenger-drop/",
+        "solid/",
+        "sounds/",
+        "spatial/",
+        "timelines/",
+        "timers/",
+        "transitions/",
+        "ui/",
+        "vectors/",
+        "scripts/encode-pixel-art.ts",
+        "scripts/encode-qr-code.ts",
+        "!**/tests",
+        "!**/tests/**"
+    ],
     "repository": {
         "type": "git",
         "url": "git+https://github.com/deluca-mike/bf6-portal-utils.git"
@@ -25,16 +68,21 @@
     "homepage": "https://github.com/deluca-mike/bf6-portal-utils#readme",
     "devDependencies": {
         "@types/node": "^25.3.0",
+        "@types/pngjs": "^6.0.5",
         "@typescript-eslint/eslint-plugin": "^8.56.0",
         "@typescript-eslint/parser": "^8.56.0",
-        "bf6-portal-mod-types": "^4.1.0",
+        "bf6-portal-mod-types": "^4.3.0",
         "eslint": "^9.39.2",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-jsdoc": "^62.6.0",
         "eslint-plugin-prettier": "^5.5.5",
+        "jsqr": "^1.4.0",
+        "pngjs": "^7.0.0",
         "prettier": "^3.8.1",
+        "quickjs-emscripten": "^0.32.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.56.0"
+        "typescript-eslint": "^8.56.0",
+        "vitest": "^4.1.11"
     }
 }
